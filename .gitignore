@@ -1,0 +1,25 @@
+# dependências
+node_modules/
+
+# build
+.nuxt/
+.output/
+dist/
+.vercel/
+
+# segredos — entram antes de existir qualquer segredo para vazar
+.env
+.env.*
+!.env.example
+
+# cache do crawl da PokeAPI (a saída em public/data/ é commitada)
+.cache/pokeapi/
+
+# testes
+coverage/
+test-results/
+playwright-report/
+
+# sistema
+.DS_Store
+*.log
