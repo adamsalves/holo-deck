@@ -12,10 +12,13 @@
   /* Ainda sem consumidor na Fase 0: é a superfície elevada da escala aprovada,
      semeada aqui para o resto da escada nascer coerente na Fase 2. */
   --color-ink-880: #0F121D;
-  /* Era #414A6B, que dá 2.23:1 sobre ink-950 e reprova o AA da WCAG (mínimo
-     4.5:1 para texto normal) — abaixo até do limiar de 3:1 de texto grande.
-     Clareado para 4.55:1 antes de a escala da Fase 2 herdar o valor. */
-  --color-ink-450: #6E7A9C;
+  /* Degrau de SUPERFÍCIE, não de texto. Sobre ink-950 dá 2.23:1, e a escada é
+     monotônica: qualquer valor entre o 500 e o 400 tem teto de 3.34:1, então
+     nenhum ink-450 legível existe. Texto usa ink-300 (abaixo). */
+  --color-ink-450: #414A6B;
+  /* O degrau mais escuro da escada aprovada que passa no AA da WCAG para texto
+     normal: 6.81:1 sobre ink-950. É o que carrega texto secundário. */
+  --color-ink-300: #8E98BC;
 }
 
 :root {
