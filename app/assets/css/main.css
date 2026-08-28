@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/**
+ * Base do tema Holo TCG. A escala completa de tokens — as 18 cores de tipo, as
+ * raridades, a escada de chanfro e a tipografia — entra na Fase 2.
+ *
+ * Regra do sistema: nenhum hex cru fora deste arquivo.
+ */
+@theme static {
+  --color-ink-950: #0B0D14;
+  --color-ink-880: #0F121D;
+  --color-ink-450: #414A6B;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-ink-950);
+}

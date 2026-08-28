@@ -15,6 +15,9 @@ dist/
 # cache do crawl da PokeAPI (a saída em public/data/ é commitada)
 .cache/pokeapi/
 
+# artefatos de typecheck
+*.tsbuildinfo
+
 # testes
 coverage/
 test-results/

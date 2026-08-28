@@ -1,0 +1,59 @@
+name: CI
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Todo push: rápido e sem serviço externo.
+  checks:
+    if: github.event_name == 'push'
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn lint
+
+      - run: yarn typecheck
+
+      - run: yarn test
+
+  # Só em PR: o Playwright sobe a build de produção, e isso é lento demais
+  # para rodar a cada push. Sem banco — os fluxos E2E rodam deslogados, que é
+  # um modo legítimo, já que jogar não exige conta.
+  e2e:
+    if: github.event_name == 'pull_request'
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn playwright install --with-deps chromium
+
+      - run: yarn build
+
+      - run: yarn test:e2e
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
