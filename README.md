@@ -21,11 +21,19 @@ yarn dev
 
 ```bash
 yarn lint        # ESLint 10 flat config, com as regras de tipagem honesta
-yarn typecheck   # vue-tsc sobre app/, server/, shared/ e test/
+yarn typecheck   # vue-tsc sobre app/, shared/, test/ e os configs
 yarn test        # Vitest — unitários, headless
-yarn test:e2e    # Playwright, sobre a build de produção
 yarn build       # saída Nitro em .output/
+yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
+                 # `yarn preview`, que serve .output/
 ```
+
+Os quatro projetos que o `nuxt prepare` gera não cobrem `test/`, `scripts/` nem
+os arquivos de configuração; quem fecha essa lacuna é o
+[`tsconfig.tools.json`](tsconfig.tools.json), referenciado pelo `tsconfig.json`
+da raiz. Ao criar uma pasta nova de TypeScript, o `include` dele, o glob
+type-aware do [`eslint.config.mjs`](eslint.config.mjs) e os aliases do Vitest
+precisam concordar — quando discordam, um portão passa e o outro não.
 
 ## Créditos
 

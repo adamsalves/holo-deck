@@ -9,8 +9,13 @@
  */
 @theme static {
   --color-ink-950: #0B0D14;
+  /* Ainda sem consumidor na Fase 0: é a superfície elevada da escala aprovada,
+     semeada aqui para o resto da escada nascer coerente na Fase 2. */
   --color-ink-880: #0F121D;
-  --color-ink-450: #414A6B;
+  /* Era #414A6B, que dá 2.23:1 sobre ink-950 e reprova o AA da WCAG (mínimo
+     4.5:1 para texto normal) — abaixo até do limiar de 3:1 de texto grande.
+     Clareado para 4.55:1 antes de a escala da Fase 2 herdar o valor. */
+  --color-ink-450: #6E7A9C;
 }
 
 :root {

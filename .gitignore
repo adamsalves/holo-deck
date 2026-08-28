@@ -23,6 +23,11 @@ coverage/
 test-results/
 playwright-report/
 
+# ferramentas locais — só o global do autor ignorava isto, então num clone de
+# outra máquina apareceria como untracked
+.claude/settings.local.json
+.code-review-graph/
+
 # sistema
 .DS_Store
 *.log

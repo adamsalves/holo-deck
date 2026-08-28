@@ -1,15 +1,24 @@
 name: CI
 
-on: [push, pull_request]
+# `pull_request` roda sobre o merge commit — o código como vai ficar em `main`,
+# não como está na branch. O `push` fica restrito a `main` para não duplicar cada
+# run da branch: sem isso, o mesmo commit dispara os dois eventos.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Em `main` cada commit é uma promoção e precisa do próprio resultado; cancelar
+  # deixaria um merge sem CI se dois caíssem seguidos.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Todo push: rápido e sem serviço externo.
   checks:
-    if: github.event_name == 'push'
     name: lint · typecheck · test
     runs-on: ubuntu-latest
     steps:
@@ -28,11 +37,9 @@ jobs:
 
       - run: yarn test
 
-  # Só em PR: o Playwright sobe a build de produção, e isso é lento demais
-  # para rodar a cada push. Sem banco — os fluxos E2E rodam deslogados, que é
-  # um modo legítimo, já que jogar não exige conta.
+  # Sem banco — os fluxos E2E rodam deslogados, que é um modo legítimo, já que
+  # jogar não exige conta.
   e2e:
-    if: github.event_name == 'pull_request'
     name: e2e
     runs-on: ubuntu-latest
     steps:
@@ -51,9 +58,13 @@ jobs:
 
       - run: yarn test:e2e
 
+      # `trace: 'on-first-retry'` grava em test-results/, fora do relatório —
+      # sem as duas pastas, uma falha no CI não deixa nem trace nem report.
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7

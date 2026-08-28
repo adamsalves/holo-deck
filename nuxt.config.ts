@@ -11,7 +11,14 @@ function resolveGitSha(): string {
   if (fromEnv) return fromEnv.slice(0, 7)
 
   try {
-    return execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8' }).trim()
+    // `stdio` explícito porque sem ele o stderr do git é herdado do processo pai:
+    // o catch abaixo pega a exceção, mas um `fatal: not a git repository` já
+    // vazou para a tela. Isso roda no postinstall, então qualquer build sem .git
+    // (Docker COPY, tarball de fonte) assustaria durante o `yarn install`.
+    return execSync('git rev-parse --short=7 HEAD', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
   }
   catch {
     return 'unknown'
@@ -47,6 +54,8 @@ export default defineNuxtConfig({
     },
   },
 
+  // Já é o default no Nuxt 4.5 — fica explícito como pino para a subida ao
+  // Nuxt 5, que muda o default. Hoje não altera comportamento nenhum.
   future: { compatibilityVersion: 4 },
   compatibilityDate: '2026-08-28',
 

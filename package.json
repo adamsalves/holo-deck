@@ -6,8 +6,9 @@
   "description": "Deck battler holográfico sobre o dex da PokeAPI — packs, coleção, deck de 6 e 9 ginásios.",
   "license": "MIT",
   "engines": {
-    "node": "24.x"
+    "node": ">=24.15.0 <25"
   },
+  "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
@@ -19,14 +20,14 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --pass-with-no-tests",
-    "data:build": "node scripts/build-dex.ts"
+    "test:e2e": "playwright test --pass-with-no-tests"
   },
   "dependencies": {
     "@nuxt/ui": "4.11.0",
     "@pinia/nuxt": "1.0.2",
     "nuxt": "4.5.2",
     "pinia": "4.0.3",
+    "tailwindcss": "4.3.3",
     "vue": "3.5.42"
   },
   "devDependencies": {

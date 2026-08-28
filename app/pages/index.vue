@@ -1,7 +1,3 @@
-<script setup lang="ts">
-useHead({ title: 'Holo Deck' })
-</script>
-
 <template>
   <main class="grid min-h-dvh place-items-center bg-ink-950 p-8">
     <div class="flex flex-col items-center gap-3 text-center">

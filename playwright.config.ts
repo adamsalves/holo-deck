@@ -9,7 +9,9 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? 'github' : 'list',
+  // O reporter `github` substitui o html padrão em vez de somar — sozinho, ele
+  // deixa o CI sem relatório e sem trace justo quando um teste falha.
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
 
   use: {
     baseURL,
