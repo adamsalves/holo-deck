@@ -35,6 +35,12 @@ da raiz. Ao criar uma pasta nova de TypeScript, o `include` dele, o glob
 type-aware do [`eslint.config.mjs`](eslint.config.mjs) e os aliases do Vitest
 precisam concordar — quando discordam, um portão passa e o outro não.
 
+## Release
+
+Versionamento e changelog são automáticos, a partir das mensagens de commit. O
+passo a passo — e a regra de merge commit que o processo exige — está no
+[`RELEASE.md`](RELEASE.md).
+
 ## Créditos
 
 Dados e sprites vêm da [PokeAPI](https://pokeapi.co), usada aqui de forma
