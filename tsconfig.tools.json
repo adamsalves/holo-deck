@@ -1,0 +1,31 @@
+{
+  "//": "Quinto projeto da solução: cobre o que os quatro do `nuxt prepare` não enxergam — testes, scripts de build e os arquivos de configuração. Os `paths` repetem os aliases do Nuxt porque sem eles um teste que importa `~~/shared/...` falha aqui e passa no Vitest, com os dois portões discordando.",
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "paths": {
+      "~~/*": ["./*"],
+      "~/*": ["./app/*"],
+      "@@/*": ["./*"],
+      "@/*": ["./app/*"]
+    }
+  },
+  "include": [
+    "test/**/*",
+    "scripts/**/*",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "eslint.config.mjs"
+  ]
+}

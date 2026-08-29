@@ -1,0 +1,30 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/**
+ * Base do tema Holo TCG. A escala completa de tokens — as 18 cores de tipo, as
+ * raridades, a escada de chanfro e a tipografia — entra na Fase 2.
+ *
+ * Regra do sistema: nenhum hex cru fora deste arquivo.
+ */
+@theme static {
+  --color-ink-950: #0B0D14;
+  /* Ainda sem consumidor na Fase 0: é a superfície elevada da escala aprovada,
+     semeada aqui para o resto da escada nascer coerente na Fase 2. */
+  --color-ink-880: #0F121D;
+  /* Degrau de SUPERFÍCIE, não de texto. Sobre ink-950 dá 2.23:1, e a escada é
+     monotônica: qualquer valor entre o 500 e o 400 tem teto de 3.34:1, então
+     nenhum ink-450 legível existe. Texto usa ink-300 (abaixo). */
+  --color-ink-450: #414A6B;
+  /* O degrau mais escuro da escada aprovada que passa no AA da WCAG para texto
+     normal: 6.81:1 sobre ink-950. É o que carrega texto secundário. */
+  --color-ink-300: #8E98BC;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-ink-950);
+}

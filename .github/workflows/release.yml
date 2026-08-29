@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# O GITHUB_TOKEN padrão basta para repositório próprio — não precisa PAT.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # Mantém aberto um PR `chore(main): release X.Y.Z` com CHANGELOG e version
+      # atualizados. Quem decide a release existir é quem mergeia esse PR.
+      #
+      # Pegadinha de repositório, e ela falha de forma opaca: Settings → Actions →
+      # General → "Allow GitHub Actions to create and approve pull requests"
+      # precisa estar ligado, senão o action não consegue abrir o PR.
+      - uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

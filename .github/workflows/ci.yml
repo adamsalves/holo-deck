@@ -1,0 +1,70 @@
+name: CI
+
+# `pull_request` roda sobre o merge commit — o código como vai ficar em `main`,
+# não como está na branch. O `push` fica restrito a `main` para não duplicar cada
+# run da branch: sem isso, o mesmo commit dispara os dois eventos.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Em `main` cada commit é uma promoção e precisa do próprio resultado; cancelar
+  # deixaria um merge sem CI se dois caíssem seguidos.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  checks:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn lint
+
+      - run: yarn typecheck
+
+      - run: yarn test
+
+  # Sem banco — os fluxos E2E rodam deslogados, que é um modo legítimo, já que
+  # jogar não exige conta.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn playwright install --with-deps chromium
+
+      - run: yarn build
+
+      - run: yarn test:e2e
+
+      # `trace: 'on-first-retry'` grava em test-results/, fora do relatório —
+      # sem as duas pastas, uma falha no CI não deixa nem trace nem report.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
