@@ -65,11 +65,32 @@ qualquer tag existir.
    (lint · typecheck · test + e2e) e o `release.yml`.
 3. Se havia commit versionável, o release-please abre — ou atualiza — o PR
    `chore(main): release X.Y.Z`. Confira o número e o changelog.
-4. O CI roda nesse PR também, incluindo o `e2e`, que faz build completo. É lento
-   e é de propósito: o que vira tag passou pelos mesmos portões que o resto.
+4. O CI **não** roda sozinho nesse PR — veja a seção abaixo.
 5. Merge do PR de release. O `release.yml` roda de novo e cria a tag `vX.Y.Z`
    mais a GitHub Release. Aqui o método de merge não importa — o release-please
    acha o próprio PR pelo label `autorelease: pending`.
+
+## O CI do PR de release fica pendente
+
+O GitHub não dispara workflow em pull request aberto pelo `GITHUB_TOKEN` — é
+proteção contra loop de automação. Como quem abre o PR de release é o
+`github-actions[bot]`, o run do `ci.yml` nasce com status `action_required` e
+fica parado esperando aprovação.
+
+Isso engana à primeira vista: o PR aparece com checks verdes, mas são os da
+Vercel, não os do projeto. Não confunda um com o outro.
+
+Para rodar, vá em **Actions → o run pendente → "Approve and run"**, ou pela CLI:
+
+```bash
+gh run list --branch release-please--branches--main--components--holo-deck
+gh api --method POST repos/:owner/:repo/actions/runs/<run-id>/approve
+```
+
+Aprovar é conferência, não obrigação: o PR de release só mexe em `CHANGELOG.md`,
+`package.json` e no manifest, e o código já passou pelos portões quando entrou em
+`main`. O que a aprovação garante é que a árvore que vira tag foi testada como
+está.
 
 ## Consertar as notas depois do merge
 
