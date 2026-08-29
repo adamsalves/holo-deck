@@ -83,6 +83,18 @@ fix: a mensagem que deveria ter entrado
 END_COMMIT_OVERRIDE
 ```
 
+## Por que `include-component-in-tag: false`
+
+O [`release-please-config.json`](release-please-config.json) declara o pacote em
+`packages: { "." }`. Nesse formato o release-please assume monorepo: ele deriva
+um *component* do nome no `package.json` e prefixa a tag com ele, porque
+`include-component-in-tag` vem `true` por padrão. Sem a flag, a tag sairia
+`holo-deck-v0.1.1`.
+
+Component é mecanismo de repositório com vários artefatos versionados
+separadamente. Aqui é um só. A flag desliga o prefixo e as tags ficam `v0.1.1`.
+Não remova achando que é ruído: ela é o que mantém o formato.
+
 ## Do que a release depende no repositório
 
 Duas configurações fora do código, que falham de formas pouco óbvias:
