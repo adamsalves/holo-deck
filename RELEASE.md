@@ -69,6 +69,40 @@ qualquer tag existir.
 5. Merge do PR de release. O `release.yml` roda de novo e cria a tag `vX.Y.Z`
    mais a GitHub Release. Aqui o método de merge não importa — o release-please
    acha o próprio PR pelo label `autorelease: pending`.
+6. Varra as branches órfãs e apague — a release não fecha antes disso. Veja a
+   seção abaixo.
+
+## Fechar a release apagando as branches órfãs
+
+Uma release deixa branch para trás por conta própria: além da branch da fase,
+o release-please cria a dele
+(`release-please--branches--main--components--<pacote>`). A primeira release do
+projeto terminou com quatro. Sem varrer no fim, o repositório acumula lixo que
+esconde as branches que ainda importam.
+
+`delete_branch_on_merge` está **desligado de propósito** — a convenção aqui é uma
+branch por fase, e a branch da fase pode valer como registro. Por isso a limpeza
+é decisão de cada release, não automatismo do GitHub, e por isso este passo
+existe.
+
+Órfã é branch já mergeada no `main`. Prove antes de apagar, nunca confie no nome:
+
+```bash
+git fetch --prune origin
+for b in $(git ls-remote --heads origin | sed 's|.*refs/heads/||' | grep -v '^main$'); do
+  git merge-base --is-ancestor "origin/$b" origin/main \
+    && echo "MERGEADA  $b" || echo "MANTER    $b"
+done
+```
+
+Só as `MERGEADA` saem:
+
+```bash
+git push origin --delete <branch>   # remota
+git branch -d <branch>              # local; o -d minúsculo recusa não-mergeada
+```
+
+A branch do release-please pode ir junto — ele recria na release seguinte.
 
 ## O CI do PR de release fica pendente
 
