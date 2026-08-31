@@ -41,6 +41,46 @@ um é lido pelo que é.
 Se algum dia precisar mesmo squashar, o assunto do commit final tem que carregar
 o tipo mais forte da branch (um `feat:` engole os `chore:` juntos).
 
+### O merge commit também entra no changelog
+
+O `commitlint` ignora merge commits por padrão — é o que mantém o job de CI
+passando no PR de release. **O release-please não os ignora**, e as duas
+ferramentas lendo a mesma mensagem com regras diferentes é o que surpreende aqui.
+
+O GitHub monta a mensagem do merge commit assim:
+
+```
+Merge pull request #7 from adamsalves/feat/dex-pipeline
+
+feat: pipeline de dados — o dex da PokeAPI gerado em build-time
+```
+
+A segunda linha é o **título do PR**, e é ela que o release-please lê. Se o
+título começa com tipo convencional, ele vira mais uma entrada do changelog, ao
+lado das que os commits da branch já geraram.
+
+Isto é o efeito observado, não a fonte lida: se o release-please pega o título do
+corpo do merge commit ou o busca pela associação do PR na API não foi conferido —
+e não muda o que fazer, porque as duas rotas chegam ao mesmo texto. O que decide
+é o título do PR.
+
+Aconteceu na `v0.2.0`: o changelog saiu com cinco Features, e a quinta —
+`pipeline de dados — o dex da PokeAPI gerado em build-time` — é o merge commit do
+PR #7 resumindo as outras quatro.
+
+**Isso não muda a versão calculada.** O tipo mais forte da branch já mandava, e
+uma entrada a mais do mesmo tipo não soma nada. O efeito é uma linha redundante
+no changelog, e a decisão é de gosto:
+
+| Título do PR                   | Changelog                                    |
+| ------------------------------ | -------------------------------------------- |
+| `feat: pipeline de dados — …`  | ganha uma linha-resumo além das dos commits  |
+| `Pipeline de dados — …`        | só as entradas dos commits da branch         |
+
+Nada a corrigir na `v0.2.0` — a linha extra descreve a fase corretamente. Vale
+saber para escolher o título da próxima com a decisão na mão, em vez de descobrir
+o efeito depois de mergear.
+
 ## O que cada tipo faz com a versão
 
 O projeto está em `0.x` e a config usa `bump-minor-pre-major`, então breaking
@@ -75,7 +115,8 @@ isso o assunto é validado por `commitlint` em dois lugares: no hook `commit-msg
 (local, e burlável com `--no-verify`) e num job do
 [`ci.yml`](.github/workflows/ci.yml) sobre todos os commits do PR — que é o que
 pega commit feito pela interface do GitHub, onde hook nenhum roda. Merge commits
-são ignorados pelo commitlint por padrão, então o job não trava no PR de release.
+são ignorados pelo commitlint por padrão, então o job não trava no PR de release —
+o release-please, esse os lê, e a seção acima explica o que isso faz no changelog.
 
 `perf:` e `revert:` estão na tabela porque **cortam release**, e isso surpreende:
 a regra do release-please não é "só `fix` versiona". Ele soma breaking e `feat`,
