@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Neste repositório a mensagem de commit não é recado — é entrada de uma
  * automação que publica release.

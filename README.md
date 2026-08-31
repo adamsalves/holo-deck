@@ -42,7 +42,7 @@ O [husky](https://typicode.github.io/husky/) instala três hooks no
 
 | Hook         | Roda                                       | Custo hoje |
 | ------------ | ------------------------------------------ | ---------- |
-| `commit-msg` | `commitlint` sobre o assunto do commit     | ~0,3 s     |
+| `commit-msg` | `commitlint` — assunto e corpo do commit   | ~0,3 s     |
 | `pre-commit` | `eslint --fix`, **só nos arquivos staged** | ~1 s       |
 | `pre-push`   | `yarn typecheck` e `yarn test`             | ~5 s       |
 

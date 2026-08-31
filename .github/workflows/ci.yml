@@ -22,8 +22,8 @@ jobs:
   # roda hook nenhum. Como o assunto do commit é o que decide a versão que o
   # release-please publica, o portão precisa existir também aqui.
   #
-  # Merge commits são ignorados pelo commitlint por padrão — conferido contra
-  # os 9 commits de `main`, os 5 merges inclusive.
+  # Merge commits são ignorados pelo commitlint por padrão — conferido contra os
+  # 14 commits de `main`: os 9 de trabalho passam, os 5 de merge são ignorados.
   commits:
     name: commitlint
     if: github.event_name == 'pull_request'
@@ -40,13 +40,23 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
-      - run: yarn install --frozen-lockfile
+      # Este job só precisa do CLI do commitlint. Sem a flag, o install dispara
+      # `nuxt prepare` e `husky`, que aqui não servem para nada.
+      - run: yarn install --frozen-lockfile --ignore-scripts
 
+      # Os SHAs vão por `env` em vez de interpolados no `run`. Estes dois campos
+      # são hex de 40 caracteres gerados pelo GitHub e não dão para injetar —
+      # mas `${{ }}` dentro de `run` é o padrão que vira injeção no dia em que
+      # alguém copiar a linha para um campo que o autor do PR controla, como
+      # `.title` ou `.head.ref`.
       - name: valida os assuntos dos commits do PR
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           yarn commitlint \
-            --from ${{ github.event.pull_request.base.sha }} \
-            --to ${{ github.event.pull_request.head.sha }} \
+            --from "$BASE_SHA" \
+            --to "$HEAD_SHA" \
             --verbose
 
   checks:

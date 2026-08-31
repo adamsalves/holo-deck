@@ -1,0 +1,9 @@
+# Os hooks de `.husky/` rodam sob dash. Num clone com `core.autocrlf=true` eles
+# chegariam com CRLF e o dash morre em `\r: not found` — o `.editorconfig` cobre
+# o que o editor escreve, não o que o checkout entrega.
+* text=auto eol=lf
+
+# Binários não passam por normalização de fim de linha.
+*.png binary
+*.ico binary
+*.woff2 binary

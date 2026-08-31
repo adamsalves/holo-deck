@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * ESLint sozinho, sem Prettier — `stylistic: true` no `@nuxt/eslint` faz o
  * próprio ESLint formatar, e foi escolhido justamente para nenhuma fase pagar
@@ -13,5 +14,5 @@
  * @type {import('lint-staged').Configuration}
  */
 export default {
-  '*.{js,mjs,ts,mts,vue}': ['eslint --fix --no-warn-ignored'],
+  '*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,vue}': ['eslint --fix --no-warn-ignored'],
 }

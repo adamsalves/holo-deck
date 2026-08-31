@@ -51,7 +51,22 @@ change ainda não estoura major:
 | `fix:`                            | patch           | Bug Fixes            |
 | `feat:`                           | minor           | Features             |
 | `feat!:` / `BREAKING CHANGE:`     | minor           | Breaking Changes     |
-| `chore:` `docs:` `test:` `refactor:` `style:` `ci:` | nada | não          |
+| `perf:`                           | patch           | Performance Improvements |
+| `revert:`                         | patch           | Reverts              |
+| `chore:` `docs:` `test:` `refactor:` `style:` `ci:` `build:` | nada | não |
+
+**O assunto começa em minúscula.** O `commitlint` reprova quando o primeiro
+caractere é maiúsculo — a regra existe para barrar `fix: Corrige o dano`, mas ela
+pega junto o nome próprio no início, que neste projeto é o caso comum:
+`feat: PokeAPI vira a fonte do dex` reprova. As duas saídas são baratas — pôr o
+artigo antes (`feat: a PokeAPI vira a fonte do dex`) ou o nome entre crases. A
+mensagem de erro fala em `sentence-case`, que não deixa isso óbvio; daí esta
+nota. Vale para o resto do assunto também? Não: só o primeiro caractere importa,
+então `fix: o alias de shared quebra no Nuxt 4` passa.
+
+O `commitlint` valida o corpo além do assunto — linhas de corpo têm teto de 100
+caracteres, e linhas com URL são isentas (os trailers `Co-Authored-By:` e
+`Claude-Session:` passam).
 
 **O tipo errado não é deslize de estilo — é a versão decidida sem querer.** Já
 aconteceu aqui: `ad21429` entrou como `fix:` numa Fase 0 planejada como `chore:`
@@ -61,6 +76,15 @@ isso o assunto é validado por `commitlint` em dois lugares: no hook `commit-msg
 [`ci.yml`](.github/workflows/ci.yml) sobre todos os commits do PR — que é o que
 pega commit feito pela interface do GitHub, onde hook nenhum roda. Merge commits
 são ignorados pelo commitlint por padrão, então o job não trava no PR de release.
+
+`perf:` e `revert:` estão na tabela porque **cortam release**, e isso surpreende:
+a regra do release-please não é "só `fix` versiona". Ele soma breaking e `feat`,
+e **todo o resto cai em patch** — o que segura os `chore:`/`docs:` da vida não é
+a versão, é o changelog ficar vazio, aí a release inteira é pulada. Os tipos que
+o preset marca como visíveis são exatamente `feat`, `fix`, `perf` e `revert`;
+`build:` é oculto como `chore:`. Conferido na fonte do release-please e do
+preset, e batendo com o que se vê aqui: o `docs:` que entrou em `main` depois da
+`v0.1.1` não abriu PR de release nenhum.
 
 Uma branch inteira de `chore:` não gera release nenhuma — e isso é o
 comportamento correto, não um bug. Na dúvida sobre o que vai sair, o PR de
