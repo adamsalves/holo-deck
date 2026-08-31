@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  GENERATION_COUNT,
+  MOVES_PER_SPECIES,
   STAT_COUNT,
   TYPE_COUNT,
   TYPE_NAMES,
@@ -33,6 +35,17 @@ function matrix(): number[][] {
   return TYPE_NAMES.map(() => TYPE_NAMES.map(() => 1))
 }
 
+/** As 9 entradas que `core.json` sempre traz. O guarda cobra `.length(9)` — um
+ * core com uma geração é o deploy parcial que ele existe para recusar. */
+function allGenerations() {
+  return Array.from({ length: GENERATION_COUNT }, (_, index) => ({
+    generation: index + 1,
+    region: `region-${index + 1}`,
+    displayName: `Generation ${index + 1}`,
+    speciesCount: 151,
+  }))
+}
+
 function validCore() {
   return {
     types: [...TYPE_NAMES],
@@ -48,7 +61,7 @@ function validCore() {
       priority: 0,
       damageClass: 'special',
     }],
-    generations: [{ generation: 1, region: 'kanto', displayName: 'Generation I', speciesCount: 151 }],
+    generations: allGenerations(),
   }
 }
 
@@ -210,6 +223,134 @@ describe('isChainsData e isFlavorData', () => {
  * continuam com a forma que `useDex()` espera — sem chamar a PokeAPI. Se ele
  * falhar por arquivo ausente, o que falta é `yarn data:build`.
  */
+describe('guardas cobram as mesmas restrições do schema de escrita', () => {
+  /**
+   * O modo de falhar que estes guardas nomeiam como alvo é o deploy parcial —
+   * `core.json` novo com `gen-1.json` velho. Ele produz arquivo **bem-formado e
+   * errado**, que uma checagem de forma aprova. Cada caso abaixo tem a forma
+   * certa e viola uma restrição que `scripts/lib/schema.ts` cobra na escrita:
+   * o portão de saída proíbe, e o de leitura precisa proibir também.
+   *
+   * O outro motivo é de princípio: um type predicate que valida menos do que
+   * afirma é a mesma mentira que um `as`, sem a palavra-chave que a tornaria
+   * visível no review. Num projeto com `assertionStyle: 'never'`, isso conta.
+   */
+
+  /** Uma geração válida com um campo trocado — o formato certo, o valor errado. */
+  function withGeneration(patch: Record<string, unknown>): unknown {
+    return { ...validGeneration(), ...patch }
+  }
+
+  /** O mesmo, na espécie. O `[first]` desestruturado em vez de `[0]!` porque o
+   * projeto proíbe a asserção não-nula, inclusive em teste. */
+  function withSpecies(patch: Record<string, unknown>): unknown {
+    const draft = validGeneration()
+    const [first] = draft.species
+    if (first === undefined) throw new Error('fixture inválida: geração sem espécie')
+    return { ...draft, species: [{ ...first, ...patch }] }
+  }
+
+  function withMove(patch: Record<string, unknown>): unknown {
+    const core = validCore()
+    const [first] = core.moves
+    if (first === undefined) throw new Error('fixture inválida: core sem golpe')
+    return { ...core, moves: [{ ...first, ...patch }] }
+  }
+
+  /** `baseStats` é tupla de 6: trocar `[0]` é o que corrompe o HP de verdade. */
+  function stats(hp: number): number[] {
+    return [hp, 55, 40, 50, 50, 90]
+  }
+
+  function moveIds(count: number): number[] {
+    return Array.from({ length: count }, (_, index) => index + 1)
+  }
+
+  it('recusa espécie sem golpe e espécie com mais de 8', () => {
+    // `moveIds: []` é o defeito que o schema nomeia por escrito: espécie sem
+    // golpe trava a batalha da Fase 4. Tem a forma de um array de números e
+    // passa por qualquer checagem que só pergunte se é um array de números.
+    expect(isGenerationData(withSpecies({ moveIds: [] }))).toBe(false)
+    expect(isGenerationData(withSpecies({ moveIds: moveIds(MOVES_PER_SPECIES + 1) }))).toBe(false)
+    expect(isGenerationData(withSpecies({ moveIds: moveIds(MOVES_PER_SPECIES) }))).toBe(true)
+  })
+
+  it('recusa geração vazia e número de geração fora de 1..9', () => {
+    expect(isGenerationData(withGeneration({ species: [] }))).toBe(false)
+    expect(isGenerationData(withGeneration({ generation: 0 }))).toBe(false)
+    expect(isGenerationData(withGeneration({ generation: GENERATION_COUNT + 1 }))).toBe(false)
+    expect(isGenerationData(withGeneration({ generation: GENERATION_COUNT }))).toBe(true)
+  })
+
+  it('recusa stat, altura, captura e cadeia com valor impossível', () => {
+    expect(isGenerationData(withSpecies({ baseStats: stats(-5) }))).toBe(false)
+    expect(isGenerationData(withSpecies({ baseStats: stats(0) }))).toBe(false)
+    expect(isGenerationData(withSpecies({ baseStats: stats(12.5) }))).toBe(false)
+    expect(isGenerationData(withSpecies({ height: -1 }))).toBe(false)
+    expect(isGenerationData(withSpecies({ captureRate: -1 }))).toBe(false)
+    expect(isGenerationData(withSpecies({ evolutionChainId: 0 }))).toBe(false)
+  })
+
+  it('recusa string vazia onde o schema pede .min(1)', () => {
+    expect(isGenerationData(withSpecies({ slug: '' }))).toBe(false)
+    expect(isGenerationData(withSpecies({ displayName: '' }))).toBe(false)
+    expect(isGenerationData(withSpecies({ color: '' }))).toBe(false)
+    expect(isGenerationData(withGeneration({ region: '' }))).toBe(false)
+    // `habitat` é `null` legítimo da geração 6 em diante — mas nunca `''`.
+    expect(isGenerationData(withSpecies({ habitat: '' }))).toBe(false)
+    expect(isGenerationData(withSpecies({ habitat: null }))).toBe(true)
+  })
+
+  it('recusa NaN e Infinity, que atravessam um typeof number', () => {
+    expect(isGenerationData(withSpecies({ baseStats: stats(Number.NaN) }))).toBe(false)
+    expect(isGenerationData(withSpecies({ weight: Number.POSITIVE_INFINITY }))).toBe(false)
+  })
+
+  it('recusa catálogo vazio e número de gerações diferente de 9', () => {
+    expect(isCoreData({ ...validCore(), moves: [] })).toBe(false)
+    expect(isCoreData({ ...validCore(), generations: [] })).toBe(false)
+    expect(isCoreData({ ...validCore(), generations: allGenerations().slice(0, 8) })).toBe(false)
+  })
+
+  it('recusa golpe com poder, pp ou acurácia sem sentido', () => {
+    expect(isCoreData(withMove({ power: -50 }))).toBe(false)
+    expect(isCoreData(withMove({ power: 0 }))).toBe(false)
+    expect(isCoreData(withMove({ pp: 0 }))).toBe(false)
+    expect(isCoreData(withMove({ accuracy: 0 }))).toBe(false)
+    expect(isCoreData(withMove({ slug: '' }))).toBe(false)
+    // `accuracy: null` é "nunca erra" — Swift, Aerial Ace —, não dado ruim.
+    expect(isCoreData(withMove({ accuracy: null }))).toBe(true)
+  })
+
+  it('recusa condição de evolução com campo do tipo errado', () => {
+    // O caso de princípio: checar só `trigger` fazia o compilador acreditar em
+    // `minLevel: number` depois de um guarda que nunca olhou o campo.
+    const chain = (minLevel: unknown): unknown => ({
+      1: {
+        speciesId: 4,
+        slug: 'charmander',
+        evolvesTo: [{
+          speciesId: 5,
+          slug: 'charmeleon',
+          via: { trigger: 'level-up', minLevel },
+          evolvesTo: [],
+        }],
+      },
+    })
+
+    expect(isChainsData(chain('muitos'))).toBe(false)
+    expect(isChainsData(chain(-3))).toBe(false)
+    expect(isChainsData(chain(16))).toBe(true)
+    // Ausente é legítimo: `phione → manaphy` chega da API sem condição nenhuma.
+    expect(isChainsData(chain(undefined))).toBe(true)
+  })
+
+  it('recusa descrição vazia em flavor-N.json', () => {
+    expect(isFlavorData({ 1: 'Um Pokémon.' })).toBe(true)
+    expect(isFlavorData({ 1: '' })).toBe(false)
+  })
+})
+
 describe('dex commitado em public/data', () => {
   function read(name: string): unknown {
     const path = `public/data/${name}`

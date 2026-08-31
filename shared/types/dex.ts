@@ -1,5 +1,5 @@
 import type { MoveId, SpeciesId } from './brand.ts'
-import { isMoveId, isSpeciesId } from './brand.ts'
+import { GYM_COUNT, isMoveId, isSpeciesId } from './brand.ts'
 
 /**
  * O contrato dos arquivos gerados em `public/data/`. Este módulo é a fonte única
@@ -47,6 +47,23 @@ export type StatName = typeof STAT_NAMES[number]
 export type BaseStats = readonly [number, number, number, number, number, number]
 
 export const STAT_COUNT = STAT_NAMES.length
+
+/**
+ * As 9 gerações do dex. É o mesmo 9 de `GYM_COUNT` — um ginásio por geração é a
+ * regra da Liga — e fica derivado dele para que os dois nunca divirjam.
+ */
+export const GENERATION_COUNT = GYM_COUNT
+
+/**
+ * Quantos golpes cada espécie carrega no dex. O jogo usa 4 numa batalha; os
+ * outros 4 são a margem de cobertura de tipo que a escolha da Fase 4 precisa
+ * para ter o que escolher.
+ *
+ * Vive aqui, e não em `scripts/`, porque três lugares precisam concordar sobre
+ * ele: o schema de escrita, o guarda de leitura e a seleção do moveset. Quando
+ * discordam, o build grava um arquivo que o próprio leitor recusa.
+ */
+export const MOVES_PER_SPECIES = 8
 
 /** Multiplicadores possíveis numa casa da matriz. */
 export type Effectiveness = 0 | 0.5 | 1 | 2
@@ -151,7 +168,12 @@ export interface EvolutionCondition {
 export interface EvolutionNode {
   readonly speciesId: SpeciesId
   readonly slug: string
-  /** Ausente na raiz da cadeia; presente em toda aresta descendente. */
+  /**
+   * Ausente na raiz da cadeia. Quase sempre presente numa aresta descendente —
+   * mas não sempre: a PokeAPI lista `phione → manaphy` sem nenhum
+   * `evolution_details`, e o build relata a aresta em vez de inventar uma
+   * condição. Quem exibe a árvore precisa tratar o caso.
+   */
   readonly via?: EvolutionCondition
   readonly evolvesTo: readonly EvolutionNode[]
 }
@@ -184,13 +206,58 @@ export function isTypeName(value: string): value is TypeName {
  *
  * O arquivo é artefato commitado deste mesmo repositório, já validado com `zod`
  * no build — mas chega por HTTP, e o modo real de falhar é um 404 devolvendo
- * HTML ou um deploy servindo a versão anterior. Estes guardas existem para esse
- * caso, não para entrada adversária: sem eles, `$fetch` entrega `any` e o portão
- * de tipagem honesta para exatamente na porta por onde o problema passa.
+ * HTML ou um deploy servindo a versão anterior. Sem eles, `$fetch` entrega `any`
+ * e o portão de tipagem honesta para exatamente na porta por onde o problema
+ * passa.
+ *
+ * **Eles cobram as mesmas restrições que `scripts/lib/schema.ts` cobra na
+ * escrita** — faixa, teto, piso, string não vazia. Checar só a forma seria
+ * cobrir o caso grosseiro (HTML no lugar de JSON) e deixar passar justamente o
+ * caso que este projeto nomeia como alvo: o deploy parcial, que produz arquivo
+ * bem-formado e errado. Um `moveIds: []` tem a forma certa e trava a batalha da
+ * Fase 4; o portão de escrita o proíbe, e o de leitura precisa proibir também.
+ *
+ * O outro motivo é de princípio. Um type predicate que valida menos do que
+ * afirma é a mesma mentira que um `as` — o compilador passa a acreditar em
+ * `minLevel: number` porque alguém checou só `trigger` — só que sem a
+ * palavra-chave que a tornaria visível no review. O `assertionStyle: 'never'`
+ * do lint não alcança isso; alcançar é trabalho destas funções.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * `Array.isArray` sobre um `unknown` estreita para `any[]`, e daí em diante todo
+ * elemento é `any` — a família `no-unsafe-*` existe para pegar exatamente isso.
+ * Este predicado diz a verdade (`readonly unknown[]`) e mantém os elementos
+ * `unknown`, obrigando a checagem elemento a elemento que vem logo abaixo.
+ */
+function isArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value)
+}
+
+/** `Number.isInteger` já recusa `NaN` e `Infinity`, que é metade do trabalho. */
+function isInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value)
+}
+
+function isPositiveInt(value: unknown): boolean {
+  return isInt(value) && value > 0
+}
+
+function isNonNegativeInt(value: unknown): boolean {
+  return isInt(value) && value >= 0
+}
+
+/** String não vazia: o schema de escrita usa `.min(1)` em toda string do dex. */
+function isText(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0
+}
+
+function isGenerationNumber(value: unknown): boolean {
+  return isInt(value) && value >= 1 && value <= GENERATION_COUNT
 }
 
 function isEffectiveness(value: unknown): value is Effectiveness {
@@ -202,46 +269,54 @@ export function isCoreData(value: unknown): value is CoreData {
 
   const { types, effectiveness, moves, generations } = value
 
-  if (!Array.isArray(types) || types.length !== TYPE_COUNT) return false
+  if (!isArray(types) || types.length !== TYPE_COUNT) return false
   if (!types.every((t, i) => t === TYPE_NAMES[i])) return false
 
-  if (!Array.isArray(effectiveness) || effectiveness.length !== TYPE_COUNT) return false
+  if (!isArray(effectiveness) || effectiveness.length !== TYPE_COUNT) return false
   if (!effectiveness.every(row =>
-    Array.isArray(row) && row.length === TYPE_COUNT && row.every(isEffectiveness),
+    isArray(row) && row.length === TYPE_COUNT && row.every(isEffectiveness),
   )) return false
 
-  if (!Array.isArray(moves) || !moves.every(isMoveEntry)) return false
-  if (!Array.isArray(generations) || !generations.every(isGenerationMeta)) return false
+  // Catálogo vazio não é "core sem golpes", é core que não terminou de gravar.
+  if (!isArray(moves) || moves.length === 0 || !moves.every(isMoveEntry)) return false
+
+  // `.length(9)` no schema: uma geração a menos deixa o grid sem uma aba, e é o
+  // tipo de perda que ninguém nota sem contar.
+  if (!isArray(generations) || generations.length !== GENERATION_COUNT) return false
+  if (!generations.every(isGenerationMeta)) return false
 
   return true
 }
 
 function isMoveEntry(value: unknown): value is MoveEntry {
   if (!isRecord(value)) return false
-  return typeof value.id === 'number' && isMoveId(value.id)
-    && typeof value.slug === 'string'
-    && typeof value.displayName === 'string'
+  return isInt(value.id) && isMoveId(value.id)
+    && isText(value.slug)
+    && isText(value.displayName)
     && typeof value.type === 'string' && isTypeName(value.type)
-    && typeof value.power === 'number'
-    && (value.accuracy === null || typeof value.accuracy === 'number')
-    && typeof value.pp === 'number'
-    && typeof value.priority === 'number'
+    && isPositiveInt(value.power)
+    // `null` é "nunca erra" (Swift, Aerial Ace); 0 ou negativo é dado corrompido.
+    && (value.accuracy === null || isPositiveInt(value.accuracy))
+    && isPositiveInt(value.pp)
+    && isInt(value.priority)
     && (value.damageClass === 'physical' || value.damageClass === 'special')
 }
 
 function isGenerationMeta(value: unknown): value is GenerationMeta {
   if (!isRecord(value)) return false
-  return typeof value.generation === 'number'
-    && typeof value.region === 'string'
-    && typeof value.displayName === 'string'
-    && typeof value.speciesCount === 'number'
+  return isGenerationNumber(value.generation)
+    && isText(value.region)
+    && isText(value.displayName)
+    && isPositiveInt(value.speciesCount)
 }
 
 export function isGenerationData(value: unknown): value is GenerationData {
   if (!isRecord(value)) return false
-  return typeof value.generation === 'number'
-    && typeof value.region === 'string'
-    && Array.isArray(value.species)
+  // Geração sem espécie nenhuma não vira arquivo no build — se chegou aqui, o
+  // arquivo é de outro build ou está truncado.
+  if (!isArray(value.species) || value.species.length === 0) return false
+  return isGenerationNumber(value.generation)
+    && isText(value.region)
     && value.species.every(isSpeciesEntry)
 }
 
@@ -250,28 +325,31 @@ function isSpeciesEntry(value: unknown): value is SpeciesEntry {
 
   const { types, baseStats, moveIds } = value
 
-  if (!Array.isArray(types) || types.length < 1 || types.length > 2) return false
+  if (!isArray(types) || types.length < 1 || types.length > 2) return false
   if (!types.every(t => typeof t === 'string' && isTypeName(t))) return false
 
-  if (!Array.isArray(baseStats) || baseStats.length !== STAT_COUNT) return false
-  if (!baseStats.every(n => typeof n === 'number')) return false
+  if (!isArray(baseStats) || baseStats.length !== STAT_COUNT) return false
+  if (!baseStats.every(isPositiveInt)) return false
 
-  if (!Array.isArray(moveIds)) return false
-  if (!moveIds.every(n => typeof n === 'number' && isMoveId(n))) return false
+  // Teto e piso, os mesmos do schema de escrita. Vazio trava a batalha da Fase 4
+  // e mais que `MOVES_PER_SPECIES` estoura a suposição de quem lê o moveset.
+  if (!isArray(moveIds)) return false
+  if (moveIds.length < 1 || moveIds.length > MOVES_PER_SPECIES) return false
+  if (!moveIds.every(n => isInt(n) && isMoveId(n))) return false
 
-  return typeof value.id === 'number' && isSpeciesId(value.id)
-    && typeof value.slug === 'string'
-    && typeof value.displayName === 'string'
-    && typeof value.height === 'number'
-    && typeof value.weight === 'number'
+  return isInt(value.id) && isSpeciesId(value.id)
+    && isText(value.slug)
+    && isText(value.displayName)
+    && isNonNegativeInt(value.height)
+    && isNonNegativeInt(value.weight)
     && typeof value.isLegendary === 'boolean'
     && typeof value.isMythical === 'boolean'
     && typeof value.isBaby === 'boolean'
-    && typeof value.captureRate === 'number'
-    && (value.habitat === null || typeof value.habitat === 'string')
-    && typeof value.baseHappiness === 'number'
-    && typeof value.color === 'string'
-    && typeof value.evolutionChainId === 'number'
+    && isNonNegativeInt(value.captureRate)
+    && (value.habitat === null || isText(value.habitat))
+    && isNonNegativeInt(value.baseHappiness)
+    && isText(value.color)
+    && isPositiveInt(value.evolutionChainId)
 }
 
 export function isChainsData(value: unknown): value is ChainsData {
@@ -279,15 +357,54 @@ export function isChainsData(value: unknown): value is ChainsData {
   return Object.values(value).every(isEvolutionNode)
 }
 
+/**
+ * Os campos opcionais de `EvolutionCondition`, agrupados pelo formato que cada
+ * um aceita.
+ *
+ * Listas em vez de 19 linhas de `&&` porque elas precisam ficar visivelmente
+ * pareadas com `evolutionCondition` de `scripts/lib/schema.ts`: é o mesmo
+ * contrato escrito duas vezes, e o jeito de os dois divergirem é um campo entrar
+ * num e não no outro.
+ */
+const CONDITION_TEXT_FIELDS = [
+  'item', 'heldItem', 'knownMove', 'knownMoveType',
+  'timeOfDay', 'location', 'tradeSpecies', 'partySpecies', 'partyType',
+] as const
+
+const CONDITION_POSITIVE_INT_FIELDS = ['minLevel'] as const
+
+const CONDITION_NON_NEGATIVE_INT_FIELDS = ['minHappiness', 'minAffection', 'minBeauty'] as const
+
+const CONDITION_INT_FIELDS = ['gender', 'relativePhysicalStats'] as const
+
+/** Os quatro que o build só grava como `true` — presente significa "sim". */
+const CONDITION_TRUE_FIELDS = [
+  'needsOverworldRain', 'turnUpsideDown', 'needsMultiplayer', 'nearSpecialRock',
+] as const
+
+function isEvolutionCondition(value: unknown): value is EvolutionCondition {
+  if (!isRecord(value)) return false
+  if (!isText(value.trigger)) return false
+
+  const optional = (field: unknown, valid: (candidate: unknown) => boolean): boolean =>
+    field === undefined || valid(field)
+
+  return CONDITION_TEXT_FIELDS.every(key => optional(value[key], isText))
+    && CONDITION_POSITIVE_INT_FIELDS.every(key => optional(value[key], isPositiveInt))
+    && CONDITION_NON_NEGATIVE_INT_FIELDS.every(key => optional(value[key], isNonNegativeInt))
+    && CONDITION_INT_FIELDS.every(key => optional(value[key], isInt))
+    && CONDITION_TRUE_FIELDS.every(key => optional(value[key], candidate => candidate === true))
+}
+
 function isEvolutionNode(value: unknown): value is EvolutionNode {
   if (!isRecord(value)) return false
-  if (!Array.isArray(value.evolvesTo) || !value.evolvesTo.every(isEvolutionNode)) return false
-  if (value.via !== undefined && !(isRecord(value.via) && typeof value.via.trigger === 'string')) return false
-  return typeof value.speciesId === 'number' && isSpeciesId(value.speciesId)
-    && typeof value.slug === 'string'
+  if (!isArray(value.evolvesTo) || !value.evolvesTo.every(isEvolutionNode)) return false
+  if (value.via !== undefined && !isEvolutionCondition(value.via)) return false
+  return isInt(value.speciesId) && isSpeciesId(value.speciesId)
+    && isText(value.slug)
 }
 
 export function isFlavorData(value: unknown): value is FlavorData {
   if (!isRecord(value)) return false
-  return Object.values(value).every(text => typeof text === 'string')
+  return Object.values(value).every(isText)
 }

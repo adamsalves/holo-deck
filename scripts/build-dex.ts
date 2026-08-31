@@ -1,6 +1,6 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { PokeApiClient } from './lib/fetch.ts'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
+import { MAX_CONCURRENCY, PokeApiClient } from './lib/fetch.ts'
 import {
   evolutionChainSchema,
   generationSchema as apiGenerationSchema,
@@ -14,6 +14,7 @@ import {
 } from './lib/pokeapi.ts'
 import type { ChainLink, EvolutionChain, Pokemon, Species } from './lib/pokeapi.ts'
 import {
+  MOVES_IN_BATTLE,
   buildEffectivenessMatrix,
   generationDisplayName,
   pickFlavorText,
@@ -36,8 +37,8 @@ import type {
   MoveEntry,
   SpeciesEntry,
 } from '../shared/types/dex.ts'
-import { TYPE_NAMES } from '../shared/types/dex.ts'
-import { GYM_COUNT, MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
+import { GENERATION_COUNT, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
+import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
 
 /**
  * Rastreia a PokeAPI uma única vez e gera o dex que o jogo consome.
@@ -50,8 +51,15 @@ import { GYM_COUNT, MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/typ
  * diff vazio.
  */
 
-const GENERATION_COUNT = GYM_COUNT
 const CACHE_DIR = '.cache/pokeapi'
+const DEFAULT_OUT_DIR = 'public/data'
+const DEFAULT_SPRITES_DIR = 'public/sprites'
+const DEFAULT_CONCURRENCY = 10
+
+/** Contagens do dataset, conferidas a cada build. Não derivam de nada — são o
+ * que o dex tem hoje, e uma mudança aqui é uma mudança na PokeAPI. */
+const KANTO_SPECIES_COUNT = 151
+const CHAIN_COUNT = 541
 
 interface Options {
   readonly outDir: string
@@ -60,9 +68,11 @@ interface Options {
   readonly speciesFilter: readonly number[] | null
   readonly generationFilter: number | null
   readonly withSprites: boolean
+  /** `--species` ou `--gen` ativo: o build cobre um recorte, não o dex. */
+  readonly partial: boolean
 }
 
-function parseArgs(argv: readonly string[]): Options {
+export function parseArgs(argv: readonly string[]): Options {
   const value = (flag: string): string | null => {
     const index = argv.indexOf(flag)
     return index === -1 ? null : argv[index + 1] ?? null
@@ -70,18 +80,75 @@ function parseArgs(argv: readonly string[]): Options {
 
   const species = value('--species')
   const generation = value('--gen')
+  const partial = species !== null || generation !== null
+
+  const outDir = value('--out') ?? DEFAULT_OUT_DIR
+
+  // Modos parciais existem para ensaiar o formato sem pagar o crawl inteiro, e
+  // escrevem exatamente os mesmos nomes de arquivo do build completo. Sem esta
+  // recusa, `--species 4,5,6` troca o dex de 1025 espécies por um de 3 e sai com
+  // sucesso — o comentário que morava aqui descrevia o risco e não o impedia.
+  if (partial && resolve(outDir) === resolve(DEFAULT_OUT_DIR)) {
+    throw new Error(
+      `ensaio parcial sobrescreveria ${DEFAULT_OUT_DIR} com um recorte do dex. `
+      + 'Use --out apontando para fora dele, por exemplo `--out /tmp/dex`.',
+    )
+  }
+
+  const rawConcurrency = value('--concurrency')
+  const concurrency = rawConcurrency === null ? DEFAULT_CONCURRENCY : Number(rawConcurrency)
+  // `Number('abc')` é `NaN`, `Math.min(NaN, n)` é `NaN` e `Array.from({ length:
+  // NaN })` é `[]` — zero worker roda e o pool devolve um array de buracos, com
+  // o erro estourando dezenas de linhas adiante. A validação mora aqui para a
+  // mensagem citar a flag que o usuário digitou.
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > MAX_CONCURRENCY) {
+    throw new Error(
+      `--concurrency precisa ser um inteiro de 1 a ${MAX_CONCURRENCY}: recebido "${rawConcurrency ?? ''}"`,
+    )
+  }
 
   return {
-    outDir: value('--out') ?? 'public/data',
-    spritesDir: value('--sprites-out') ?? 'public/sprites',
-    concurrency: Number(value('--concurrency') ?? 10),
-    // Modos parciais existem para ensaiar o formato sem pagar o crawl inteiro.
-    // Eles escrevem exatamente os mesmos arquivos, então precisam de `--out`
-    // apontando para fora de `public/data` — senão o ensaio sobrescreve o dex.
+    outDir,
+    spritesDir: value('--sprites-out') ?? DEFAULT_SPRITES_DIR,
+    concurrency,
     speciesFilter: species === null ? null : species.split(',').map(Number),
     generationFilter: generation === null ? null : Number(generation),
     withSprites: !argv.includes('--no-sprites'),
+    partial,
   }
+}
+
+/** Os nomes que este script grava. Tudo além disso não é saída dele. */
+function isGeneratedName(name: string): boolean {
+  return name === 'core.json'
+    || name === 'chains.json'
+    || /^gen-\d+\.json$/.test(name)
+    || /^flavor-\d+\.json$/.test(name)
+}
+
+/**
+ * Esvazia o diretório de saída — e recusa fazê-lo se ele contiver qualquer
+ * coisa que este script não tenha escrito.
+ *
+ * O caminho vem de `--out` e vai direto para um `rm` recursivo. `--out public`,
+ * que é um erro de digitação plausível, apagaria os 1025 sprites e o favicon
+ * junto. A regra é simples e não depende de o usuário lembrar dela: só apago um
+ * diretório que só tenha saída minha dentro.
+ */
+async function clearOutputDir(dir: string): Promise<void> {
+  const entries = await readdir(dir).catch(() => null)
+  if (entries === null) return
+
+  const foreign = entries.filter(name => !isGeneratedName(name))
+  if (foreign.length > 0) {
+    const sample = foreign.slice(0, 3).join(', ')
+    throw new Error(
+      `${dir} contém o que não é saída deste build (${sample}${foreign.length > 3 ? ', …' : ''}) `
+      + '— recusando apagar. Aponte --out para um diretório dedicado.',
+    )
+  }
+
+  await rm(dir, { recursive: true, force: true })
 }
 
 /** Contagens declaradas no plano, conferidas contra a API viva a cada execução.
@@ -127,7 +194,7 @@ function progress(label: string): (done: number, total: number) => void {
  * espécie e seguir `varieties[].is_default` é o que garante um nome canônico por
  * entidade, que é a regra de "uma URL por entidade" da arquitetura.
  */
-function defaultVarietyId(species: Species): number {
+export function defaultVarietyId(species: Species): number {
   const variety = species.varieties.find(entry => entry.is_default)
   if (variety === undefined) {
     throw new Error(`${species.name}: nenhuma variedade marcada como padrão`)
@@ -135,7 +202,11 @@ function defaultVarietyId(species: Species): number {
   return resourceId(variety.pokemon.url)
 }
 
-function buildEvolutionNode(link: ChainLink, via?: ChainLink['evolution_details'][number]): EvolutionNode {
+export function buildEvolutionNode(
+  link: ChainLink,
+  report: Report,
+  via?: ChainLink['evolution_details'][number],
+): EvolutionNode {
   const speciesId = resourceId(link.species.url)
   if (!isSpeciesId(speciesId)) {
     throw new Error(`cadeia de evolução aponta para espécie fora da faixa: ${speciesId}`)
@@ -144,13 +215,20 @@ function buildEvolutionNode(link: ChainLink, via?: ChainLink['evolution_details'
   const node: EvolutionNode = {
     speciesId,
     slug: link.species.name,
-    // A raiz não tem condição; toda aresta descendente tem pelo menos uma. Onde
-    // a API lista várias (Eevee, Tyrogue), fica a primeira: é a que os jogos
+    // A raiz não tem condição; quase toda aresta descendente tem pelo menos uma.
+    // Onde a API lista várias (Eevee, Tyrogue), fica a primeira: é a que os jogos
     // tratam como canônica e a que a aba Evolução exibe.
     ...(via === undefined ? {} : { via: toEvolutionCondition(via) }),
-    evolvesTo: link.evolves_to.map(child =>
-      buildEvolutionNode(child, child.evolution_details[0]),
-    ),
+    evolvesTo: link.evolves_to.map((child) => {
+      const detail = child.evolution_details[0]
+      if (detail === undefined) {
+        // `phione → manaphy` chega da PokeAPI sem nenhum `evolution_details`. A
+        // aresta existe e a condição não — inventar uma seria pior que relatar,
+        // e a aba Evolução da Fase 3 precisa saber que o caso ocorre.
+        report.evolutionWithoutCondition.push(`${link.species.name} → ${child.species.name}`)
+      }
+      return buildEvolutionNode(child, report, detail)
+    }),
   }
   return node
 }
@@ -172,8 +250,12 @@ function buildSpeciesEntry(
   }
 
   const { moveIds, source } = selectMoveset(pokemon, catalog, versionGroupOrder)
+  if (source === 'supplemented') report.movesetSupplemented.push(species.name)
   if (source === 'any-method') report.movesetFallback.push(species.name)
   if (source === 'struggle') report.movesetStruggle.push(species.name)
+  if (moveIds.length < MOVES_IN_BATTLE) {
+    report.movesetShort.push(`${species.name}:${moveIds.length}`)
+  }
 
   if (species.evolution_chain === null) {
     throw new Error(`${species.name}: sem cadeia de evolução`)
@@ -199,10 +281,16 @@ function buildSpeciesEntry(
   }
 }
 
-interface Report {
+export interface Report {
   readonly displayNameFallback: string[]
+  readonly movesetSupplemented: string[]
   readonly movesetFallback: string[]
   readonly movesetStruggle: string[]
+  /** Moveset final abaixo das 4 vagas de batalha, depois de toda tentativa de
+   * completá-lo. É o número que precisa aparecer: eram 54 espécies, e só 11
+   * chegavam ao relatório. */
+  readonly movesetShort: string[]
+  readonly evolutionWithoutCondition: string[]
   readonly flavorMissing: string[]
   readonly legacyCasing: string[]
 }
@@ -224,8 +312,11 @@ async function main(): Promise<void> {
   const client = new PokeApiClient({ cacheDir: CACHE_DIR, concurrency: options.concurrency })
   const report: Report = {
     displayNameFallback: [],
+    movesetSupplemented: [],
     movesetFallback: [],
     movesetStruggle: [],
+    movesetShort: [],
+    evolutionWithoutCondition: [],
     flavorMissing: [],
     legacyCasing: [],
   }
@@ -367,14 +458,18 @@ async function main(): Promise<void> {
   }
   coreSchema.parse(core)
 
+  // O `sort` é redundante hoje — chave de objeto que parece inteiro itera em
+  // ordem numérica ascendente por especificação, então `Object.fromEntries`
+  // produziria o mesmo arquivo sem ele. Fica porque o determinismo do dex não
+  // deve depender de um detalhe da especificação que ninguém lembra ao ler.
   const chainsData: ChainsData = Object.fromEntries(
     chains
       .sort((a: EvolutionChain, b: EvolutionChain) => a.id - b.id)
-      .map(chain => [String(chain.id), buildEvolutionNode(chain.chain)]),
+      .map(chain => [String(chain.id), buildEvolutionNode(chain.chain, report)]),
   )
   chainsSchema.parse(chainsData)
 
-  await rm(options.outDir, { recursive: true, force: true })
+  await clearOutputDir(options.outDir)
 
   const written: { name: string, bytes: number }[] = []
 
@@ -437,43 +532,99 @@ async function main(): Promise<void> {
 
   console.log('\n[7/7] miniaturas')
   let spriteBytes = 0
+  let removedSprites = 0
   if (options.withSprites) {
     await mkdir(options.spritesDir, { recursive: true })
     const ids = generationData.flatMap(data => data.species.map(entry => entry.id))
-    const artworks = await client.getAllBinary(
-      ids,
-      id => ({ url: artworkUrl(id), cacheKey: `artwork-${id}.png` }),
-      progress('arte oficial'),
-    )
-    // O callback sai do laço de propósito: `progress` guarda o último valor
-    // impresso num closure, e recriá-lo a cada volta zera esse estado e imprime
-    // as 1025 linhas em vez de 20.
-    const onThumbnail = progress('miniaturas')
+
+    // Baixar, converter e gravar na mesma tarefa. Materializar as 1025 artes num
+    // `Map` antes da primeira conversão custava ~121 MB residentes para nada:
+    // cada PNG é lido uma vez e some em seguida.
+    const onSprite = progress('miniaturas')
     let done = 0
-    for (const [id, artwork] of artworks) {
-      const thumbnail = await toThumbnail(artwork)
+    await client.forEach(ids, async (id) => {
+      const thumbnail = await generateThumbnail(client, id)
       await writeFile(join(options.spritesDir, `${id}.webp`), thumbnail)
       spriteBytes += thumbnail.length
       done += 1
-      onThumbnail(done, artworks.size)
+      onSprite(done, ids.length)
+    })
+
+    // O `rm` da saída JSON não alcança os sprites. Sem esta varredura, um id que
+    // saia do dex deixa um `.webp` órfão acumulando no repositório para sempre.
+    // Só num build completo: num ensaio parcial, "órfão" seria o dex inteiro.
+    if (!options.partial) {
+      const keep = new Set(ids.map(id => `${id}.webp`))
+      for (const name of await readdir(options.spritesDir)) {
+        if (!name.endsWith('.webp') || keep.has(name)) continue
+        await rm(join(options.spritesDir, name))
+        removedSprites += 1
+      }
     }
   }
   else {
     console.log('  puladas (--no-sprites)')
   }
 
-  printReport(report, written, spriteBytes, client, generationData, chainsData, core)
+  const failedChecks = printReport({
+    report,
+    written,
+    spriteBytes,
+    removedSprites,
+    client,
+    generationData,
+    chains: chainsData,
+    core,
+    partial: options.partial,
+  })
+
+  // As checagens da Fase 1 eram impressas com ✗ e o processo saía com 0 — o que
+  // as tornava decoração. Num ensaio parcial elas falham por construção (3
+  // espécies não somam 1025), então lá o resultado é informativo.
+  if (failedChecks > 0 && !options.partial) {
+    console.error(`\n${failedChecks} checagem(ns) da Fase 1 falharam — a saída está incompleta.`)
+    process.exitCode = 1
+  }
 }
 
-function printReport(
-  report: Report,
-  written: readonly { name: string, bytes: number }[],
-  spriteBytes: number,
-  client: PokeApiClient,
-  generationData: readonly GenerationData[],
-  chains: ChainsData,
-  core: CoreData,
-): void {
+/**
+ * A miniatura de uma espécie, com a decodificação servindo de validação do cache.
+ *
+ * O `sharp` estourando é o sinal de que os bytes gravados estão truncados; o
+ * cliente apaga a entrada e refaz a requisição sozinho. O que ele não sabe é de
+ * quem são os bytes — daí o `cause`: sem ele a falha é um `vipspng: libpng read
+ * error` que não diz qual das 1025 espécies quebrou.
+ */
+async function generateThumbnail(client: PokeApiClient, id: number): Promise<Buffer> {
+  try {
+    return await client.getBinary(
+      artworkUrl(id),
+      `artwork-${id}.png`,
+      async bytes => toThumbnail(bytes),
+    )
+  }
+  catch (error) {
+    throw new Error(`espécie ${id}: falha ao gerar a miniatura`, { cause: error })
+  }
+}
+
+interface ReportInput {
+  readonly report: Report
+  readonly written: readonly { name: string, bytes: number }[]
+  readonly spriteBytes: number
+  readonly removedSprites: number
+  readonly client: PokeApiClient
+  readonly generationData: readonly GenerationData[]
+  readonly chains: ChainsData
+  readonly core: CoreData
+  readonly partial: boolean
+}
+
+/** Devolve quantas checagens da Fase 1 falharam — quem decide o código de saída
+ * é `main`, que sabe se o build foi parcial. */
+function printReport(input: ReportInput): number {
+  const { report, written, spriteBytes, removedSprites, client, generationData, chains, core } = input
+
   console.log('\n── saída ──')
   const totalBytes = written.reduce((sum, file) => sum + file.bytes, 0)
   for (const file of written) {
@@ -482,6 +633,9 @@ function printReport(
   console.log(`  ${'total JSON'.padEnd(16)} ${(totalBytes / 1024).toFixed(1).padStart(8)} KB`)
   if (spriteBytes > 0) {
     console.log(`  ${`sprites ${THUMBNAIL_SIZE}px`.padEnd(16)} ${(spriteBytes / 1024 / 1024).toFixed(1).padStart(8)} MB`)
+  }
+  if (removedSprites > 0) {
+    console.log(`  ${'sprites órfãos'.padEnd(16)} ${String(removedSprites).padStart(8)} apagados`)
   }
 
   console.log('\n── requisições ──')
@@ -493,16 +647,27 @@ function printReport(
   const charizard = describeChain(chains, 'charmander')
 
   const checks: readonly [string, boolean, string][] = [
-    ['core.json tem 18 tipos', core.types.length === 18, `${core.types.length}`],
-    ['matriz completa 18×18', core.effectiveness.every(row => row.length === 18), ''],
-    ['gen-1 tem 151 espécies', gen1 === 151, `${gen1}`],
-    ['as gerações somam 1025', speciesTotal === SPECIES_COUNT, `${speciesTotal}`],
-    ['chains.json tem 541 cadeias', Object.keys(chains).length === 541, `${Object.keys(chains).length}`],
+    [`core.json tem ${TYPE_COUNT} tipos`, core.types.length === TYPE_COUNT, `${core.types.length}`],
+    [
+      `matriz completa ${TYPE_COUNT}×${TYPE_COUNT}`,
+      core.effectiveness.length === TYPE_COUNT
+      && core.effectiveness.every(row => row.length === TYPE_COUNT),
+      '',
+    ],
+    [`core.json tem ${GENERATION_COUNT} gerações`, core.generations.length === GENERATION_COUNT, `${core.generations.length}`],
+    [`gen-1 tem ${KANTO_SPECIES_COUNT} espécies`, gen1 === KANTO_SPECIES_COUNT, `${gen1}`],
+    [`as gerações somam ${SPECIES_COUNT}`, speciesTotal === SPECIES_COUNT, `${speciesTotal}`],
+    [`chains.json tem ${CHAIN_COUNT} cadeias`, Object.keys(chains).length === CHAIN_COUNT, `${Object.keys(chains).length}`],
     ['Charizard resolve com 16 e 36', charizard === 'charmander → charmeleon (16) → charizard (36)', charizard],
   ]
 
+  let failed = 0
   for (const [label, passed, detail] of checks) {
+    if (!passed) failed += 1
     console.log(`  ${passed ? '✓' : '✗'} ${label}${detail === '' ? '' : ` — ${detail}`}`)
+  }
+  if (failed > 0 && input.partial) {
+    console.log('  (build parcial: as contagens falham por construção)')
   }
 
   const hardNames = ['mr-mime', 'nidoran-f', 'type-null', 'mr-rime']
@@ -516,8 +681,11 @@ function printReport(
   console.log('\n── relatório ──')
   const lines: readonly [string, readonly string[]][] = [
     ['displayName sem entrada em inglês', report.displayNameFallback],
+    ['moveset completado com máquina/tutor do mesmo grupo', report.movesetSupplemented],
     ['moveset sem golpe por nível (usou máquina/tutor)', report.movesetFallback],
     ['moveset caiu em Struggle (sem golpe de dano próprio)', report.movesetStruggle],
+    [`moveset abaixo das ${MOVES_IN_BATTLE} vagas de batalha`, report.movesetShort],
+    ['aresta de evolução sem condição na PokeAPI', report.evolutionWithoutCondition],
     ['sem flavor text em inglês', report.flavorMissing],
     ['flavor com POKéMON em caixa de cartucho', report.legacyCasing],
   ]
@@ -529,6 +697,8 @@ function printReport(
     const sample = items.slice(0, 12).join(', ')
     console.log(`  ${label}: ${items.length} — ${sample}${items.length > 12 ? ', …' : ''}`)
   }
+
+  return failed
 }
 
 function describeChain(chains: ChainsData, rootSlug: string): string {
@@ -546,4 +716,21 @@ function describeChain(chains: ChainsData, rootSlug: string): string {
   return 'cadeia não encontrada'
 }
 
-await main()
+/**
+ * `await main()` solto no escopo do módulo dispara o crawl inteiro em qualquer
+ * `import` deste arquivo — o que deixava `parseArgs`, `defaultVarietyId` e
+ * `buildEvolutionNode` sem nenhum teste possível. O guarda custa uma linha.
+ */
+if (import.meta.main) {
+  await main().catch((error: unknown) => {
+    // Sem o catch, uma falha de configuração sai como rejeição não tratada: quinze
+    // linhas de stack do loader do Node para dizer "--concurrency precisa ser um
+    // inteiro". A causa continua impressa logo abaixo, que é o que importa quando
+    // o erro vem do `sharp` e não de uma flag.
+    console.error(`\n✗ ${error instanceof Error ? error.message : String(error)}`)
+    if (error instanceof Error && error.cause !== undefined) {
+      console.error(`  causa: ${String(error.cause)}`)
+    }
+    process.exitCode = 1
+  })
+}

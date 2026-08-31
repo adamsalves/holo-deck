@@ -6,7 +6,7 @@ import type {
   FlavorData,
   GenerationData,
 } from '../../shared/types/dex.ts'
-import { TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
+import { GENERATION_COUNT, MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
 import { isMoveId, isSpeciesId } from '../../shared/types/brand.ts'
 
@@ -14,11 +14,22 @@ import { isMoveId, isSpeciesId } from '../../shared/types/brand.ts'
  * Validação da **saída** — o que vai para `public/data/`.
  *
  * A anotação `z.ZodType<CoreData>` é o ponto do arquivo: ela faz o compilador
- * conferir que o schema produz exatamente o contrato declarado em
- * `shared/types/dex.ts`. Um campo que entra no schema e não no tipo (ou o
- * contrário) quebra o `yarn typecheck` — que é o único portão capaz de provar
- * isso, já que nenhum teste de runtime nota um tipo saindo de sincronia com o
- * schema que deveria descrevê-lo.
+ * conferir que o schema produz o contrato declarado em `shared/types/dex.ts`.
+ * Um campo que entra no **tipo** e não no schema quebra o `yarn typecheck` — que
+ * é o único portão capaz de provar isso, já que nenhum teste de runtime nota um
+ * tipo saindo de sincronia com o schema que deveria descrevê-lo.
+ *
+ * **A direção contrária não é pega, e vale saber por quê.** Um `ZodObject` cujo
+ * `_output` é `CoreData & { extra: string }` continua atribuível a
+ * `z.ZodType<CoreData>`, por variância — um campo a mais só no schema passa
+ * limpo. Na prática um campo *obrigatório* a mais estoura no `parse` do build,
+ * então o que escapa é o campo *opcional*: dado gravado no arquivo que nenhum
+ * leitor sabe que existe. Quem fecha esse lado é a paridade com os guardas de
+ * `shared/types/dex.ts`, conferida a olho.
+ *
+ * As constantes de faixa — `TYPE_COUNT`, `GENERATION_COUNT`,
+ * `MOVES_PER_SPECIES` — vêm de `shared/`, não de literais aqui: escrever `8` nos
+ * dois lados é como os dois portões passam a discordar sem ninguém mudar nada.
  */
 
 /**
@@ -62,7 +73,7 @@ const moveEntry = z.object({
 })
 
 const generationMeta = z.object({
-  generation: z.number().int().min(1).max(9),
+  generation: z.number().int().min(1).max(GENERATION_COUNT),
   region: z.string().min(1),
   displayName: z.string().min(1),
   speciesCount: z.number().int().positive(),
@@ -74,7 +85,7 @@ export const coreSchema: z.ZodType<CoreData> = z.object({
   types: z.array(typeName).length(TYPE_COUNT),
   effectiveness: z.array(z.array(effectiveness).length(TYPE_COUNT)).length(TYPE_COUNT),
   moves: z.array(moveEntry).min(1),
-  generations: z.array(generationMeta).length(9),
+  generations: z.array(generationMeta).length(GENERATION_COUNT),
 })
 
 const speciesEntry = z.object({
@@ -104,11 +115,11 @@ const speciesEntry = z.object({
   color: z.string().min(1),
   evolutionChainId: z.number().int().positive(),
   // Vazio é defeito: espécie sem golpe trava a batalha da Fase 4.
-  moveIds: z.array(moveIdSchema).min(1).max(8),
+  moveIds: z.array(moveIdSchema).min(1).max(MOVES_PER_SPECIES),
 })
 
 export const generationSchema: z.ZodType<GenerationData> = z.object({
-  generation: z.number().int().min(1).max(9),
+  generation: z.number().int().min(1).max(GENERATION_COUNT),
   region: z.string().min(1),
   species: z.array(speciesEntry).min(1),
 })

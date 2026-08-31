@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { gunzip, gzip } from 'node:zlib'
 import { promisify } from 'node:util'
@@ -8,6 +8,27 @@ const gzipAsync = promisify(gzip)
 const gunzipAsync = promisify(gunzip)
 
 const API_ROOT = 'https://pokeapi.co/api/v2'
+
+const DEFAULT_CONCURRENCY = 10
+
+/**
+ * Teto de concorrência. O cabeçalho deste arquivo declara fair use como
+ * contrato; sem um teto, `--concurrency 500` o contradiz em uma flag.
+ */
+export const MAX_CONCURRENCY = 20
+
+/**
+ * Sem `signal`, uma conexão pendurada trava o build para sempre — a promessa
+ * nunca rejeita, então não existe retentativa possível. Num crawl de ~3.500
+ * requisições isso não é hipótese.
+ */
+const REQUEST_TIMEOUT_MS = 30_000
+
+const MAX_ATTEMPTS = 3
+
+/** Base da espera entre tentativas: 1s, 2s. Configurável só para que o teste da
+ * retentativa não precise esperar de verdade. */
+const DEFAULT_RETRY_BACKOFF_MS = 500
 
 /**
  * A PokeAPI é explicitamente não-comercial e pede fair use. O contrato deste
@@ -24,6 +45,7 @@ export interface ClientOptions {
   readonly cacheDir: string
   readonly concurrency?: number
   readonly userAgent?: string
+  readonly retryBackoffMs?: number
 }
 
 interface Stats {
@@ -31,17 +53,61 @@ interface Stats {
   fromNetwork: number
 }
 
+/**
+ * Resposta que chegou e disse não. Carrega o status porque a decisão de repetir
+ * depende dele, e um `Error` de mensagem formatada obrigaria a reler a string.
+ */
+class HttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, url: string) {
+    super(`HTTP ${status} em ${url}`)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
+/**
+ * Erro que não adianta repetir: o servidor entendeu e recusou. Repetir um 404
+ * custa três tentativas e 1,5 s de espera para chegar à mesma conclusão.
+ *
+ * O 429 é a exceção — é o único 4xx que quer dizer "de novo, mais devagar", que
+ * é precisamente o que a retentativa faz.
+ */
+function isPermanent(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 429
+}
+
+/**
+ * `?` e `=` de um endpoint de lista são legais em nome de arquivo no Linux e
+ * ilegais no Windows. Sanear custa uma linha e evita um cache que funciona só na
+ * máquina de quem escreveu. Como efeito, `/` também colapsa — o que torna
+ * `../` impossível num caminho de cache.
+ */
+function safeName(path: string): string {
+  return path.replaceAll(/[^a-z0-9._-]/gi, '_')
+}
+
 export class PokeApiClient {
   private readonly cacheDir: string
   private readonly concurrency: number
   private readonly userAgent: string
+  private readonly retryBackoffMs: number
   readonly stats: Stats = { fromCache: 0, fromNetwork: 0 }
 
   constructor(options: ClientOptions) {
     this.cacheDir = options.cacheDir
-    this.concurrency = options.concurrency ?? 10
+    this.concurrency = options.concurrency ?? DEFAULT_CONCURRENCY
+    if (!Number.isInteger(this.concurrency)
+      || this.concurrency < 1
+      || this.concurrency > MAX_CONCURRENCY) {
+      throw new Error(
+        `concorrência precisa ser um inteiro de 1 a ${MAX_CONCURRENCY}: ${this.concurrency}`,
+      )
+    }
     this.userAgent = options.userAgent
       ?? 'holo-deck-build/1.0 (+https://github.com/adamsalves/holo-deck)'
+    this.retryBackoffMs = options.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS
   }
 
   /**
@@ -64,7 +130,7 @@ export class PokeApiClient {
     const body = await this.request(`${API_ROOT}/${path}`)
     const parsed: unknown = JSON.parse(body)
     const data = schema.parse(parsed)
-    await this.writeCache(path, body)
+    await this.writeAtomic(this.cacheFile(path), await gzipAsync(Buffer.from(body, 'utf8')))
     this.stats.fromNetwork += 1
     return data
   }
@@ -79,38 +145,52 @@ export class PokeApiClient {
   }
 
   /**
-   * Baixa um binário (arte oficial). Vive fora do `get` porque não é JSON e não
-   * passa por schema — a validação dele é o `sharp` conseguir decodificar.
+   * Baixa um binário (arte oficial) e o entrega decodificado.
+   *
+   * `decode` é a validação, e roda **inclusive sobre os bytes do cache** — mesmo
+   * contrato do `get`. Um PNG truncado devolvido intacto faria o `sharp` estourar
+   * a cada execução até alguém apagar o arquivo à mão; aqui a entrada ruim é
+   * apagada e a requisição refeita. Quem decodifica fica de fora deste módulo
+   * de propósito: `sharp` não pertence ao cliente HTTP.
    */
-  async getBinary(url: string, cacheKey: string): Promise<Buffer> {
-    const file = join(this.cacheDir, 'binary', cacheKey)
-    try {
-      const cached = await readFile(file)
-      this.stats.fromCache += 1
-      return cached
-    }
-    catch {
-      // Ausente no cache é o caminho normal na primeira execução.
+  async getBinary<R>(
+    url: string,
+    cacheKey: string,
+    decode: (bytes: Buffer) => Promise<R>,
+  ): Promise<R> {
+    const file = join(this.cacheDir, 'binary', safeName(cacheKey))
+
+    const cached = await readFileOrNull(file)
+    if (cached !== null) {
+      try {
+        const decoded = await decode(cached)
+        this.stats.fromCache += 1
+        return decoded
+      }
+      catch {
+        console.warn(`  cache binário inválido em ${cacheKey}, refazendo a requisição`)
+        await rm(file, { force: true })
+      }
     }
 
-    const response = await this.fetchWithRetry(url)
+    const response = await this.fetchWithRetry(url, 'image/png')
     const bytes = Buffer.from(await response.arrayBuffer())
-    await mkdir(dirname(file), { recursive: true })
-    await writeFile(file, bytes)
+    await this.writeAtomic(file, bytes)
     this.stats.fromNetwork += 1
-    return bytes
+    return decode(bytes)
   }
 
-  async getAllBinary<T>(
+  /**
+   * Roda `work` sobre todos os itens com a concorrência do cliente, **sem reter
+   * resultado**. É o que permite baixar 1025 artes e gravar 1025 miniaturas sem
+   * materializar os ~121 MB de PNG num `Map` antes da primeira conversão.
+   */
+  async forEach<T>(
     items: readonly T[],
-    toRequest: (item: T) => { url: string, cacheKey: string },
+    work: (item: T) => Promise<void>,
     onProgress?: (done: number, total: number) => void,
-  ): Promise<Map<T, Buffer>> {
-    const results = await this.pool(items, async (item) => {
-      const { url, cacheKey } = toRequest(item)
-      return [item, await this.getBinary(url, cacheKey)] as const
-    }, onProgress)
-    return new Map(results)
+  ): Promise<void> {
+    await this.pool(items, work, onProgress)
   }
 
   /**
@@ -133,7 +213,12 @@ export class PokeApiClient {
         const index = next
         next += 1
         const item = items[index]
-        if (item === undefined) continue
+        if (item === undefined) {
+          // Pular deixaria `results[index]` como buraco enquanto a assinatura
+          // promete um array cheio, e o erro apareceria dezenas de linhas adiante
+          // como `Cannot read properties of undefined`, sem pista da causa.
+          throw new Error(`pool: item ausente no índice ${index} de ${items.length}`)
+        }
         results[index] = await work(item)
         done += 1
         onProgress?.(done, items.length)
@@ -147,41 +232,42 @@ export class PokeApiClient {
   }
 
   private async request(url: string): Promise<string> {
-    const response = await this.fetchWithRetry(url)
+    const response = await this.fetchWithRetry(url, 'application/json')
     return response.text()
   }
 
   /**
    * Três tentativas com espera crescente. Numa varredura de ~3.500 requisições,
    * um 429 ou 503 isolado é esperado — sem retentativa ele derrubaria um build
-   * de 25 minutos no minuto 20.
+   * de 25 minutos no minuto 20. Um 404, porém, não melhora com insistência: a
+   * distinção entre transitório e permanente é o que a `isPermanent` faz.
    */
-  private async fetchWithRetry(url: string, attempt = 1): Promise<Response> {
-    const maxAttempts = 3
+  private async fetchWithRetry(url: string, accept: string, attempt = 1): Promise<Response> {
     try {
       const response = await fetch(url, {
-        headers: { 'Accept': 'application/json', 'User-Agent': this.userAgent },
+        headers: { 'Accept': accept, 'User-Agent': this.userAgent },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status} em ${url}`)
+        // O corpo precisa ser consumido ou cancelado: descartar a `Response`
+        // deixa o socket do undici pendurado até o coletor passar.
+        await response.body?.cancel()
+        throw new HttpError(response.status, url)
       }
       return response
     }
     catch (error) {
-      if (attempt >= maxAttempts) throw error
-      const waitMs = 500 * 2 ** attempt
+      if (error instanceof HttpError && isPermanent(error.status)) throw error
+      if (attempt >= MAX_ATTEMPTS) throw error
+      const waitMs = this.retryBackoffMs * 2 ** attempt
       console.warn(`  tentativa ${attempt} falhou em ${url}; nova em ${waitMs}ms`)
       await new Promise(resolve => setTimeout(resolve, waitMs))
-      return this.fetchWithRetry(url, attempt + 1)
+      return this.fetchWithRetry(url, accept, attempt + 1)
     }
   }
 
   private cacheFile(path: string): string {
-    // `?` e `=` de um endpoint de lista são legais em nome de arquivo no Linux
-    // e ilegais no Windows. Sanear aqui custa uma linha e evita um cache que
-    // funciona só na máquina de quem escreveu.
-    const safe = path.replaceAll(/[^a-z0-9._-]/gi, '_')
-    return join(this.cacheDir, 'json', `${safe}.json.gz`)
+    return join(this.cacheDir, 'json', `${safeName(path)}.json.gz`)
   }
 
   private async readCache(path: string): Promise<unknown> {
@@ -196,9 +282,26 @@ export class PokeApiClient {
     }
   }
 
-  private async writeCache(path: string, body: string): Promise<void> {
-    const file = this.cacheFile(path)
+  /**
+   * Grava por temporário e `rename`. O `rename` é atômico dentro do mesmo
+   * sistema de arquivos, então um Ctrl+C no meio deixa um `.tmp` órfão em vez de
+   * um arquivo truncado que o próximo build lê como se fosse bom — que é
+   * exatamente o modo de falhar que a validação do cache existe para pegar.
+   */
+  private async writeAtomic(file: string, bytes: Buffer): Promise<void> {
     await mkdir(dirname(file), { recursive: true })
-    await writeFile(file, await gzipAsync(Buffer.from(body, 'utf8')))
+    const temporary = `${file}.${process.pid}.tmp`
+    await writeFile(temporary, bytes)
+    await rename(temporary, file)
+  }
+}
+
+async function readFileOrNull(file: string): Promise<Buffer | null> {
+  try {
+    return await readFile(file)
+  }
+  catch {
+    // Ausente no cache é o caminho normal na primeira execução.
+    return null
   }
 }

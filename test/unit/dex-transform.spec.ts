@@ -177,6 +177,119 @@ describe('buildEffectivenessMatrix', () => {
     ]
     expect(() => buildEffectivenessMatrix(types)).toThrow(/inconsistente/)
   })
+
+  it('para o build também quando um _to não tem nenhum _from que o confirme', () => {
+    // A outra direção, e a que passa despercebida: aqui `water` não declara
+    // *nada* em `_from`. Uma conferência que só percorra as listas `_from` nunca
+    // visita esta casa — o `_to` espúrio entra na matriz e o build segue.
+    // Comparando coluna por coluna, a ausência vale 1 e a contradição aparece.
+    const types: PokeType[] = [
+      { id: 13, name: 'electric', damage_relations: relations({ double_damage_to: [named('water')] }) },
+      { id: 11, name: 'water', damage_relations: relations() },
+    ]
+    expect(() => buildEffectivenessMatrix(types)).toThrow(/inconsistente/)
+  })
+})
+
+describe('selectMoveset — completar moveset curto', () => {
+  const catalog = new Map<number, MoveEntry>([
+    [85, entry({ id: 85, name: 'thunderbolt', power: 90, type: named('electric') })],
+    [98, entry({ id: 98, name: 'quick-attack', power: 40, type: named('normal') })],
+    [231, entry({ id: 231, name: 'iron-tail', power: 100, accuracy: 75, type: named('steel') })],
+    [89, entry({ id: 89, name: 'earthquake', power: 100, type: named('ground') })],
+    [58, entry({ id: 58, name: 'ice-beam', power: 90, type: named('ice') })],
+    [126, entry({ id: 126, name: 'fire-blast', power: 110, type: named('fire') })],
+  ])
+
+  /** vg 25 é scarlet-violet (order 27); vg 1 é red-blue (order 3). */
+  const order = new Map([[1, 3], [25, 27]])
+
+  function learns(moveId: number, versionGroupId: number, level: number, method = 'level-up') {
+    return {
+      move: named('m', moveId),
+      version_group_details: [{
+        level_learned_at: level,
+        version_group: named('vg', versionGroupId),
+        move_learn_method: named(method),
+      }],
+    }
+  }
+
+  it('completa com máquina e tutor quando o nível não enche as 4 vagas', () => {
+    // O defeito que isto conserta: parar no primeiro método com resultado dava a
+    // Clefable, Ninetales, Poliwrath e Ludicolo 2 golpes cada, porque são
+    // evoluções por pedra e o grupo mais recente quase não lhes ensina por
+    // nível — embora o MESMO grupo tenha máquina e tutor de sobra.
+    const p = pokemon({
+      moves: [
+        learns(85, 25, 30),
+        learns(98, 25, 10),
+        learns(231, 25, 0, 'machine'),
+        learns(89, 25, 0, 'tutor'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.source).toBe('supplemented')
+    expect(result.moveIds).toEqual([85, 89, 98, 231])
+  })
+
+  it('não completa quando o nível já dá as 4 vagas', () => {
+    // A regra 1 continua valendo: golpe por nível é o que descreve a espécie.
+    // A complementação é exceção, não o caminho normal.
+    const p = pokemon({
+      moves: [
+        learns(85, 25, 40),
+        learns(98, 25, 30),
+        learns(231, 25, 20),
+        learns(89, 25, 10),
+        learns(58, 25, 0, 'machine'),
+        learns(126, 25, 0, 'machine'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.source).toBe('level-up')
+    expect(result.moveIds).toEqual([85, 89, 98, 231])
+    expect(result.moveIds).not.toContain(58)
+  })
+
+  it('só completa dentro do MESMO version group', () => {
+    // Misturar grupos produziria um moveset que nunca existiu em jogo nenhum —
+    // é a decisão 1, e a complementação não pode furá-la para encher vaga.
+    const p = pokemon({
+      moves: [
+        learns(85, 25, 30),
+        learns(231, 1, 0, 'machine'),
+        learns(89, 1, 0, 'tutor'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.source).toBe('level-up')
+    expect(result.moveIds).toEqual([85])
+  })
+
+  it('mantém o nível quando o golpe é aprendido pelos dois métodos', () => {
+    // Um golpe que existe por nível e por máquina no mesmo grupo entra uma vez
+    // só, e com o nível — que é o que descreve quando a espécie de fato o ganha.
+    const p = pokemon({
+      moves: [
+        {
+          move: named('m', 85),
+          version_group_details: [
+            { level_learned_at: 36, version_group: named('vg', 25), move_learn_method: named('level-up') },
+            { level_learned_at: 0, version_group: named('vg', 25), move_learn_method: named('machine') },
+          ],
+        },
+        learns(98, 25, 0, 'machine'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.source).toBe('supplemented')
+    expect(result.moveIds).toEqual([85, 98])
+  })
 })
 
 function pokemon(overrides: Partial<Pokemon> = {}): Pokemon {

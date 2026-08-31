@@ -9,7 +9,7 @@ import type {
   StatName,
   TypeName,
 } from '../../shared/types/dex.ts'
-import { TYPE_COUNT, TYPE_NAMES, isTypeName, typeIndex } from '../../shared/types/dex.ts'
+import { MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES, isTypeName, typeIndex } from '../../shared/types/dex.ts'
 import type { MoveId } from '../../shared/types/brand.ts'
 import { isMoveId } from '../../shared/types/brand.ts'
 
@@ -19,9 +19,15 @@ import { isMoveId } from '../../shared/types/brand.ts'
  * torna a parte interessante do build testável sem um único mock de `fetch`.
  */
 
-/** Quantos golpes cada espécie carrega. O jogo usa 4; os outros 4 são a margem
- * de cobertura de tipo que a escolha da Fase 4 precisa para ter o que escolher. */
-export const MOVES_PER_SPECIES = 8
+/**
+ * Quantos golpes o motor da Fase 4 leva para uma batalha. É o piso: abaixo dele
+ * a espécie entra em campo com vaga vazia, e o build tenta completar o moveset
+ * antes de aceitar isso — ver `selectMoveset`.
+ *
+ * O teto é `MOVES_PER_SPECIES`, que vive em `shared/types/dex.ts` porque o
+ * schema de escrita e o guarda de leitura também precisam dele.
+ */
+export const MOVES_IN_BATTLE = 4
 
 /** Tetos herdados da regra de moveset do plano. */
 export const MAX_MOVE_POWER = 120
@@ -92,6 +98,12 @@ export function pickFlavorText(species: Species): string | null {
  * de origem está inconsistente e o build para — em vez de gerar uma tabela de
  * dano silenciosamente errada, que é o defeito mais caro possível num jogo de
  * batalha por tipo.
+ *
+ * A conferência fecha as **duas** direções. Percorrer só as listas `_from` deixa
+ * passar o caso oposto — uma casa escrita por um `_to` que nenhuma `_from`
+ * confirma, que é exatamente um `_to` espúrio —, porque essa casa nunca chega a
+ * ser visitada. Comparar coluna por coluna, tratando a ausência nas `_from` como
+ * o 1 que ela significa, pega os dois lados com o mesmo laço.
  */
 export function buildEffectivenessMatrix(types: readonly PokeType[]): Effectiveness[][] {
   const matrix: Effectiveness[][] = TYPE_NAMES.map(() => TYPE_NAMES.map(() => 1))
@@ -129,22 +141,30 @@ function assertTransposeAgrees(types: readonly PokeType[], matrix: readonly (rea
     const defender = typeIndex(type.name)
     if (defender === -1) continue
 
-    const expected: readonly (readonly [readonly { name: string }[], Effectiveness])[] = [
-      [type.damage_relations.no_damage_from, 0],
-      [type.damage_relations.half_damage_from, 0.5],
-      [type.damage_relations.double_damage_from, 2],
-    ]
-
-    for (const [sources, value] of expected) {
+    // O que as `_from` deste tipo afirmam, por atacante. O que não aparece nelas
+    // vale 1 — e é justamente essa ausência que fecha a segunda direção: uma
+    // casa ≠ 1 sem `_from` correspondente vira 1 esperado contra o valor escrito.
+    const expected = new Map<number, Effectiveness>()
+    const declare = (sources: readonly { readonly name: string }[], value: Effectiveness): void => {
       for (const source of sources) {
         const attacker = typeIndex(source.name)
         if (attacker === -1) continue
-        if (read(attacker, defender) !== value) {
-          throw new Error(
-            `damage_relations inconsistente: ${source.name} → ${type.name} vale `
-            + `${read(attacker, defender)} pelas relações _to e ${value} pelas _from`,
-          )
-        }
+        expected.set(attacker, value)
+      }
+    }
+
+    declare(type.damage_relations.no_damage_from, 0)
+    declare(type.damage_relations.half_damage_from, 0.5)
+    declare(type.damage_relations.double_damage_from, 2)
+
+    for (let attacker = 0; attacker < TYPE_COUNT; attacker += 1) {
+      const fromRelations = expected.get(attacker) ?? 1
+      const toRelations = read(attacker, defender)
+      if (toRelations !== fromRelations) {
+        throw new Error(
+          `damage_relations inconsistente: ${TYPE_NAMES[attacker] ?? attacker} → ${type.name} vale `
+          + `${toRelations} pelas relações _to e ${fromRelations} pelas _from`,
+        )
       }
     }
   }
@@ -221,25 +241,29 @@ export function isEligibleMove(move: MoveEntry): boolean {
 
 /**
  * Id de Struggle. É o que os jogos usam quando um Pokémon não tem golpe
- * utilizável — e Ditto, Wobbuffet e Smeargle caem exatamente nesse caso: os três
- * não aprendem um único golpe de dano com poder fixo (Transform e Sketch são
+ * utilizável, e **dez espécies** caem exatamente nesse caso: Metapod, Kakuna,
+ * Abra, Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku, Cosmog e Cosmoem. Nenhuma
+ * delas aprende um único golpe de dano com poder fixo (Transform e Sketch são
  * status; Counter e Mirror Coat têm `power: null` porque o dano deles vem do
  * golpe recebido, não de um valor da tabela).
  *
+ * Unown **não** está na lista, embora pareça: ele tem Hidden Power, que é um
+ * golpe de dano — o moveset dele é curto, não vazio.
+ *
  * **Nota para a Fase 4:** a PokeAPI dá `pp: 1` a Struggle, resíduo do dado de
  * primeira geração. Nos jogos modernos Struggle não tem PP — o motor precisa
- * tratá-lo como ilimitado, senão estes três atacam uma vez por batalha e ficam
- * parados até o fim.
+ * tratá-lo como ilimitado, senão estas dez atacam uma vez por batalha e ficam
+ * paradas até o fim.
  */
 export const STRUGGLE_MOVE_ID = 165
 
 /**
- * De onde saiu o moveset. Discriminante em vez de booleano porque são três
- * situações distintas, e as duas de exceção precisam aparecer separadas no
+ * De onde saiu o moveset. Discriminante em vez de booleano porque são quatro
+ * situações distintas, e as três de exceção precisam aparecer separadas no
  * relatório do build — um número que cresce em silêncio é o jeito de o dex
  * degradar sem ninguém notar.
  */
-export type MovesetSource = 'level-up' | 'any-method' | 'struggle'
+export type MovesetSource = 'level-up' | 'supplemented' | 'any-method' | 'struggle'
 
 export interface MovesetResult {
   readonly moveIds: readonly MoveId[]
@@ -247,9 +271,9 @@ export interface MovesetResult {
 }
 
 /**
- * Escolhe até 8 golpes de dano da espécie.
+ * Escolhe até `MOVES_PER_SPECIES` golpes de dano da espécie.
  *
- * Duas decisões que parecem detalhe e não são:
+ * Três decisões que parecem detalhe e não são:
  *
  * 1. **Um único version group.** Um golpe aprendido no nível 1 em red-blue e no
  *    50 em scarlet-violet tem dois níveis; misturar as 26 versões produziria um
@@ -259,22 +283,50 @@ export interface MovesetResult {
  *    óbvio e é uma armadilha: se os 8 forem do mesmo tipo, a escolha por
  *    cobertura da Fase 4 fica sem nada para escolher. Primeiro entra o melhor de
  *    cada tipo, e só depois o resto preenche as vagas.
+ * 3. **Menos de `MOVES_IN_BATTLE` golpes por nível completa com máquina e
+ *    tutor** — do mesmo version group, para não quebrar a decisão 1. Parar no
+ *    primeiro método com resultado é o que fazia Clefable, Ninetales, Poliwrath
+ *    e Ludicolo entrarem no dex com 2 golpes: são evoluções por pedra, e o grupo
+ *    mais recente quase não lhes dá golpe por nível, embora o mesmo grupo tenha
+ *    máquina e tutor de sobra. Eram 54 espécies abaixo das 4 vagas, e só 11
+ *    apareciam no relatório — as outras 43 degradavam caladas.
  */
 export function selectMoveset(
   pokemon: Pokemon,
   catalog: ReadonlyMap<number, MoveEntry>,
   versionGroupOrder: ReadonlyMap<number, number>,
 ): MovesetResult {
-  const byLevelUp = collectCandidates(pokemon, catalog, versionGroupOrder, m => m === 'level-up')
-  if (byLevelUp.length > 0) {
-    return { moveIds: pickDiverse(byLevelUp), source: 'level-up' }
+  const byLevelUpOnly = (method: string): boolean => method === 'level-up'
+  const byAnyMethod = (): boolean => true
+
+  const levelOrder = latestOrderWith(pokemon, versionGroupOrder, byLevelUpOnly)
+  if (levelOrder !== -1) {
+    const fromLevel = candidatesAt(pokemon, catalog, versionGroupOrder, byLevelUpOnly, levelOrder)
+    if (fromLevel.length >= MOVES_IN_BATTLE) {
+      return { moveIds: pickDiverse(fromLevel), source: 'level-up' }
+    }
+
+    const supplemented = mergeById(
+      fromLevel,
+      candidatesAt(pokemon, catalog, versionGroupOrder, byAnyMethod, levelOrder),
+    )
+    if (supplemented.length > fromLevel.length) {
+      return { moveIds: pickDiverse(supplemented), source: 'supplemented' }
+    }
+    if (fromLevel.length > 0) {
+      return { moveIds: pickDiverse(fromLevel), source: 'level-up' }
+    }
   }
 
-  // Aprende golpe de dano, mas só por máquina ou tutor. Aceitar é melhor que
-  // entrar no dex com moveset vazio, que trava a batalha da Fase 4.
-  const byAnyMethod = collectCandidates(pokemon, catalog, versionGroupOrder, () => true)
-  if (byAnyMethod.length > 0) {
-    return { moveIds: pickDiverse(byAnyMethod), source: 'any-method' }
+  // Aprende golpe de dano, mas só por máquina ou tutor — e em nenhum grupo em
+  // que também aprenda por nível. Aceitar é melhor que entrar no dex com moveset
+  // vazio, que trava a batalha da Fase 4.
+  const anyOrder = latestOrderWith(pokemon, versionGroupOrder, byAnyMethod)
+  if (anyOrder !== -1) {
+    const fromAny = candidatesAt(pokemon, catalog, versionGroupOrder, byAnyMethod, anyOrder)
+    if (fromAny.length > 0) {
+      return { moveIds: pickDiverse(fromAny), source: 'any-method' }
+    }
   }
 
   const struggle = catalog.get(STRUGGLE_MOVE_ID)
@@ -289,32 +341,47 @@ interface Candidate {
   readonly level: number
 }
 
-function collectCandidates(
+/**
+ * O `order` do grupo mais recente em que a espécie aprende algo pelo método
+ * aceito, ou `-1` se não aprende nada assim.
+ *
+ * `order`, nunca o id do version group: `blue-japan` tem id 29 e
+ * `scarlet-violet` tem 25, porque a PokeAPI cadastrou o relançamento japonês de
+ * 1996 depois. Ordenar por id daria às 1025 espécies o moveset de Game Boy — e o
+ * resultado é plausível o bastante para ninguém notar lendo a saída.
+ *
+ * Empate de `order` é impossível na prática, e o `>` deixa o primeiro vencer de
+ * forma determinística em vez de depender da ordem de `moves[]`.
+ */
+function latestOrderWith(
+  pokemon: Pokemon,
+  versionGroupOrder: ReadonlyMap<number, number>,
+  acceptsMethod: (method: string) => boolean,
+): number {
+  let latest = -1
+  for (const entry of pokemon.moves) {
+    for (const detail of entry.version_group_details) {
+      if (!acceptsMethod(detail.move_learn_method.name)) continue
+      const order = versionGroupOrder.get(resourceId(detail.version_group.url)) ?? -1
+      if (order > latest) latest = order
+    }
+  }
+  return latest
+}
+
+/** Os golpes elegíveis que a espécie aprende pelo método aceito num `order` fixo. */
+function candidatesAt(
   pokemon: Pokemon,
   catalog: ReadonlyMap<number, MoveEntry>,
   versionGroupOrder: ReadonlyMap<number, number>,
   acceptsMethod: (method: string) => boolean,
+  order: number,
 ): Candidate[] {
-  const orderOf = (url: string): number => versionGroupOrder.get(resourceId(url)) ?? -1
-
-  // O grupo mais recente em que a espécie aprende algo pelo método aceito.
-  // Empate de `order` é impossível na prática, mas o `>` deixa o primeiro vencer
-  // de forma determinística em vez de depender da ordem de `moves[]`.
-  let latestOrder = -1
-  for (const entry of pokemon.moves) {
-    for (const detail of entry.version_group_details) {
-      if (!acceptsMethod(detail.move_learn_method.name)) continue
-      const order = orderOf(detail.version_group.url)
-      if (order > latestOrder) latestOrder = order
-    }
-  }
-  if (latestOrder === -1) return []
-
   const candidates: Candidate[] = []
   for (const entry of pokemon.moves) {
     const detail = entry.version_group_details.find(
       item => acceptsMethod(item.move_learn_method.name)
-        && orderOf(item.version_group.url) === latestOrder,
+        && (versionGroupOrder.get(resourceId(item.version_group.url)) ?? -1) === order,
     )
     if (detail === undefined) continue
 
@@ -324,6 +391,22 @@ function collectCandidates(
     candidates.push({ move, level: detail.level_learned_at })
   }
   return candidates
+}
+
+/**
+ * União por id de golpe, com o candidato de `preferred` vencendo o empate: um
+ * golpe aprendido por nível **e** por máquina no mesmo grupo aparece nas duas
+ * listas com `level_learned_at` diferente, e o do nível é o que descreve quando
+ * a espécie de fato o ganha. A ordem de inserção do `Map` mantém o resultado
+ * determinístico.
+ */
+function mergeById(preferred: readonly Candidate[], extra: readonly Candidate[]): Candidate[] {
+  const byId = new Map<number, Candidate>()
+  for (const candidate of preferred) byId.set(candidate.move.id, candidate)
+  for (const candidate of extra) {
+    if (!byId.has(candidate.move.id)) byId.set(candidate.move.id, candidate)
+  }
+  return [...byId.values()]
 }
 
 /** Empate resolvido por poder e depois por id: o resultado precisa ser o mesmo
