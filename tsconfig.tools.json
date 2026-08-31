@@ -26,6 +26,8 @@
     "scripts/**/*",
     "vitest.config.ts",
     "playwright.config.ts",
-    "eslint.config.mjs"
+    "eslint.config.mjs",
+    "commitlint.config.mjs",
+    "lint-staged.config.mjs"
   ]
 }

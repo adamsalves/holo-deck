@@ -1,0 +1,12 @@
+. "$(dirname -- "$0")/common.sh"
+
+# Os dois portões que não têm como ser recortados por arquivo: `vue-tsc` e o
+# Vitest olham o projeto todo. Ficam aqui, no push, e não no commit.
+#
+# São ~6 s hoje. Quando a Fase 4 trouxer a suíte do motor e isso incomodar, o
+# certo é apagar este arquivo — não conviver com `--no-verify` no dedo. O CI
+# continua sendo a autoridade; isto aqui só evita descobrir pelo e-mail.
+# Encadeados com `&&` de propósito. O husky roda os hooks com `sh -e`, o que
+# hoje já abortaria no primeiro erro — mas isso é detalhe de implementação de
+# dependência, e a regressão seria um pre-push verde com o typecheck quebrado.
+yarn typecheck && yarn test

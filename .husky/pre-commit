@@ -1,0 +1,7 @@
+. "$(dirname -- "$0")/common.sh"
+
+# Só os arquivos staged, para o hook não crescer junto com o projeto.
+# `yarn lint` no repo inteiro é papel do CI; aqui ele passaria de 5 s já hoje,
+# e hook lento vira `--no-verify` — que é pior que hook nenhum, porque dá
+# confiança falsa.
+lint-staged
