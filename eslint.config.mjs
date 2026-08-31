@@ -49,10 +49,16 @@ export default withNuxt(
    * entra por `JSON.parse`, `res.json()` e round-trip de `localStorage` — que é
    * exatamente a fronteira do save. Sem a família `no-unsafe-*`, o portão de
    * tipagem honesta para na porta por onde o problema passa.
+   *
+   * **`app/` está na lista.** Ela entrou na Fase 1: `useDex()` lê JSON servido por
+   * HTTP, que é uma fronteira de `any` igual à do save. Sem este glob, um
+   * `$fetch(...)` sem `<unknown>` em `app/` passa limpo enquanto o mesmo código
+   * em `shared/` dá três erros — e o portão vira uma questão de qual pasta o
+   * arquivo calhou de estar.
    */
   {
     name: 'holo-deck/typing-honesty-type-aware',
-    files: ['shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts'],
+    files: ['app/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,

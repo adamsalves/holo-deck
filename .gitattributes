@@ -7,3 +7,10 @@
 *.png binary
 *.ico binary
 *.woff2 binary
+*.webp binary
+
+# Dex gerado por `yarn data:build`. Marcado como gerado para o GitHub colapsar o
+# diff no review e não contar as ~200 KB de JSON como código escrito à mão — o
+# que interessa num PR é a mudança no script, não as 1025 linhas que ela produz.
+public/data/*.json linguist-generated=true
+public/sprites/*.webp linguist-generated=true

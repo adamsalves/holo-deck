@@ -15,6 +15,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "data:build": "node scripts/build-dex.ts",
     "prepare": "husky",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -44,8 +45,10 @@
     "happy-dom": "20.11.13",
     "husky": "9.1.7",
     "lint-staged": "17.4.1",
+    "sharp": "0.35.4",
     "typescript": "5.9.3",
     "vitest": "4.1.11",
-    "vue-tsc": "3.3.11"
+    "vue-tsc": "3.3.11",
+    "zod": "4.5.4"
   }
 }
