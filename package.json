@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Deck battler holográfico sobre o dex da PokeAPI — packs, coleção, deck de 6 e 9 ginásios.",
+  "description": "Deck battler hologr\u00e1fico sobre o dex da PokeAPI \u2014 packs, cole\u00e7\u00e3o, deck de 6 e 9 gin\u00e1sios.",
   "license": "MIT",
   "engines": {
     "node": ">=24.15.0 <25"
@@ -15,6 +15,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "data:build": "node scripts/build-dex.ts",
     "prepare": "husky",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -44,8 +45,10 @@
     "happy-dom": "20.11.13",
     "husky": "9.1.7",
     "lint-staged": "17.4.1",
+    "sharp": "0.35.4",
     "typescript": "5.9.3",
     "vitest": "4.1.11",
-    "vue-tsc": "3.3.11"
+    "vue-tsc": "3.3.11",
+    "zod": "4.5.4"
   }
 }
