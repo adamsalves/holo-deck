@@ -53,6 +53,15 @@ change ainda não estoura major:
 | `feat!:` / `BREAKING CHANGE:`     | minor           | Breaking Changes     |
 | `chore:` `docs:` `test:` `refactor:` `style:` `ci:` | nada | não          |
 
+**O tipo errado não é deslize de estilo — é a versão decidida sem querer.** Já
+aconteceu aqui: `ad21429` entrou como `fix:` numa Fase 0 planejada como `chore:`
+puro, e a release saiu `v0.1.1` em vez de a versão apenas nascer em `0.1.0`. Por
+isso o assunto é validado por `commitlint` em dois lugares: no hook `commit-msg`
+(local, e burlável com `--no-verify`) e num job do
+[`ci.yml`](.github/workflows/ci.yml) sobre todos os commits do PR — que é o que
+pega commit feito pela interface do GitHub, onde hook nenhum roda. Merge commits
+são ignorados pelo commitlint por padrão, então o job não trava no PR de release.
+
 Uma branch inteira de `chore:` não gera release nenhuma — e isso é o
 comportamento correto, não um bug. Na dúvida sobre o que vai sair, o PR de
 release é a fonte da verdade: ele mostra o número e o changelog antes de

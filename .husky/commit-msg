@@ -1,0 +1,11 @@
+. "$(dirname -- "$0")/common.sh"
+
+# O portão que o CI não tem como substituir sozinho.
+#
+# Merge commit é regra aqui (RELEASE.md), então todo commit da branch chega em
+# `main` — e o release-please lê o assunto de cada um para decidir a próxima
+# versão. Assunto é entrada de automação de release, não recado.
+#
+# Já falhou uma vez: `ad21429` entrou como `fix:` numa fase planejada como
+# `chore:` puro e cortou `v0.1.1` em vez de nascer em `0.1.0`.
+commitlint --edit "$1"
