@@ -21,6 +21,8 @@
       "@/*": ["./app/*"]
     }
   },
+  "//exclude": "test/nuxt/ é coberto pelo tsconfig.app.json do Nuxt, que traz os auto-imports (`useState`, `createError`). Incluí-lo aqui também faria este projeto type-checkar código de app/ sem esses ambientes, e o erro apontaria para o composable em vez de para a configuração.",
+  "exclude": ["test/nuxt/**/*"],
   "include": [
     "test/**/*",
     "scripts/**/*",
