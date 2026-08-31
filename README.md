@@ -21,11 +21,12 @@ yarn dev
 
 ```bash
 yarn lint        # ESLint 10 flat config, com as regras de tipagem honesta
-yarn typecheck   # vue-tsc sobre app/, shared/, test/ e os configs
+yarn typecheck   # vue-tsc sobre app/, shared/, scripts/, test/ e os configs
 yarn test        # Vitest — unitários, headless
 yarn build       # saída Nitro em .output/
 yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
                  # `yarn preview`, que serve .output/
+yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver abaixo
 ```
 
 Os quatro projetos que o `nuxt prepare` gera não cobrem `test/`, `scripts/` nem
@@ -34,6 +35,45 @@ os arquivos de configuração; quem fecha essa lacuna é o
 da raiz. Ao criar uma pasta nova de TypeScript, o `include` dele, o glob
 type-aware do [`eslint.config.mjs`](eslint.config.mjs) e os aliases do Vitest
 precisam concordar — quando discordam, um portão passa e o outro não.
+
+## Dados do jogo
+
+O dex **não** é buscado em runtime. Ele é gerado por
+[`scripts/build-dex.ts`](scripts/build-dex.ts), commitado em `public/data/` e
+`public/sprites/`, e lido pelo composable `useDex()`. Nem o CI nem a Vercel
+chamam a PokeAPI — o que respeita o fair use de uma API explicitamente
+não-comercial, torna o build determinístico e é o que viabiliza grid de 1025
+cartas, evolução sem requisição e o modo offline.
+
+```bash
+yarn data:build                    # o dex inteiro (1ª vez ~10 min; depois, cache)
+yarn data:build --species 4,5,6 --out /tmp/dex   # ensaio, sem tocar public/data
+```
+
+O crawl guarda tudo em `.cache/pokeapi/` (gitignorado, gzipado), então a segunda
+execução não faz requisição nenhuma. **Rodar isto só é necessário quando o
+pipeline muda**; para jogar ou desenvolver, os arquivos commitados bastam.
+
+| Arquivo             | Conteúdo                                              |
+| ------------------- | ----------------------------------------------------- |
+| `core.json`         | matriz de efetividade 18×18, catálogo de golpes, gerações |
+| `chains.json`       | as 541 cadeias de evolução já resolvidas em árvore    |
+| `gen-N.json`        | as espécies da geração N — o que o grid precisa       |
+| `flavor-N.json`     | as descrições, **em arquivo separado**: pesam mais que todo o resto do dex junto, e só a página de detalhe as usa |
+| `sprites/{id}.webp` | miniatura de 128 px, recortada no alpha               |
+
+Três coisas que o pipeline decide e que não dá para deduzir lendo a saída:
+
+- **A versão de um moveset vem do campo `order`, nunca do id do version group.**
+  `blue-japan` tem id 29 e `scarlet-violet` tem 25 — a PokeAPI cadastrou o
+  relançamento japonês de 1996 depois. Ordenar por id dá às 1025 espécies o
+  moveset de Game Boy, e o resultado é plausível o bastante para ninguém notar.
+- **Ditto, Wobbuffet e Smeargle não têm golpe de dano nenhum** e caem em
+  Struggle, como nos jogos. A PokeAPI dá `pp: 1` a Struggle por resíduo do dado
+  de 1ª geração; o motor de batalha precisa tratá-lo como ilimitado.
+- **Import relativo dentro de `shared/` leva `.ts` explícito.** O script carrega
+  `shared/` em Node puro, que não tem a resolução sem extensão do Vite — um
+  `from './brand'` ali quebra o `yarn data:build` e nada mais.
 
 ## Hooks de git
 
