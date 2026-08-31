@@ -6,7 +6,7 @@ import type {
   FlavorData,
   GenerationData,
 } from '../../shared/types/dex.ts'
-import { STAT_COUNT, TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
+import { TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
 import { isMoveId, isSpeciesId } from '../../shared/types/brand.ts'
 
@@ -148,5 +148,3 @@ const evolutionNode: z.ZodType<EvolutionNode> = z.object({
 export const chainsSchema: z.ZodType<ChainsData> = z.record(z.string(), evolutionNode)
 
 export const flavorSchema: z.ZodType<FlavorData> = z.record(z.string(), z.string().min(1))
-
-export { STAT_COUNT }

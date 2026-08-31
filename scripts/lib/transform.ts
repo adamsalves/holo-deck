@@ -9,7 +9,7 @@ import type {
   StatName,
   TypeName,
 } from '../../shared/types/dex.ts'
-import { STAT_NAMES, TYPE_COUNT, TYPE_NAMES, isTypeName, typeIndex } from '../../shared/types/dex.ts'
+import { TYPE_COUNT, TYPE_NAMES, isTypeName, typeIndex } from '../../shared/types/dex.ts'
 import type { MoveId } from '../../shared/types/brand.ts'
 import { isMoveId } from '../../shared/types/brand.ts'
 
@@ -392,5 +392,3 @@ export function toEvolutionCondition(detail: EvolutionDetail): EvolutionConditio
 export function generationDisplayName(names: readonly LocalizedName[], slug: string): string {
   return resolveDisplayName(names, slug)
 }
-
-export { STAT_NAMES }
