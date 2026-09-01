@@ -93,6 +93,53 @@
   --text-body: var(--color-ink-200); /* 7.57 — corpo */
   --text-muted: var(--color-ink-350); /* 4.73 — rótulo, metadado */
   --text-faint: var(--color-ink-400); /* 3.34 — nota de rodapé, só em texto grande */
+
+  /**
+   * O Nuxt UI recebe os nossos, para `UModal`, `UTabs`, `UToast` e
+   * `UCommandPalette` nascerem dentro do sistema em vez de com cara de template.
+   *
+   * A escala neutra dele passa a ser a nossa, e isso faz a maior parte do
+   * trabalho sozinho: os slots que não estão nomeados abaixo continuam com o
+   * mapeamento padrão do Nuxt UI e caem na família `ink` em vez de no `slate`
+   * dele. Só quem discorda da nossa tabela é sobrescrito logo em seguida.
+   */
+  --ui-color-neutral-50: var(--color-ink-50);
+  --ui-color-neutral-100: var(--color-ink-100);
+  --ui-color-neutral-200: var(--color-ink-200);
+  --ui-color-neutral-300: var(--color-ink-300);
+  --ui-color-neutral-400: var(--color-ink-400);
+  --ui-color-neutral-500: var(--color-ink-500);
+  --ui-color-neutral-600: var(--color-ink-600);
+  --ui-color-neutral-700: var(--color-ink-700);
+  --ui-color-neutral-800: var(--color-ink-800);
+  --ui-color-neutral-900: var(--color-ink-900);
+  --ui-color-neutral-950: var(--color-ink-950);
+
+  /* Superfícies: o escuro dele para no 900, o nosso desce até o 950. */
+  --ui-bg: var(--bg);
+  --ui-bg-muted: var(--surface);
+  --ui-bg-elevated: var(--surface-raised);
+
+  /**
+   * Texto. Estes três existem por acessibilidade, não por gosto: no escuro o
+   * Nuxt UI aponta `muted` para o degrau 400 (3.34:1) e `dimmed` para o 500
+   * (1.94:1), que são exatamente os dois valores que esta fase tirou dos papéis
+   * de texto. Sem a sobrescrita, todo rótulo de `UFormField` e toda descrição de
+   * `UCommandPalette` reprovariam o AA por padrão.
+   *
+   * `--ui-text-toned` fica de fora de propósito. O Nuxt UI tem cinco níveis de
+   * texto e este sistema declara quatro; sem a sobrescrita ele cai no degrau 300
+   * (6.81:1), que é legível e se encaixa entre o corpo e o `muted`. Inventar um
+   * quinto papel semântico para preencher a lacuna seria criar token sem uso.
+   */
+  --ui-text-highlighted: var(--text);
+  --ui-text: var(--text-body);
+  --ui-text-muted: var(--text-muted);
+  --ui-text-dimmed: var(--text-faint);
+
+  /* Fios: o dele usa 800 e 700, a tabela daqui usa 700 e 600. */
+  --ui-border: var(--border);
+  --ui-border-accented: var(--border-strong);
 }
 
 body {

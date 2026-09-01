@@ -1,8 +1,8 @@
-import { existsSync, readdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import eslintConfig from '../../eslint.config.mjs'
+import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
 
 /**
  * O portão que verifica a si mesmo.
@@ -31,7 +31,6 @@ import eslintConfig from '../../eslint.config.mjs'
  * e `test/unit/`.
  */
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const BLOCK = 'holo-deck/typing-honesty-type-aware'
 
 /** Extensões que carregam TypeScript — `.vue` inclusa, pelo bloco `<script setup>`. */
@@ -79,17 +78,6 @@ function skippedDirs(ignores: readonly string[]): Set<string> {
   return new Set([...fromConfig, 'node_modules'])
 }
 
-function walk(dir: string, skip: Set<string>): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.name.startsWith('.')) return []
-
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) return skip.has(entry.name) ? [] : walk(full, skip)
-
-    return TS_BEARING.some(ext => entry.name.endsWith(ext)) ? [relative(ROOT, full)] : []
-  })
-}
-
 describe('portão de tipagem type-aware', () => {
   it('alcança todo arquivo que carrega TypeScript', async () => {
     const config = await eslintConfig
@@ -108,7 +96,7 @@ describe('portão de tipagem type-aware', () => {
     const reach = (file: string) =>
       covered.some(({ root, ext }) => file.startsWith(`${root}/`) && file.endsWith(ext))
 
-    const sources = walk(ROOT, skippedDirs(ignores))
+    const sources = walkFiles(REPO_ROOT, skippedDirs(ignores), hasExtension(TS_BEARING))
     const unguarded = sources.filter(file => !reach(file) && !UNGUARDED_CONFIG.includes(file))
 
     expect(unguarded, 'arquivos de TypeScript fora do bloco type-aware').toEqual([])
@@ -127,6 +115,6 @@ describe('portão de tipagem type-aware', () => {
     // antes para a pasta nascer já dentro do portão, em vez de nascer fora e
     // alguém descobrir depois.
     expect([...roots].sort()).toEqual(['app', 'scripts', 'server', 'shared', 'test'])
-    expect(existsSync(join(ROOT, 'server')), 'server/ nasceu: conferir os outros três portões').toBe(false)
+    expect(existsSync(join(REPO_ROOT, 'server')), 'server/ nasceu: conferir os outros três portões').toBe(false)
   })
 })
