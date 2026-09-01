@@ -4,8 +4,8 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 0 — a fundação. O jogo entra a
-> partir da Fase 1. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da Fase 2 — o sistema de design. As telas do
+> jogo entram a partir da Fase 3. O README completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -36,11 +36,82 @@ da raiz. Ao criar uma pasta nova de TypeScript, o `include` dele, o glob
 type-aware do [`eslint.config.mjs`](eslint.config.mjs) e os aliases do Vitest
 precisam concordar — quando discordam, um portão passa e o outro não.
 
-O glob type-aware cobre `app/` desde a Fase 1. Ele existe para a família
-`no-unsafe-*`, que é o que impede `any` de entrar por `JSON.parse` e `$fetch`; e
-foi na Fase 1 que `app/` ganhou a primeira fronteira de dados, em `useDex()`. Com
-a pasta de fora, o mesmo código dava três erros em `shared/` e passava limpo em
-`app/` — o portão virava uma questão de onde o arquivo calhou de estar.
+O glob type-aware cobre `app/` desde a Fase 1 e os `.vue` desde a Fase 2. Ele
+existe para a família `no-unsafe-*`, que é o que impede `any` de entrar por
+`JSON.parse` e `$fetch`. Na Fase 1 foi `app/` que ficou de fora ao ganhar a
+primeira fronteira de dados, em `useDex()`; na Fase 2 foi o bloco `<script
+setup>`, bem quando o repositório se encheu de componente. Nos dois casos o mesmo
+código dava três erros num arquivo e passava limpo no outro.
+
+O padrão se repetiu três vezes, então virou teste:
+[`test/unit/lint-gate.spec.ts`](test/unit/lint-gate.spec.ts) anda pelo disco e
+reprova se existir arquivo capaz de carregar TypeScript fora do alcance do bloco
+— sem precisar saber de antemão que pasta ou extensão alguém inventou.
+
+## Sistema de design
+
+Tema **Holo TCG**, escuro-único. Não é limitação: o foil holográfico depende de
+`mix-blend-mode: color-dodge`, que clareia — sobre fundo claro ele estoura em
+branco e o efeito deixa de existir. A especificação visual é o canvas de 17
+pranchas aprovado antes da implementação; divergir dele é decisão consciente e
+está anotada no commit que diverge.
+
+Tudo mora em [`app/assets/css/main.css`](app/assets/css/main.css), em duas
+camadas — que é como o Nuxt UI 4 já se organiza, e a razão de plugarmos nele em
+vez de manter um sistema paralelo:
+
+| | |
+|---|---|
+| **Primitivos** | a escada `ink` de 15 degraus, as 18 cores de tipo, as 5 de raridade, os 4 chanfros, o raio e as duas famílias |
+| **Semânticos** | `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` `--text` `--text-body` `--text-muted` `--text-faint` |
+
+**Regra dura: componente consome semântico. Nunca primitivo, nunca hex cru.** As
+pranchas do canvas usam hex inline porque são mockup, e copiar da prancha para o
+componente copia o hex junto — por isso a regra é cobrada por
+[`test/unit/token-gate.spec.ts`](test/unit/token-gate.spec.ts), que reprova hex e
+`ink-NNN` fora do tema.
+
+Os semânticos ficam **fora** de `@theme` de propósito: ali gerariam um
+`bg-surface` paralelo ao `bg-muted` do Nuxt UI — dois jeitos de dizer a mesma
+coisa. Fora dele, ficam em `:root` sem camada, e regra sem camada ganha do
+`@layer theme` onde o Nuxt UI declara os dele. O vocabulário que os componentes
+escrevem é o dele, já carregando os nossos valores: `bg-default` `bg-muted`
+`bg-elevated`, `text-highlighted` `text-default` `text-muted` `text-dimmed`,
+`border-default` `border-accented`.
+
+**Contraste.** Com um fundo só, toda cor de texto tem exatamente uma razão de
+contraste, e ela é verificável por teste em vez de por inspeção. Os quatro papéis
+de texto passam o AA — `--text` 17,19:1, `--text-body` 7,57:1, `--text-muted`
+4,73:1 e `--text-faint` 3,34:1, este último só em texto grande. O degrau
+`ink-350` (`#737C9F`) existe por causa disso: o plano apontava `--text-muted`
+para `ink-400` (3,34:1) e `--text-faint` para `ink-500` (1,94:1), dois papéis de
+texto sobre degraus que não sustentam texto. Empurrar tudo um degrau acima não
+resolvia — `--text-muted` em `ink-300` fica colado no corpo e a hierarquia some.
+
+**Tipo e raridade são variáveis de escopo, não regras por papel.** `[data-type]`
+publica `--type` e `[data-rarity]` publica `--rarity`, `--rarity-label`,
+`--rarity-fill` e `--foil`; badge, brilho, barra e moldura derivam com
+`color-mix()`. Trocar a identidade de um tipo é uma linha. `--rarity-label` é
+separado de `--rarity` porque `common` é `ink-500`, que serve de fio e não
+sustenta texto.
+
+**Foil** ([`app/composables/useFoil.ts`](app/composables/useFoil.ts)) só de raro
+para cima — a regra mora em `shared/types/game.ts`, headless, porque a
+consequência é de custo. Uma carta não interativa instala **zero** listener, e
+nenhum deles é de janela: é o que mantém as 1025 do grid baratas. O repouso do
+composable é o mesmo gradiente estático que o CSS já desenha, então a carta do
+grid mostra o foil sem rodar JavaScript. `prefers-reduced-motion` desliga o
+rastreio na origem, não a animação no fim — e o foil continua visível como
+gradiente estático, porque a raridade nunca é comunicada só por brilho: a
+etiqueta textual está sempre lá.
+
+**Número** usa o utilitário `numeric`, que traz `JetBrains Mono` e
+`tabular-nums` juntos. Separados, o modo de errar é escrever metade — e aí um HP
+caindo de 110 para 99 empurra o texto ao lado a cada quadro.
+
+Rodando `yarn dev`, **`/styleguide`** é o espelho de tudo isso: a escada, os
+papéis, os chanfros, os 18 tipos e as 6 raridades em carta. Existe só em
+desenvolvimento — o `pages:extend` do `nuxt.config.ts` a remove do build.
 
 ## Dados do jogo
 
