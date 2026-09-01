@@ -6,8 +6,14 @@ import type { TypeName } from './dex.ts'
  * `dex.ts` descreve a espécie como a PokeAPI a entrega; aqui ficam as noções que
  * o Holo Deck inventa em cima dela. A Fase 2 traz só a raridade, porque ela é
  * quem decide tratamento visual: moldura, etiqueta, brilho e foil. Os limiares
- * de BST que atribuem raridade a cada espécie são da Fase 5 e moram em
- * `shared/game/rarity.ts` — aqui está o vocabulário, não a regra.
+ * de BST que atribuem raridade a cada espécie moram em `shared/game/rarity.ts`
+ * — aqui está o vocabulário, não a regra.
+ *
+ * Essa separação continua valendo; o que mudou é **quando** a regra chegou. Ela
+ * estava marcada para a Fase 5 e entrou na 3, porque a Pokédex a exibe: a
+ * prancha *Detalhe* estampa `Raridade RARO` e a prancha *Pokédex* colore a
+ * moldura de cada carta do grid. Raridade sai de BST e das duas marcas, tudo
+ * dentro do próprio dex — nada nela espera pela coleção.
  */
 
 /**
