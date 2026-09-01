@@ -2,29 +2,100 @@
 @import "@nuxt/ui";
 
 /**
- * Base do tema Holo TCG. A escala completa de tokens — as 18 cores de tipo, as
- * raridades, a escada de chanfro e a tipografia — entra na Fase 2.
+ * Tema Holo TCG — duas camadas de token, porque o Nuxt UI 4 já é assim.
  *
- * Regra do sistema: nenhum hex cru fora deste arquivo.
+ * Camada 1, primitivos: a escada `ink`, um valor por degrau, sem papel.
+ * Camada 2, semânticos: o papel, apontando para um degrau da camada 1.
+ *
+ * **Regra dura: componente consome semântico. Nunca primitivo, nunca hex cru.**
+ * Trocar `--surface` de degrau é uma linha aqui; trocar `bg-ink-850` espalhado
+ * por trinta componentes é um commit de refatoração. As pranchas do canvas usam
+ * hex inline porque são mockup — o código não repete isso, e há teste cobrando.
+ *
+ * Escuro-único, decidido no plano: o foil depende de `background-blend-mode:
+ * color-dodge`, que clareia. Sobre fundo claro ele estoura em branco e o efeito
+ * deixa de existir, então não há segunda paleta a manter.
  */
+
 @theme static {
-  --color-ink-950: #0B0D14;
-  /* Ainda sem consumidor na Fase 0: é a superfície elevada da escala aprovada,
-     semeada aqui para o resto da escada nascer coerente na Fase 2. */
-  --color-ink-880: #0F121D;
-  /* Degrau de SUPERFÍCIE, não de texto. Sobre ink-950 dá 2.23:1, e a escada é
-     monotônica: qualquer valor entre o 500 e o 400 tem teto de 3.34:1, então
-     nenhum ink-450 legível existe. Texto usa ink-300 (abaixo). */
-  --color-ink-450: #414A6B;
-  /* O degrau mais escuro da escada aprovada que passa no AA da WCAG para texto
-     normal: 6.81:1 sobre ink-950. É o que carrega texto secundário. */
-  --color-ink-300: #8E98BC;
+  /**
+   * Camada 1 — primitivos.
+   *
+   * Quinze degraus sobre `ink-950`. Os números entre parênteses são a razão de
+   * contraste WCAG contra o fundo da página, que é o único fundo que existe: ela
+   * decide se um degrau pode carregar texto ou se é só superfície.
+   *
+   * A escada é monotônica de propósito. Os degraus fora da grade de dez
+   * (880, 850, 450, 350) existem porque as 17 pranchas usam esses valores; sem
+   * token, alguém escreve o hex na mão.
+   */
+
+  /* Superfícies. Nenhuma passa de 3:1 — nenhuma carrega texto. */
+  --color-ink-950: #0B0D14; /* 1.00 — fundo da página */
+  --color-ink-900: #0E1119; /* 1.03 */
+  --color-ink-880: #0F121D; /* 1.04 — fundo de célula de grid, 65 usos no canvas */
+  --color-ink-850: #121522; /* 1.07 */
+  --color-ink-800: #1A1E30; /* 1.18 */
+  --color-ink-700: #252B42; /* 1.39 */
+  --color-ink-600: #2E3450; /* 1.59 */
+  --color-ink-500: #39415F; /* 1.94 */
+  --color-ink-450: #414A6B; /* 2.23 — 64 usos no canvas; degrau de superfície, ver abaixo */
+
+  /* Texto. Do limite do AA para cima. */
+  --color-ink-400: #5C6484; /* 3.34 — AA só em texto grande */
+  --color-ink-350: #737C9F; /* 4.73 — AA */
+  --color-ink-300: #8E98BC; /* 6.81 — AA */
+  --color-ink-200: #99A1BD; /* 7.57 — AA */
+  --color-ink-100: #C9D4E8; /* 13.00 — AA */
+  --color-ink-50: #EEF1FA; /* 17.19 — AA */
 }
 
 :root {
   color-scheme: dark;
+
+  /**
+   * Camada 2 — semânticos. É esta lista que os componentes podem citar.
+   *
+   * Fora de `@theme` de propósito: aqui eles não geram utilitário do Tailwind,
+   * e o `@layer theme` do Nuxt UI perde para regra sem camada — que é o que
+   * permite o mapeamento `--ui-*` mais adiante sobrescrever sem disputa de
+   * especificidade.
+   */
+
+  --bg: var(--color-ink-950);
+  --surface: var(--color-ink-850); /* painel, carta */
+  --surface-raised: var(--color-ink-800); /* chip, slot, trilho de barra */
+  --surface-sunken: var(--color-ink-900); /* coluna lateral, log de turno */
+
+  --border: var(--color-ink-700); /* fio padrão */
+  --border-strong: var(--color-ink-600); /* tracejado, estado vazio */
+
+  /**
+   * Os quatro níveis de texto, e por que não são os do plano original.
+   *
+   * O plano mapeava `--text-muted` em `ink-400` (3.34) e `--text-faint` em
+   * `ink-500` (1.94) — dois papéis de texto apoiados em degraus que não
+   * sustentam texto. `#5C6484` aparece 280 vezes como texto nas 17 pranchas e
+   * reprova o AA; `ink-500` sobre `ink-950` é praticamente invisível.
+   *
+   * A dívida foi levantada na Fase 0 e adiada de propósito para cá, para ser
+   * resolvida junto com a escala completa. A saída não podia ser só empurrar
+   * tudo um degrau acima: `--text-muted` em `ink-300` (6.81) fica colado no
+   * corpo (7.57) e a hierarquia some. Por isso `ink-350` entrou na escada — é o
+   * degrau que faltava entre "passa no AA" e "é visivelmente mais fraco que o
+   * corpo".
+   *
+   * `ink-500` saiu dos papéis de texto e ficou só superfície. Mesma decisão que
+   * a Fase 0 já tinha tomado para `ink-450`: degrau de superfície não vira
+   * texto por conveniência.
+   */
+  --text: var(--color-ink-50); /* 17.19 — primário */
+  --text-body: var(--color-ink-200); /* 7.57 — corpo */
+  --text-muted: var(--color-ink-350); /* 4.73 — rótulo, metadado */
+  --text-faint: var(--color-ink-400); /* 3.34 — nota de rodapé, só em texto grande */
 }
 
 body {
-  background-color: var(--color-ink-950);
+  background-color: var(--bg);
+  color: var(--text-body);
 }
