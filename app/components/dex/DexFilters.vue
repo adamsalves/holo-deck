@@ -102,9 +102,41 @@ function clear() {
 <style scoped>
 .filters {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
+}
+
+/**
+ * Numa tela estreita a linha rola em vez de quebrar.
+ *
+ * Quebrando, os 24 chips ocupam cinco fileiras num aparelho de 390px e empurram
+ * o grid para mais da metade da altura — a tela deixa de ser uma Pokédex e passa
+ * a ser uma tela de filtros. É a mesma pressão que fez a prancha truncar em
+ * `6 tipos + 12`; a faixa rolável resolve sem esconder nenhum, que é o que
+ * mantém o filtro imediato.
+ *
+ * A margem negativa e o respiro fazem a faixa sangrar até a borda do viewport:
+ * um chip cortado no meio da margem parece defeito, cortado na borda parece
+ * rolagem.
+ */
+@media (max-width: 767px) {
+  .filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -24px;
+    padding: 2px 24px;
+    scrollbar-width: none;
+  }
+
+  .filters > * {
+    flex: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .filters {
+    flex-wrap: wrap;
+  }
 }
 
 .filters__divider {
