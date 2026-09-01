@@ -55,10 +55,19 @@ export default withNuxt(
    * `$fetch(...)` sem `<unknown>` em `app/` passa limpo enquanto o mesmo código
    * em `shared/` dá três erros — e o portão vira uma questão de qual pasta o
    * arquivo calhou de estar.
+   *
+   * **`.vue` entrou na Fase 2, e pelo mesmo motivo — terceira vez que este
+   * defeito aparece.** O glob dizia `*.ts` e nada mais, então o bloco
+   * `<script setup>` ficava de fora: código idêntico dava três erros em
+   * `app/composables/x.ts` e passava limpo em `app/components/X.vue`. A Fase 2
+   * é a que enche o repositório de componente e a Fase 3 põe `useFetch` dentro
+   * de `<script setup>` — a fronteira de dados muda de arquivo, e o portão
+   * precisava mudar junto. O parser de `.vue` já vem do `@nuxt/eslint`; não
+   * há `extraFileExtensions` a declarar aqui.
    */
   {
     name: 'holo-deck/typing-honesty-type-aware',
-    files: ['app/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts'],
+    files: ['app/**/*.vue', 'app/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,
