@@ -167,16 +167,74 @@
 [data-rarity] {
   --rarity: var(--color-rarity-common);
   --rarity-fill: linear-gradient(var(--rarity), var(--rarity));
+
+  /**
+   * A cor do RÓTULO, que não é sempre a cor da moldura.
+   *
+   * `common` é `ink-500`, e `ink-500` dá 1.94:1 — serve de fio, não sustenta
+   * texto. O canvas já tinha resolvido isso e escreve COMUM em `ink-300`; sem
+   * este token o rótulo textual da raridade mais frequente do dex fica ilegível,
+   * bem na regra que o canvas anota por escrito: *a raridade nunca é comunicada
+   * só por brilho, a etiqueta textual sempre está lá.*
+   */
+  --rarity-label: var(--color-ink-300);
+
+  /**
+   * A varredura do foil, inteira, como um token.
+   *
+   * Fica aqui e não no componente porque a receita é do tema: os três pontos são
+   * a cor da própria carta, ultra e incomum — a sequência que o canvas desenha na
+   * carta rara. O componente escreve `background: var(--foil)` e não conhece
+   * nenhuma delas.
+   *
+   * Os fallbacks são o repouso, e são os mesmos números de `FOIL_REST` em
+   * `useFoil.ts`: carta sem JavaScript nenhum — o grid — já nasce com o foil
+   * estático do canvas, e ligar o rastreio só troca as variáveis.
+   */
+  --foil: conic-gradient(
+    from var(--foil-angle, 200deg) at var(--foil-x, 42%) var(--foil-y, 32%),
+    color-mix(in srgb, var(--rarity) 70%, transparent),
+    color-mix(in srgb, var(--color-rarity-ultra) 40%, transparent),
+    color-mix(in srgb, var(--color-rarity-uncommon) 45%, transparent),
+    color-mix(in srgb, var(--rarity) 70%, transparent)
+  );
+
+  /**
+   * Força do brilho por raridade. `rare` e `ultra` são os valores do canvas;
+   * `legendary` e `mythic` continuam a série, porque o canvas não desenha carta
+   * dessas duas com foil.
+   */
+  --foil-strength: 0;
 }
 
-[data-rarity="uncommon"] { --rarity: var(--color-rarity-uncommon); }
-[data-rarity="rare"] { --rarity: var(--color-rarity-rare); }
-[data-rarity="ultra"] { --rarity: var(--color-rarity-ultra); }
-[data-rarity="legendary"] { --rarity: var(--color-rarity-legendary); }
+[data-rarity="uncommon"] {
+  --rarity: var(--color-rarity-uncommon);
+  --rarity-label: var(--rarity);
+}
+
+[data-rarity="rare"] {
+  --rarity: var(--color-rarity-rare);
+  --rarity-label: var(--rarity);
+  --foil-strength: 0.24;
+}
+
+[data-rarity="ultra"] {
+  --rarity: var(--color-rarity-ultra);
+  --rarity-label: var(--rarity);
+  --foil-strength: 0.38;
+}
+
+[data-rarity="legendary"] {
+  --rarity: var(--color-rarity-legendary);
+  --rarity-label: var(--rarity);
+  --foil-strength: 0.44;
+}
 
 [data-rarity="mythic"] {
   /* Cor de apoio para fio e brilho — é o primeiro ponto do prismático. */
   --rarity: var(--color-type-psychic);
+  --rarity-label: var(--rarity);
+  --foil-strength: 0.5;
   --rarity-fill: conic-gradient(
     from 0deg,
     var(--color-type-psychic),
@@ -245,6 +303,7 @@
   --surface: var(--color-ink-850); /* painel, carta */
   --surface-raised: var(--color-ink-800); /* chip, slot, trilho de barra */
   --surface-sunken: var(--color-ink-900); /* coluna lateral, log de turno */
+  --surface-cell: var(--color-ink-880); /* célula de grid e pé de carta — 65 usos no canvas */
 
   --border: var(--color-ink-700); /* fio padrão */
   --border-strong: var(--color-ink-600); /* tracejado, estado vazio */
