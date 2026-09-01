@@ -48,6 +48,159 @@
   --color-ink-200: #99A1BD; /* 7.57 — AA */
   --color-ink-100: #C9D4E8; /* 13.00 — AA */
   --color-ink-50: #EEF1FA; /* 17.19 — AA */
+
+  /**
+   * As 18 cores de tipo — as canônicas empurradas para neon sobre `ink-950`.
+   *
+   * A ordem é a de `TYPE_NAMES` em `shared/types/dex.ts`, que é a ordem de id da
+   * PokeAPI, e há teste cobrando que nenhum tipo do contrato fique sem cor.
+   * Todas passam o AA sobre o fundo da página; a mais fraca é `dragon`, a 4.69.
+   */
+  --color-type-normal: #C6C6A7;
+  --color-type-fighting: #FF5A4E;
+  --color-type-flying: #B8A5FF;
+  --color-type-poison: #E056DB;
+  --color-type-ground: #F5C95C;
+  --color-type-rock: #D6BE5A;
+  --color-type-bug: #B8E33C;
+  --color-type-ghost: #9B7FE8;
+  --color-type-steel: #C9D4E8;
+  --color-type-fire: #FF8A3D;
+  --color-type-water: #4FA8FF;
+  --color-type-grass: #5FE07A;
+  --color-type-electric: #FFE44D;
+  --color-type-psychic: #FF6BA8;
+  --color-type-ice: #7FE8E8;
+  --color-type-dragon: #8B5CFF;
+  --color-type-dark: #A08878;
+  --color-type-fairy: #FF9FC4;
+
+  /**
+   * As raridades. `common` reusa um degrau da escada de propósito: comum não tem
+   * cor própria porque comum não se anuncia.
+   *
+   * `mythic` não tem entrada aqui — ele é gradiente, não cor, e mora nas regras
+   * de escopo abaixo.
+   */
+  --color-rarity-common: var(--color-ink-500);
+  --color-rarity-uncommon: #3FD8A4;
+  --color-rarity-rare: #4FA8FF;
+  --color-rarity-ultra: #C264FF;
+  --color-rarity-legendary: #FFC24D;
+
+  /**
+   * A escada de chanfro — a assinatura da silhueta, no canto superior-esquerdo e
+   * no inferior-direito.
+   *
+   * É escada e não valor único porque 16px num chip de 24px de altura come o
+   * chip. Os quatro degraus saem do que as pranchas desenham: elas usam seis
+   * valores diferentes, e a revisão do canvas normalizou nos quatro que têm
+   * papel distinto (o `14px` da própria prancha *Tokens* é erro dela).
+   */
+  --bevel-card: 16px; /* carta em tamanho de herói e de detalhe */
+  --bevel-tile: 12px; /* carta no grid, painel, slot de deck */
+  --bevel-chip: 9px; /* chip, badge de tipo, etiqueta de raridade */
+  --bevel-control: 10px; /* botão e campo */
+
+  /**
+   * Raio de 3px em painel e chip, e nada arredondado além disso.
+   *
+   * Diverge do canvas de propósito: as pranchas usam 2px 104 vezes e 3px 65, mas
+   * os dois valores não têm papéis diferentes — é variação de mockup desenhado à
+   * mão, não decisão. Um único token, no valor que o plano declara.
+   */
+  --radius: 3px;
+}
+
+/**
+ * Um tipo é uma variável de escopo, não 18 regras por papel.
+ *
+ * Cada tipo aparece em quatro papéis — badge, brilho atrás da arte, preenchimento
+ * de barra, cabeçalho de região. Escrever a cor à mão para cada combinação daria
+ * 72 valores. Aqui `[data-type]` publica `--type`, e cada papel deriva dele com
+ * `color-mix()`. Trocar a identidade de um tipo é uma linha.
+ */
+[data-type="normal"] { --type: var(--color-type-normal); }
+[data-type="fighting"] { --type: var(--color-type-fighting); }
+[data-type="flying"] { --type: var(--color-type-flying); }
+[data-type="poison"] { --type: var(--color-type-poison); }
+[data-type="ground"] { --type: var(--color-type-ground); }
+[data-type="rock"] { --type: var(--color-type-rock); }
+[data-type="bug"] { --type: var(--color-type-bug); }
+[data-type="ghost"] { --type: var(--color-type-ghost); }
+[data-type="steel"] { --type: var(--color-type-steel); }
+[data-type="fire"] { --type: var(--color-type-fire); }
+[data-type="water"] { --type: var(--color-type-water); }
+[data-type="grass"] { --type: var(--color-type-grass); }
+[data-type="electric"] { --type: var(--color-type-electric); }
+[data-type="psychic"] { --type: var(--color-type-psychic); }
+[data-type="ice"] { --type: var(--color-type-ice); }
+[data-type="dragon"] { --type: var(--color-type-dragon); }
+[data-type="dark"] { --type: var(--color-type-dark); }
+[data-type="fairy"] { --type: var(--color-type-fairy); }
+
+/**
+ * Mesma ideia para raridade, com um token a mais porque mítico é prismático.
+ *
+ * `--rarity` é cor: serve a brilho, fio e texto simples. `--rarity-fill` é
+ * imagem: serve a superfície. Os dois existem porque mítico não cabe numa cor
+ * só — e para os outros cinco `--rarity-fill` é o gradiente de dois pontos
+ * iguais, que é a forma de um `<color>` virar `<image>` sem caso especial no
+ * componente.
+ *
+ * O prismático sai dos tokens que já existem: psychic, legendary, grass, rare e
+ * ultra, nessa ordem. Nenhum hex novo entra por causa dele.
+ */
+[data-rarity] {
+  --rarity: var(--color-rarity-common);
+  --rarity-fill: linear-gradient(var(--rarity), var(--rarity));
+}
+
+[data-rarity="uncommon"] { --rarity: var(--color-rarity-uncommon); }
+[data-rarity="rare"] { --rarity: var(--color-rarity-rare); }
+[data-rarity="ultra"] { --rarity: var(--color-rarity-ultra); }
+[data-rarity="legendary"] { --rarity: var(--color-rarity-legendary); }
+
+[data-rarity="mythic"] {
+  /* Cor de apoio para fio e brilho — é o primeiro ponto do prismático. */
+  --rarity: var(--color-type-psychic);
+  --rarity-fill: conic-gradient(
+    from 0deg,
+    var(--color-type-psychic),
+    var(--color-rarity-legendary),
+    var(--color-type-grass),
+    var(--color-rarity-rare),
+    var(--color-rarity-ultra),
+    var(--color-type-psychic)
+  );
+  /* Cônico embaralha num texto curto; o rótulo usa a varredura linear. */
+  --rarity-text: linear-gradient(
+    92deg,
+    var(--color-type-psychic),
+    var(--color-rarity-legendary),
+    var(--color-type-grass),
+    var(--color-rarity-rare),
+    var(--color-rarity-ultra)
+  );
+}
+
+/**
+ * O chanfro como utilitário, um por degrau da escada: `bevel-card`,
+ * `bevel-tile`, `bevel-chip`, `bevel-control`.
+ *
+ * `clip-path` em vez de borda porque a silhueta precisa cortar o foil e a arte
+ * junto — uma borda desenharia o corte por cima e o brilho vazaria no canto.
+ */
+@utility bevel-* {
+  --bevel: --value(--bevel-*);
+  clip-path: polygon(
+    var(--bevel) 0,
+    100% 0,
+    100% calc(100% - var(--bevel)),
+    calc(100% - var(--bevel)) 100%,
+    0 100%,
+    0 var(--bevel)
+  );
 }
 
 :root {
