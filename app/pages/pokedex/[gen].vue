@@ -87,20 +87,26 @@ useSeoMeta({
           </NuxtLink>
         </nav>
 
-        <p class="numeric region-header__generation">
-          {{ region?.generationLabel }}
-        </p>
-        <h1 class="region-header__name">
-          {{ region?.label }}
-        </h1>
-        <p class="numeric region-header__meta">
-          {{ region?.speciesCount }} espécies
-          <span
-            class="region-header__separator"
-            aria-hidden="true"
-          >·</span>
-          {{ region === null ? '' : dexRange(region.firstId, region.lastId) }}
-        </p>
+        <div class="region-header__row">
+          <div>
+            <p class="numeric region-header__generation">
+              {{ region?.generationLabel }}
+            </p>
+            <h1 class="region-header__name">
+              {{ region?.label }}
+            </h1>
+            <p class="numeric region-header__meta">
+              {{ region?.speciesCount }} espécies
+              <span
+                class="region-header__separator"
+                aria-hidden="true"
+              >·</span>
+              {{ region === null ? '' : dexRange(region.firstId, region.lastId) }}
+            </p>
+          </div>
+
+          <DexSearch />
+        </div>
       </div>
     </header>
 
@@ -133,6 +139,14 @@ useSeoMeta({
 .region-header__back {
   color: var(--text-muted);
   text-decoration: none;
+}
+
+.region-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
 }
 
 .region-header__back:hover,

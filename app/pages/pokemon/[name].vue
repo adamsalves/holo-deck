@@ -172,18 +172,29 @@ useSeoMeta({
       </nav>
 
       <div class="hero__art">
-        <!-- Arte oficial remota, 475px, uma por página. O grid usa a miniatura
-             de 128px commitada; aqui a resolução cheia é o ponto da tela. -->
-        <NuxtImg
+        <!--
+          Arte oficial remota, 475px, uma por página. O grid usa a miniatura de
+          128px commitada; aqui a resolução cheia é o ponto da tela.
+
+          **`<img>` cru, e não `<NuxtImg>`** — divergência consciente do plano,
+          e medida. Com o otimizador no caminho, pré-renderizar as 1025 páginas
+          vira 1025 downloads de `raw.githubusercontent.com` durante o build:
+          testado, e o GitHub derruba a conexão no meio (`ECONNRESET`). Isso
+          contraria a regra que este repositório escreveu na Fase 1 — o build
+          não bate em terceiro — e trocaria uma dependência de rede em runtime
+          por uma em tempo de build, que é pior porque quebra o deploy.
+
+          `eager` porque esta é a maior imagem acima da dobra da página; as
+          dimensões evitam o salto de layout enquanto ela chega.
+        -->
+        <img
           :src="artworkUrl(species.id)"
           :alt="`Arte oficial de ${species.displayName}`"
           width="475"
           height="475"
-          sizes="320px md:420px"
-          format="webp"
-          fit="contain"
-          preload
-        />
+          loading="eager"
+          decoding="async"
+        >
       </div>
 
       <p class="numeric hero__number">
@@ -228,8 +239,17 @@ useSeoMeta({
 
     <!-- COLUNA DOS DADOS -->
     <div class="panel">
+      <!--
+        `unmount-on-hide` desligado: por padrão o `UTabs` só monta o painel
+        ativo, e as três abas são pré-renderizadas em 1025 páginas. Com o padrão,
+        o HTML servido sai com a descrição e **sem** base stats, relações de dano
+        e linha evolutiva — que é o conteúdo pelo qual estas páginas seriam
+        encontradas. Também é o que faz o Ctrl+F do navegador achar o que está
+        na aba fechada.
+      -->
       <UTabs
         :items="tabs"
+        :unmount-on-hide="false"
         variant="link"
         class="w-full"
       >

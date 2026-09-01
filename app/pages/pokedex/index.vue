@@ -37,16 +37,20 @@ useSeoMeta({
 
 <template>
   <main class="mx-auto w-full max-w-6xl px-6 py-12">
-    <header class="mb-10">
-      <p class="numeric text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-        Referência completa
-      </p>
-      <h1 class="mt-2 text-5xl font-bold tracking-tight text-highlighted">
-        Pokédex
-      </h1>
-      <p class="mt-3 max-w-xl text-sm text-toned">
-        As 1025 espécies, possuídas ou não. Escolha uma região.
-      </p>
+    <header class="mb-10 flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <p class="numeric text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
+          Referência completa
+        </p>
+        <h1 class="mt-2 text-5xl font-bold tracking-tight text-highlighted">
+          Pokédex
+        </h1>
+        <p class="mt-3 max-w-xl text-sm text-toned">
+          As 1025 espécies, possuídas ou não. Escolha uma região ou busque direto.
+        </p>
+      </div>
+
+      <DexSearch />
     </header>
 
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

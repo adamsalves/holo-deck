@@ -4,8 +4,8 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 2 — o sistema de design. As telas do
-> jogo entram a partir da Fase 3. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da Fase 3 — a Pokédex. Packs, coleção, deck
+> e batalha entram a partir da Fase 4. O README completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -31,8 +31,13 @@ yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver a
 
 Os quatro projetos que o `nuxt prepare` gera não cobrem `test/`, `scripts/` nem
 os arquivos de configuração; quem fecha essa lacuna é o
-[`tsconfig.tools.json`](tsconfig.tools.json), referenciado pelo `tsconfig.json`
-da raiz. Ao criar uma pasta nova de TypeScript, o `include` dele, o glob
+[`tsconfig.tools.json`](tsconfig.tools.json). Os testes de ponta a ponta ganharam
+um sexto projeto, o [`tsconfig.e2e.json`](tsconfig.e2e.json): o corpo de
+`page.evaluate` roda **dentro** do navegador e precisa da lib `dom`, que nenhum
+outro projeto da suíte deve ter. Os dois são referenciados pelo `tsconfig.json`
+da raiz.
+
+Ao criar uma pasta nova de TypeScript, o `include` de um desses projetos, o glob
 type-aware do [`eslint.config.mjs`](eslint.config.mjs) e os aliases do Vitest
 precisam concordar — quando discordam, um portão passa e o outro não.
 
@@ -47,6 +52,15 @@ O padrão se repetiu três vezes, então virou teste:
 [`test/unit/lint-gate.spec.ts`](test/unit/lint-gate.spec.ts) anda pelo disco e
 reprova se existir arquivo capaz de carregar TypeScript fora do alcance do bloco
 — sem precisar saber de antemão que pasta ou extensão alguém inventou.
+
+Na quarta vez o defeito mudou de portão: a Fase 3 criou `test/e2e/` e ela nasceu
+fora de todos os projetos de `tsconfig`, com o sintoma apontando para o código
+(`Cannot find name 'document'`, e o ESLint recusando o arquivo inteiro) em vez de
+para a configuração. Isso também virou teste:
+[`test/unit/tsconfig-gate.spec.ts`](test/unit/tsconfig-gate.spec.ts) pergunta ao
+**próprio TypeScript** quais arquivos cada projeto cobre e reprova se algum ficar
+de fora — ou se algum projeto ficar vazio, que é como o `tsconfig.e2e.json`
+nasceu, com o `exclude` herdado do `extends` anulando o `include` dele.
 
 ## Sistema de design
 
@@ -205,6 +219,7 @@ pipeline muda**; para jogar ou desenvolver, os arquivos commitados bastam.
 | `core.json`         | matriz de efetividade 18×18, catálogo de golpes, gerações |
 | `chains.json`       | as 541 cadeias de evolução já resolvidas em árvore    |
 | `gen-N.json`        | as espécies da geração N — o que o grid precisa       |
+| `index.json`        | id, slug, nome, geração e tipos das 1025 — o que a busca global indexa e o que faz `/pokemon/[name]` achar a geração de um slug sem abrir os nove arquivos |
 | `flavor-N.json`     | as descrições, **em arquivo separado**: pesam mais que todo o resto do dex junto, e só a página de detalhe as usa |
 | `sprites/{id}.webp` | miniatura de 128 px, recortada no alpha               |
 
@@ -231,6 +246,54 @@ Cinco coisas que o pipeline decide e que não dá para deduzir lendo a saída:
 - **Import relativo dentro de `shared/` leva `.ts` explícito.** O script carrega
   `shared/` em Node puro, que não tem a resolução sem extensão do Vite — um
   `from './brand'` ali quebra o `yarn data:build` e nada mais.
+
+## Pokédex
+
+Referência completa das 1025 espécies — **não** coleção. Elas aparecem todas,
+possuídas ou não; quem cuida de posse, duplicata e pó é a `/collection`, que
+chega na Fase 5.
+
+| Rota               | O que é                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `/pokedex`         | as 9 gerações como cartas de região                       |
+| `/pokedex/[gen]`   | o grid da região, virtualizado                            |
+| `/pokemon/[name]`  | a espécie: Sobre, base stats, relações de dano e evolução |
+
+Busca global em `Cmd/Ctrl+K`, em qualquer uma das três. Ela indexa nome, número e
+tipo — dá para procurar por `venenoso` ou por `0150` — e só baixa o `index.json`
+quando abre pela primeira vez.
+
+Quatro decisões desta fase que não se deduzem lendo o código:
+
+- **O grid existe em duas formas.** O servidor renderiza as 151 cartas inteiras;
+  o cliente monta a versão virtualizada por cima. Não é redundância: o HTML
+  servido é a única coisa que linka as 1025 páginas de detalhe, e são elas que
+  carregam o SEO. Um HTML pré-renderizado com as 18 cartas visíveis deixaria 133
+  páginas de Kanto sem nenhuma referência apontando para elas. A troca é feita
+  pelo `<ClientOnly>`, cujo fallback não é hidratado — então o cliente monta do
+  zero em vez de reconciliar 151 contra 18.
+- **O SSR lê o dex do disco; o navegador busca por HTTP.** Em servidor o
+  `$fetch` relativo não sai pela rede — ele chama o app h3 por dentro, e asset
+  público não é rota do h3. O caminho cai no renderizador de páginas e volta o
+  HTML de 404. Verificado em `dev`, na pré-renderização e no `node
+  .output/server/index.mjs`, onde o mesmo arquivo responde 200 por `curl` e falha
+  por `$fetch`. Os dois caminhos passam pelo mesmo guarda de leitura.
+- **Tudo é pré-renderizado — 1036 páginas, ~18 s de build.** `crawlLinks` parte
+  de `/pokedex`, alcança as nove regiões e, de cada grid, as 1025 espécies. As
+  três abas do detalhe são montadas mesmo fechadas (`unmount-on-hide` desligado):
+  sem isso o HTML sai com a descrição e **sem** base stats, relações de dano e
+  linha evolutiva, que é o conteúdo pelo qual a página seria encontrada.
+- **A arte oficial do herói é um `<img>` cru, não `<NuxtImg>`.** O plano pedia
+  `@nuxt/image`; com o otimizador no caminho, pré-renderizar as 1025 páginas vira
+  1025 downloads de `raw.githubusercontent.com` durante o build — testado, e o
+  GitHub derruba a conexão no meio. Trocar uma dependência de rede em runtime por
+  uma em tempo de build é pior: ela quebra o deploy.
+
+A raridade (`shared/game/rarity.ts`) e a matriz de tipos
+(`shared/game/typechart.ts`) estavam marcadas para as fases 4 e 5 e chegaram
+aqui, porque a Pokédex as exibe e nenhuma das duas depende de coleção. Os
+limiares saem do percentil sobre as 1025, não do chute: com os originais do plano
+a distribuição saía invertida, com *raro* virando o maior tier do jogo.
 
 ## Hooks de git
 

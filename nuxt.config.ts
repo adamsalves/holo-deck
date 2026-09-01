@@ -29,7 +29,6 @@ export default defineNuxtConfig({
 
   modules: [
     '@nuxt/eslint',
-    '@nuxt/image',
     '@nuxt/ui',
     '@pinia/nuxt',
     '@vueuse/nuxt',
@@ -64,6 +63,12 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'pt-BR', class: 'dark' },
       title: 'Holo Deck',
+      // A arte oficial do herói do detalhe é a única imagem de terceiro do
+      // projeto. O handshake com o host custa mais que o download dela em
+      // conexão móvel, e ele começa antes de o HTML terminar de chegar.
+      link: [
+        { rel: 'preconnect', href: 'https://raw.githubusercontent.com', crossorigin: '' },
+      ],
     },
   },
 
@@ -89,9 +94,24 @@ export default defineNuxtConfig({
   future: { compatibilityVersion: 4 },
   compatibilityDate: '2026-08-28',
 
+  /**
+   * A Pokédex inteira sai pronta do build.
+   *
+   * O plano põe o SEO nestas páginas, e SEO exige HTML com conteúdo — não uma
+   * casca que preenche depois. Pré-renderizar também resolve uma segunda coisa
+   * que não é opcional: o dex é lido do disco no servidor (ver `useDex`), e o
+   * build é o único momento em que `public/data/` existe ao lado do processo.
+   * Numa função da Vercel ele não estaria lá.
+   *
+   * `crawlLinks` é quem alcança as 1025: a raiz leva às nove regiões, e o grid
+   * de cada região carrega um link por espécie no HTML servido. É a mesma razão
+   * de o grid ser renderizado inteiro no servidor — sem esses links, o
+   * rastreador pararia em nove páginas.
+   */
   nitro: {
     prerender: {
-      routes: ['/pokedex', '/pokedex/1'],
+      crawlLinks: true,
+      routes: ['/pokedex'],
     },
   },
 
@@ -126,20 +146,4 @@ export default defineNuxtConfig({
     ],
   },
 
-  /**
-   * A arte oficial é a **única** imagem remota do projeto, e só a página de
-   * detalhe a usa.
-   *
-   * O grid come as miniaturas de 128px commitadas — arte oficial a 118 KB
-   * faria Kanto custar 17,8 MB. No detalhe é uma imagem por vez, e aí a
-   * resolução cheia vale: é a superfície onde a carta aparece em tamanho de
-   * herói.
-   *
-   * `domains` é o que autoriza o otimizador a tocar num host de terceiro; sem
-   * ele o `<NuxtImg>` devolve a URL crua e a otimização não acontece — em
-   * silêncio, que é o modo de falhar mais caro possível para uma imagem.
-   */
-  image: {
-    domains: ['raw.githubusercontent.com'],
-  },
 })
