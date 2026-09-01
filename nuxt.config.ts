@@ -27,7 +27,35 @@ function resolveGitSha(): string {
 
 export default defineNuxtConfig({
 
-  modules: ['@nuxt/eslint', '@nuxt/ui', '@pinia/nuxt', '@vueuse/nuxt'],
+  modules: [
+    '@nuxt/eslint',
+    '@nuxt/ui',
+    '@pinia/nuxt',
+    '@vueuse/nuxt',
+
+    /**
+     * `/styleguide` existe só em desenvolvimento.
+     *
+     * Ela é o espelho do sistema de design — o lugar onde dá para ver que o foil
+     * começa em raro e que `prefers-reduced-motion` para tudo. Isso é ferramenta
+     * de quem constrói, não superfície do jogo: mantê-la fora do build evita
+     * inventar uma rota que o plano não tem e não deixa uma página de tokens
+     * pública e indexável.
+     *
+     * Módulo em linha, e não um `hooks:` no config, por causa do `nuxt` que ele
+     * recebe: `nuxt.options.dev` é a fonte que o próprio Nuxt usa para decidir o
+     * modo. `process.env.NODE_ENV` é uma sombra dela — sobrevive a um
+     * `NODE_ENV=development yarn build` e publicaria a página.
+     */
+    (_options, nuxt) => {
+      nuxt.hook('pages:extend', (pages) => {
+        if (nuxt.options.dev) return
+
+        const index = pages.findIndex(page => page.path === '/styleguide')
+        if (index !== -1) pages.splice(index, 1)
+      })
+    },
+  ],
 
   devtools: { enabled: true },
 
@@ -40,8 +68,9 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  // Escuro-único: o foil holográfico depende de `background-blend-mode: color-dodge`,
+  // Escuro-único: o foil holográfico depende de `mix-blend-mode: color-dodge`,
   // que clareia — sobre fundo claro o efeito estoura em branco e deixa de existir.
+  // (O plano escreve `background-blend-mode`; quem renderiza é o `mix-`.)
   // Sem @nuxtjs/color-mode em runtime: a classe `dark` é fixa no <html>.
   ui: {
     colorMode: false,
@@ -63,24 +92,6 @@ export default defineNuxtConfig({
     strict: true,
     // O portão roda em `yarn typecheck` (CI e local), não a cada HMR.
     typeCheck: false,
-  },
-
-  hooks: {
-    /**
-     * `/styleguide` existe só em desenvolvimento.
-     *
-     * Ela é o espelho do sistema de design — o lugar onde dá para ver que o foil
-     * começa em raro e que `prefers-reduced-motion` para tudo. Isso é ferramenta
-     * de quem constrói, não superfície do jogo: mantê-la fora do build evita
-     * inventar uma rota que o plano não tem e não deixa uma página de tokens
-     * pública e indexável.
-     */
-    'pages:extend': (pages) => {
-      if (process.env.NODE_ENV === 'development') return
-
-      const index = pages.findIndex(page => page.path === '/styleguide')
-      if (index !== -1) pages.splice(index, 1)
-    },
   },
 
   eslint: {
