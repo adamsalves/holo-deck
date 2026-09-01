@@ -24,6 +24,13 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
 const THEME = 'app/assets/css/main.css'
 
 /**
+ * O espelho do sistema é a única página autorizada a citar primitivo pelo nome —
+ * mostrar os primitivos é literalmente o trabalho dela. A exceção fica escrita
+ * aqui, e não escondida num comentário de desativação dentro do arquivo.
+ */
+const STYLEGUIDE = 'app/pages/styleguide.vue'
+
+/**
  * Raízes varridas. `test/` fica de fora: um teste de tema precisa citar o valor
  * que verifica, e proibir isso seria proibir verificar.
  */
@@ -48,7 +55,7 @@ function scannedFiles(): string[] {
     .map(root => join(REPO_ROOT, root))
     .filter(dir => existsSync(dir))
     .flatMap(dir => walkFiles(dir, SKIP, hasExtension(SOURCE_EXTENSIONS)))
-    .filter(file => file !== THEME)
+    .filter(file => file !== THEME && file !== STYLEGUIDE)
 }
 
 function offenders(pattern: RegExp): string[] {

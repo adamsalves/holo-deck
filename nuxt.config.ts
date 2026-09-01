@@ -65,6 +65,24 @@ export default defineNuxtConfig({
     typeCheck: false,
   },
 
+  hooks: {
+    /**
+     * `/styleguide` existe só em desenvolvimento.
+     *
+     * Ela é o espelho do sistema de design — o lugar onde dá para ver que o foil
+     * começa em raro e que `prefers-reduced-motion` para tudo. Isso é ferramenta
+     * de quem constrói, não superfície do jogo: mantê-la fora do build evita
+     * inventar uma rota que o plano não tem e não deixa uma página de tokens
+     * pública e indexável.
+     */
+    'pages:extend': (pages) => {
+      if (process.env.NODE_ENV === 'development') return
+
+      const index = pages.findIndex(page => page.path === '/styleguide')
+      if (index !== -1) pages.splice(index, 1)
+    },
+  },
+
   eslint: {
     config: {
       // Regras de formatação no próprio ESLint, sem Prettier. Decidido na
