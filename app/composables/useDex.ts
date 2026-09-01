@@ -1,5 +1,5 @@
-import type { ChainsData, CoreData, FlavorData, GenerationData } from '~~/shared/types/dex'
-import { isChainsData, isCoreData, isFlavorData, isGenerationData } from '~~/shared/types/dex'
+import type { ChainsData, CoreData, FlavorData, GenerationData, IndexData, SearchEntry } from '~~/shared/types/dex'
+import { isChainsData, isCoreData, isFlavorData, isGenerationData, isIndexData } from '~~/shared/types/dex'
 
 /**
  * Leitura do dex gerado em `public/data/`.
@@ -34,6 +34,7 @@ import { isChainsData, isCoreData, isFlavorData, isGenerationData } from '~~/sha
  * espécies, para observar mutações que nunca acontecem.
  */
 const core = shallowRef<CoreData | null>(null)
+const index = shallowRef<IndexData | null>(null)
 const chains = shallowRef<ChainsData | null>(null)
 const generations = shallowRef<Readonly<Record<number, GenerationData>>>({})
 const flavors = shallowRef<Readonly<Record<number, FlavorData>>>({})
@@ -47,6 +48,7 @@ const flavors = shallowRef<Readonly<Record<number, FlavorData>>>({})
  * limpá-la ao final é o que permite uma nova tentativa depois de uma falha.
  */
 let corePending: Promise<CoreData> | null = null
+let indexPending: Promise<IndexData> | null = null
 let chainsPending: Promise<ChainsData> | null = null
 const generationPending = new Map<number, Promise<GenerationData>>()
 const flavorPending = new Map<number, Promise<FlavorData>>()
@@ -65,6 +67,30 @@ export function useDex() {
       })
 
     corePending = pending
+    return pending
+  }
+
+  /**
+   * `index.json` — as 1025 linhas de nome, tipo e geração.
+   *
+   * Dois leitores, e nenhum deles cabe no carregamento por geração: a busca
+   * global precisa dos 1025 nomes de uma vez, e `/pokemon/[name]` recebe um slug
+   * sem saber em qual `gen-N.json` procurar. São 15 KB gzipados contra os ~60 KB
+   * dos nove arquivos completos, e ele fica em cache para os dois.
+   */
+  async function loadIndex(): Promise<IndexData> {
+    if (index.value !== null) return index.value
+
+    const pending = indexPending ?? fetchGuarded('/data/index.json', isIndexData, 'index.json')
+      .then((data) => {
+        index.value = data
+        return data
+      })
+      .finally(() => {
+        indexPending = null
+      })
+
+    indexPending = pending
     return pending
   }
 
@@ -126,7 +152,32 @@ export function useDex() {
     return pending
   }
 
-  return { core, chains, generations, flavors, loadCore, loadChains, loadGeneration, loadFlavor }
+  /**
+   * A linha do índice de um slug, ou `null` — que é o 404 de `/pokemon/[name]`.
+   *
+   * Busca linear sobre 1025 registros: são ~0,02 ms, e cada tela a chama uma vez
+   * na navegação. Um `Map` construído a cada leitura custaria mais que a
+   * varredura, e um `Map` memoizado seria um segundo cache a invalidar junto com
+   * o primeiro.
+   */
+  async function findBySlug(slug: string): Promise<SearchEntry | null> {
+    const entries = await loadIndex()
+    return entries.find(entry => entry.slug === slug) ?? null
+  }
+
+  return {
+    core,
+    index,
+    chains,
+    generations,
+    flavors,
+    loadCore,
+    loadIndex,
+    loadChains,
+    loadGeneration,
+    loadFlavor,
+    findBySlug,
+  }
 }
 
 /**

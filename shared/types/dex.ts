@@ -1,5 +1,5 @@
 import type { MoveId, SpeciesId } from './brand.ts'
-import { GYM_COUNT, isMoveId, isSpeciesId } from './brand.ts'
+import { GYM_COUNT, isMoveId, isSpeciesId, SPECIES_COUNT } from './brand.ts'
 
 /**
  * O contrato dos arquivos gerados em `public/data/`. Este módulo é a fonte única
@@ -129,6 +129,35 @@ export interface SpeciesEntry {
   readonly evolutionChainId: number
   readonly moveIds: readonly MoveId[]
 }
+
+/**
+ * Uma linha do índice do dex — o mínimo para achar uma espécie sem carregar a
+ * geração dela.
+ *
+ * Existe porque duas coisas da Fase 3 precisam das 1025 de uma vez e nenhuma
+ * precisa dos dados completos: a busca global (`Cmd/Ctrl+K`), que indexa nome, e
+ * a rota `/pokemon/[name]`, que recebe um slug e não sabe em qual `gen-N.json`
+ * procurar. As alternativas eram carregar os nove arquivos (319 KB para resolver
+ * um slug) ou derivar a geração da faixa de id — que funciona hoje, porque os
+ * ids são contíguos e ordenados por geração, e falharia em silêncio no dia em
+ * que deixassem de ser. O campo `generation` custa dez bytes por linha e não
+ * depende de nenhuma das duas coisas continuarem verdadeiras.
+ *
+ * `displayName` está aqui porque não é derivável do slug: `mr-mime` vira
+ * `Mr. Mime`, `nidoran-f` vira `Nidoran♀`. `types` está porque a paleta desenha
+ * os mesmos chips do grid, e sem eles ela seria a única superfície do sistema
+ * que lista espécie sem dizer o tipo.
+ */
+export interface SearchEntry {
+  readonly id: SpeciesId
+  readonly slug: string
+  readonly displayName: string
+  readonly generation: number
+  readonly types: readonly [TypeName] | readonly [TypeName, TypeName]
+}
+
+/** `index.json` — as 1025 linhas acima, na ordem do dex nacional. */
+export type IndexData = readonly SearchEntry[]
 
 /** `gen-N.json` — carregado sob demanda, uma geração por vez. */
 export interface GenerationData {
@@ -350,6 +379,31 @@ function isSpeciesEntry(value: unknown): value is SpeciesEntry {
     && isNonNegativeInt(value.baseHappiness)
     && isText(value.color)
     && isPositiveInt(value.evolutionChainId)
+}
+
+/**
+ * O índice é o arquivo de que mais coisa depende para achar qualquer coisa —
+ * uma linha faltando não quebra a tela, ela some do dex do ponto de vista da
+ * busca. Por isso a contagem entra no guarda: `index.json` com 900 linhas é um
+ * deploy parcial, e é exatamente a falha que os guardas deste módulo existem
+ * para pegar.
+ */
+export function isIndexData(value: unknown): value is IndexData {
+  if (!isArray(value) || value.length !== SPECIES_COUNT) return false
+  return value.every(isSearchEntry)
+}
+
+function isSearchEntry(value: unknown): value is SearchEntry {
+  if (!isRecord(value)) return false
+
+  const { types } = value
+  if (!isArray(types) || types.length < 1 || types.length > 2) return false
+  if (!types.every(t => typeof t === 'string' && isTypeName(t))) return false
+
+  return isInt(value.id) && isSpeciesId(value.id)
+    && isText(value.slug)
+    && isText(value.displayName)
+    && isGenerationNumber(value.generation)
 }
 
 export function isChainsData(value: unknown): value is ChainsData {

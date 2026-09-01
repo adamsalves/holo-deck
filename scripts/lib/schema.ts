@@ -5,10 +5,11 @@ import type {
   EvolutionNode,
   FlavorData,
   GenerationData,
+  IndexData,
 } from '../../shared/types/dex.ts'
 import { GENERATION_COUNT, MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
-import { isMoveId, isSpeciesId } from '../../shared/types/brand.ts'
+import { isMoveId, isSpeciesId, SPECIES_COUNT } from '../../shared/types/brand.ts'
 
 /**
  * Validação da **saída** — o que vai para `public/data/`.
@@ -88,14 +89,18 @@ export const coreSchema: z.ZodType<CoreData> = z.object({
   generations: z.array(generationMeta).length(GENERATION_COUNT),
 })
 
+/** Um ou dois tipos, nessa ordem. Compartilhado com o índice: os dois gravam a
+ * mesma tupla, e escrevê-la duas vezes é como as duas saídas divergem. */
+const speciesTypes = z.union([
+  z.tuple([typeName]),
+  z.tuple([typeName, typeName]),
+])
+
 const speciesEntry = z.object({
   id: speciesIdSchema,
   slug: z.string().min(1),
   displayName: z.string().min(1),
-  types: z.union([
-    z.tuple([typeName]),
-    z.tuple([typeName, typeName]),
-  ]),
+  types: speciesTypes,
   baseStats: z.tuple([
     z.number().int().positive(),
     z.number().int().positive(),
@@ -123,6 +128,19 @@ export const generationSchema: z.ZodType<GenerationData> = z.object({
   region: z.string().min(1),
   species: z.array(speciesEntry).min(1),
 })
+
+/**
+ * O índice tem tamanho fixo, e é a única saída em que isso é verificável: são as
+ * 1025 espécies do dex nacional, uma linha cada. `.length()` transforma "faltou
+ * uma geração no crawl" de bug de tela em build que não termina.
+ */
+export const indexSchema: z.ZodType<IndexData> = z.array(z.object({
+  id: speciesIdSchema,
+  slug: z.string().min(1),
+  displayName: z.string().min(1),
+  generation: z.number().int().min(1).max(GENERATION_COUNT),
+  types: speciesTypes,
+})).length(SPECIES_COUNT)
 
 const evolutionCondition = z.object({
   trigger: z.string().min(1),
