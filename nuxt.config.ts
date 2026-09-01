@@ -88,6 +88,12 @@ export default defineNuxtConfig({
   future: { compatibilityVersion: 4 },
   compatibilityDate: '2026-08-28',
 
+  nitro: {
+    prerender: {
+      routes: ['/pokedex', '/pokedex/1'],
+    },
+  },
+
   typescript: {
     strict: true,
     // O portão roda em `yarn typecheck` (CI e local), não a cada HMR.

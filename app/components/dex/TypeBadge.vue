@@ -20,17 +20,29 @@ defineProps<{ type: TypeName }>()
 <template>
   <span
     :data-type="type"
-    class="type-badge bevel-chip"
+    class="type-badge"
   >{{ TYPE_LABELS[type] }}</span>
 </template>
 
 <style scoped>
+/**
+ * **Sem chanfro, e isso é correção de uma divergência da Fase 2.**
+ *
+ * As 17 pranchas desenham `.tchip` com `border-radius:2px` e nenhum `clip-path`
+ * — em nenhuma tela o chip de tipo é chanfrado; quem carrega a assinatura é a
+ * carta, o painel e o botão. O `bevel-chip` que estava aqui só ficava de pé no
+ * tamanho grande: no grid da Pokédex o chip tem 11px de altura, e um chanfro de
+ * 9px come o canto inteiro, cortando a última letra de VENENOSO na diagonal. É
+ * literalmente o caso que o comentário da escada de chanfro descreve ao
+ * justificar por que ela é escada.
+ */
 .type-badge {
   /* Texto sobre a cor do tipo, não o contrário: os 18 valores foram escolhidos
      para serem legíveis sobre o fundo escuro, e todos passam folgado com o
      fundo da página por cima deles. */
   background: var(--type);
   color: var(--bg);
+  border-radius: var(--radius);
 
   display: inline-block;
   padding: 4px 9px;

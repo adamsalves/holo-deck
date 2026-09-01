@@ -76,6 +76,62 @@ export const RARITY_LABELS: Record<Rarity, string> = {
 }
 
 /**
+ * As 9 regiões, na ordem das gerações — a lista que o dex traz como
+ * `main_region.name` em `core.json`.
+ *
+ * Existe como tupla, e não como `string` solta, para o rótulo poder ser um
+ * `Record` completo: uma região nova sem nome escrito não compila. O portão de
+ * `test/unit/regions.spec.ts` fecha o outro lado, conferindo que esta lista é a
+ * mesma que o dex gerado contém e na mesma ordem.
+ */
+export const REGION_NAMES = [
+  'kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea',
+] as const
+
+export type RegionName = typeof REGION_NAMES[number]
+
+export function isRegionName(value: string): value is RegionName {
+  return REGION_NAMES.some(known => known === value)
+}
+
+/**
+ * O nome próprio de cada região.
+ *
+ * São os mesmos nos dois idiomas — é justamente por isso que o rótulo existe:
+ * sem ele o cabeçalho escreveria `kanto` em caixa baixa, e a alternativa seria
+ * capitalizar o slug em runtime, que funciona para estas nove e quebra na
+ * primeira região de nome composto.
+ */
+export const REGION_LABELS: Record<RegionName, string> = {
+  kanto: 'Kanto',
+  johto: 'Johto',
+  hoenn: 'Hoenn',
+  sinnoh: 'Sinnoh',
+  unova: 'Unova',
+  kalos: 'Kalos',
+  alola: 'Alola',
+  galar: 'Galar',
+  paldea: 'Paldea',
+}
+
+/**
+ * `Geração IV`, que é como a prancha *Pokédex* escreve o sobretítulo da região.
+ *
+ * O dex traz `Generation IV` em `displayName`, vindo da PokeAPI — em inglês, num
+ * documento `lang="pt-BR"`. Traduzir aqui, e não no build, mantém a regra do
+ * repositório de que `dex.ts` guarda o que vem de fora e o texto que o jogador
+ * lê é coisa deste módulo.
+ *
+ * O algarismo sai da lista, e não de um conversor: são nove valores fixos, e um
+ * conversor genérico seria mais código para cobrir 991 números que não existem.
+ */
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
+
+export function generationLabel(generation: number): string {
+  return `Geração ${ROMAN_NUMERALS[generation - 1] ?? generation}`
+}
+
+/**
  * Os 18 tipos em português. Mesma razão que `RARITY_LABELS`, e mora aqui e não
  * em `dex.ts` porque a PokeAPI não entrega isto: `dex.ts` é o contrato do que
  * vem de fora, e o nome que o jogador lê é coisa que este jogo inventa.

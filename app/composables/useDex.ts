@@ -181,6 +181,60 @@ export function useDex() {
 }
 
 /**
+ * Onde o dex mora para quem está lendo — e são dois lugares, não um.
+ *
+ * No **navegador** é um arquivo estático em `/data/`, buscado por HTTP e
+ * cacheado pela CDN (e, na Fase 8, pelo service worker). É o desenho que a
+ * Fase 1 escolheu e ele continua valendo.
+ *
+ * No **servidor** é o mesmo arquivo em disco, lido com `node:fs`. O `$fetch`
+ * relativo não serve aqui, e o motivo é estrutural: em SSR ele não sai pela
+ * rede, ele chama o app h3 por dentro — e asset público não é rota do h3, é
+ * middleware estático na frente dele. O caminho cai no renderizador de páginas,
+ * que devolve o HTML de 404. Verificado nos três modos: em `dev` o vue-router
+ * ainda avisa `No match found for location with path "/data/gen-1.json"`, na
+ * pré-renderização a página sai vazia, e no `node .output/server/index.mjs` o
+ * mesmo arquivo responde 200 por `curl` e falha por `$fetch`.
+ *
+ * O guarda roda igual nos dois caminhos, e é ele que faz esta divisão ser
+ * segura: um dos lados lendo arquivo diferente do outro reprova na leitura em
+ * vez de renderizar meio dex.
+ */
+async function readServerSide(path: string): Promise<unknown> {
+  const { readFile } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+
+  // `public/` durante `dev` e pré-renderização, `.output/public/` num servidor
+  // Nitro já construído — nesta ordem porque a primeira é a que roda no build,
+  // que é quando estas páginas são geradas.
+  const roots = ['public', '.output/public']
+  const tried: string[] = []
+
+  for (const root of roots) {
+    const file = join(process.cwd(), root, path)
+    tried.push(file)
+    try {
+      const parsed: unknown = JSON.parse(await readFile(file, 'utf8'))
+      return parsed
+    }
+    catch (cause) {
+      // Só a ausência do arquivo justifica tentar a raiz seguinte. JSON quebrado
+      // é defeito do dex e precisa subir com a causa, não virar "não encontrado".
+      if (!isMissingFile(cause)) throw cause
+    }
+  }
+
+  throw createError({
+    statusCode: 500,
+    statusMessage: `dex não encontrado em disco: ${tried.join(', ')}`,
+  })
+}
+
+function isMissingFile(cause: unknown): boolean {
+  return typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ENOENT'
+}
+
+/**
  * `$fetch` devolve `any`, e é por aí que um `any` entra num projeto que baniu a
  * palavra. O `unknown` explícito força o guarda.
  *
@@ -192,15 +246,15 @@ export function useDex() {
  *
  * **Falha de rede sobe crua, de propósito.** Um `$fetch` que rejeita por 500 ou
  * por estar offline não vira `createError` aqui: quem decide entre repetir,
- * degradar e avisar é a tela, e ela chega na Fase 3. Envolver o erro agora só
- * escolheria por ela — e esconderia a causa.
+ * degradar e avisar é a tela. Envolver o erro aqui só escolheria por ela — e
+ * esconderia a causa.
  */
 async function fetchGuarded<T>(
   path: string,
   guard: (value: unknown) => value is T,
   label: string,
 ): Promise<T> {
-  const raw = await $fetch<unknown>(path)
+  const raw = import.meta.server ? await readServerSide(path) : await $fetch<unknown>(path)
   if (!guard(raw)) {
     throw createError({
       statusCode: 500,

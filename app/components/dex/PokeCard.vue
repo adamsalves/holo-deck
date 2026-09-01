@@ -101,8 +101,16 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
         <!-- A raridade nunca é comunicada só por brilho: a etiqueta textual está
              sempre presente, inclusive com reduced-motion ligado. É regra do canvas.
              Em português, porque o documento é `lang="pt-BR"` e quem lê a carta —
-             inclusive o leitor de tela — lê a frase inteira no mesmo idioma. -->
-        <span class="poke-card__rarity numeric">{{ RARITY_LABELS[rarity] }}</span>
+             inclusive o leitor de tela — lê a frase inteira no mesmo idioma.
+
+             O slot existe porque a prancha *Pokédex* põe os chips de tipo neste
+             lugar em vez da etiqueta: num grid, o que se varre é o tipo. Quem
+             troca o rodapé fica devendo a raridade em texto, e é por isso que
+             `PokeCard` sozinho não resolve — o grid dá o nome acessível ao link
+             que envolve a carta, com número, tipos e raridade na mesma frase. -->
+        <slot name="footer">
+          <span class="poke-card__rarity numeric">{{ RARITY_LABELS[rarity] }}</span>
+        </slot>
       </div>
 
       <div
@@ -131,7 +139,9 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   aspect-ratio: 5 / 7;
   padding: 9px 0 11px;
 
-  background: linear-gradient(168deg, var(--surface-raised), var(--surface-cell));
+  /* `--card-surface` é o gradiente do tema, já tingido pela cor do tipo — o
+     `data-type` deste mesmo elemento é quem o resolve. */
+  background: var(--card-surface);
   border: 1px solid var(--rarity);
   color: var(--text);
 
@@ -142,7 +152,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   transform: perspective(700px)
     rotateX(var(--foil-tilt-x, 0deg))
     rotateY(var(--foil-tilt-y, 0deg));
-  transition: transform 120ms var(--ease-out, ease-out);
+  transition: transform 120ms var(--ease-out);
 }
 
 /* O brilho do tipo, atrás da arte. Deriva de `--type` com `color-mix`, que é o
