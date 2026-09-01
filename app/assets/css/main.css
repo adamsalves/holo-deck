@@ -31,9 +31,14 @@
    * `test/unit/theme.spec.ts` cobra a matriz inteira; estes números são só a
    * coluna que cabe num comentário.
    *
-   * A escada é monotônica de propósito. Os degraus fora da grade de dez
-   * (880, 850, 450, 350) existem porque as 17 pranchas usam esses valores; sem
-   * token, alguém escreve o hex na mão.
+   * A escada é monotônica de propósito, e os degraus fora da grade de dez estão
+   * aqui por dois motivos que não se confundem. `880`, `850`, `450` e `350` são
+   * valores que as 17 pranchas usam: sem token, alguém escreve o hex na mão.
+   *
+   * `325` não aparece em prancha nenhuma. Ele é divergência consciente, como o
+   * raio e o `mix-blend-mode`, e entrou porque a matriz de contraste pediu um
+   * degrau entre o corpo e o texto grande que a escada não tinha — a conta está
+   * no bloco dos papéis de texto, mais abaixo.
    */
 
   /* Superfícies. Nenhuma passa de 3:1 — nenhuma carrega texto. */

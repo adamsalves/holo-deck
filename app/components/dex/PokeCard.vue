@@ -70,7 +70,12 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
     >
       <!-- Cada brilho publica o próprio `--type` pelo `data-type`: a variável de
            escopo aninha, então duas cores não custam nenhum token novo nem
-           nenhuma das 18 regras repetidas. -->
+           nenhuma das 18 regras repetidas.
+
+           O segundo brilho é divergência consciente: o canvas não o desenha.
+           Sem ele `types[1]` chega à carta e não tem efeito nenhum, e a
+           alternativa seria um token para a cor composta — que é exatamente o
+           que o escopo aninhado existe para não precisar. -->
       <div
         class="poke-card__glow"
         :data-type="types[0]"
