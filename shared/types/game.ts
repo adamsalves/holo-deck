@@ -1,3 +1,5 @@
+import type { TypeName } from './dex.ts'
+
 /**
  * Tipos do jogo — o que a Pokédex não conhece.
  *
@@ -44,4 +46,51 @@ export function hasFoil(rarity: Rarity): boolean {
  * `includes` de uma tupla `as const` só aceita os próprios literais. */
 export function isRarity(value: string): value is Rarity {
   return RARITY_NAMES.some(known => known === value)
+}
+
+/**
+ * O texto que o jogador lê, e a razão de ele não ser o próprio identificador.
+ *
+ * O documento é `lang="pt-BR"` e os identificadores do repositório são em inglês
+ * — as duas coisas são decisões firmes e incompatíveis num `{{ rarity }}` cru,
+ * que põe COMMON na carta e faz o leitor de tela ler o enum em inglês no meio de
+ * uma frase em português.
+ *
+ * São `Record` completo, e não `Partial`, de propósito: um nível novo na escada
+ * não compila até ganhar rótulo. É a mesma amarração que o portão de tema faz
+ * entre `TYPE_NAMES` e as cores, só que aqui o compilador dá conta sozinho.
+ */
+export const RARITY_LABELS: Record<Rarity, string> = {
+  common: 'Comum',
+  uncommon: 'Incomum',
+  rare: 'Raro',
+  ultra: 'Ultra',
+  legendary: 'Lendário',
+  mythic: 'Mítico',
+}
+
+/**
+ * Os 18 tipos em português. Mesma razão que `RARITY_LABELS`, e mora aqui e não
+ * em `dex.ts` porque a PokeAPI não entrega isto: `dex.ts` é o contrato do que
+ * vem de fora, e o nome que o jogador lê é coisa que este jogo inventa.
+ */
+export const TYPE_LABELS: Record<TypeName, string> = {
+  normal: 'Normal',
+  fighting: 'Lutador',
+  flying: 'Voador',
+  poison: 'Venenoso',
+  ground: 'Terrestre',
+  rock: 'Pedra',
+  bug: 'Inseto',
+  ghost: 'Fantasma',
+  steel: 'Aço',
+  fire: 'Fogo',
+  water: 'Água',
+  grass: 'Planta',
+  electric: 'Elétrico',
+  psychic: 'Psíquico',
+  ice: 'Gelo',
+  dragon: 'Dragão',
+  dark: 'Sombrio',
+  fairy: 'Fada',
 }

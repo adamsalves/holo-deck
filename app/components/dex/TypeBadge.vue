@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TypeName } from '~~/shared/types/dex'
+import { TYPE_LABELS } from '~~/shared/types/game'
 
 /**
  * A etiqueta de tipo — o primeiro consumidor da variável de escopo.
@@ -8,6 +9,10 @@ import type { TypeName } from '~~/shared/types/dex'
  * etiqueta, e a regra abaixo lê a variável: dezoito tipos, uma declaração. É o
  * mesmo mecanismo que o brilho atrás da arte e o preenchimento de barra vão usar,
  * e a razão de nenhum deles precisar de 18 regras próprias.
+ *
+ * O texto sai de `TYPE_LABELS` e não do próprio `type` pelo mesmo motivo que o da
+ * raridade: o identificador é em inglês, o documento é `lang="pt-BR"`, e é a
+ * etiqueta que o jogador lê.
  */
 defineProps<{ type: TypeName }>()
 </script>
@@ -16,7 +21,7 @@ defineProps<{ type: TypeName }>()
   <span
     :data-type="type"
     class="type-badge bevel-chip"
-  >{{ type }}</span>
+  >{{ TYPE_LABELS[type] }}</span>
 </template>
 
 <style scoped>

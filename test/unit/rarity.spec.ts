@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FOIL_FROM_RARITY, hasFoil, isRarity, RARITY_COUNT, RARITY_NAMES, rarityRank } from '~~/shared/types/game'
+import { TYPE_NAMES } from '~~/shared/types/dex'
+import { FOIL_FROM_RARITY, hasFoil, isRarity, RARITY_COUNT, RARITY_LABELS, RARITY_NAMES, rarityRank, TYPE_LABELS } from '~~/shared/types/game'
 
 describe('escada de raridade', () => {
   it('tem os seis níveis, do mais comum ao mais raro', () => {
@@ -43,5 +44,33 @@ describe('foil', () => {
     const comFoil = RARITY_NAMES.filter(hasFoil)
 
     expect(comFoil).toEqual(['rare', 'ultra', 'legendary', 'mythic'])
+  })
+})
+
+/**
+ * O texto que o jogador lê.
+ *
+ * `Record` completo já faz o compilador cobrar a cobertura — um nível novo não
+ * compila sem rótulo. O que ele **não** cobra é o conteúdo: um rótulo vazio, ou
+ * o identificador em inglês copiado para o valor, passa limpo pelo tipo. Foi
+ * assim que a carta saiu escrevendo COMMON num documento `lang="pt-BR"`.
+ */
+describe('rótulos em português', () => {
+  it('dá um rótulo não vazio a cada raridade e a cada tipo', () => {
+    expect(RARITY_NAMES.filter(r => RARITY_LABELS[r].trim() === ''), 'raridades sem rótulo').toEqual([])
+    expect(TYPE_NAMES.filter(t => TYPE_LABELS[t].trim() === ''), 'tipos sem rótulo').toEqual([])
+  })
+
+  it('não deixa o identificador em inglês vazar como rótulo', () => {
+    // `ultra` é o único que é a mesma palavra nos dois idiomas.
+    const iguais = RARITY_NAMES.filter(r => RARITY_LABELS[r].toLowerCase() === r && r !== 'ultra')
+    expect(iguais, 'raridade com o identificador no lugar do rótulo').toEqual([])
+
+    expect(TYPE_NAMES.filter(t => TYPE_LABELS[t].toLowerCase() === t && t !== 'normal'), 'tipo com o identificador no lugar do rótulo').toEqual([])
+  })
+
+  it('não repete rótulo — dois nomes iguais são um nome só na tela', () => {
+    expect(new Set(RARITY_NAMES.map(r => RARITY_LABELS[r])).size).toBe(RARITY_COUNT)
+    expect(new Set(TYPE_NAMES.map(t => TYPE_LABELS[t])).size).toBe(TYPE_NAMES.length)
   })
 })
