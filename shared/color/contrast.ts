@@ -1,11 +1,12 @@
 /**
  * Contraste WCAG 2.1, para o tema ser verificado e não apenas afirmado.
  *
- * O escuro-único torna isto barato: existe um fundo só, então toda cor de texto
- * do sistema tem exatamente uma razão de contraste, e ela dá para ser conferida
- * por teste em vez de por inspeção. Foi assim que a dívida de `ink-400` (3.34:1
- * usado como texto 280 vezes nas pranchas) apareceu — e é assim que ela fica
- * consertada.
+ * Mora em `shared/` porque tem dois leitores que precisam concordar: o portão de
+ * tema, que reprova o build, e o espelho em `/styleguide`, que mostra a razão ao
+ * lado de cada papel. Enquanto a conta estava só no teste, o espelho exibia
+ * números escritos à mão — e um número escrito à mão não acompanha a paleta.
+ *
+ * Nada aqui depende de DOM: a razão de contraste é aritmética sobre dois hex.
  */
 
 /** Limiar AA para texto normal. */
@@ -20,7 +21,7 @@ function byte(pair: string): number {
   return Number.parseInt(pair, 16)
 }
 
-/** `#RGB` ou `#RRGGBB` → os três canais em 0..255. `null` no que não for hex. */
+/** Hex curto ou longo → os três canais em 0..255. `null` no que não for hex. */
 export function parseHex(hex: string): Channels | null {
   const trimmed = hex.trim()
 

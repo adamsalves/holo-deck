@@ -12,18 +12,24 @@
  * por trinta componentes é um commit de refatoração. As pranchas do canvas usam
  * hex inline porque são mockup — o código não repete isso, e há teste cobrando.
  *
- * Escuro-único, decidido no plano: o foil depende de `background-blend-mode:
+ * Escuro-único, decidido no plano: o foil depende de `mix-blend-mode:
  * color-dodge`, que clareia. Sobre fundo claro ele estoura em branco e o efeito
  * deixa de existir, então não há segunda paleta a manter.
+ *
+ * (O plano escreve `background-blend-mode`; o canvas usa `mix-blend-mode`, e é o
+ * segundo que renderiza. Divergência consciente, registrada aqui e no README.)
  */
 
 @theme static {
   /**
    * Camada 1 — primitivos.
    *
-   * Quinze degraus sobre `ink-950`. Os números entre parênteses são a razão de
-   * contraste WCAG contra o fundo da página, que é o único fundo que existe: ela
-   * decide se um degrau pode carregar texto ou se é só superfície.
+   * Dezesseis degraus sobre `ink-950`. Os números entre parênteses são a razão
+   * de contraste WCAG contra `ink-950` — o **melhor** caso, não o único. Um
+   * sistema com cinco superfícies tem cinco razões por degrau, e a que decide é
+   * sempre a da superfície mais clara que carrega texto (`ink-800`). O portão em
+   * `test/unit/theme.spec.ts` cobra a matriz inteira; estes números são só a
+   * coluna que cabe num comentário.
    *
    * A escada é monotônica de propósito. Os degraus fora da grade de dez
    * (880, 850, 450, 350) existem porque as 17 pranchas usam esses valores; sem
@@ -42,9 +48,10 @@
   --color-ink-450: #414A6B; /* 2.23 — 64 usos no canvas; degrau de superfície, ver abaixo */
 
   /* Texto. Do limite do AA para cima. */
-  --color-ink-400: #5C6484; /* 3.34 — AA só em texto grande */
-  --color-ink-350: #737C9F; /* 4.73 — AA */
-  --color-ink-300: #8E98BC; /* 6.81 — AA */
+  --color-ink-400: #5C6484; /* 3.34 sobre ink-950, 2.84 sobre ink-800 — não sustenta texto */
+  --color-ink-350: #737C9F; /* 4.73 / 4.02 — AA grande em toda superfície */
+  --color-ink-325: #858FB2; /* 6.07 / 5.16 — AA em toda superfície */
+  --color-ink-300: #8E98BC; /* 6.81 / 5.79 — AA */
   --color-ink-200: #99A1BD; /* 7.57 — AA */
   --color-ink-100: #C9D4E8; /* 13.00 — AA */
   --color-ink-50: #EEF1FA; /* 17.19 — AA */
@@ -155,18 +162,19 @@
 /**
  * Mesma ideia para raridade, com um token a mais porque mítico é prismático.
  *
- * `--rarity` é cor: serve a brilho, fio e texto simples. `--rarity-fill` é
- * imagem: serve a superfície. Os dois existem porque mítico não cabe numa cor
- * só — e para os outros cinco `--rarity-fill` é o gradiente de dois pontos
- * iguais, que é a forma de um `<color>` virar `<image>` sem caso especial no
- * componente.
+ * `--rarity` é cor: serve a brilho, fio e texto simples. Mítico não cabe numa
+ * cor só, então ganha `--rarity-text`, que é imagem — a varredura recortada no
+ * rótulo. O prismático sai dos tokens que já existem: psychic, legendary,
+ * grass, rare e ultra, nessa ordem. Nenhum hex novo entra por causa dele.
  *
- * O prismático sai dos tokens que já existem: psychic, legendary, grass, rare e
- * ultra, nessa ordem. Nenhum hex novo entra por causa dele.
+ * Houve aqui um `--rarity-fill` (o gradiente de dois pontos iguais, para um
+ * `<color>` virar `<image>` sem caso especial no componente). Saiu por não ter
+ * consumidor: token declarado e nunca lido é receita não verificada, e a
+ * primeira superfície que precisar dele — moldura de mítico, slot de deck — é
+ * quem diz qual é a forma certa. Volta com ela.
  */
 [data-rarity] {
   --rarity: var(--color-rarity-common);
-  --rarity-fill: linear-gradient(var(--rarity), var(--rarity));
 
   /**
    * A cor do RÓTULO, que não é sempre a cor da moldura.
@@ -235,16 +243,7 @@
   --rarity: var(--color-type-psychic);
   --rarity-label: var(--rarity);
   --foil-strength: 0.5;
-  --rarity-fill: conic-gradient(
-    from 0deg,
-    var(--color-type-psychic),
-    var(--color-rarity-legendary),
-    var(--color-type-grass),
-    var(--color-rarity-rare),
-    var(--color-rarity-ultra),
-    var(--color-type-psychic)
-  );
-  /* Cônico embaralha num texto curto; o rótulo usa a varredura linear. */
+  /* O rótulo usa varredura linear: um cônico embaralha num texto curto. */
   --rarity-text: linear-gradient(
     92deg,
     var(--color-type-psychic),
@@ -255,13 +254,6 @@
   );
 }
 
-/**
- * O chanfro como utilitário, um por degrau da escada: `bevel-card`,
- * `bevel-tile`, `bevel-chip`, `bevel-control`.
- *
- * `clip-path` em vez de borda porque a silhueta precisa cortar o foil e a arte
- * junto — uma borda desenharia o corte por cima e o brilho vazaria no canto.
- */
 /**
  * Todo número do jogo — HP, stat, dano, id, contador, custo.
  *
@@ -275,6 +267,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/**
+ * O chanfro como utilitário, um por degrau da escada: `bevel-card`,
+ * `bevel-tile`, `bevel-chip`, `bevel-control`.
+ *
+ * `clip-path` em vez de borda porque a silhueta precisa cortar o foil e a arte
+ * junto — uma borda desenharia o corte por cima e o brilho vazaria no canto.
+ */
 @utility bevel-* {
   --bevel: --value(--bevel-*);
   clip-path: polygon(
@@ -309,28 +308,33 @@
   --border-strong: var(--color-ink-600); /* tracejado, estado vazio */
 
   /**
-   * Os quatro níveis de texto, e por que não são os do plano original.
+   * Os quatro níveis de texto, e o fundo contra o qual eles foram escolhidos.
    *
    * O plano mapeava `--text-muted` em `ink-400` (3.34) e `--text-faint` em
    * `ink-500` (1.94) — dois papéis de texto apoiados em degraus que não
    * sustentam texto. `#5C6484` aparece 280 vezes como texto nas 17 pranchas e
    * reprova o AA; `ink-500` sobre `ink-950` é praticamente invisível.
    *
-   * A dívida foi levantada na Fase 0 e adiada de propósito para cá, para ser
-   * resolvida junto com a escala completa. A saída não podia ser só empurrar
-   * tudo um degrau acima: `--text-muted` em `ink-300` (6.81) fica colado no
-   * corpo (7.57) e a hierarquia some. Por isso `ink-350` entrou na escada — é o
-   * degrau que faltava entre "passa no AA" e "é visivelmente mais fraco que o
-   * corpo".
+   * **O erro seguinte foi medir contra o fundo errado.** A primeira versão desta
+   * fase escolheu os quatro degraus contra `ink-950` apoiada em "existe um fundo
+   * só" — e foi esta mesma fase que acabou com isso, ao declarar cinco
+   * superfícies. Nenhum texto de carta cai sobre `ink-950`: a carta é um
+   * gradiente que começa em `--surface-raised` (`ink-800`), e sobre ele
+   * `--text-muted` caía a 4.02 e `--text-faint` a 2.84 — abaixo até do piso de
+   * texto grande. A escolha certa é sempre contra a superfície **mais clara**
+   * que carrega texto, e é essa matriz que o portão cobra.
    *
-   * `ink-500` saiu dos papéis de texto e ficou só superfície. Mesma decisão que
-   * a Fase 0 já tinha tomado para `ink-450`: degrau de superfície não vira
-   * texto por conveniência.
+   * Daí `ink-325`: `ink-300` (5.79 sobre `ink-800`) fica colado no corpo (6.43)
+   * e a hierarquia some; `ink-350` (4.02) não sustenta texto pequeno. O degrau
+   * que faltava fica entre os dois. `ink-400` seguiu `ink-450` e `ink-500` e
+   * virou só superfície — degrau de superfície não vira texto por conveniência.
+   *
+   * Os pares são (sobre `ink-950` / sobre `ink-800`), melhor e pior caso.
    */
-  --text: var(--color-ink-50); /* 17.19 — primário */
-  --text-body: var(--color-ink-200); /* 7.57 — corpo */
-  --text-muted: var(--color-ink-350); /* 4.73 — rótulo, metadado */
-  --text-faint: var(--color-ink-400); /* 3.34 — nota de rodapé, só em texto grande */
+  --text: var(--color-ink-50); /* 17.19 / 14.62 — primário */
+  --text-body: var(--color-ink-200); /* 7.57 / 6.43 — corpo */
+  --text-muted: var(--color-ink-325); /* 6.07 / 5.16 — rótulo, metadado */
+  --text-faint: var(--color-ink-350); /* 4.73 / 4.02 — nota de rodapé, só em texto grande */
 
   /**
    * O Nuxt UI recebe os nossos, para `UModal`, `UTabs`, `UToast` e
@@ -367,17 +371,38 @@
    *
    * `--ui-text-toned` fica de fora de propósito. O Nuxt UI tem cinco níveis de
    * texto e este sistema declara quatro; sem a sobrescrita ele cai no degrau 300
-   * (6.81:1), que é legível e se encaixa entre o corpo e o `muted`. Inventar um
-   * quinto papel semântico para preencher a lacuna seria criar token sem uso.
+   * (6.81 / 5.79), que é legível e se encaixa entre o corpo e o `muted`. Inventar
+   * um quinto papel semântico para preencher a lacuna seria criar token sem uso.
+   *
+   * `dimmed` recebe `--text-muted`, e **não** `--text-faint`, apesar de ser o
+   * nível mais fraco dos dois lados. `--text-faint` é papel de texto grande, e
+   * `dimmed` é onde o Nuxt UI põe descrição de `UCommandPalette` e ajuda de
+   * `UFormField` — texto pequeno. Apontar um para o outro seria repetir, uma
+   * camada acima, o mesmo defeito que esta fase veio consertar. O quinto nível
+   * colapsa no quarto em vez de descer abaixo do AA.
    */
   --ui-text-highlighted: var(--text);
   --ui-text: var(--text-body);
   --ui-text-muted: var(--text-muted);
-  --ui-text-dimmed: var(--text-faint);
+  --ui-text-dimmed: var(--text-muted);
 
   /* Fios: o dele usa 800 e 700, a tabela daqui usa 700 e 600. */
   --ui-border: var(--border);
   --ui-border-accented: var(--border-strong);
+
+  /**
+   * O raio, que sem esta linha não saía do papel.
+   *
+   * O Nuxt UI reencaixa a escala inteira do Tailwind na dele —
+   * `--radius-sm: var(--ui-radius)`, `--radius-md: calc(var(--ui-radius) * 1.5)`
+   * e assim por diante. Então todo `rounded-*` que um componente escreve deriva
+   * de `--ui-radius`, não de `--radius`; o `--radius` do tema alimenta só o
+   * `rounded` pelado, que ninguém usa. Sem este mapeamento a decisão de 3px fica
+   * declarada, documentada e sem nenhum efeito, e todo `UButton` continua nos
+   * 4px de fábrica — exatamente a "cara de template" que plugar no Nuxt UI
+   * deveria evitar.
+   */
+  --ui-radius: var(--radius);
 }
 
 body {
