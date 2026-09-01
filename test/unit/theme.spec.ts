@@ -214,6 +214,10 @@ describe('contraste do tema', () => {
    * A lista fica aqui e é exata: se uma cor nova entrar reprovando, ou se
    * `dragon` for corrigida, o portão reprova e alguém decide de novo — em vez de
    * a exceção crescer sozinha.
+   *
+   * A decisão em si está na #11, com as saídas que não tocam a paleta. Quem
+   * mexer nesta lista fecha a issue junto; a referência está nos dois lados para
+   * o registro não sobreviver ao portão nem o portão à issue.
    */
   it('registra quais tipos não sustentam texto sobre painel', () => {
     const source = themeSource()
