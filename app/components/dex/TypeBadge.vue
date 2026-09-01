@@ -30,7 +30,7 @@ defineProps<{ type: TypeName }>()
   display: inline-block;
   padding: 4px 9px;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.1em;
   line-height: 1;
   text-transform: uppercase;

@@ -79,6 +79,16 @@ describe('disciplina de token', () => {
     ).toEqual([])
   })
 
+  it('não deixa número escapar do utilitário que o alinha', () => {
+    // `font-mono` sozinho dá a fonte e esquece `tabular-nums`, e aí os dígitos
+    // têm largura própria: um HP caindo de 110 para 99 empurra o texto ao lado a
+    // cada quadro. O utilitário `numeric` traz os dois, e não existe metade dele.
+    expect(
+      offenders(/\bfont-mono\b/g),
+      'usar `numeric`, que traz a fonte e o `tabular-nums` juntos',
+    ).toEqual([])
+  })
+
   it('encontra o tema, e o tema é o que carrega os valores', () => {
     const theme = readFileSync(join(REPO_ROOT, THEME), 'utf8')
 

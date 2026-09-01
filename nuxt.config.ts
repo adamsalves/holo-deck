@@ -72,4 +72,21 @@ export default defineNuxtConfig({
       stylistic: true,
     },
   },
+
+  /**
+   * As duas famílias do tema, declaradas em vez de deixadas para descoberta.
+   *
+   * O `@nuxt/fonts` acha a família varrendo o CSS, mas os **pesos** ele infere do
+   * que encontra escrito — e peso usado só em componente que ainda não existe não
+   * é encontrado. Declarar aqui faz o build baixar a mesma coisa hoje e na Fase 6.
+   *
+   * Chakra Petch vai até 700; o canvas usa 800 em rótulo, que o navegador
+   * sintetizaria engordando o traço. O sistema usa 700, que é o negrito real.
+   */
+  fonts: {
+    families: [
+      { name: 'Chakra Petch', provider: 'google', weights: [400, 500, 600, 700] },
+      { name: 'JetBrains Mono', provider: 'google', weights: [400, 700] },
+    ],
+  },
 })

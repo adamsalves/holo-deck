@@ -110,6 +110,19 @@
    * mão, não decisão. Um único token, no valor que o plano declara.
    */
   --radius: 3px;
+
+  /**
+   * Chakra Petch para display e UI, JetBrains Mono para número.
+   *
+   * As duas pilhas são as do canvas, com o fallback junto: `Arial Narrow` porque
+   * a Chakra é estreita e cair numa fonte de largura normal quebra o alinhamento
+   * de rótulo antes de a web font chegar.
+   *
+   * Servidas pelo `@nuxt/fonts`, que baixa e auto-hospeda no build — não há
+   * requisição a terceiro em runtime, e nenhum `<link>` para o Google no HTML.
+   */
+  --font-sans: "Chakra Petch", "Arial Narrow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 
 /**
@@ -191,6 +204,19 @@
  * `clip-path` em vez de borda porque a silhueta precisa cortar o foil e a arte
  * junto — uma borda desenharia o corte por cima e o brilho vazaria no canto.
  */
+/**
+ * Todo número do jogo — HP, stat, dano, id, contador, custo.
+ *
+ * É um utilitário só, e não `font-mono tabular-nums`, porque o modo de errar é
+ * escrever metade: sem `tabular-nums` os dígitos têm largura própria e uma barra
+ * de HP caindo de 110 para 99 empurra o texto ao lado a cada quadro. Com uma
+ * classe só, não existe a metade.
+ */
+@utility numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 @utility bevel-* {
   --bevel: --value(--bevel-*);
   clip-path: polygon(
