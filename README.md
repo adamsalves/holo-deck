@@ -263,6 +263,11 @@ Busca global em `Cmd/Ctrl+K`, em qualquer uma das três. Ela indexa nome, númer
 tipo — dá para procurar por `venenoso` ou por `0150` — e só baixa o `index.json`
 quando abre pela primeira vez.
 
+O grid filtra por tipo e por raridade: **OU** dentro de cada grupo, **E** entre
+os dois. A prancha desenha um terceiro grupo — *Possuídos* e *Faltando* — que não
+está aqui: posse é coleção, e coleção é Fase 5. Um filtro *Possuídos* que devolve
+zero sempre não seria um filtro incompleto, seria um filtro mentiroso.
+
 Quatro decisões desta fase que não se deduzem lendo o código:
 
 - **O grid existe em duas formas.** O servidor renderiza as 151 cartas inteiras;

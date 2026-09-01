@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import type { TypeName } from '~~/shared/types/dex'
+import type { Rarity } from '~~/shared/types/game'
+import { computed, ref } from 'vue'
+import { rarityOf } from '~~/shared/game/rarity'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
 import { toRegions } from '~/composables/useRegions'
 import { useDex } from '~/composables/useDex'
@@ -60,6 +63,32 @@ if (error.value) {
 const region = computed(() => data.value?.region ?? null)
 const species = computed(() => data.value?.species ?? [])
 
+/**
+ * O filtro é estado local, e não da URL.
+ *
+ * Uma URL filtrada seria compartilhável, mas ela também é uma segunda forma de
+ * endereçar a mesma tela — e o que esta fase pré-renderiza é uma página por
+ * região. Enquanto o filtro não tiver um consumidor que precise dele por link,
+ * o estado local é o que não cria URL sem página.
+ */
+const selectedTypes = ref<readonly TypeName[]>([])
+const selectedRarities = ref<readonly Rarity[]>([])
+
+/**
+ * Tipo é OU dentro do grupo (planta *ou* fogo), e o mesmo vale para raridade;
+ * entre os dois grupos é E. É a leitura que a linha de chips sugere: ligar mais
+ * chips do mesmo grupo amplia, ligar de grupos diferentes restringe.
+ */
+const filtered = computed(() => species.value.filter((entry) => {
+  const byType = selectedTypes.value.length === 0
+    || entry.types.some(type => selectedTypes.value.includes(type))
+
+  const byRarity = selectedRarities.value.length === 0
+    || selectedRarities.value.includes(rarityOf(entry))
+
+  return byType && byRarity
+}))
+
 useSeoMeta({
   title: () => `${region.value?.label ?? 'Pokédex'} — Pokédex — Holo Deck`,
   description: () => region.value === null
@@ -107,6 +136,14 @@ useSeoMeta({
 
           <DexSearch />
         </div>
+
+        <DexFilters
+          v-model:types="selectedTypes"
+          v-model:rarities="selectedRarities"
+          :total="species.length"
+          :shown="filtered.length"
+          class="mt-6"
+        />
       </div>
     </header>
 
@@ -119,13 +156,23 @@ useSeoMeta({
       -->
       <ClientOnly>
         <DexGrid
-          :species="species"
+          :species="filtered"
           virtualize
         />
         <template #fallback>
+          <!-- O servidor renderiza a lista **inteira**, não a filtrada: o
+               filtro é estado do cliente, e o HTML pré-renderizado é o que
+               carrega os 151 links das páginas de detalhe. -->
           <DexGrid :species="species" />
         </template>
       </ClientOnly>
+
+      <p
+        v-if="filtered.length === 0"
+        class="grid-empty"
+      >
+        Nenhuma espécie de {{ region?.label }} combina com esses filtros.
+      </p>
     </div>
   </main>
 </template>
@@ -174,6 +221,13 @@ useSeoMeta({
 .region-header__meta {
   margin-top: 12px;
   font-size: 13px;
+  color: var(--text-muted);
+}
+
+.grid-empty {
+  padding: 48px 0;
+  text-align: center;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
