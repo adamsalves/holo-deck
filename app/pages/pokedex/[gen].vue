@@ -33,7 +33,7 @@ if (generation.value === null) {
   throw createError({ statusCode: 404, statusMessage: 'Geração fora do dex', fatal: true })
 }
 
-const { data } = await useAsyncData(
+const { data, error } = await useAsyncData(
   () => `pokedex-gen-${generation.value ?? 0}`,
   async () => {
     const target = generation.value
@@ -46,6 +46,16 @@ const { data } = await useAsyncData(
   },
   { watch: [generation] },
 )
+
+// `useAsyncData` captura o erro em vez de deixá-lo subir; sem este relance, um
+// `gen-N.json` que não carrega vira uma página 200 com o cabeçalho vazio.
+if (error.value) {
+  throw createError({
+    statusCode: error.value.statusCode ?? 500,
+    statusMessage: error.value.statusMessage ?? 'Não foi possível carregar a geração',
+    fatal: true,
+  })
+}
 
 const region = computed(() => data.value?.region ?? null)
 const species = computed(() => data.value?.species ?? [])

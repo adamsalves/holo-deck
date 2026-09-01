@@ -29,6 +29,7 @@ export default defineNuxtConfig({
 
   modules: [
     '@nuxt/eslint',
+    '@nuxt/image',
     '@nuxt/ui',
     '@pinia/nuxt',
     '@vueuse/nuxt',
@@ -123,5 +124,22 @@ export default defineNuxtConfig({
       { name: 'Chakra Petch', provider: 'google', weights: [400, 500, 600, 700] },
       { name: 'JetBrains Mono', provider: 'google', weights: [400, 700] },
     ],
+  },
+
+  /**
+   * A arte oficial é a **única** imagem remota do projeto, e só a página de
+   * detalhe a usa.
+   *
+   * O grid come as miniaturas de 128px commitadas — arte oficial a 118 KB
+   * faria Kanto custar 17,8 MB. No detalhe é uma imagem por vez, e aí a
+   * resolução cheia vale: é a superfície onde a carta aparece em tamanho de
+   * herói.
+   *
+   * `domains` é o que autoriza o otimizador a tocar num host de terceiro; sem
+   * ele o `<NuxtImg>` devolve a URL crua e a otimização não acontece — em
+   * silêncio, que é o modo de falhar mais caro possível para uma imagem.
+   */
+  image: {
+    domains: ['raw.githubusercontent.com'],
   },
 })

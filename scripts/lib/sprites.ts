@@ -28,8 +28,12 @@ export async function toThumbnail(artwork: Buffer, size = THUMBNAIL_SIZE): Promi
     .toBuffer()
 }
 
-/** A arte oficial não é armazenada no dex: a URL é derivável do id. */
-export function artworkUrl(speciesId: number): string {
-  return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon'
-    + `/other/official-artwork/${speciesId}.png`
-}
+/**
+ * A arte oficial não é armazenada no dex: a URL é derivável do id.
+ *
+ * A fórmula mora em `shared/dex/artwork.ts` porque a página de detalhe precisa
+ * dela em runtime — o herói dela é a mesma imagem que este build recorta em
+ * miniatura. Duas cópias seriam duas chances de as duas apontarem para lugares
+ * diferentes.
+ */
+export { artworkUrl } from '../../shared/dex/artwork.ts'

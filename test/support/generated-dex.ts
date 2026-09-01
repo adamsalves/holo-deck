@@ -1,7 +1,7 @@
-import type { CoreData, GenerationData, IndexData, SpeciesEntry } from '~~/shared/types/dex'
+import type { ChainsData, CoreData, GenerationData, IndexData, SpeciesEntry } from '~~/shared/types/dex'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { GENERATION_COUNT, isCoreData, isGenerationData, isIndexData } from '~~/shared/types/dex'
+import { GENERATION_COUNT, isChainsData, isCoreData, isGenerationData, isIndexData } from '~~/shared/types/dex'
 import { REPO_ROOT } from './source-tree'
 
 /**
@@ -30,6 +30,10 @@ export function readCore(): CoreData {
 
 export function readGeneration(generation: number): GenerationData {
   return readGuarded(`gen-${generation}.json`, isGenerationData)
+}
+
+export function readChains(): ChainsData {
+  return readGuarded('chains.json', isChainsData)
 }
 
 export function readIndex(): IndexData {
