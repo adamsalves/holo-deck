@@ -1,6 +1,6 @@
 import type { MaybeRefOrGetter, Ref } from 'vue'
-import { useEventListener, usePreferredReducedMotion } from '@vueuse/core'
-import { computed, ref, toValue } from 'vue'
+import { createSharedComposable, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
+import { computed, shallowRef, toValue, watch } from 'vue'
 
 /**
  * O foil holográfico — a única coisa da interface que reage ao ponteiro.
@@ -17,7 +17,24 @@ import { computed, ref, toValue } from 'vue'
  * **Custo é requisito, não detalhe.** O plano proíbe o foil ativo nas 1025 cartas
  * do grid, então nada aqui escuta enquanto a carta não está sob ponteiro ou foco:
  * os alvos dos listeners são reativos e valem `null` fora disso. Uma carta parada
- * custa dois listeners de entrada/saída no próprio elemento — nenhum na janela.
+ * custa dois listeners de entrada/saída no próprio elemento.
+ *
+ * **A preferência de movimento é compartilhada, e essa linha é a mais cara do
+ * arquivo.** `usePreferredReducedMotion` é `useMediaQuery` por baixo, e o VueUse
+ * não o memoiza: cada chamada cria um `MediaQueryList` novo e assina `change`
+ * nele. Chamado direto, o grid pagaria 1025 assinaturas de mídia — listeners de
+ * verdade, e de objeto de janela, exatamente o que a regra de custo proíbe.
+ * `createSharedComposable` faz as 1025 cartas dividirem uma assinatura só.
+ */
+
+/**
+ * O alvo que `useFoil` mede **não pode ser o elemento que recebe a inclinação**.
+ *
+ * `getBoundingClientRect()` devolve a caixa já transformada, então medir o próprio
+ * elemento inclinado realimenta a leitura com a saída dela — e com a transição de
+ * 120ms no meio, o resultado passa a depender do estado da animação e não só do
+ * ponteiro. Por isso `PokeCard` mede a moldura externa, que não gira, e inclina o
+ * `<article>` de dentro.
  */
 
 export interface FoilReading {
@@ -105,8 +122,23 @@ export function foilVariables(reading: FoilReading): Record<string, string> {
  * graus. A faixa útil é pequena — ninguém vira o telefone 90° para ver um brilho
  * —, então 20° de giro cobrem o curso inteiro.
  */
+/**
+ * Leitura de sensor que dá para usar como número.
+ *
+ * `=== null` não bastava: a especificação diz `double?`, mas um evento sem os
+ * campos entrega `undefined`, e `undefined / 20` é `NaN`. O NaN não estoura em
+ * lugar nenhum — ele sai por `foilVariables` como `--foil-x: NaN%`, o navegador
+ * descarta a variável, o foil volta ao fallback e nada acusa.
+ *
+ * Predicado e não `Number.isFinite` solto porque só o predicado estreita o
+ * `number | null` — e ele verifica exatamente o que afirma.
+ */
+function isReading(value: number | null): value is number {
+  return value !== null && Number.isFinite(value)
+}
+
 export function readFoilFromTilt(beta: number | null, gamma: number | null): FoilReading {
-  if (beta === null || gamma === null) return FOIL_REST
+  if (!isReading(beta) || !isReading(gamma)) return FOIL_REST
 
   const USEFUL_RANGE = 20
 
@@ -116,6 +148,56 @@ export function readFoilFromTilt(beta: number | null, gamma: number | null): Foi
     1 + Math.min(1, Math.max(-1, beta / USEFUL_RANGE)),
   )
 }
+
+/**
+ * A portaria do giroscópio no iOS 13+.
+ *
+ * Lá o evento não chega sem `DeviceOrientationEvent.requestPermission()`, e a
+ * chamada só vale dentro de um gesto do usuário. É a razão de o rastreio por
+ * inclinação parecer simplesmente não existir no aparelho onde ele mais faz
+ * sentido — nenhum erro é lançado, os eventos apenas nunca vêm.
+ *
+ * Fora do iOS não há portaria: devolve `true` sem perguntar nada.
+ */
+interface TiltGatekeeper {
+  requestPermission: () => Promise<unknown>
+}
+
+/**
+ * Predicado em vez de cast: `requestPermission` não está na lib do DOM porque é
+ * extensão do WebKit, e afirmar que ela existe seria a mentira que o
+ * `assertionStyle: 'never'` proíbe. Este predicado *verifica* o que afirma.
+ */
+function isTiltGatekeeper(value: unknown): value is TiltGatekeeper {
+  return typeof value === 'object' && value !== null
+    && 'requestPermission' in value
+    && typeof value.requestPermission === 'function'
+}
+
+/** Chame de dentro de um gesto do usuário — um clique, um toque. */
+export async function requestTiltPermission(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+
+  const constructor: unknown = window.DeviceOrientationEvent
+  if (!isTiltGatekeeper(constructor)) return true
+
+  const state = await constructor.requestPermission()
+  return state === 'granted'
+}
+
+/** Se vale a pena oferecer o botão de permissão — só onde existe a portaria. */
+export function tiltNeedsPermission(): boolean {
+  if (typeof window === 'undefined') return false
+  return isTiltGatekeeper(window.DeviceOrientationEvent)
+}
+
+/**
+ * Uma assinatura de `prefers-reduced-motion` para o app inteiro.
+ *
+ * Ver o docblock do topo: sem isto, cada carta do grid assina a media query por
+ * conta própria e a afirmação de custo do plano deixa de valer.
+ */
+const useSharedReducedMotion = createSharedComposable(usePreferredReducedMotion)
 
 export interface FoilOptions {
   /**
@@ -128,7 +210,7 @@ export interface FoilOptions {
 }
 
 export interface FoilControls {
-  /** Verdadeiro enquanto a carta está sob ponteiro ou foco *e* o movimento é permitido. */
+  /** Verdadeiro enquanto a carta está sendo rastreada — por ponteiro, foco ou sensor. */
   readonly active: Readonly<Ref<boolean>>
   /** As variáveis a aplicar na carta — repouso quando inativa. */
   readonly variables: Readonly<Ref<Record<string, string>>>
@@ -138,7 +220,7 @@ export function useFoil(
   target: MaybeRefOrGetter<HTMLElement | null | undefined>,
   options: FoilOptions = {},
 ): FoilControls {
-  const reducedMotion = usePreferredReducedMotion()
+  const reducedMotion = useSharedReducedMotion()
 
   /**
    * `prefers-reduced-motion` desliga o rastreio na origem, não na animação.
@@ -149,21 +231,61 @@ export function useFoil(
    */
   const allowed = computed(() => toValue(options.enabled ?? true) && reducedMotion.value !== 'reduce')
 
-  const engaged = ref(false)
-  const reading = ref<FoilReading>(FOIL_REST)
+  /** Ponteiro ou foco na carta. */
+  const engaged = shallowRef(false)
+  /** O sensor já entregou pelo menos uma leitura — o rastreio sem ponteiro. */
+  const tilting = shallowRef(false)
+  const reading = shallowRef<FoilReading>(FOIL_REST)
 
-  const active = computed(() => engaged.value && allowed.value)
-
-  const enterTarget = computed(() => (allowed.value ? toValue(target) ?? null : null))
-  const moveTarget = computed(() => (active.value ? toValue(target) ?? null : null))
+  const active = computed(() => allowed.value && (engaged.value || tilting.value))
 
   function rest(): void {
     engaged.value = false
+    tilting.value = false
     reading.value = FOIL_REST
   }
 
+  /**
+   * Quem desliga o rastreio precisa desligar o estado junto.
+   *
+   * Sem isto, `allowed` caindo com a carta engajada (o usuário liga
+   * reduced-motion no sistema, a Fase 6 desmarca a preferência) tira os listeners
+   * de cena e deixa `engaged` preso em `true`. Ao religar, a carta volta
+   * inclinada na última leitura, e só um novo entra-e-sai do ponteiro a endireita.
+   */
+  watch(allowed, (permitido) => {
+    if (!permitido) rest()
+  })
+
+  const enterTarget = computed(() => (allowed.value ? toValue(target) ?? null : null))
+  const moveTarget = computed(() => (allowed.value && engaged.value ? toValue(target) ?? null : null))
+
+  /**
+   * O giroscópio vale **sem** ponteiro, que é o ponto dele.
+   *
+   * Antes ele exigia `active`, e `active` exigia `pointerenter` ou `focusin` —
+   * num aparelho de toque isso é "enquanto o dedo está encostado na carta", ou
+   * seja, o sensor só funcionava para quem já tinha ponteiro. Agora ele escuta
+   * enquanto o rastreio é permitido e o ponteiro **não** está na carta: quem tem
+   * ponteiro manda, quem não tem inclina o aparelho.
+   *
+   * Continua preso a `allowed`, então a carta do grid segue sem listener nenhum —
+   * é isso, e não o `active`, que mantém as 1025 baratas.
+   */
+  const tiltTarget = computed(() => {
+    if (!allowed.value || engaged.value) return null
+    if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return null
+    return window
+  })
+
   useEventListener(enterTarget, ['pointerenter', 'focusin'], () => {
     engaged.value = true
+    // O ponteiro assume no repouso, e não na última leitura do sensor: herdá-la
+    // faria a carta saltar da posição em que o aparelho estava para a do cursor
+    // no primeiro `pointermove`. O repouso é o ângulo do canvas — a mesma razão
+    // de `readFoil` devolvê-lo no centro exato.
+    tilting.value = false
+    reading.value = FOIL_REST
   })
 
   useEventListener(enterTarget, ['pointerleave', 'focusout'], rest)
@@ -176,13 +298,15 @@ export function useFoil(
     reading.value = readFoil(rect, event.clientX, event.clientY)
   })
 
-  // Giroscópio só onde há giroscópio, e só com a carta engajada: o evento é de
-  // janela, e mantê-lo ligado no grid custaria em todo scroll de celular.
   useEventListener<'deviceorientation', DeviceOrientationEvent>(
-    () => (active.value && typeof window !== 'undefined' ? window : null),
+    tiltTarget,
     'deviceorientation',
     (event) => {
+      // Um evento sem leitura não acende o rastreio: `tilting` ligado sem número
+      // deixaria a carta "ativa" mostrando o repouso, que é pior que inativa.
+      if (!isReading(event.beta) || !isReading(event.gamma)) return
       reading.value = readFoilFromTilt(event.beta, event.gamma)
+      tilting.value = true
     },
   )
 

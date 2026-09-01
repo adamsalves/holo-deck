@@ -1,6 +1,6 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it } from 'vitest'
-import { effectScope, ref } from 'vue'
+import { effectScope, nextTick, ref } from 'vue'
 import {
   FOIL_MAX_TILT,
   FOIL_REST,
@@ -125,6 +125,12 @@ describe('variáveis entregues à carta', () => {
  * sobre custo: uma carta parada não pode instalar nada. E `prefers-reduced-motion`
  * é uma afirmação sobre origem: quem pede menos movimento não quer o cálculo a
  * cada `pointermove`, não quer só a transição zerada.
+ *
+ * **Contar só os listeners do elemento não bastava.** A versão anterior deste
+ * arquivo trocava `window.matchMedia` por um duplo cujo `addEventListener` era
+ * `() => {}` — e o único listener que uma carta do grid realmente instalava era
+ * justamente na media query, invisível para o espião. O duplo agora **anota** o
+ * que recebe, e a afirmação de custo passa a ser medida onde ela falhava.
  */
 
 const desfazer: (() => void)[] = []
@@ -133,17 +139,23 @@ afterEach(() => {
   while (desfazer.length > 0) desfazer.pop()?.()
 })
 
-/** Troca `window.matchMedia` por um duplo que responde o que o teste quiser. */
-function comMovimentoReduzido(reduzido: boolean): void {
+interface Bancada {
+  /** Cada assinatura de media query que alguém abriu. */
+  readonly midia: string[]
+}
+
+/** Troca `window.matchMedia` por um duplo que responde e anota o que assinam. */
+function comMovimentoReduzido(reduzido: boolean): Bancada {
   const original = window.matchMedia
+  const midia: string[] = []
 
   const duplo = (query: string) => ({
     matches: query.includes('prefers-reduced-motion: reduce') ? reduzido : !reduzido,
     media: query,
     onchange: null,
-    addEventListener: () => {},
+    addEventListener: () => { midia.push(query) },
     removeEventListener: () => {},
-    addListener: () => {},
+    addListener: () => { midia.push(query) },
     removeListener: () => {},
     dispatchEvent: () => false,
   })
@@ -154,6 +166,8 @@ function comMovimentoReduzido(reduzido: boolean): void {
   desfazer.push(() => {
     Object.defineProperty(window, 'matchMedia', { value: original, configurable: true })
   })
+
+  return { midia }
 }
 
 /** Um elemento que anota todo `addEventListener` que recebe. */
@@ -170,6 +184,39 @@ function cartaEspiada(): { elemento: HTMLElement, eventos: string[] } {
   Object.defineProperty(elemento, 'addEventListener', { value: espia, configurable: true })
 
   return { elemento, eventos }
+}
+
+/**
+ * Um `deviceorientation` com leitura de verdade.
+ *
+ * O construtor do happy-dom ignora `beta`/`gamma` do dicionário de inicialização
+ * e os entrega `undefined` — que foi como este teste descobriu que a leitura
+ * chegava a `NaN` até o `style` da carta. `defineProperty` é a mesma técnica do
+ * duplo de `matchMedia`: monta o evento sem `as` e sem `any`.
+ */
+function eventoDeInclinacao(beta: number, gamma: number): Event {
+  const evento = new Event('deviceorientation')
+  Object.defineProperty(evento, 'beta', { value: beta, configurable: true })
+  Object.defineProperty(evento, 'gamma', { value: gamma, configurable: true })
+  return evento
+}
+
+/** Anota todo listener instalado na janela enquanto o teste roda. */
+function janelaEspiada(): string[] {
+  const eventos: string[] = []
+  const original = window.addEventListener.bind(window)
+
+  const espia = (tipo: string, ouvinte: EventListener, opcoes?: AddEventListenerOptions) => {
+    eventos.push(tipo)
+    original(tipo, ouvinte, opcoes)
+  }
+
+  Object.defineProperty(window, 'addEventListener', { value: espia, configurable: true })
+  desfazer.push(() => {
+    Object.defineProperty(window, 'addEventListener', { value: original, configurable: true })
+  })
+
+  return eventos
 }
 
 function montar(elemento: HTMLElement, interativa: boolean): void {
@@ -194,20 +241,36 @@ describe('quando o rastreio existe', () => {
     // A regra do plano é sobre custo, e é esta linha que a mede: 1025 cartas
     // paradas somam zero listener, não 1025 baratos.
     comMovimentoReduzido(false)
+    const janela = janelaEspiada()
     const { elemento, eventos } = cartaEspiada()
 
     montar(elemento, false)
 
     expect(eventos).toEqual([])
+    expect(janela, 'carta do grid não escuta a janela').toEqual([])
+  })
+
+  it('faz as cartas do grid dividirem uma assinatura de media query só', () => {
+    // O defeito que este teste existe para pegar: `usePreferredReducedMotion` é
+    // `useMediaQuery` por baixo, e o VueUse não o memoiza — cada chamada abre um
+    // `MediaQueryList` e assina `change` nele. Chamado direto, o grid pagaria
+    // 1025 assinaturas, que são listeners de verdade e de objeto de janela.
+    const bancada = comMovimentoReduzido(false)
+
+    for (let i = 0; i < 5; i++) montar(cartaEspiada().elemento, false)
+
+    expect(bancada.midia.length, 'uma assinatura por carta, e não uma para todas').toBeLessThanOrEqual(1)
   })
 
   it('não instala nada sob prefers-reduced-motion, nem sendo interativa', () => {
     comMovimentoReduzido(true)
+    const janela = janelaEspiada()
     const { elemento, eventos } = cartaEspiada()
 
     montar(elemento, true)
 
     expect(eventos).toEqual([])
+    expect(janela).toEqual([])
   })
 
   it('deixa o foil no repouso sob reduced-motion — estático, não ausente', () => {
@@ -222,5 +285,99 @@ describe('quando o rastreio existe', () => {
 
     expect(controles?.active.value).toBe(false)
     expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+  })
+
+  it('volta ao repouso quando a permissão cai com a carta engajada', async () => {
+    // Sem o `watch` sobre `allowed`, os listeners somem e `engaged` fica preso em
+    // `true`: ao religar, a carta reaparece inclinada na última leitura e só um
+    // novo entra-e-sai do ponteiro a endireita.
+    comMovimentoReduzido(false)
+    const { elemento } = cartaEspiada()
+    const ligado = ref(true)
+
+    const escopo = effectScope()
+    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: ligado }))
+    desfazer.push(() => escopo.stop())
+
+    elemento.dispatchEvent(new Event('pointerenter'))
+    await nextTick()
+    expect(controles?.active.value).toBe(true)
+
+    ligado.value = false
+    await nextTick()
+
+    ligado.value = true
+    await nextTick()
+
+    expect(controles?.active.value, 'religou ainda engajada, sem ponteiro nenhum').toBe(false)
+    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+  })
+})
+
+describe('o giroscópio, para quem não tem ponteiro', () => {
+  it('escuta a inclinação sem exigir ponteiro na carta', async () => {
+    // Antes o listener só entrava com `active`, e `active` exigia
+    // `pointerenter`/`focusin`. Num aparelho de toque isso é "enquanto o dedo
+    // está encostado", ou seja: o sensor só servia a quem já tinha ponteiro.
+    comMovimentoReduzido(false)
+    const janela = janelaEspiada()
+    const { elemento } = cartaEspiada()
+
+    montar(elemento, true)
+    await nextTick()
+
+    expect(janela).toContain('deviceorientation')
+  })
+
+  it('cede a vez ao ponteiro quando ele chega', async () => {
+    comMovimentoReduzido(false)
+    const { elemento } = cartaEspiada()
+
+    const escopo = effectScope()
+    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: () => true }))
+    desfazer.push(() => escopo.stop())
+
+    window.dispatchEvent(eventoDeInclinacao(20, 20))
+    await nextTick()
+
+    // O sensor sozinho já acende o rastreio — é o caso do telefone parado na mão.
+    expect(controles?.active.value).toBe(true)
+    expect(controles?.variables.value['--foil-x']).not.toBe('42.00%')
+
+    elemento.dispatchEvent(new Event('pointerenter'))
+    await nextTick()
+
+    // E some do caminho assim que existe ponteiro: dois donos da mesma leitura
+    // brigariam a cada quadro.
+    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+  })
+
+  it('ignora um evento sem leitura, em vez de escrever NaN na carta', async () => {
+    // Um `deviceorientation` sem `beta`/`gamma` não estoura em lugar nenhum: ele
+    // vira `--foil-x: NaN%` no `style`, o navegador descarta a variável e o foil
+    // volta ao fallback — defeito que não aparece em log nem em review.
+    comMovimentoReduzido(false)
+    const { elemento } = cartaEspiada()
+
+    const escopo = effectScope()
+    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: () => true }))
+    desfazer.push(() => escopo.stop())
+
+    window.dispatchEvent(new Event('deviceorientation'))
+    await nextTick()
+
+    expect(controles?.active.value).toBe(false)
+    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+  })
+
+  it('não escuta a inclinação na carta do grid', async () => {
+    comMovimentoReduzido(false)
+    const janela = janelaEspiada()
+    const { elemento } = cartaEspiada()
+
+    montar(elemento, false)
+    await nextTick()
+
+    expect(janela).not.toContain('deviceorientation')
   })
 })
