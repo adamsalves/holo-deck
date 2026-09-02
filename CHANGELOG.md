@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/adamsalves/holo-deck/compare/v0.4.0...v0.5.0) (2026-09-02)
+
+
+### Features
+
+* **dex:** o catálogo carrega os golpes de status das quatro condições ([34152f4](https://github.com/adamsalves/holo-deck/commit/34152f458657f71157f14ba15d4aeb426b1b8e2b))
+* **game:** escolha dos 4 golpes e os times dos nove ginásios ([61b9e0d](https://github.com/adamsalves/holo-deck/commit/61b9e0deac7746182ed1fdb8880a274f4526024c))
+* **game:** fórmula de dano e as quatro condições ([67ec6ee](https://github.com/adamsalves/holo-deck/commit/67ec6eed6d9deceb7dbc67087ff947d14b3a63b3))
+* **game:** motor de batalha headless, testado sobre o dex real ([ad9977d](https://github.com/adamsalves/holo-deck/commit/ad9977d6dfba396e2b1a32dfa76e33024b2a8f1d))
+* **game:** motor de batalha, decisão do líder e replay ([9ca6dfb](https://github.com/adamsalves/holo-deck/commit/9ca6dfbc491eb0508e9abdaded2a2caca9bb84c8))
+* **game:** rng com seed, stat de Lv50 e o portão de pureza de shared/ ([3913e1f](https://github.com/adamsalves/holo-deck/commit/3913e1f5c091687d8e183ac6d7649f37777413d5))
+
+
+### Bug Fixes
+
+* **game:** o Struggle sem tipo, a troca com abrigo e o portão que faltava ([3f0a275](https://github.com/adamsalves/holo-deck/commit/3f0a27577f111f6ff7fb882abfc9dd81ce59b22d))
+
 ## [0.4.0](https://github.com/adamsalves/holo-deck/compare/v0.3.0...v0.4.0) (2026-09-02)
 
 
