@@ -13,7 +13,9 @@ import type {
   TypeName,
 } from '../../shared/types/dex.ts'
 import {
+  MOVES_IN_BATTLE,
   MOVES_PER_SPECIES,
+  STRUGGLE_MOVE_ID,
   TYPE_COUNT,
   TYPE_NAMES,
   isAilmentName,
@@ -28,16 +30,6 @@ import { isMoveId } from '../../shared/types/brand.ts'
  * registros que vão para `public/data/`. Nada aqui toca rede nem disco — é o que
  * torna a parte interessante do build testável sem um único mock de `fetch`.
  */
-
-/**
- * Quantos golpes o motor da Fase 4 leva para uma batalha. É o piso: abaixo dele
- * a espécie entra em campo com vaga vazia, e o build tenta completar o moveset
- * antes de aceitar isso — ver `selectMoveset`.
- *
- * O teto é `MOVES_PER_SPECIES`, que vive em `shared/types/dex.ts` porque o
- * schema de escrita e o guarda de leitura também precisam dele.
- */
-export const MOVES_IN_BATTLE = 4
 
 /** Tetos herdados da regra de moveset do plano. */
 export const MAX_MOVE_POWER = 120
@@ -305,22 +297,19 @@ export function isEligibleMove(move: MoveEntry): boolean {
 }
 
 /**
- * Id de Struggle. É o que os jogos usam quando um Pokémon não tem golpe
- * utilizável, e **dez espécies** caem exatamente nesse caso: Metapod, Kakuna,
- * Abra, Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku, Cosmog e Cosmoem. Nenhuma
- * delas aprende um único golpe de dano com poder fixo (Transform e Sketch são
- * status; Counter e Mirror Coat têm `power: null` porque o dano deles vem do
- * golpe recebido, não de um valor da tabela).
+ * **Dez espécies** caem em Struggle por não aprenderem golpe de dano nenhum:
+ * Metapod, Kakuna, Abra, Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku, Cosmog e
+ * Cosmoem. Nenhuma delas tem um único golpe de dano com poder fixo (Transform e
+ * Sketch são status; Counter e Mirror Coat têm `power: null` porque o dano
+ * vem do golpe recebido, não de um valor da tabela).
  *
  * Unown **não** está na lista, embora pareça: ele tem Hidden Power, que é um
  * golpe de dano — o moveset dele é curto, não vazio.
  *
- * **Nota para a Fase 4:** a PokeAPI dá `pp: 1` a Struggle, resíduo do dado de
- * primeira geração. Nos jogos modernos Struggle não tem PP — o motor precisa
- * tratá-lo como ilimitado, senão estas dez atacam uma vez por batalha e ficam
- * paradas até o fim.
+ * O id mora em `shared/types/dex.ts`, onde o motor também o lê. Fica
+ * reexportado aqui porque os testes do pipeline o usam pelo nome.
  */
-export const STRUGGLE_MOVE_ID = 165
+export { MOVES_IN_BATTLE, STRUGGLE_MOVE_ID } from '../../shared/types/dex.ts'
 
 /**
  * De onde saiu o moveset. Discriminante em vez de booleano porque são quatro

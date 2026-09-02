@@ -14,7 +14,6 @@ import {
 } from './lib/pokeapi.ts'
 import type { ChainLink, EvolutionChain, Pokemon, Species } from './lib/pokeapi.ts'
 import {
-  MOVES_IN_BATTLE,
   buildEffectivenessMatrix,
   generationDisplayName,
   pickFlavorText,
@@ -38,7 +37,7 @@ import type {
   MoveEntry,
   SpeciesEntry,
 } from '../shared/types/dex.ts'
-import { AILMENT_NAMES, GENERATION_COUNT, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
+import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
 import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
 
 /**

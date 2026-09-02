@@ -65,6 +65,33 @@ export const GENERATION_COUNT = GYM_COUNT
  */
 export const MOVES_PER_SPECIES = 8
 
+/**
+ * Quantos golpes cada Pokémon leva para uma batalha.
+ *
+ * Mora aqui, e não em `scripts/`, pela mesma razão que `MOVES_PER_SPECIES`:
+ * agora são três os leitores que precisam concordar sobre ele — o build, que o
+ * usa como piso ao montar o moveset; o motor, que escolhe 4 dos 8 guardados; e o
+ * relatório, que conta quem ficou abaixo. Quando discordam, o build grava um
+ * arquivo que o próprio leitor recusa.
+ */
+export const MOVES_IN_BATTLE = 4
+
+/**
+ * Id de Struggle, o golpe que os jogos usam quando não há nenhum utilizável.
+ *
+ * Ele é dado do dex — dez espécies o levam como moveset inteiro — e regra de
+ * motor ao mesmo tempo, e é por isso que o id precisa estar em `shared/`: o
+ * build o grava e a batalha o reconhece, e um número repetido nos dois lugares
+ * é como eles deixam de ser o mesmo golpe.
+ *
+ * Duas exceções que o motor cobra sobre ele, nenhuma derivável do registro:
+ * a PokeAPI lhe dá `pp: 1` por resíduo do dado de primeira geração, e nos jogos
+ * modernos ele **não tem PP**; e ele é **sem tipo**, enquanto o catálogo o
+ * guarda como `normal` — dar STAB a Struggle premiaria justamente quem não tem
+ * golpe nenhum.
+ */
+export const STRUGGLE_MOVE_ID = 165
+
 /** Multiplicadores possíveis numa casa da matriz. */
 export type Effectiveness = 0 | 0.5 | 1 | 2
 
