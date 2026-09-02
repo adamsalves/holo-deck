@@ -65,6 +65,72 @@ function validCore() {
   }
 }
 
+/** Thunder Wave: o par que a união exige — classe `status`, poder nulo e
+ * condição obrigatória. */
+function statusMove() {
+  return {
+    id: 86,
+    slug: 'thunder-wave',
+    displayName: 'Thunder Wave',
+    type: 'electric',
+    power: null,
+    accuracy: 90,
+    pp: 20,
+    priority: 0,
+    damageClass: 'status',
+    ailment: { kind: 'paralysis', chance: 100 },
+  }
+}
+
+describe('isCoreData — a união de golpes', () => {
+  it('aceita golpe de status com poder nulo e condição', () => {
+    expect(isCoreData({ ...validCore(), moves: [statusMove()] })).toBe(true)
+  })
+
+  it('aceita efeito secundário num golpe de dano, e a ausência dele', () => {
+    const [thunderbolt] = validCore().moves
+    expect(isCoreData({
+      ...validCore(),
+      moves: [{ ...thunderbolt, ailment: { kind: 'paralysis', chance: 10 } }],
+    })).toBe(true)
+    expect(isCoreData(validCore())).toBe(true)
+  })
+
+  it('recusa golpe de status sem condição', () => {
+    // É o registro que o motor não sabe executar: um golpe que não tira HP e
+    // não aplica nada gasta o turno do jogador e não faz coisa alguma.
+    const { ailment: _ailment, ...semCondicao } = statusMove()
+    expect(isCoreData({ ...validCore(), moves: [semCondicao] })).toBe(false)
+  })
+
+  it('recusa golpe de status com poder', () => {
+    // O `power: null` é o que impede o golpe de entrar na fórmula de dano; um
+    // número aqui desfaz a proteção que a união inteira existe para dar.
+    expect(isCoreData({ ...validCore(), moves: [{ ...statusMove(), power: 50 }] })).toBe(false)
+  })
+
+  it('recusa golpe de dano com poder nulo', () => {
+    const [thunderbolt] = validCore().moves
+    expect(isCoreData({ ...validCore(), moves: [{ ...thunderbolt, power: null }] })).toBe(false)
+  })
+
+  it('recusa a chance zero, que é a convenção crua da PokeAPI', () => {
+    // Se ela reaparecer no arquivo, alguém gravou o valor sem normalizar — e o
+    // leitor seguinte entende "nunca aplica" num Thunder Wave.
+    expect(isCoreData({
+      ...validCore(),
+      moves: [{ ...statusMove(), ailment: { kind: 'paralysis', chance: 0 } }],
+    })).toBe(false)
+  })
+
+  it('recusa condição fora das quatro modeladas', () => {
+    expect(isCoreData({
+      ...validCore(),
+      moves: [{ ...statusMove(), ailment: { kind: 'freeze', chance: 10 } }],
+    })).toBe(false)
+  })
+})
+
 describe('isCoreData', () => {
   it('aceita a forma completa', () => {
     expect(isCoreData(validCore())).toBe(true)

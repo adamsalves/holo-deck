@@ -17,6 +17,7 @@ function emptyReport(): Report {
     movesetFallback: [],
     movesetStruggle: [],
     movesetShort: [],
+    movesetWithStatus: [],
     evolutionWithoutCondition: [],
     flavorMissing: [],
     legacyCasing: [],

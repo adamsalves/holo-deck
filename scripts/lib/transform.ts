@@ -2,14 +2,24 @@ import type { EvolutionDetail, Move, PokeType, Pokemon, Species } from './pokeap
 import { resourceId } from './pokeapi.ts'
 import type {
   BaseStats,
-  DamageClass,
+  DamagingClass,
+  DamagingMoveEntry,
   Effectiveness,
   EvolutionCondition,
+  MoveAilment,
   MoveEntry,
   StatName,
+  StatusMoveEntry,
   TypeName,
 } from '../../shared/types/dex.ts'
-import { MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES, isTypeName, typeIndex } from '../../shared/types/dex.ts'
+import {
+  MOVES_PER_SPECIES,
+  TYPE_COUNT,
+  TYPE_NAMES,
+  isAilmentName,
+  isTypeName,
+  typeIndex,
+} from '../../shared/types/dex.ts'
 import type { MoveId } from '../../shared/types/brand.ts'
 import { isMoveId } from '../../shared/types/brand.ts'
 
@@ -209,33 +219,88 @@ export function toTypes(pokemon: Pokemon): readonly [TypeName] | readonly [TypeN
   return second === undefined ? [first] : [first, second]
 }
 
-/** Só golpes de dano entram no catálogo: o jogo não usa status, e carregá-los
- * custaria ~40 KB de `core.json` sem nenhuma tela que os leia. */
+/**
+ * Do payload da PokeAPI para o registro do catálogo, ou `null` para o que não
+ * entra.
+ *
+ * **O que entra mudou na Fase 4.** A Fase 1 aceitava só golpes de dano, com a
+ * razão escrita de que o jogo não usava status. Ele usa: as quatro condições do
+ * motor não têm outra origem, e a prancha da Batalha desenha Thunder Wave no
+ * quarto slot do Pikachu. Agora entram também os golpes de status **das quatro
+ * condições modeladas** — e só eles. Congelamento, confusão, armadilha, silêncio
+ * e todo golpe de status sem condição continuam fora: carregá-los custaria os
+ * ~40 KB que a Fase 1 economizou, e o motor não saberia o que fazer com eles.
+ */
 export function toMoveEntry(move: Move): MoveEntry | null {
-  const damageClass = move.damage_class.name
-  if (damageClass !== 'physical' && damageClass !== 'special') return null
-  if (move.power === null || move.pp === null) return null
+  if (move.pp === null) return null
   if (!isTypeName(move.type.name)) return null
   if (!isMoveId(move.id)) return null
 
-  const known: DamageClass = damageClass
-  return {
+  const common = {
     id: move.id,
     slug: move.name,
     displayName: resolveDisplayName(move.names, move.name),
     type: move.type.name,
-    power: move.power,
     accuracy: move.accuracy,
     pp: move.pp,
     priority: move.priority,
-    damageClass: known,
   }
+
+  const damageClass = move.damage_class.name
+  const ailment = toMoveAilment(move)
+
+  if (damageClass === 'status') {
+    // Golpe de status sem uma das quatro condições não tem o que fazer numa
+    // batalha deste motor — Teleport, Sketch e Safeguard param aqui.
+    if (ailment === null) return null
+    return { ...common, damageClass, power: null, ailment }
+  }
+
+  if (damageClass !== 'physical' && damageClass !== 'special') return null
+  // Counter e Mirror Coat: classe de dano, poder nulo — o dano vem do golpe
+  // recebido, e uma tabela de poder fixo não os representa.
+  if (move.power === null) return null
+
+  const known: DamagingClass = damageClass
+  return ailment === null
+    ? { ...common, damageClass: known, power: move.power }
+    : { ...common, damageClass: known, power: move.power, ailment }
 }
 
-/** Golpe elegível para o moveset: os dois tetos que o plano fixou. `accuracy`
- * nula é "nunca erra" (Swift, Aerial Ace), não acurácia baixa. */
+/**
+ * A condição do golpe, ou `null` quando ele não aplica nenhuma das quatro.
+ *
+ * Aqui mora a normalização do zero. A PokeAPI grava `ailment_chance: 0` em
+ * **todo** golpe de status, querendo dizer "é para isso que ele existe";
+ * `toxic-thread` é a única exceção e vem com 100. Guardar o zero cru obrigaria
+ * todo leitor a conhecer a convenção, e o primeiro que a esquecesse leria
+ * "nunca aplica" num Thunder Wave.
+ *
+ * Qualquer outro valor fora de 1..100 sai daqui como está e **reprova no schema
+ * de escrita**, que é onde dado impossível deve parar o build.
+ */
+function toMoveAilment(move: Move): MoveAilment | null {
+  const kind = move.meta?.ailment.name
+  if (kind === undefined || !isAilmentName(kind)) return null
+
+  const chance = move.meta?.ailment_chance ?? 0
+  return { kind, chance: chance === 0 ? 100 : chance }
+}
+
+/**
+ * Golpe elegível para o moveset: os dois tetos que o plano fixou.
+ *
+ * O teto de poder só faz sentido para quem tem poder, e é a união discriminada
+ * que obriga essa distinção a ficar escrita em vez de depender de `null > 120`
+ * ser falso por acidente.
+ *
+ * A acurácia vale para os dois, e nos golpes de status ela é quem faz o corte
+ * que importa: Sing (55), Grass Whistle (55) e Dark Void (50) ficam de fora, e
+ * dos sete golpes de sono sobram quatro. Acurácia nula é "nunca erra" (Swift,
+ * Aerial Ace), não acurácia baixa.
+ */
 export function isEligibleMove(move: MoveEntry): boolean {
-  if (move.power > MAX_MOVE_POWER) return false
+  if (move.damageClass !== 'status' && move.power > MAX_MOVE_POWER) return false
   return move.accuracy === null || move.accuracy >= MIN_MOVE_ACCURACY
 }
 
@@ -262,6 +327,10 @@ export const STRUGGLE_MOVE_ID = 165
  * situações distintas, e as três de exceção precisam aparecer separadas no
  * relatório do build — um número que cresce em silêncio é o jeito de o dex
  * degradar sem ninguém notar.
+ *
+ * Ele descreve **o moveset de dano**. A vaga de status é ortogonal: uma espécie
+ * pode ter `source: 'struggle'` e ainda assim levar Thunder Wave, que é o caso
+ * de quem não aprende golpe de dano nenhum mas aprende condição.
  */
 export type MovesetSource = 'level-up' | 'supplemented' | 'any-method' | 'struggle'
 
@@ -271,9 +340,10 @@ export interface MovesetResult {
 }
 
 /**
- * Escolhe até `MOVES_PER_SPECIES` golpes de dano da espécie.
+ * Escolhe até `MOVES_PER_SPECIES` golpes da espécie: os de dano por nível e
+ * cobertura, mais **uma** vaga reservada para golpe de status.
  *
- * Três decisões que parecem detalhe e não são:
+ * Quatro decisões que parecem detalhe e não são:
  *
  * 1. **Um único version group.** Um golpe aprendido no nível 1 em red-blue e no
  *    50 em scarlet-violet tem dois níveis; misturar as 26 versões produziria um
@@ -290,6 +360,11 @@ export interface MovesetResult {
  *    mais recente quase não lhes dá golpe por nível, embora o mesmo grupo tenha
  *    máquina e tutor de sobra. Eram 54 espécies abaixo das 4 vagas, e só 11
  *    apareciam no relatório — as outras 43 degradavam caladas.
+ * 4. **A vaga de status é reservada, não disputada.** Golpe de status não entra
+ *    na lista de candidatos de dano: ele tem a sua vaga, e o moveset de dano
+ *    fica idêntico ao que era antes da Fase 4 abrir o catálogo. Sem essa
+ *    separação, Toxic — máquina em quase toda geração — reescreveria o moveset
+ *    de quase todas as 1025 espécies de uma vez.
  */
 export function selectMoveset(
   pokemon: Pokemon,
@@ -299,11 +374,24 @@ export function selectMoveset(
   const byLevelUpOnly = (method: string): boolean => method === 'level-up'
   const byAnyMethod = (): boolean => true
 
+  /** A vaga de status sai do mesmo grupo, e sempre custa uma das oito. */
+  const assemble = (
+    candidates: readonly Candidate[],
+    source: MovesetSource,
+    order: number,
+  ): MovesetResult => {
+    const status = bestStatusMoveAt(pokemon, catalog, versionGroupOrder, order)
+    const limit = status === null ? MOVES_PER_SPECIES : MOVES_PER_SPECIES - 1
+    const damaging = pickDiverse(candidates, limit)
+    if (status === null) return { moveIds: damaging, source }
+    return { moveIds: [...damaging, status.id].sort((a, b) => a - b), source }
+  }
+
   const levelOrder = latestOrderWith(pokemon, versionGroupOrder, byLevelUpOnly)
   if (levelOrder !== -1) {
     const fromLevel = candidatesAt(pokemon, catalog, versionGroupOrder, byLevelUpOnly, levelOrder)
     if (fromLevel.length >= MOVES_IN_BATTLE) {
-      return { moveIds: pickDiverse(fromLevel), source: 'level-up' }
+      return assemble(fromLevel, 'level-up', levelOrder)
     }
 
     const supplemented = mergeById(
@@ -311,10 +399,10 @@ export function selectMoveset(
       candidatesAt(pokemon, catalog, versionGroupOrder, byAnyMethod, levelOrder),
     )
     if (supplemented.length > fromLevel.length) {
-      return { moveIds: pickDiverse(supplemented), source: 'supplemented' }
+      return assemble(supplemented, 'supplemented', levelOrder)
     }
     if (fromLevel.length > 0) {
-      return { moveIds: pickDiverse(fromLevel), source: 'level-up' }
+      return assemble(fromLevel, 'level-up', levelOrder)
     }
   }
 
@@ -325,19 +413,85 @@ export function selectMoveset(
   if (anyOrder !== -1) {
     const fromAny = candidatesAt(pokemon, catalog, versionGroupOrder, byAnyMethod, anyOrder)
     if (fromAny.length > 0) {
-      return { moveIds: pickDiverse(fromAny), source: 'any-method' }
+      return assemble(fromAny, 'any-method', anyOrder)
+    }
+
+    // Sem golpe de dano nenhum, mas com condição: entram as duas. Struggle fica
+    // porque continua sendo o único jeito de a espécie tirar HP de alguém.
+    //
+    // Uma das dez cai exatamente aqui: **Pyukumuku sai com Toxic e Struggle**.
+    // Ela é o caso que o caminho existe para atender — uma espécie que não sabe
+    // atacar mas sabe envenenar, e que sem isto entraria na batalha com um
+    // golpe só.
+    const status = bestStatusMoveAt(pokemon, catalog, versionGroupOrder, anyOrder)
+    if (status !== null) {
+      return { moveIds: [status.id, struggleFrom(catalog)].sort((a, b) => a - b), source: 'struggle' }
     }
   }
 
+  return { moveIds: [struggleFrom(catalog)], source: 'struggle' }
+}
+
+function struggleFrom(catalog: ReadonlyMap<number, MoveEntry>): MoveId {
   const struggle = catalog.get(STRUGGLE_MOVE_ID)
   if (struggle === undefined) {
     throw new Error(`Struggle (${STRUGGLE_MOVE_ID}) fora do catálogo — sem fallback possível`)
   }
-  return { moveIds: [struggle.id], source: 'struggle' }
+  return struggle.id
+}
+
+/**
+ * O golpe de status que a espécie leva, ou `null` quando ela não aprende nenhum
+ * dos doze no version group escolhido.
+ *
+ * **Uma vaga, nunca duas.** É o slot 4 da escolha do motor, e duas condições na
+ * mesma mão transformariam a batalha em quem-adormece-primeiro.
+ *
+ * **Qualquer método de aprendizado, de propósito:** Toxic, Thunder Wave e
+ * Will-O-Wisp são máquina na maior parte das gerações, e exigir nível deixaria a
+ * vaga vazia quase sempre. O que não muda é o version group — ele continua sendo
+ * o que o moveset de dano escolheu, pela mesma razão da decisão 1.
+ *
+ * **O desempate é por acurácia, não por condição.** Um golpe de status que erra
+ * não aplica nada, e declarar que "sono vale mais que veneno" seria decidir
+ * balanço dentro do pipeline, longe de onde o balanço é medido. Empate resolve
+ * por id crescente, para o build ser reproduzível.
+ */
+function bestStatusMoveAt(
+  pokemon: Pokemon,
+  catalog: ReadonlyMap<number, MoveEntry>,
+  versionGroupOrder: ReadonlyMap<number, number>,
+  order: number,
+): StatusMoveEntry | null {
+  let best: StatusMoveEntry | null = null
+
+  for (const entry of pokemon.moves) {
+    const learnedHere = entry.version_group_details.some(
+      detail => (versionGroupOrder.get(resourceId(detail.version_group.url)) ?? -1) === order,
+    )
+    if (!learnedHere) continue
+
+    const move = catalog.get(resourceId(entry.move.url))
+    if (move === undefined || move.damageClass !== 'status') continue
+    if (!isEligibleMove(move)) continue
+
+    if (best === null || accuracyRank(move) > accuracyRank(best)) {
+      best = move
+      continue
+    }
+    if (accuracyRank(move) === accuracyRank(best) && move.id < best.id) best = move
+  }
+
+  return best
+}
+
+/** `null` é "nunca erra", então vale mais que qualquer número da tabela. */
+function accuracyRank(move: MoveEntry): number {
+  return move.accuracy ?? 101
 }
 
 interface Candidate {
-  readonly move: MoveEntry
+  readonly move: DamagingMoveEntry
   readonly level: number
 }
 
@@ -369,7 +523,8 @@ function latestOrderWith(
   return latest
 }
 
-/** Os golpes elegíveis que a espécie aprende pelo método aceito num `order` fixo. */
+/** Os golpes de dano elegíveis que a espécie aprende pelo método aceito num
+ * `order` fixo. Golpe de status não disputa vaga aqui — ele tem a dele. */
 function candidatesAt(
   pokemon: Pokemon,
   catalog: ReadonlyMap<number, MoveEntry>,
@@ -386,7 +541,8 @@ function candidatesAt(
     if (detail === undefined) continue
 
     const move = catalog.get(resourceId(entry.move.url))
-    if (move === undefined || !isEligibleMove(move)) continue
+    if (move === undefined || move.damageClass === 'status') continue
+    if (!isEligibleMove(move)) continue
 
     candidates.push({ move, level: detail.level_learned_at })
   }
@@ -410,24 +566,25 @@ function mergeById(preferred: readonly Candidate[], extra: readonly Candidate[])
 }
 
 /** Empate resolvido por poder e depois por id: o resultado precisa ser o mesmo
- * a cada build, e a ordem de `moves[]` da API não é promessa nenhuma. */
-function pickDiverse(candidates: readonly Candidate[]): readonly MoveId[] {
+ * a cada build, e a ordem de `moves[]` da API não é promessa nenhuma. O `limit`
+ * é o que abre espaço para a vaga de status sem mexer nesta regra. */
+function pickDiverse(candidates: readonly Candidate[], limit: number): readonly MoveId[] {
   const ranked = [...candidates].sort((a, b) =>
     b.level - a.level || b.move.power - a.move.power || a.move.id - b.move.id,
   )
 
-  const chosen: MoveEntry[] = []
+  const chosen: DamagingMoveEntry[] = []
   const seenTypes = new Set<TypeName>()
 
   for (const candidate of ranked) {
-    if (chosen.length >= MOVES_PER_SPECIES) break
+    if (chosen.length >= limit) break
     if (seenTypes.has(candidate.move.type)) continue
     seenTypes.add(candidate.move.type)
     chosen.push(candidate.move)
   }
 
   for (const candidate of ranked) {
-    if (chosen.length >= MOVES_PER_SPECIES) break
+    if (chosen.length >= limit) break
     if (chosen.includes(candidate.move)) continue
     chosen.push(candidate.move)
   }

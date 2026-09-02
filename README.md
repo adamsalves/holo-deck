@@ -216,14 +216,14 @@ pipeline muda**; para jogar ou desenvolver, os arquivos commitados bastam.
 
 | Arquivo             | Conteúdo                                              |
 | ------------------- | ----------------------------------------------------- |
-| `core.json`         | matriz de efetividade 18×18, catálogo de golpes, gerações |
+| `core.json`         | matriz de efetividade 18×18, catálogo de golpes — de dano e os 10 de status —, gerações |
 | `chains.json`       | as 541 cadeias de evolução já resolvidas em árvore    |
 | `gen-N.json`        | as espécies da geração N — o que o grid precisa       |
 | `index.json`        | id, slug, nome, geração e tipos das 1025 — o que a busca global indexa e o que faz `/pokemon/[name]` achar a geração de um slug sem abrir os nove arquivos |
 | `flavor-N.json`     | as descrições, **em arquivo separado**: pesam mais que todo o resto do dex junto, e só a página de detalhe as usa |
 | `sprites/{id}.webp` | miniatura de 128 px, recortada no alpha               |
 
-Cinco coisas que o pipeline decide e que não dá para deduzir lendo a saída:
+Seis coisas que o pipeline decide e que não dá para deduzir lendo a saída:
 
 - **A versão de um moveset vem do campo `order`, nunca do id do version group.**
   `blue-japan` tem id 29 e `scarlet-violet` tem 25 — a PokeAPI cadastrou o
@@ -233,13 +233,25 @@ Cinco coisas que o pipeline decide e que não dá para deduzir lendo a saída:
   group. Parar no primeiro método com resultado dava 2 golpes a Clefable,
   Ninetales, Poliwrath e Ludicolo: são evoluções por pedra, o grupo mais recente
   quase não lhes ensina por nível, e o mesmo grupo tem máquina e tutor de sobra.
-  Sobram 20 espécies abaixo das 4 vagas — Metapod só sabe Harden, Magikarp só
-  Splash e Tackle —, e o build lista as 20 no relatório.
+  Sobram 19 espécies abaixo das 4 vagas — Metapod só sabe Harden, Magikarp só
+  Splash e Tackle —, e o build lista as 19 no relatório.
+- **Uma das oito vagas é reservada para golpe de status**, e ela é a razão de o
+  catálogo ter deixado de ser só de dano na Fase 4. Sem ela nada no dex diz que
+  Thunder Wave paralisa, e as quatro condições do motor ficam sem origem — só
+  efeitos secundários dariam 36 golpes, alcançariam 383 espécies e deixariam o
+  sono com um golpe único. **A vaga não disputa com os de dano**: o moveset de
+  dano é escolhido primeiro, exatamente como antes, e a vaga custa a oitava
+  posição de quem já a tinha cheia. Rodando o pipeline com e sem a mudança, 716
+  espécies ficaram idênticas, 309 perderam só o oitavo golpe, e nenhuma mudou de
+  outra forma. Hoje 515 das 1025 levam uma condição, e o desempate entre duas é
+  por acurácia — Spore antes de Hypnosis —, nunca por qual condição é melhor.
 - **Dez espécies não têm golpe de dano nenhum** e caem em Struggle, como nos
   jogos: Metapod, Kakuna, Abra, Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku,
   Cosmog e Cosmoem. A PokeAPI dá `pp: 1` a Struggle por resíduo do dado de 1ª
   geração; o motor de batalha precisa tratá-lo como ilimitado, senão os dez
-  atacam uma vez por batalha.
+  atacam uma vez por batalha. Pyukumuku é a única das dez que sai com dois
+  golpes: ela não sabe atacar, mas sabe envenenar, e leva Toxic ao lado de
+  Struggle.
 - **Uma aresta de evolução chega sem condição.** `phione → manaphy` vem da
   PokeAPI com `evolution_details` vazio. O build relata a aresta em vez de
   inventar uma condição, e o `via` de `EvolutionNode` é opcional por causa dela.

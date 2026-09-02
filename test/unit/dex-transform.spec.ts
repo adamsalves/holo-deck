@@ -367,8 +367,15 @@ function move(overrides: Partial<Move> = {}): Move {
     priority: 0,
     type: named('electric'),
     damage_class: named('special'),
+    meta: null,
     ...overrides,
   }
+}
+
+/** O bloco `meta` da PokeAPI. O zero em `chance` é a convenção dela para
+ * "sempre", e é o que `toMoveEntry` normaliza. */
+function meta(ailment: string, chance: number): Move['meta'] {
+  return { ailment: named(ailment), ailment_chance: chance }
 }
 
 function entry(overrides: Partial<Move> = {}): MoveEntry {
@@ -377,12 +384,64 @@ function entry(overrides: Partial<Move> = {}): MoveEntry {
   return built
 }
 
+/** Golpe de status pronto: poder nulo e classe `status`, que é o par que a
+ * união exige. Quem chama escolhe a condição e a acurácia. */
+function statusEntry(overrides: Partial<Move> = {}): MoveEntry {
+  const built = toMoveEntry(move({
+    damage_class: named('status'),
+    power: null,
+    meta: meta('paralysis', 0),
+    ...overrides,
+  }))
+  if (built === null) throw new Error('fixture deveria produzir um golpe de status')
+  return built
+}
+
 describe('toMoveEntry', () => {
-  it('descarta golpe de status e golpe sem poder', () => {
-    expect(toMoveEntry(move({ damage_class: named('status') }))).toBeNull()
+  it('descarta golpe sem poder', () => {
     // Counter e Mirror Coat: classe de dano, poder nulo — o dano vem do golpe
     // recebido, e uma tabela de poder fixo não os representa.
     expect(toMoveEntry(move({ power: null }))).toBeNull()
+  })
+
+  it('descarta golpe de status que não aplica uma das quatro condições', () => {
+    // Teleport não aplica nada; Confuse Ray aplica confusão, que o motor não
+    // modela. Aceitar qualquer um dos dois seria gravar no dex um golpe que a
+    // batalha não sabe executar.
+    expect(toMoveEntry(move({ damage_class: named('status'), power: null }))).toBeNull()
+    expect(toMoveEntry(move({
+      damage_class: named('status'),
+      power: null,
+      meta: meta('confusion', 0),
+    }))).toBeNull()
+  })
+
+  it('aceita o golpe de status das quatro, com poder nulo', () => {
+    // É o golpe que a prancha da Batalha desenha no quarto slot do Pikachu.
+    const wave = statusEntry({ id: 86, name: 'thunder-wave', accuracy: 90 })
+
+    expect(wave.damageClass).toBe('status')
+    expect(wave.power).toBeNull()
+    expect(wave.ailment).toEqual({ kind: 'paralysis', chance: 100 })
+  })
+
+  it('normaliza o zero da PokeAPI, onde ele significa "sempre"', () => {
+    // O zero cru diria "nunca aplica" para quem lesse o campo sem conhecer a
+    // convenção — e Thunder Wave existe exatamente para paralisar.
+    expect(statusEntry({ meta: meta('paralysis', 0) }).ailment?.chance).toBe(100)
+    // toxic-thread é a única exceção do catálogo: já vem com 100.
+    expect(statusEntry({ meta: meta('poison', 100) }).ailment?.chance).toBe(100)
+  })
+
+  it('guarda a chance real do efeito secundário de um golpe de dano', () => {
+    expect(entry({ meta: meta('paralysis', 10) }).ailment).toEqual({ kind: 'paralysis', chance: 10 })
+  })
+
+  it('golpe de dano sem condição modelada entra como dano puro', () => {
+    // Ice Beam congela em 10% e congelamento ficou de fora por decisão de jogo:
+    // o golpe entra sem prometer o que ninguém aplica.
+    expect(entry({ meta: meta('freeze', 10) }).ailment).toBeUndefined()
+    expect(entry().ailment).toBeUndefined()
   })
 
   it('preserva acurácia nula, que significa "nunca erra"', () => {
@@ -400,6 +459,13 @@ describe('isEligibleMove', () => {
 
   it('acurácia nula passa — não é acurácia baixa', () => {
     expect(isEligibleMove(entry({ accuracy: null }))).toBe(true)
+  })
+
+  it('golpe de status não tem poder para o teto medir, mas tem acurácia', () => {
+    // É o corte que decide a lista de golpes de sono: Spore (100) entra, Sing
+    // (55), Grass Whistle (55) e Dark Void (50) ficam de fora.
+    expect(isEligibleMove(statusEntry({ accuracy: 100, meta: meta('sleep', 0) }))).toBe(true)
+    expect(isEligibleMove(statusEntry({ accuracy: 55, meta: meta('sleep', 0) }))).toBe(false)
   })
 })
 
@@ -480,6 +546,119 @@ describe('selectMoveset', () => {
     const many = Array.from({ length: 30 }, (_, i) => learns(85, 25, i + 1))
     const result = selectMoveset(pokemon({ moves: many }), catalog, order)
     expect(result.moveIds.length).toBeLessThanOrEqual(8)
+  })
+})
+
+describe('selectMoveset — a vaga de golpe de status', () => {
+  const catalog = new Map<number, MoveEntry>([
+    [85, entry({ id: 85, name: 'thunderbolt', power: 90, type: named('electric') })],
+    [98, entry({ id: 98, name: 'quick-attack', power: 40, type: named('normal') })],
+    [231, entry({ id: 231, name: 'iron-tail', power: 100, accuracy: 75, type: named('steel') })],
+    [89, entry({ id: 89, name: 'earthquake', power: 100, type: named('ground') })],
+    [58, entry({ id: 58, name: 'ice-beam', power: 90, type: named('ice') })],
+    [126, entry({ id: 126, name: 'fire-blast', power: 110, type: named('fire') })],
+    [87, entry({ id: 87, name: 'thunder', power: 110, accuracy: 70, type: named('electric') })],
+    [84, entry({ id: 84, name: 'thunder-shock', power: 40, type: named('electric') })],
+    [86, statusEntry({ id: 86, name: 'thunder-wave', accuracy: 90, meta: meta('paralysis', 0) })],
+    [92, statusEntry({ id: 92, name: 'toxic', accuracy: 90, meta: meta('poison', 0) })],
+    [147, statusEntry({ id: 147, name: 'spore', accuracy: 100, meta: meta('sleep', 0) })],
+    [173, statusEntry({ id: 173, name: 'sing', accuracy: 55, meta: meta('sleep', 0) })],
+    [STRUGGLE_MOVE_ID, entry({ id: STRUGGLE_MOVE_ID, name: 'struggle', power: 50, accuracy: null, type: named('normal') })],
+  ])
+
+  const order = new Map([[1, 3], [25, 27]])
+
+  function learns(moveId: number, versionGroupId: number, level: number, method = 'level-up') {
+    return {
+      move: named('m', moveId),
+      version_group_details: [{
+        level_learned_at: level,
+        version_group: named('vg', versionGroupId),
+        move_learn_method: named(method),
+      }],
+    }
+  }
+
+  const statusIn = (ids: readonly number[]): number[] =>
+    ids.filter(id => catalog.get(id)?.damageClass === 'status')
+
+  it('reserva uma vaga, e ela aceita máquina', () => {
+    // Toxic, Thunder Wave e Will-O-Wisp são máquina na maior parte das gerações
+    // — exigir nível deixaria a vaga vazia quase sempre.
+    const p = pokemon({ moves: [learns(85, 25, 30), learns(86, 25, 0, 'machine')] })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.moveIds).toEqual([85, 86])
+  })
+
+  it('leva um só, e é o de maior acurácia', () => {
+    // Duas condições na mesma mão transformariam a batalha em quem-adormece-
+    // primeiro. O desempate é acurácia porque golpe de status que erra não
+    // aplica nada — e não "sono vale mais que veneno", que seria decidir
+    // balanço dentro do pipeline.
+    const p = pokemon({
+      moves: [
+        learns(85, 25, 30),
+        learns(86, 25, 0, 'machine'),
+        learns(92, 25, 0, 'machine'),
+        learns(147, 25, 0, 'machine'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(statusIn(result.moveIds)).toEqual([147])
+  })
+
+  it('empate de acurácia resolve por id crescente', () => {
+    const p = pokemon({
+      moves: [learns(85, 25, 30), learns(92, 25, 0, 'machine'), learns(86, 25, 0, 'machine')],
+    })
+
+    expect(statusIn(selectMoveset(p, catalog, order).moveIds)).toEqual([86])
+  })
+
+  it('a vaga custa uma das oito, não uma nona', () => {
+    const p = pokemon({
+      moves: [
+        learns(85, 25, 80), learns(98, 25, 70), learns(231, 25, 60), learns(89, 25, 50),
+        learns(58, 25, 40), learns(126, 25, 30), learns(87, 25, 20), learns(84, 25, 10),
+        learns(86, 25, 0, 'machine'),
+      ],
+    })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.moveIds).toHaveLength(8)
+    expect(statusIn(result.moveIds)).toEqual([86])
+  })
+
+  it('golpe de status de outro version group não entra', () => {
+    // Mesma decisão que rege o moveset de dano: misturar grupos produz um
+    // moveset que nunca existiu em jogo nenhum.
+    const p = pokemon({ moves: [learns(85, 25, 30), learns(86, 1, 0, 'machine')] })
+
+    expect(statusIn(selectMoveset(p, catalog, order).moveIds)).toEqual([])
+  })
+
+  it('golpe de status abaixo da acurácia mínima não ocupa a vaga', () => {
+    const p = pokemon({ moves: [learns(85, 25, 30), learns(173, 25, 0, 'machine')] })
+
+    expect(selectMoveset(p, catalog, order).moveIds).toEqual([85])
+  })
+
+  it('sem golpe de dano nenhum, a condição entra ao lado de Struggle', () => {
+    // Pyukumuku aprende Toxic e nenhum golpe de dano. Struggle fica porque
+    // continua sendo o único jeito de ela tirar HP de alguém.
+    const p = pokemon({ moves: [learns(92, 25, 0, 'machine')] })
+
+    const result = selectMoveset(p, catalog, order)
+    expect(result.source).toBe('struggle')
+    expect(result.moveIds).toEqual([92, STRUGGLE_MOVE_ID])
+  })
+
+  it('sem golpe de dano e sem condição, continua só Struggle', () => {
+    const result = selectMoveset(pokemon({ moves: [] }), catalog, order)
+
+    expect(result.moveIds).toEqual([STRUGGLE_MOVE_ID])
   })
 })
 
