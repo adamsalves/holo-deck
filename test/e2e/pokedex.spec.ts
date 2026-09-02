@@ -28,10 +28,15 @@ test('o índice leva à região e a região leva à espécie', async ({ page }) 
 })
 
 test('o HTML servido já traz um link por espécie, antes de qualquer JavaScript', async ({ page }) => {
-  // A razão de o grid ser renderizado inteiro no servidor. Com JavaScript
-  // desligado o que resta é o HTML que o rastreador lê — e ele precisa conter
-  // as 151, não as 18 que a versão virtualizada mostra.
-  await page.context().addInitScript(() => {})
+  // A razão de o grid ser renderizado inteiro no servidor: o que o rastreador lê
+  // é o HTML servido, e ele precisa conter as 151 — não as 18 que a versão
+  // virtualizada mostra.
+  //
+  // `page.request` e não `page.goto`: ele busca o documento sem abrir uma página,
+  // então nenhum JavaScript roda e o que volta é literalmente o que o servidor
+  // mandou. (Havia um `addInitScript(() => {})` aqui prometendo desligar o
+  // JavaScript; ele não desligava nada — o teste sempre passou por causa do
+  // `request`, e o comentário descrevia um mecanismo que não existia.)
   const response = await page.request.get('/pokedex/1')
   const html = await response.text()
 

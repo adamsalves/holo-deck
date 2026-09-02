@@ -275,14 +275,31 @@ Quatro decisões desta fase que não se deduzem lendo o código:
   servido é a única coisa que linka as 1025 páginas de detalhe, e são elas que
   carregam o SEO. Um HTML pré-renderizado com as 18 cartas visíveis deixaria 133
   páginas de Kanto sem nenhuma referência apontando para elas. A troca é feita
-  pelo `<ClientOnly>`, cujo fallback não é hidratado — então o cliente monta do
-  zero em vez de reconciliar 151 contra 18.
-- **O SSR lê o dex do disco; o navegador busca por HTTP.** Em servidor o
-  `$fetch` relativo não sai pela rede — ele chama o app h3 por dentro, e asset
-  público não é rota do h3. O caminho cai no renderizador de páginas e volta o
-  HTML de 404. Verificado em `dev`, na pré-renderização e no `node
-  .output/server/index.mjs`, onde o mesmo arquivo responde 200 por `curl` e falha
-  por `$fetch`. Os dois caminhos passam pelo mesmo guarda de leitura.
+  pelo `<ClientOnly>`, que garante que o HTML servido e o primeiro render do
+  cliente sejam o mesmo. **E ela custa uma hidratação inteira**: o `ClientOnly`
+  mostra o fallback enquanto `mounted` é `false`, e ele só vira `true` no
+  `onMounted` — na hidratação, quem está montado é a forma completa. As 151
+  cartas são hidratadas e descartadas um tick depois. O preço dos 151 links é
+  esse, e é real.
+- **O SSR lê o dex do `serverAssets`; o navegador busca por HTTP.** Em servidor
+  o `$fetch` relativo não sai pela rede — ele chama o app h3 por dentro, e asset
+  público não é rota do h3: o caminho cai no renderizador de páginas e volta o
+  HTML de 404. A leitura em servidor passa pelo `serverAssets` do Nitro, que
+  embarca `public/data/` junto do servidor.
+
+  **Isso é correção de um defeito de produção.** A primeira versão montava
+  `join(process.cwd(), 'public' | '.output/public', …)`, e esses dois caminhos só
+  são a raiz do projeto no build e no `yarn preview`. Num deploy serverless o
+  `cwd` é a raiz da função e o dex não está lá — no preset da Vercel ele vai
+  inteiro para `.vercel/output/static/` e a função não recebe cópia nenhuma.
+  Como toda rota válida é pré-renderizada, a única classe de URL que chega ao
+  servidor é a inválida, que é justamente quando o índice precisa ser lido para
+  responder 404: `/pokemon/<slug inexistente>` respondia **500, com o caminho
+  absoluto do servidor na linha de status e no corpo**. O e2e que provava o 404
+  não pegava porque roda contra `yarn preview` a partir da raiz do repositório —
+  o único `cwd` em que o código quebrado funcionava. Agora quem prova é
+  [`test/e2e/server-runtime.spec.ts`](test/e2e/server-runtime.spec.ts), que sobe
+  o servidor construído de um diretório temporário.
 - **Tudo é pré-renderizado — 1036 páginas, ~18 s de build.** `crawlLinks` parte
   de `/pokedex`, alcança as nove regiões e, de cada grid, as 1025 espécies. As
   três abas do detalhe são montadas mesmo fechadas (`unmount-on-hide` desligado):

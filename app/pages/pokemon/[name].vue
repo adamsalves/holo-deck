@@ -5,7 +5,7 @@ import { flattenChain } from '~~/shared/game/evolution'
 import { rarityOf } from '~~/shared/game/rarity'
 import { RARITY_LABELS } from '~~/shared/types/game'
 import { artworkUrl } from '~~/shared/dex/artwork'
-import { dexNumber, toRegions } from '~/composables/useRegions'
+import { dexNumber, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
 
 /**
@@ -131,6 +131,20 @@ const tabs = [
   { label: 'Evolução', slot: 'evolution' as const },
 ]
 
+/**
+ * O `preconnect` da arte oficial mora aqui, e não no `app.head`.
+ *
+ * `raw.githubusercontent.com` é o único host de terceiro do projeto e só esta
+ * página o usa. No head global, `/`, `/pokedex` e as nove regiões pagavam um
+ * DNS+TLS que nunca gastam. O handshake continua começando antes de o HTML
+ * terminar de chegar — que era a razão de ele existir.
+ */
+useHead({
+  link: [
+    { rel: 'preconnect', href: 'https://raw.githubusercontent.com', crossorigin: '' },
+  ],
+})
+
 useSeoMeta({
   title: () => (species.value === null ? 'Pokédex — Holo Deck' : `${species.value.displayName} — Pokédex — Holo Deck`),
   description: () => (species.value === null
@@ -156,20 +170,29 @@ useSeoMeta({
         aria-hidden="true"
       >{{ String(species.id).padStart(4, '0') }}</span>
 
-      <nav
-        class="hero__crumbs"
-        aria-label="Trilha"
-      >
-        <NuxtLink to="/pokedex">
-          Pokédex
-        </NuxtLink>
-        <span aria-hidden="true">/</span>
-        <NuxtLink :to="`/pokedex/${region?.generation ?? 1}`">
-          {{ region?.label }}
-        </NuxtLink>
-        <span aria-hidden="true">/</span>
-        <span class="hero__crumbs-current">{{ species.displayName }}</span>
-      </nav>
+      <div class="hero__nav">
+        <nav
+          class="hero__crumbs"
+          aria-label="Trilha"
+        >
+          <NuxtLink to="/pokedex">
+            Pokédex
+          </NuxtLink>
+          <span aria-hidden="true">/</span>
+          <NuxtLink :to="`/pokedex/${region?.generation ?? 1}`">
+            {{ region?.label }}
+          </NuxtLink>
+          <span aria-hidden="true">/</span>
+          <span class="hero__crumbs-current">{{ species.displayName }}</span>
+        </nav>
+
+        <!-- A busca também aqui, e não só nas duas telas de grid: estas são 1025
+             das 1036 páginas do site, e é para cá que a própria busca leva. Sem
+             ela, o único jeito de sair era voltar pela trilha — e o `Cmd/Ctrl+K`
+             que o resto da Pokédex promete não respondia justamente onde o
+             jogador passa a maior parte do tempo. -->
+        <DexSearch />
+      </div>
 
       <div class="hero__art">
         <!--
@@ -255,9 +278,9 @@ useSeoMeta({
       >
         <template #about>
           <div class="panel__section">
-            <h3 class="panel__label">
+            <h2 class="panel__label">
               Sobre
-            </h3>
+            </h2>
             <!-- Em inglês, e assumido: a PokeAPI não tem descrição em português.
                  Traduzir de ouvido 1025 textos seria inventar dado. -->
             <p
@@ -391,6 +414,14 @@ useSeoMeta({
   line-height: 1;
   color: color-mix(in oklab, var(--type) 12%, transparent);
   pointer-events: none;
+}
+
+.hero__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .hero__crumbs {

@@ -116,3 +116,43 @@ describe('árvore em fileiras', () => {
     expect(fora.map(entry => entry.slug)).toEqual([])
   })
 })
+
+/**
+ * A aresta sem condição.
+ *
+ * `shared/types/dex.ts` nomeia `phione → manaphy` como o caso que *"quem exibe a
+ * árvore precisa tratar"*: a PokeAPI entrega essa aresta com `evolution_details`
+ * vazio, e o build **relata** em vez de inventar uma condição — é por causa dela
+ * que o `via` de `EvolutionNode` é opcional.
+ *
+ * O resto deste arquivo filtra os `via === undefined` para fora antes de
+ * qualquer asserção, então nada provava que a aresta existe nem que a árvore
+ * continua inteira com ela. Sem isso, "consertar" o build inventando uma
+ * condição passaria por toda a suíte sem reprovar em lugar nenhum.
+ */
+describe('aresta sem condição', () => {
+  // `flattenChain` devolve `[raiz, ...descendentes]`, e a raiz não tem `via` por
+  // definição — é o `slice(1)` que deixa só as arestas de verdade.
+  const semVia = Object.values(chains)
+    .flatMap(root => flattenChain(root).slice(1))
+    .filter(node => node.via === undefined)
+
+  it('é exatamente uma em todo o dex, e é phione → manaphy', () => {
+    expect(semVia.map(node => node.slug)).toEqual(['manaphy'])
+  })
+
+  it('não some da árvore por não ter condição', () => {
+    // O modo de falhar que importa: um `v-if="node.via"` no componente, ou um
+    // filtro aqui no meio do caminho, tira o manaphy da linha evolutiva do
+    // phione — e a página abre com um estágio só, sem erro nenhum.
+    const phione = Object.values(chains).find(chain => chain.slug === 'phione')
+    expect(phione, 'a cadeia de phione sumiu do dex').toBeDefined()
+    if (phione === undefined) return
+
+    const stages = toStages(phione)
+
+    expect(stages).toHaveLength(2)
+    expect(stages[1]?.nodes.map(node => node.slug)).toEqual(['manaphy'])
+    expect(stages[1]?.nodes[0]?.via).toBeUndefined()
+  })
+})

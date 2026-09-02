@@ -61,9 +61,20 @@ const effectiveness = z.union([
   z.literal(2),
 ])
 
+/**
+ * Um slug, e não uma string qualquer.
+ *
+ * `z.string().min(1)` aceitava barra, espaço e acento — e o slug de espécie vira
+ * rota pré-renderizada (`/pokemon/${slug}`) e chave de busca. Um `min(1)` deixa
+ * passar um slug que gera URL inválida, e o defeito só apareceria no build
+ * seguinte ao dia em que a PokeAPI mudasse a forma do campo. A validação certa é
+ * a do formato que o consumidor exige, feita na borda onde o dado entra.
+ */
+const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'slug fora do formato kebab-case')
+
 const moveEntry = z.object({
   id: moveIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   displayName: z.string().min(1),
   type: typeName,
   power: z.number().int().positive(),
@@ -98,7 +109,7 @@ const speciesTypes = z.union([
 
 const speciesEntry = z.object({
   id: speciesIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   displayName: z.string().min(1),
   types: speciesTypes,
   baseStats: z.tuple([
@@ -136,7 +147,7 @@ export const generationSchema: z.ZodType<GenerationData> = z.object({
  */
 export const indexSchema: z.ZodType<IndexData> = z.array(z.object({
   id: speciesIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   displayName: z.string().min(1),
   generation: z.number().int().min(1).max(GENERATION_COUNT),
   types: speciesTypes,
@@ -167,7 +178,7 @@ const evolutionCondition = z.object({
 
 const evolutionNode: z.ZodType<EvolutionNode> = z.object({
   speciesId: speciesIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   via: evolutionCondition.optional(),
   get evolvesTo() {
     return z.array(evolutionNode)
