@@ -1,5 +1,5 @@
-import type { GenerationMeta } from '~~/shared/types/dex'
-import { generationLabel, isRegionName, REGION_LABELS } from '~~/shared/types/game'
+import type { GenerationMeta } from '../types/dex.ts'
+import { generationLabel, isRegionName, REGION_LABELS } from '../types/game.ts'
 
 /**
  * Uma região como a tela a lê: rótulos em português e a faixa de dex que ela
@@ -8,8 +8,15 @@ import { generationLabel, isRegionName, REGION_LABELS } from '~~/shared/types/ga
  * A faixa não vem do dex — ela é **derivada** somando as contagens anteriores, e
  * é isso que a torna barata: o índice de regiões mostra `#0001–0151` sem abrir
  * nenhum `gen-N.json`. Vale porque os ids do dex nacional são contíguos e
- * ordenados por geração, o que `test/unit/regions.spec.ts` confere contra os
- * nove arquivos em vez de assumir.
+ * ordenados por geração — e é `test/unit/regions.spec.ts` que confere isso
+ * contra os nove arquivos, cruzando cada `[firstId, lastId]` derivado com os ids
+ * que a geração realmente tem.
+ *
+ * **Mora em `shared/` porque não tem nada de composable.** As três funções são
+ * puras, sem reatividade e sem `use*`; ficavam em `app/composables/` só para
+ * pegar o auto-import, e o preço era um teste unitário não conseguir alcançá-las
+ * pelo projeto de tipos certo — a aritmética de faixa ficou sem cobertura
+ * enquanto o docblock afirmava que ela tinha.
  */
 export interface Region {
   readonly generation: number

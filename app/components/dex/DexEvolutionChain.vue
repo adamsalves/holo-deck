@@ -3,7 +3,7 @@ import type { EvolutionNode, SpeciesEntry, TypeName } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { describeEvolution, toStages } from '~~/shared/game/evolution'
 import { baseStatTotal } from '~~/shared/game/rarity'
-import { dexNumber } from '~/composables/useRegions'
+import { dexNumber } from '~~/shared/dex/regions'
 
 /**
  * A linha evolutiva, resolvida do JSON local — zero requisições, que é a
@@ -40,10 +40,10 @@ function nameOf(node: EvolutionNode): string {
 
 <template>
   <section :data-type="type">
-    <h3 class="chain__title">
+    <h2 class="chain__title">
       Linha evolutiva
       <span class="chain__note">— resolvida do JSON local, zero requisições</span>
-    </h3>
+    </h2>
 
     <ol class="chain">
       <li

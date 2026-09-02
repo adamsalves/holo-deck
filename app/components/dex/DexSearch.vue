@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { TYPE_LABELS } from '~~/shared/types/game'
-import { dexNumber } from '~/composables/useRegions'
+import { dexNumber } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
 
 /**

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toRegions } from '~/composables/useRegions'
+import { dexRange, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
 
 /**
