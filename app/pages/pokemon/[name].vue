@@ -277,55 +277,64 @@ useSeoMeta({
         class="w-full"
       >
         <template #about>
-          <div class="panel__section">
-            <h2 class="panel__label">
-              Sobre
-            </h2>
-            <!-- Em inglês, e assumido: a PokeAPI não tem descrição em português.
+          <!--
+            Duas colunas, como a prancha desenha: a descrição à esquerda e os
+            três números de referência à direita. O app empilhava os dois, e a
+            diferença não era decisão de ninguém — só não tinha sido reproduzida.
+          -->
+          <div class="panel__section about">
+            <div class="about__flavor">
+              <h2 class="panel__label">
+                Sobre
+              </h2>
+              <!-- Em inglês, e assumido: a PokeAPI não tem descrição em português.
                  Traduzir de ouvido 1025 textos seria inventar dado. -->
-            <p
-              v-if="description"
-              class="panel__flavor"
-              lang="en"
-            >
-              {{ description }}
-            </p>
-            <p
-              v-else
-              class="panel__flavor panel__flavor--missing"
-            >
-              A PokeAPI não traz descrição para esta espécie.
-            </p>
+              <p
+                v-if="description"
+                class="panel__flavor"
+                lang="en"
+              >
+                {{ description }}
+              </p>
+              <p
+                v-else
+                class="panel__flavor panel__flavor--missing"
+              >
+                A PokeAPI não traz descrição para esta espécie.
+              </p>
+            </div>
 
-            <dl class="facts">
-              <div class="facts__row">
-                <dt class="numeric">
-                  Habitat
-                </dt>
-                <dd class="numeric">
-                  {{ species.habitat === null ? '—' : species.habitat.replace('-', ' ') }}
-                </dd>
-              </div>
-              <div class="facts__row">
-                <dt class="numeric">
-                  Taxa de captura
-                </dt>
-                <dd class="numeric">
-                  {{ species.captureRate }}<span class="facts__max">/255</span>
-                </dd>
-              </div>
-              <div class="facts__row">
-                <dt class="numeric">
-                  Felicidade base
-                </dt>
-                <dd class="numeric">
-                  {{ species.baseHappiness }}
-                </dd>
-              </div>
-            </dl>
-            <p class="facts__note">
-              Os três vinham da aba <em>Training</em> da Pokédex antiga. Não têm papel no jogo — são referência.
-            </p>
+            <div class="about__facts">
+              <dl class="facts">
+                <div class="facts__row">
+                  <dt class="numeric">
+                    Habitat
+                  </dt>
+                  <dd class="numeric">
+                    {{ species.habitat === null ? '—' : species.habitat.replace('-', ' ') }}
+                  </dd>
+                </div>
+                <div class="facts__row">
+                  <dt class="numeric">
+                    Taxa de captura
+                  </dt>
+                  <dd class="numeric">
+                    {{ species.captureRate }}<span class="facts__max">/255</span>
+                  </dd>
+                </div>
+                <div class="facts__row">
+                  <dt class="numeric">
+                    Felicidade base
+                  </dt>
+                  <dd class="numeric">
+                    {{ species.baseHappiness }}
+                  </dd>
+                </div>
+              </dl>
+              <p class="facts__note">
+                Os três vinham da aba <em>Training</em> da Pokédex antiga. Não têm papel no jogo — são referência.
+              </p>
+            </div>
           </div>
         </template>
 
@@ -545,6 +554,37 @@ useSeoMeta({
 
 .panel__flavor--missing {
   color: var(--text-muted);
+}
+
+/**
+ * O painel *Sobre*, em duas colunas — a divisão que a prancha desenha e que a
+ * implementação não tinha reproduzido.
+ *
+ * O corte é em 1180px, e não nos 900px em que a página vira duas colunas: ali o
+ * painel tem ~525px, e dividi-lo de novo deixaria a descrição em 300px. A
+ * prancha é de 1440, com o painel em ~880 — é essa largura que a divisão pede.
+ */
+.about {
+  display: grid;
+  gap: 34px;
+}
+
+@media (min-width: 1180px) {
+  .about {
+    grid-template-columns: 1.5fr 1fr;
+  }
+
+  /* No empilhado a lista precisa do respiro; na coluna ela começa no topo. */
+  .about__facts .facts {
+    margin-top: 0;
+  }
+}
+
+/* O fio de acento da prancha. `--type` vem do `data-type` do `<main>`, então
+   ele muda com a espécie — é a mesma cor que o brilho do herói usa. */
+.about__flavor .panel__flavor {
+  border-left: 2px solid var(--type);
+  padding-left: 16px;
 }
 
 .facts {
