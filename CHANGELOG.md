@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0](https://github.com/adamsalves/holo-deck/compare/v0.3.0...v0.4.0) (2026-09-02)
+
+
+### Features
+
+* **dex:** o dex ganha um índice, e com ele a busca e a rota por slug ([7a08093](https://github.com/adamsalves/holo-deck/commit/7a08093e28050b448809da5619d026a1ee7c7500))
+* **game:** a raridade e a matriz de tipos saem do dex, antes da tela ([b614b8a](https://github.com/adamsalves/holo-deck/commit/b614b8ac1ebbe57c1ce15d4bada163d37ef6218f))
+* **pokedex:** a busca global, a pré-renderização e o primeiro E2E ([d4dbbf8](https://github.com/adamsalves/holo-deck/commit/d4dbbf8508dab6155a98c8861ebc278d855ec06a))
+* **pokedex:** a página da espécie, com evolução resolvida do JSON local ([5c0480c](https://github.com/adamsalves/holo-deck/commit/5c0480c77d6fbe19d384e6e60bbfebfa65323056))
+* **pokedex:** a Pokédex preservada, com evolução sem requisição ([91a3b54](https://github.com/adamsalves/holo-deck/commit/91a3b54263ab42515d9515a2ac33d0249b3f35c3))
+* **pokedex:** as nove regiões e o grid da geração ([ccda77a](https://github.com/adamsalves/holo-deck/commit/ccda77a76ad74cae5db50fc0740fa90efd7069c4))
+* **pokedex:** o grid filtra por tipo e por raridade ([237d212](https://github.com/adamsalves/holo-deck/commit/237d2128cb14e7d2a78229af5bee3f3412405163))
+
+
+### Bug Fixes
+
+* **pokedex:** a busca chega à página da espécie, e o preconnect sai de quem não usa ([b57e9e7](https://github.com/adamsalves/holo-deck/commit/b57e9e7734b6b0297a736735cc96c4714de7e17e))
+* **pokedex:** a raiz leva à Pokédex, e o filtro cabe no celular ([fe06fe6](https://github.com/adamsalves/holo-deck/commit/fe06fe6b5afcce76e74f8858085da25d89b710d3))
+* **pokedex:** o 404 da espécie deixa de virar 500 fora da raiz do projeto ([7ba568f](https://github.com/adamsalves/holo-deck/commit/7ba568ff1944981e55d9ffc32e7da65a4950367f))
+* **pokedex:** o chip de tipo apagado volta a ter contraste, e a sigla volta a ter nome ([652807a](https://github.com/adamsalves/holo-deck/commit/652807ae1854baf0f3a4ec9651fed563e177531a))
+* **pokedex:** o virtualizador remede ao redimensionar, e para de trabalhar no grid completo ([fc1302d](https://github.com/adamsalves/holo-deck/commit/fc1302d954237eaba13a3702de24ce5eb83a04dd))
+
 ## [0.3.0](https://github.com/adamsalves/holo-deck/compare/v0.2.0...v0.3.0) (2026-09-01)
 
 
