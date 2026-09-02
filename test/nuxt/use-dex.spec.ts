@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { registerEndpoint } from '@nuxt/test-utils/runtime'
 import { GENERATION_COUNT, TYPE_NAMES } from '~~/shared/types/dex'
+import { SPECIES_COUNT } from '~~/shared/types/brand'
 import { useDex } from '~/composables/useDex'
 
 const core = {
@@ -66,12 +67,28 @@ const chains = {
 
 const flavor = { 25: 'Quando vários destes Pokémon se juntam, sua eletricidade pode causar tempestades.' }
 
+/**
+ * O índice tem tamanho fixo no guarda — 1025 linhas —, então a fixture não pode
+ * ser um punhado de espécies escolhidas à mão. Ela é gerada, e as duas que os
+ * testes procuram por slug são plantadas em posições conhecidas.
+ */
+const index = Array.from({ length: SPECIES_COUNT }, (_, position) => ({
+  id: position + 1,
+  slug: `species-${position + 1}`,
+  displayName: `Species ${position + 1}`,
+  generation: Math.min(GENERATION_COUNT, Math.floor(position / 151) + 1),
+  types: ['electric'],
+}))
+index[24] = { id: 25, slug: 'pikachu', displayName: 'Pikachu', generation: 1, types: ['electric'] }
+index[5] = { id: 6, slug: 'charizard', displayName: 'Charizard', generation: 1, types: ['fire', 'flying'] }
+
 let coreHits = 0
 registerEndpoint('/data/core.json', () => {
   coreHits += 1
   return core
 })
 registerEndpoint('/data/gen-1.json', () => generation)
+registerEndpoint('/data/index.json', () => index)
 registerEndpoint('/data/chains.json', () => chains)
 registerEndpoint('/data/flavor-1.json', () => flavor)
 
@@ -153,6 +170,34 @@ describe('useDex', () => {
     expect(gen1.species[0]?.displayName).toBe('Pikachu')
     expect(dex.generations.value[1]).toBeDefined()
     expect(dex.generations.value[2]).toBeUndefined()
+  })
+
+  it('carrega o índice inteiro — as 1025 numa requisição só', async () => {
+    const dex = useDex()
+    const loaded = await dex.loadIndex()
+
+    expect(loaded).toHaveLength(SPECIES_COUNT)
+    expect(dex.index.value).not.toBeNull()
+  })
+
+  it('acha a espécie pelo slug, que é o que a rota /pokemon/[name] recebe', async () => {
+    const dex = useDex()
+
+    expect(await dex.findBySlug('charizard')).toEqual({
+      id: 6,
+      slug: 'charizard',
+      displayName: 'Charizard',
+      generation: 1,
+      types: ['fire', 'flying'],
+    })
+  })
+
+  it('devolve null para slug que não existe — é o 404 da rota, não uma exceção', async () => {
+    // A tela precisa distinguir "não existe" de "não carregou": o primeiro vira
+    // 404, o segundo vira erro. Um `throw` aqui apagaria a diferença.
+    const dex = useDex()
+
+    expect(await dex.findBySlug('missingno')).toBeNull()
   })
 
   it('recusa resposta com forma errada em vez de deixar any entrar', async () => {

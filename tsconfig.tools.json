@@ -21,13 +21,12 @@
       "@/*": ["./app/*"]
     }
   },
-  "//exclude": "test/nuxt/ é coberto pelo tsconfig.app.json do Nuxt, que traz os auto-imports (`useState`, `createError`). Incluí-lo aqui também faria este projeto type-checkar código de app/ sem esses ambientes, e o erro apontaria para o composable em vez de para a configuração.",
-  "exclude": ["test/nuxt/**/*"],
+  "//exclude": "test/nuxt/ é coberto pelo tsconfig.app.json do Nuxt, que traz os auto-imports (`useState`, `createError`). Incluí-lo aqui também faria este projeto type-checkar código de app/ sem esses ambientes, e o erro apontaria para o composable em vez de para a configuração. test/e2e/ sai por outro motivo: o corpo de `page.evaluate` roda no navegador e precisa da lib `dom`, que este projeto não tem — ver tsconfig.e2e.json.",
+  "exclude": ["test/nuxt/**/*", "test/e2e/**/*"],
   "include": [
     "test/**/*",
     "scripts/**/*",
     "vitest.config.ts",
-    "playwright.config.ts",
     "eslint.config.mjs",
     "commitlint.config.mjs",
     "lint-staged.config.mjs"

@@ -165,6 +165,30 @@
 [data-type="fairy"] { --type: var(--color-type-fairy); }
 
 /**
+ * A superfície da carta, tingida pelo tipo.
+ *
+ * As pranchas desenham toda carta — grid, binder, slot de deck, herói — com o
+ * mesmo gradiente de 168°, e o primeiro ponto dele **não** é um degrau da escada
+ * `ink`: é a cor do tipo diluída no fundo de célula, entre 9% e 14% conforme o
+ * tipo. A Fase 2 entregou a carta com dois degraus neutros e perdeu essa metade
+ * da identidade elemental; a diluição única de 12% é a média que as pranchas
+ * usam, e o que dispensa 18 gradientes escritos à mão.
+ *
+ * **A regra vem depois das 18 acima e é isso que a faz funcionar.** `var(--type)`
+ * dentro de uma custom property resolve no elemento onde a propriedade é
+ * declarada, não onde é usada — declarar isto no `:root` daria um gradiente com
+ * `--type` vazio para todo mundo. Aqui o seletor casa o mesmo elemento que
+ * acabou de receber `--type`, e cada carta computa o seu.
+ */
+[data-type] {
+  --card-surface: linear-gradient(
+    168deg,
+    color-mix(in oklab, var(--type) 12%, var(--surface-cell)),
+    var(--surface-cell)
+  );
+}
+
+/**
  * Mesma ideia para raridade, com um token a mais porque mítico é prismático.
  *
  * `--rarity` é cor: serve a brilho, fio e texto simples. Mítico não cabe numa
@@ -336,6 +360,38 @@
    *
    * Os pares são (sobre `ink-950` / sobre `ink-800`), melhor e pior caso.
    */
+  /**
+   * O azul de acento — link, foco, seleção, aba ativa.
+   *
+   * Ele vale exatamente o mesmo que `--color-type-water` e que
+   * `--color-rarity-rare`, e isso não é acidente nem economia: as 17 pranchas
+   * declaram `a { color:#4FA8FF }` no cabeçalho de todas, e é o mesmo azul que
+   * elas dão ao tipo água e à moldura rara. O que justifica o terceiro nome é o
+   * papel — quem escreve um link não está falando de água nem de raridade, e no
+   * dia em que o acento andar, ele anda sozinho.
+   */
+  --accent: var(--color-type-water);
+
+  /**
+   * O anel de foco, e por que ele é o acento e não o texto.
+   *
+   * Precisa ser visível sobre as cinco superfícies e sobre a moldura colorida de
+   * uma carta lendária. Branco resolveria o contraste e sumiria dentro da carta
+   * mítica, que já é prismática; o azul é a única cor do sistema que não colide
+   * com nenhuma das seis raridades.
+   */
+  --focus: var(--accent);
+
+  /**
+   * A curva das transições curtas.
+   *
+   * `PokeCard` já a citava como `var(--ease-out, ease-out)` desde a Fase 2, e o
+   * fallback fazia o trabalho inteiro — o token não existia. Declarar aqui é o
+   * que faz a curva ser uma decisão do tema em vez de um valor que cada
+   * componente redescobre.
+   */
+  --ease-out: cubic-bezier(0.2, 0.85, 0.25, 1);
+
   --text: var(--color-ink-50); /* 17.19 / 14.62 — primário */
   --text-body: var(--color-ink-200); /* 7.57 / 6.43 — corpo */
   --text-muted: var(--color-ink-325); /* 6.07 / 5.16 — rótulo, metadado */
@@ -394,6 +450,16 @@
   /* Fios: o dele usa 800 e 700, a tabela daqui usa 700 e 600. */
   --ui-border: var(--border);
   --ui-border-accented: var(--border-strong);
+
+  /**
+   * O acento, que sem esta linha continuaria verde.
+   *
+   * O Nuxt UI nasce com `primary` no verde de fábrica dele, e é esse verde que
+   * pinta a aba ativa do `UTabs` e a linha selecionada do `UCommandPalette` —
+   * os dois componentes que a Pokédex usa. O plano já mandava mapear; a Fase 2
+   * mapeou neutro, texto, fio e raio, e este ficou de fora.
+   */
+  --ui-primary: var(--accent);
 
   /**
    * O raio, que sem esta linha não saía do papel.

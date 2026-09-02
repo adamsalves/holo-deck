@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AA_LARGE, AA_NORMAL, contrastRatio } from '~~/shared/color/contrast'
+import { AA_LARGE, AA_NORMAL, NON_TEXT, contrastRatio } from '~~/shared/color/contrast'
 import { TYPE_NAMES } from '~~/shared/types/dex'
 import { hasFoil, RARITY_NAMES } from '~~/shared/types/game'
 import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
@@ -49,6 +49,26 @@ const TEXT_ROLES = [
   { token: '--text-muted', minimum: AA_NORMAL },
   { token: '--text-faint', minimum: AA_LARGE },
 ]
+
+/**
+ * Os papéis de cor que **não** se chamam `--text-*` e mesmo assim carregam
+ * texto ou fronteira.
+ *
+ * A matriz cobria só o que casava `^--text(-…)?$`, e a Fase 3 introduziu dois
+ * que não casam: `--accent`, que pinta texto em quatro arquivos
+ * (`index.vue`, `[gen].vue`, `[name].vue`, `DexFilters.vue`), e `--focus`, que é
+ * o anel de foco de `DexCard` e `DexFilters`. Os dois passavam — mas passavam
+ * por acaso, que é exatamente a condição que o teste de cobertura abaixo diz
+ * não aceitar. O piso difere pelo papel: texto é AA normal, contorno de
+ * componente é o 3:1 do critério 1.4.11.
+ */
+const UI_ROLES = [
+  { token: '--accent', minimum: AA_NORMAL },
+  { token: '--focus', minimum: NON_TEXT },
+]
+
+/** Todo papel de cor que a matriz de contraste cobra, seja qual for o nome. */
+const COLOR_ROLES = [...TEXT_ROLES, ...UI_ROLES]
 
 describe('cobertura da paleta', () => {
   it('dá cor e escopo a cada um dos 18 tipos do contrato', () => {
@@ -103,12 +123,15 @@ describe('contraste do tema', () => {
     const declarados = new Set(
       declarations(themeSource())
         .map(({ name }) => name)
-        .filter(name => /^--text(?:-[\w-]+)?$/.test(name)),
+        .filter(name => /^--(?:text(?:-[\w-]+)?|accent|focus)$/.test(name)),
     )
 
     // Um papel novo entrar no tema e não entrar na matriz seria um papel sem
-    // piso — legível por acaso, não por decisão.
-    expect([...declarados].sort()).toEqual(TEXT_ROLES.map(r => r.token).sort())
+    // piso — legível por acaso, não por decisão. O padrão lista os nomes que
+    // não são `--text-*` um a um, de propósito: um papel de cor novo precisa
+    // aparecer aqui **e** em `COLOR_ROLES`, e é o segundo passo que escolhe o
+    // piso dele.
+    expect([...declarados].sort()).toEqual(COLOR_ROLES.map(r => r.token).sort())
   })
 
   it('mantém os papéis legíveis sobre TODA superfície, não só sobre o fundo', () => {
@@ -117,7 +140,7 @@ describe('contraste do tema', () => {
 
     expect(fundos.length, 'nenhuma superfície encontrada no tema').toBeGreaterThan(1)
 
-    const reprovam = TEXT_ROLES.flatMap(({ token, minimum }) => {
+    const reprovam = COLOR_ROLES.flatMap(({ token, minimum }) => {
       const hex = resolveToken(token, source)
       expect(hex, `${token} não resolve em cor`).not.toBeNull()
 
@@ -129,7 +152,7 @@ describe('contraste do tema', () => {
 
     // O par que reprovava antes deste portão existir: `--text-faint` sobre
     // `--surface-raised`, a 2.84 — o topo do gradiente de toda carta.
-    expect(reprovam, 'papel de texto abaixo do piso em alguma superfície').toEqual([])
+    expect(reprovam, 'papel de cor abaixo do piso em alguma superfície').toEqual([])
   })
 
   it('mantém a hierarquia visível em toda superfície, e não só legível', () => {

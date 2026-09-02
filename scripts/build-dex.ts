@@ -25,7 +25,7 @@ import {
   toMoveEntry,
   toTypes,
 } from './lib/transform.ts'
-import { chainsSchema, coreSchema, flavorSchema, generationSchema } from './lib/schema.ts'
+import { chainsSchema, coreSchema, flavorSchema, generationSchema, indexSchema } from './lib/schema.ts'
 import { THUMBNAIL_SIZE, artworkUrl, toThumbnail } from './lib/sprites.ts'
 import type {
   ChainsData,
@@ -34,6 +34,7 @@ import type {
   FlavorData,
   GenerationData,
   GenerationMeta,
+  IndexData,
   MoveEntry,
   SpeciesEntry,
 } from '../shared/types/dex.ts'
@@ -121,6 +122,7 @@ export function parseArgs(argv: readonly string[]): Options {
 /** Os nomes que este script grava. Tudo além disso não é saída dele. */
 function isGeneratedName(name: string): boolean {
   return name === 'core.json'
+    || name === 'index.json'
     || name === 'chains.json'
     || /^gen-\d+\.json$/.test(name)
     || /^flavor-\d+\.json$/.test(name)
@@ -480,6 +482,33 @@ async function main(): Promise<void> {
       + `"generations":${JSON.stringify(core.generations)},"moves":[`,
       core.moves.map(move => JSON.stringify(move)),
       ']}',
+    )),
+  })
+
+  /**
+   * O índice sai das gerações já montadas, e não de uma segunda passagem pela
+   * API: ele é uma projeção do que `gen-N.json` grava, então derivá-lo aqui é o
+   * que garante que os dois nunca discordem sobre o nome ou o tipo de ninguém.
+   */
+  const indexData: IndexData = generationData.flatMap(data =>
+    data.species.map(entry => ({
+      id: entry.id,
+      slug: entry.slug,
+      displayName: entry.displayName,
+      generation: data.generation,
+      types: entry.types,
+    })),
+  )
+  // Só o build completo produz um índice de 1025 — um ensaio `--gen 1` grava 151
+  // e o `.length()` do schema recusaria, o que tornaria o modo parcial inútil.
+  if (!options.partial) indexSchema.parse(indexData)
+
+  written.push({
+    name: 'index.json',
+    bytes: await writeOutput(options.outDir, 'index.json', serializeRows(
+      '[',
+      indexData.map(entry => JSON.stringify(entry)),
+      ']',
     )),
   })
 

@@ -6,8 +6,14 @@ import type { TypeName } from './dex.ts'
  * `dex.ts` descreve a espécie como a PokeAPI a entrega; aqui ficam as noções que
  * o Holo Deck inventa em cima dela. A Fase 2 traz só a raridade, porque ela é
  * quem decide tratamento visual: moldura, etiqueta, brilho e foil. Os limiares
- * de BST que atribuem raridade a cada espécie são da Fase 5 e moram em
- * `shared/game/rarity.ts` — aqui está o vocabulário, não a regra.
+ * de BST que atribuem raridade a cada espécie moram em `shared/game/rarity.ts`
+ * — aqui está o vocabulário, não a regra.
+ *
+ * Essa separação continua valendo; o que mudou é **quando** a regra chegou. Ela
+ * estava marcada para a Fase 5 e entrou na 3, porque a Pokédex a exibe: a
+ * prancha *Detalhe* estampa `Raridade RARO` e a prancha *Pokédex* colore a
+ * moldura de cada carta do grid. Raridade sai de BST e das duas marcas, tudo
+ * dentro do próprio dex — nada nela espera pela coleção.
  */
 
 /**
@@ -67,6 +73,62 @@ export const RARITY_LABELS: Record<Rarity, string> = {
   ultra: 'Ultra',
   legendary: 'Lendário',
   mythic: 'Mítico',
+}
+
+/**
+ * As 9 regiões, na ordem das gerações — a lista que o dex traz como
+ * `main_region.name` em `core.json`.
+ *
+ * Existe como tupla, e não como `string` solta, para o rótulo poder ser um
+ * `Record` completo: uma região nova sem nome escrito não compila. O portão de
+ * `test/unit/regions.spec.ts` fecha o outro lado, conferindo que esta lista é a
+ * mesma que o dex gerado contém e na mesma ordem.
+ */
+export const REGION_NAMES = [
+  'kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea',
+] as const
+
+export type RegionName = typeof REGION_NAMES[number]
+
+export function isRegionName(value: string): value is RegionName {
+  return REGION_NAMES.some(known => known === value)
+}
+
+/**
+ * O nome próprio de cada região.
+ *
+ * São os mesmos nos dois idiomas — é justamente por isso que o rótulo existe:
+ * sem ele o cabeçalho escreveria `kanto` em caixa baixa, e a alternativa seria
+ * capitalizar o slug em runtime, que funciona para estas nove e quebra na
+ * primeira região de nome composto.
+ */
+export const REGION_LABELS: Record<RegionName, string> = {
+  kanto: 'Kanto',
+  johto: 'Johto',
+  hoenn: 'Hoenn',
+  sinnoh: 'Sinnoh',
+  unova: 'Unova',
+  kalos: 'Kalos',
+  alola: 'Alola',
+  galar: 'Galar',
+  paldea: 'Paldea',
+}
+
+/**
+ * `Geração IV`, que é como a prancha *Pokédex* escreve o sobretítulo da região.
+ *
+ * O dex traz `Generation IV` em `displayName`, vindo da PokeAPI — em inglês, num
+ * documento `lang="pt-BR"`. Traduzir aqui, e não no build, mantém a regra do
+ * repositório de que `dex.ts` guarda o que vem de fora e o texto que o jogador
+ * lê é coisa deste módulo.
+ *
+ * O algarismo sai da lista, e não de um conversor: são nove valores fixos, e um
+ * conversor genérico seria mais código para cobrir 991 números que não existem.
+ */
+const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
+
+export function generationLabel(generation: number): string {
+  return `Geração ${ROMAN_NUMERALS[generation - 1] ?? generation}`
 }
 
 /**

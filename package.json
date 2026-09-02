@@ -27,6 +27,8 @@
   "dependencies": {
     "@nuxt/ui": "4.11.0",
     "@pinia/nuxt": "1.0.2",
+    "@tanstack/vue-virtual": "3.13.36",
+    "fuse.js": "7.5.0",
     "nuxt": "4.5.2",
     "pinia": "4.0.3",
     "tailwindcss": "4.3.3",

@@ -1,0 +1,11 @@
+{
+  "//": "Sexto projeto da solução: os testes de ponta a ponta. Eles rodam em Node, mas o corpo de `page.evaluate` e `page.waitForFunction` é avaliado DENTRO do navegador — `window` e `document` existem ali e em nenhum outro lugar da suíte. Sem este projeto o `tsconfig.tools.json` os pega com `lib: esnext`, e as duas consequências aparecem juntas: `yarn typecheck` acusa 'Cannot find name document' e o bloco type-aware do ESLint reprova cada acesso como `no-unsafe-member-access`, porque o tipo não resolve. Dar `dom` ao projeto de ferramentas inteiro resolveria os dois erros e criaria um pior: um teste unitário, que roda em Node, passaria a compilar citando `document`.",
+  "extends": "./tsconfig.tools.json",
+  "compilerOptions": {
+    "lib": ["esnext", "dom"],
+    "types": ["node"]
+  },
+  "//exclude": "Vazio, e não por descuido: `exclude` é herdado pelo `extends`, e o do tsconfig.tools.json lista `test/e2e/**/*` — sem esta linha o projeto inclui e exclui os mesmos arquivos, fica vazio, e o `projectService` do ESLint recusa cada spec com 'was not found by the project service'.",
+  "exclude": [],
+  "include": ["test/e2e/**/*", "playwright.config.ts"]
+}

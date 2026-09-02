@@ -48,6 +48,18 @@ const SKIP = new Set(['node_modules'])
 const RAW_HEX = /#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b/gi
 
 /**
+ * `#0001` é número de dex, não cor — e é o falso positivo que a Fase 3 trouxe.
+ *
+ * A Pokédex escreve a espécie como `#` mais quatro casas (`String(id)
+ * .padStart(4, '0')`), e quatro dígitos decimais são um `#RGBA` válido aos olhos
+ * da regra acima. A ressalva é estreita de propósito: só o caso de **quatro
+ * dígitos, todos decimais**. `#000` continua pego, `#0a0b` continua pego, e
+ * `#0011ff` continua pego — o que sai da varredura é a única forma que este
+ * repositório usa para um número que não é cor.
+ */
+const DEX_NUMBER = /^#\d{4}$/
+
+/**
  * Primitivo citado por componente, nas três formas em que ele aparece.
  *
  * A versão anterior olhava só a escada `ink`, e as outras duas famílias de
@@ -108,10 +120,12 @@ const sources = scannedFiles().map(file => ({
   lines: readFileSync(join(REPO_ROOT, file), 'utf8').split('\n'),
 }))
 
-function offenders(pattern: RegExp): string[] {
+function offenders(pattern: RegExp, ignore: (hit: string) => boolean = () => false): string[] {
   return sources.flatMap(({ file, lines }) =>
     lines.flatMap((line, index) =>
-      (line.match(pattern) ?? []).map(hit => `${file}:${index + 1} → ${hit}`),
+      (line.match(pattern) ?? [])
+        .filter(hit => !ignore(hit))
+        .map(hit => `${file}:${index + 1} → ${hit}`),
     ),
   )
 }
@@ -119,9 +133,25 @@ function offenders(pattern: RegExp): string[] {
 describe('disciplina de token', () => {
   it('não deixa hex cru fora do tema', () => {
     expect(
-      offenders(RAW_HEX),
+      offenders(RAW_HEX, hit => DEX_NUMBER.test(hit)),
       `hex fora de ${THEME}: o valor pertence a um token, e o componente cita o token`,
     ).toEqual([])
+  })
+
+  it('continua pegando cor curta e cor com alfa, apesar da ressalva do dex', () => {
+    // A ressalva abre uma porta e este teste mede a largura dela. Sem isto,
+    // trocar `\d{4}` por `\w{4}` num refactor apagaria o portão sem reprovar nada.
+    //
+    // A cópia sem `g` não é preciosismo: `RegExp.test` com a flag global avança
+    // `lastIndex` a cada chamada, e o segundo `#fff` da lista voltaria `false`
+    // por ter começado a busca depois do fim do primeiro.
+    const detect = new RegExp(RAW_HEX.source, 'i')
+    const escapam = ['#000', '#fff', '#0a0b', '#0011ff', '#0011ff80']
+      .filter(candidate => !detect.test(candidate) || DEX_NUMBER.test(candidate))
+
+    expect(escapam, 'cor que a ressalva do número de dex deixaria passar').toEqual([])
+    expect(DEX_NUMBER.test('#0001')).toBe(true)
+    expect(DEX_NUMBER.test('#1025')).toBe(true)
   })
 
   it('não deixa cor literal entrar por outra notação', () => {

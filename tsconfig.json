@@ -1,11 +1,12 @@
 {
-  "//": "Solution file. Os quatro primeiros projetos são gerados pelo `nuxt prepare`; o quinto cobre o que o Nuxt não enxerga — testes unitários, scripts de build e os arquivos de configuração.",
+  "//": "Solution file. Os quatro primeiros projetos são gerados pelo `nuxt prepare`; o quinto cobre o que o Nuxt não enxerga — testes unitários, scripts de build e os arquivos de configuração — e o sexto, os testes de ponta a ponta, cujo `page.evaluate` roda no navegador e precisa da lib `dom`.",
   "files": [],
   "references": [
     { "path": "./.nuxt/tsconfig.app.json" },
     { "path": "./.nuxt/tsconfig.server.json" },
     { "path": "./.nuxt/tsconfig.shared.json" },
     { "path": "./.nuxt/tsconfig.node.json" },
-    { "path": "./tsconfig.tools.json" }
+    { "path": "./tsconfig.tools.json" },
+    { "path": "./tsconfig.e2e.json" }
   ]
 }

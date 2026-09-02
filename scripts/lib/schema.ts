@@ -5,10 +5,11 @@ import type {
   EvolutionNode,
   FlavorData,
   GenerationData,
+  IndexData,
 } from '../../shared/types/dex.ts'
 import { GENERATION_COUNT, MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
-import { isMoveId, isSpeciesId } from '../../shared/types/brand.ts'
+import { isMoveId, isSpeciesId, SPECIES_COUNT } from '../../shared/types/brand.ts'
 
 /**
  * Validação da **saída** — o que vai para `public/data/`.
@@ -60,9 +61,20 @@ const effectiveness = z.union([
   z.literal(2),
 ])
 
+/**
+ * Um slug, e não uma string qualquer.
+ *
+ * `z.string().min(1)` aceitava barra, espaço e acento — e o slug de espécie vira
+ * rota pré-renderizada (`/pokemon/${slug}`) e chave de busca. Um `min(1)` deixa
+ * passar um slug que gera URL inválida, e o defeito só apareceria no build
+ * seguinte ao dia em que a PokeAPI mudasse a forma do campo. A validação certa é
+ * a do formato que o consumidor exige, feita na borda onde o dado entra.
+ */
+const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'slug fora do formato kebab-case')
+
 const moveEntry = z.object({
   id: moveIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   displayName: z.string().min(1),
   type: typeName,
   power: z.number().int().positive(),
@@ -88,14 +100,18 @@ export const coreSchema: z.ZodType<CoreData> = z.object({
   generations: z.array(generationMeta).length(GENERATION_COUNT),
 })
 
+/** Um ou dois tipos, nessa ordem. Compartilhado com o índice: os dois gravam a
+ * mesma tupla, e escrevê-la duas vezes é como as duas saídas divergem. */
+const speciesTypes = z.union([
+  z.tuple([typeName]),
+  z.tuple([typeName, typeName]),
+])
+
 const speciesEntry = z.object({
   id: speciesIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   displayName: z.string().min(1),
-  types: z.union([
-    z.tuple([typeName]),
-    z.tuple([typeName, typeName]),
-  ]),
+  types: speciesTypes,
   baseStats: z.tuple([
     z.number().int().positive(),
     z.number().int().positive(),
@@ -124,6 +140,19 @@ export const generationSchema: z.ZodType<GenerationData> = z.object({
   species: z.array(speciesEntry).min(1),
 })
 
+/**
+ * O índice tem tamanho fixo, e é a única saída em que isso é verificável: são as
+ * 1025 espécies do dex nacional, uma linha cada. `.length()` transforma "faltou
+ * uma geração no crawl" de bug de tela em build que não termina.
+ */
+export const indexSchema: z.ZodType<IndexData> = z.array(z.object({
+  id: speciesIdSchema,
+  slug: slugSchema,
+  displayName: z.string().min(1),
+  generation: z.number().int().min(1).max(GENERATION_COUNT),
+  types: speciesTypes,
+})).length(SPECIES_COUNT)
+
 const evolutionCondition = z.object({
   trigger: z.string().min(1),
   minLevel: z.number().int().positive().optional(),
@@ -149,7 +178,7 @@ const evolutionCondition = z.object({
 
 const evolutionNode: z.ZodType<EvolutionNode> = z.object({
   speciesId: speciesIdSchema,
-  slug: z.string().min(1),
+  slug: slugSchema,
   via: evolutionCondition.optional(),
   get evolvesTo() {
     return z.array(evolutionNode)
