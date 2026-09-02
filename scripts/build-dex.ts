@@ -14,7 +14,6 @@ import {
 } from './lib/pokeapi.ts'
 import type { ChainLink, EvolutionChain, Pokemon, Species } from './lib/pokeapi.ts'
 import {
-  MOVES_IN_BATTLE,
   buildEffectivenessMatrix,
   generationDisplayName,
   pickFlavorText,
@@ -36,9 +35,9 @@ import type {
   GenerationMeta,
   IndexData,
   MoveEntry,
-  SpeciesEntry,
+  SpeciesEntry, AilmentName,
 } from '../shared/types/dex.ts'
-import { GENERATION_COUNT, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
+import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
 import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
 
 /**
@@ -255,6 +254,9 @@ function buildSpeciesEntry(
   if (source === 'supplemented') report.movesetSupplemented.push(species.name)
   if (source === 'any-method') report.movesetFallback.push(species.name)
   if (source === 'struggle') report.movesetStruggle.push(species.name)
+  if (moveIds.some(id => catalog.get(id)?.damageClass === 'status')) {
+    report.movesetWithStatus.push(species.name)
+  }
   if (moveIds.length < MOVES_IN_BATTLE) {
     report.movesetShort.push(`${species.name}:${moveIds.length}`)
   }
@@ -292,6 +294,9 @@ export interface Report {
    * completá-lo. É o número que precisa aparecer: eram 54 espécies, e só 11
    * chegavam ao relatório. */
   readonly movesetShort: string[]
+  /** Espécies que levam a vaga de status ocupada. Não é anomalia, é a medida da
+   * decisão da Fase 4: se este número desabar, o motor ficou sem condições. */
+  readonly movesetWithStatus: string[]
   readonly evolutionWithoutCondition: string[]
   readonly flavorMissing: string[]
   readonly legacyCasing: string[]
@@ -318,6 +323,7 @@ async function main(): Promise<void> {
     movesetFallback: [],
     movesetStruggle: [],
     movesetShort: [],
+    movesetWithStatus: [],
     evolutionWithoutCondition: [],
     flavorMissing: [],
     legacyCasing: [],
@@ -343,7 +349,8 @@ async function main(): Promise<void> {
     const entry = toMoveEntry(move)
     if (entry !== null) catalog.set(entry.id, entry)
   }
-  console.log(`  ${catalog.size} de dano, de ${moves.length} no total`)
+  const statusCount = [...catalog.values()].filter(move => move.damageClass === 'status').length
+  console.log(`  ${catalog.size - statusCount} de dano e ${statusCount} de status, de ${moves.length} no total`)
 
   // 32 requisições que decidem o moveset inteiro: sem a ordem cronológica, o
   // "grupo mais recente" vira `blue-japan` e cada espécie recebe o moveset de 1996.
@@ -688,6 +695,19 @@ function printReport(input: ReportInput): number {
     [`as gerações somam ${SPECIES_COUNT}`, speciesTotal === SPECIES_COUNT, `${speciesTotal}`],
     [`chains.json tem ${CHAIN_COUNT} cadeias`, Object.keys(chains).length === CHAIN_COUNT, `${Object.keys(chains).length}`],
     ['Charizard resolve com 16 e 36', charizard === 'charmander → charmeleon (16) → charizard (36)', charizard],
+    [
+      // Sem esta checagem, uma mudança no `meta` da PokeAPI — ou um filtro que
+      // aperte demais — produz um dex bem-formado em que nenhum golpe aplica
+      // condição, e o motor perde as quatro sem uma linha de erro.
+      //
+      // Ela exige **golpe de status**, e não qualquer golpe com condição: com o
+      // critério frouxo, um filtro que apagasse os dez golpes de status ainda
+      // passaria, porque Relic Song sozinha cobre o sono como efeito secundário.
+      // O que a Fase 4 decidiu foi trazer os golpes de status; é isso que se mede.
+      `o catálogo cobre as ${AILMENT_NAMES.length} condições com golpe de status`,
+      AILMENT_NAMES.every(kind => coversAilment(core, kind)),
+      AILMENT_NAMES.filter(kind => !coversAilment(core, kind)).join(', '),
+    ],
   ]
 
   let failed = 0
@@ -714,6 +734,7 @@ function printReport(input: ReportInput): number {
     ['moveset sem golpe por nível (usou máquina/tutor)', report.movesetFallback],
     ['moveset caiu em Struggle (sem golpe de dano próprio)', report.movesetStruggle],
     [`moveset abaixo das ${MOVES_IN_BATTLE} vagas de batalha`, report.movesetShort],
+    ['moveset com golpe de status', report.movesetWithStatus],
     ['aresta de evolução sem condição na PokeAPI', report.evolutionWithoutCondition],
     ['sem flavor text em inglês', report.flavorMissing],
     ['flavor com POKéMON em caixa de cartucho', report.legacyCasing],
@@ -728,6 +749,11 @@ function printReport(input: ReportInput): number {
   }
 
   return failed
+}
+
+/** Se alguma entrada de status do catálogo aplica a condição. */
+function coversAilment(core: CoreData, kind: AilmentName): boolean {
+  return core.moves.some(move => move.damageClass === 'status' && move.ailment?.kind === kind)
 }
 
 function describeChain(chains: ChainsData, rootSlug: string): string {

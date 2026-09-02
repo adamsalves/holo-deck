@@ -65,29 +65,133 @@ export const GENERATION_COUNT = GYM_COUNT
  */
 export const MOVES_PER_SPECIES = 8
 
+/**
+ * Quantos golpes cada Pokémon leva para uma batalha.
+ *
+ * Mora aqui, e não em `scripts/`, pela mesma razão que `MOVES_PER_SPECIES`:
+ * agora são três os leitores que precisam concordar sobre ele — o build, que o
+ * usa como piso ao montar o moveset; o motor, que escolhe 4 dos 8 guardados; e o
+ * relatório, que conta quem ficou abaixo. Quando discordam, o build grava um
+ * arquivo que o próprio leitor recusa.
+ */
+export const MOVES_IN_BATTLE = 4
+
+/**
+ * Id de Struggle, o golpe que os jogos usam quando não há nenhum utilizável.
+ *
+ * Ele é dado do dex — nove espécies o levam como moveset inteiro, e uma décima,
+ * Pyukumuku, o leva ao lado de Toxic — e regra de motor ao mesmo tempo, e é por isso que o id precisa estar em `shared/`: o
+ * build o grava e a batalha o reconhece, e um número repetido nos dois lugares
+ * é como eles deixam de ser o mesmo golpe.
+ *
+ * Duas exceções que o motor cobra sobre ele, nenhuma derivável do registro:
+ * a PokeAPI lhe dá `pp: 1` por resíduo do dado de primeira geração, e nos jogos
+ * modernos ele **não tem PP**; e ele é **sem tipo**, enquanto o catálogo o
+ * guarda como `normal` — dar STAB a Struggle premiaria justamente quem não tem
+ * golpe nenhum.
+ */
+export const STRUGGLE_MOVE_ID = 165
+
 /** Multiplicadores possíveis numa casa da matriz. */
 export type Effectiveness = 0 | 0.5 | 1 | 2
 
-export type DamageClass = 'physical' | 'special'
+/**
+ * As três classes da PokeAPI. `status` entrou na Fase 4: sem ela o catálogo não
+ * tem Thunder Wave, e as quatro condições do motor ficam sem origem nenhuma.
+ */
+export type DamageClass = 'physical' | 'special' | 'status'
+
+/** As duas que passam pela fórmula de dano. */
+export type DamagingClass = Exclude<DamageClass, 'status'>
 
 /**
- * Golpe de dano. Só golpes de status ficam fora do catálogo — o jogo não os usa,
- * e carregá-los custaria ~40 KB sem leitor.
- *
- * `accuracy` é `null` de propósito: em Swift e Aerial Ace ele significa "nunca
- * erra", que é diferente de 100. Colapsar os dois para 100 apagaria a regra.
+ * As quatro condições que o motor modela, e a lista é fechada de propósito.
+ * Congelamento ficou de fora por decisão de jogo — é frustrante de receber e
+ * pouco interessante de aplicar; confusão, armadilha e silêncio porque não são
+ * modelados. Um golpe cujo `ailment` não está aqui entra no dex como golpe
+ * comum, sem efeito secundário, em vez de prometer o que o motor não sabe fazer.
  */
-export interface MoveEntry {
+export const AILMENT_NAMES = ['paralysis', 'burn', 'poison', 'sleep'] as const
+
+export type AilmentName = typeof AILMENT_NAMES[number]
+
+/** Mesma razão de `isTypeName`: o `includes` de uma tupla `as const` só aceita
+ * os próprios literais, e o `some` faz o trabalho sem um único cast. */
+export function isAilmentName(value: string): value is AilmentName {
+  return AILMENT_NAMES.some(known => known === value)
+}
+
+/**
+ * A condição que um golpe aplica, e com que chance.
+ *
+ * É um objeto, e não dois campos opcionais soltos, porque `chance` sem `kind` é
+ * estado ilegal — não existe "30% de nada". Assim o par nasce junto ou não nasce.
+ *
+ * `chance` é sempre 1..100, **inclusive nos golpes de status**: a PokeAPI grava
+ * `ailment_chance: 0` neles, querendo dizer "é para isso que o golpe existe", e
+ * o build normaliza para 100 na fronteira em vez de espalhar a convenção por
+ * todo leitor que um dia comparar o campo com zero.
+ */
+export interface MoveAilment {
+  readonly kind: AilmentName
+  readonly chance: number
+}
+
+interface MoveCommon {
   readonly id: MoveId
   readonly slug: string
   readonly displayName: string
   readonly type: TypeName
-  readonly power: number
+  /**
+   * `null` de propósito: em Swift e Aerial Ace significa "nunca erra", que é
+   * diferente de 100. Colapsar os dois para 100 apagaria a regra.
+   */
   readonly accuracy: number | null
   readonly pp: number
   readonly priority: number
-  readonly damageClass: DamageClass
 }
+
+/**
+ * Golpe que tira HP. O `ailment` aqui é efeito **secundário**: Thunderbolt
+ * paralisa em 10% das vezes e nas outras 90% é só dano.
+ */
+export interface DamagingMoveEntry extends MoveCommon {
+  readonly damageClass: DamagingClass
+  readonly power: number
+  readonly ailment?: MoveAilment
+}
+
+/**
+ * Golpe que só aplica condição.
+ *
+ * `power: null` não é dado faltando — é o que impede um golpe de status de
+ * entrar na fórmula de dano por descuido: com a união discriminada, o
+ * compilador exige a checagem de `damageClass` antes de deixar alguém ler
+ * `power` como número.
+ */
+export interface StatusMoveEntry extends MoveCommon {
+  readonly damageClass: 'status'
+  readonly power: null
+  readonly ailment: MoveAilment
+}
+
+/**
+ * Um golpe do catálogo.
+ *
+ * **A Fase 1 guardou só golpes de dano**, com a razão escrita de que o jogo não
+ * usava status e de que carregá-los custaria ~40 KB sem leitor. A Fase 4 provou
+ * o contrário: as quatro condições do motor não teriam de onde sair — só
+ * efeitos secundários dão 36 golpes e alcançam 383 das 1025 espécies, com o sono
+ * reduzido a um único golpe —, e a prancha da Batalha desenha Thunder Wave no
+ * quarto slot do Pikachu.
+ *
+ * Passaram a entrar os golpes de status **das quatro condições**, e só eles: 12
+ * sobrevivem ao filtro de acurácia e **10** acabam referenciados por alguma
+ * espécie, que é o recorte que o catálogo guarda. Sleep Powder e Poison Gas
+ * ficam de fora por perderem sempre o desempate para Spore e Toxic. Todo o
+ * resto continua fora, e o catálogo segue custando pouco.
+ */
+export type MoveEntry = DamagingMoveEntry | StatusMoveEntry
 
 export interface GenerationMeta {
   readonly generation: number
@@ -309,6 +413,11 @@ export function isCoreData(value: unknown): value is CoreData {
   // Catálogo vazio não é "core sem golpes", é core que não terminou de gravar.
   if (!isArray(moves) || moves.length === 0 || !moves.every(isMoveEntry)) return false
 
+  // Struggle é o golpe de reserva do motor, e sem ele a primeira carta que fica
+  // sem PP derruba a batalha. É a mesma classe do `moveIds: []`: forma certa,
+  // deploy parcial, e o defeito aparece a dez turnos de distância da causa.
+  if (!moves.some(move => isRecord(move) && move.id === STRUGGLE_MOVE_ID)) return false
+
   // `.length(9)` no schema: uma geração a menos deixa o grid sem uma aba, e é o
   // tipo de perda que ninguém nota sem contar.
   if (!isArray(generations) || generations.length !== GENERATION_COUNT) return false
@@ -317,18 +426,40 @@ export function isCoreData(value: unknown): value is CoreData {
   return true
 }
 
+/**
+ * A condição, nos dois lados da união. `chance` fora de 1..100 é dado
+ * corrompido, e o zero em particular é a convenção da PokeAPI que o build
+ * normaliza — se ele reaparecer aqui, alguém gravou o valor cru.
+ */
+function isMoveAilment(value: unknown): value is MoveAilment {
+  if (!isRecord(value)) return false
+  return typeof value.kind === 'string' && isAilmentName(value.kind)
+    && isInt(value.chance) && value.chance >= 1 && value.chance <= 100
+}
+
 function isMoveEntry(value: unknown): value is MoveEntry {
   if (!isRecord(value)) return false
-  return isInt(value.id) && isMoveId(value.id)
+
+  const common = isInt(value.id) && isMoveId(value.id)
     && isText(value.slug)
     && isText(value.displayName)
     && typeof value.type === 'string' && isTypeName(value.type)
-    && isPositiveInt(value.power)
     // `null` é "nunca erra" (Swift, Aerial Ace); 0 ou negativo é dado corrompido.
     && (value.accuracy === null || isPositiveInt(value.accuracy))
     && isPositiveInt(value.pp)
     && isInt(value.priority)
-    && (value.damageClass === 'physical' || value.damageClass === 'special')
+  if (!common) return false
+
+  // `power === null` explícito, e não "ausente ou nulo": um golpe de status que
+  // chegasse sem a chave passaria por um guarda mais frouxo e viraria
+  // `undefined` dentro da fórmula de dano, que é exatamente o que o `null`
+  // declarado existe para impedir.
+  if (value.damageClass === 'status') {
+    return value.power === null && isMoveAilment(value.ailment)
+  }
+  if (value.damageClass !== 'physical' && value.damageClass !== 'special') return false
+  return isPositiveInt(value.power)
+    && (value.ailment === undefined || isMoveAilment(value.ailment))
 }
 
 function isGenerationMeta(value: unknown): value is GenerationMeta {

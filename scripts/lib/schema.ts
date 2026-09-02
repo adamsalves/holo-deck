@@ -7,7 +7,14 @@ import type {
   GenerationData,
   IndexData,
 } from '../../shared/types/dex.ts'
-import { GENERATION_COUNT, MOVES_PER_SPECIES, TYPE_COUNT, TYPE_NAMES } from '../../shared/types/dex.ts'
+import {
+  AILMENT_NAMES,
+  GENERATION_COUNT,
+  MOVES_PER_SPECIES,
+  STRUGGLE_MOVE_ID,
+  TYPE_COUNT,
+  TYPE_NAMES,
+} from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
 import { isMoveId, isSpeciesId, SPECIES_COUNT } from '../../shared/types/brand.ts'
 
@@ -72,17 +79,49 @@ const effectiveness = z.union([
  */
 const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'slug fora do formato kebab-case')
 
-const moveEntry = z.object({
+/**
+ * A condição do golpe, com a mesma faixa que o guarda de leitura cobra.
+ *
+ * **O zero fica de fora de propósito.** Ele é a convenção da PokeAPI para
+ * "sempre", e `toMoveEntry` a normaliza para 100 na fronteira; aceitá-lo aqui
+ * deixaria o valor cru entrar no arquivo na primeira distração, e o leitor
+ * seguinte entenderia "nunca aplica" num Thunder Wave.
+ */
+const moveAilment = z.object({
+  kind: z.enum(AILMENT_NAMES),
+  chance: z.number().int().min(1).max(100),
+})
+
+const moveCommon = {
   id: moveIdSchema,
   slug: slugSchema,
   displayName: z.string().min(1),
   type: typeName,
-  power: z.number().int().positive(),
   accuracy: z.number().int().positive().nullable(),
   pp: z.number().int().positive(),
   priority: z.number().int(),
-  damageClass: z.enum(['physical', 'special']),
-})
+}
+
+/**
+ * União discriminada por `damageClass`, e não um objeto com os dois campos
+ * opcionais: é o que torna `power: null` **obrigatório** no golpe de status e
+ * proibido no de dano. Um schema frouxo aqui gravaria golpe de status sem
+ * condição — que é justamente o registro que o motor não sabe executar.
+ */
+const moveEntry = z.discriminatedUnion('damageClass', [
+  z.object({
+    ...moveCommon,
+    damageClass: z.enum(['physical', 'special']),
+    power: z.number().int().positive(),
+    ailment: moveAilment.optional(),
+  }),
+  z.object({
+    ...moveCommon,
+    damageClass: z.literal('status'),
+    power: z.null(),
+    ailment: moveAilment,
+  }),
+])
 
 const generationMeta = z.object({
   generation: z.number().int().min(1).max(GENERATION_COUNT),
@@ -96,7 +135,12 @@ export const coreSchema: z.ZodType<CoreData> = z.object({
   // defeito que passa despercebido e produz dano errado numa batalha só.
   types: z.array(typeName).length(TYPE_COUNT),
   effectiveness: z.array(z.array(effectiveness).length(TYPE_COUNT)).length(TYPE_COUNT),
-  moves: z.array(moveEntry).min(1),
+  // O `.refine` é a paridade com o guarda de leitura: quem grava um catálogo sem
+  // Struggle está gravando um dex em que a primeira carta sem PP trava a luta.
+  moves: z.array(moveEntry).min(1).refine(
+    list => list.some(move => move.id === STRUGGLE_MOVE_ID),
+    { message: 'catálogo sem Struggle — o motor fica sem golpe de reserva' },
+  ),
   generations: z.array(generationMeta).length(GENERATION_COUNT),
 })
 

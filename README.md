@@ -4,8 +4,9 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 3 — a Pokédex. Packs, coleção, deck
-> e batalha entram a partir da Fase 4. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da Fase 4 — a Pokédex e o motor de batalha,
+> ainda sem tela. Packs, coleção e deck entram a partir da Fase 5, e a tela da
+> batalha na Fase 6. O README completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -216,14 +217,14 @@ pipeline muda**; para jogar ou desenvolver, os arquivos commitados bastam.
 
 | Arquivo             | Conteúdo                                              |
 | ------------------- | ----------------------------------------------------- |
-| `core.json`         | matriz de efetividade 18×18, catálogo de golpes, gerações |
+| `core.json`         | matriz de efetividade 18×18, catálogo de golpes — de dano e os 10 de status —, gerações |
 | `chains.json`       | as 541 cadeias de evolução já resolvidas em árvore    |
 | `gen-N.json`        | as espécies da geração N — o que o grid precisa       |
 | `index.json`        | id, slug, nome, geração e tipos das 1025 — o que a busca global indexa e o que faz `/pokemon/[name]` achar a geração de um slug sem abrir os nove arquivos |
 | `flavor-N.json`     | as descrições, **em arquivo separado**: pesam mais que todo o resto do dex junto, e só a página de detalhe as usa |
 | `sprites/{id}.webp` | miniatura de 128 px, recortada no alpha               |
 
-Cinco coisas que o pipeline decide e que não dá para deduzir lendo a saída:
+Seis coisas que o pipeline decide e que não dá para deduzir lendo a saída:
 
 - **A versão de um moveset vem do campo `order`, nunca do id do version group.**
   `blue-japan` tem id 29 e `scarlet-violet` tem 25 — a PokeAPI cadastrou o
@@ -233,13 +234,25 @@ Cinco coisas que o pipeline decide e que não dá para deduzir lendo a saída:
   group. Parar no primeiro método com resultado dava 2 golpes a Clefable,
   Ninetales, Poliwrath e Ludicolo: são evoluções por pedra, o grupo mais recente
   quase não lhes ensina por nível, e o mesmo grupo tem máquina e tutor de sobra.
-  Sobram 20 espécies abaixo das 4 vagas — Metapod só sabe Harden, Magikarp só
-  Splash e Tackle —, e o build lista as 20 no relatório.
+  Sobram 19 espécies abaixo das 4 vagas — Metapod só sabe Harden, Magikarp só
+  Splash e Tackle —, e o build lista as 19 no relatório.
+- **Uma das oito vagas é reservada para golpe de status**, e ela é a razão de o
+  catálogo ter deixado de ser só de dano na Fase 4. Sem ela nada no dex diz que
+  Thunder Wave paralisa, e as quatro condições do motor ficam sem origem — só
+  efeitos secundários dariam 36 golpes, alcançariam 383 espécies e deixariam o
+  sono com um golpe único. **A vaga não disputa com os de dano**: o moveset de
+  dano é escolhido primeiro, exatamente como antes, e a vaga custa a oitava
+  posição de quem já a tinha cheia. Rodando o pipeline com e sem a mudança, 716
+  espécies ficaram idênticas, 309 perderam só o oitavo golpe, e nenhuma mudou de
+  outra forma. Hoje 515 das 1025 levam uma condição, e o desempate entre duas é
+  por acurácia — Spore antes de Hypnosis —, nunca por qual condição é melhor.
 - **Dez espécies não têm golpe de dano nenhum** e caem em Struggle, como nos
   jogos: Metapod, Kakuna, Abra, Ditto, Wobbuffet, Smeargle, Wynaut, Pyukumuku,
   Cosmog e Cosmoem. A PokeAPI dá `pp: 1` a Struggle por resíduo do dado de 1ª
   geração; o motor de batalha precisa tratá-lo como ilimitado, senão os dez
-  atacam uma vez por batalha.
+  atacam uma vez por batalha. Pyukumuku é a única das dez que sai com dois
+  golpes: ela não sabe atacar, mas sabe envenenar, e leva Toxic ao lado de
+  Struggle.
 - **Uma aresta de evolução chega sem condição.** `phione → manaphy` vem da
   PokeAPI com `evolution_details` vazio. O build relata a aresta em vez de
   inventar uma condição, e o `via` de `EvolutionNode` é opcional por causa dela.
@@ -316,6 +329,84 @@ A raridade (`shared/game/rarity.ts`) e a matriz de tipos
 aqui, porque a Pokédex as exibe e nenhuma das duas depende de coleção. Os
 limiares saem do percentil sobre as 1025, não do chute: com os originais do plano
 a distribuição saía invertida, com *raro* virando o maior tier do jogo.
+
+## Motor de batalha
+
+Tudo em [`shared/game/`](shared/game/), TypeScript puro, sem uma linha de Vue —
+o que faz a suíte do motor rodar sem montar componente nenhum. É a Fase 4, e a
+tela que a consome é a Fase 6.
+
+| Módulo | O que decide |
+| --- | --- |
+| `rng.ts` | mulberry32 com seed; estado e seed são o mesmo uint32 |
+| `stats.ts` | base stat → stat de Lv50 (IV 31, EV 0, natureza neutra) |
+| `damage.ts` | a fórmula da geração V, com a ordem de modificadores fixa |
+| `status.ts` | paralisia, queimadura, envenenamento e sono — uma por vez |
+| `moveset.ts` | quais 4 dos 8 guardados entram em campo |
+| `gyms.ts` | os nove líderes e a regra que monta o time de cada um |
+| `ai.ts` | a decisão do líder: gulosa, com ruído que cai a cada ginásio |
+| `battle.ts` | estado, ação, evento e `ENGINE_VERSION` |
+| `engine.ts` | a máquina de estados, o log de ações e o replay |
+
+**O motor é puro e o `shared/` inteiro é vigiado por
+[`test/unit/shared-purity.spec.ts`](test/unit/shared-purity.spec.ts)**: só
+import relativo, só para dentro de `shared/`, sempre com `.ts` explícito, e nada
+de `Math.random`, `Date.now` ou `performance.now`. As três primeiras regras
+existem porque `shared/` viaja para o bundle do cliente **e** para o Node puro
+do `yarn data:build`; a última existe porque a batalha é salva como seed mais
+lista de ações e reconstruída por replay — um sorteio fora do gerador com seed
+não derruba nada, só faz o mesmo log produzir outra luta amanhã.
+
+Oito coisas que o motor decide e que não dá para deduzir lendo o código:
+
+- **A ordem dos modificadores de dano é fixa: crítico, aleatório, STAB,
+  efetividade.** `floor` não comuta, e trocar a ordem muda o número na tela. Com
+  o Pikachu e o Noctowl da prancha da Batalha, esta ordem produz de 62 a 74 de
+  Thunderbolt, e os **68** que a prancha estampa saem do rolo 92.
+- **A ordem de consumo do RNG é o contrato de `ENGINE_VERSION`**: decisão da IA,
+  desempate de Speed (só quando empatam), e por golpe — impedimento, acerto,
+  crítico, aleatório de dano, chance da condição, turnos de sono. O fim de turno
+  não rola nada. Uma rolagem a mais, a menos ou em outra ordem muda toda batalha
+  já gravada, e o certo é subir a versão: um log de versão anterior é
+  **recusado**, nunca reproduzido torto.
+- **As rolagens de crítico e de aleatório acontecem mesmo contra imunidade.**
+  Sair antes economizaria dois números e faria o consumo do fluxo depender do
+  tipo do defensor — o que transforma um `×0` no meio da luta em divergência de
+  replay.
+- **O `BattleLog` guarda o time.** O plano descrevia `{ gymId, seed,
+  engineVersion, ações[] }`; sem os seis ids, o replay dependeria do deck ativo
+  na hora de retomar, e trocar uma carta no meio de um ginásio faria o mesmo log
+  produzir outra luta em silêncio.
+- **Struggle é sem tipo e sem PP — três exceções, não duas.** A PokeAPI lhe dá
+  `pp: 1` por resíduo do dado de primeira geração, e o catálogo o guarda como
+  `normal` porque é assim que ela o entrega. Sem elas, as nove espécies que só o
+  têm atacariam uma vez por batalha, ganhariam 50% de bônus para isso e — a que
+  custou mais caro — **não conseguiriam encostar num Fantasma**: `normal → ghost`
+  é zero, e dois lados sem PP numa luta de Fantasma trocavam golpes de dano nulo
+  sem a batalha terminar nunca. É por isso que o teste de terminação varre os
+  nove ginásios, e não só o primeiro.
+- **A troca da faixa C só acontece para um abrigo de verdade.** O líder foge de
+  uma matchup de ×2, mas apenas para quem não está na mesma: sem esse filtro ele
+  trocava por trocar, 113 vezes por batalha no nono ginásio, e a dificuldade
+  **caía** do sétimo ao nono porque ele gastava o turno trocando em vez de
+  atacar.
+- **Condição respeita imunidade de tipo.** Thunder Wave não paralisa Terrestre e
+  Toxic não envenena Aço. O golpe de dano já parava no `×0` da fórmula; o de
+  status não passa por ela e precisa da checagem própria.
+- **O líder usa o golpe de status enquanto o alvo estiver limpo**, e para quando
+  a condição pega. A escolha gulosa nunca o pegaria: dano esperado zero perde de
+  qualquer ataque, e a vaga que o pipeline reserva no moveset seria peso morto na
+  mão dos nove. Não é "uma vez por batalha" — se Thunder Wave errar, ele tenta de
+  novo. As faixas de comportamento são cumulativas pela mesma razão que a regra
+  existe: um líder do nono ginásio que não usasse poção seria mais fraco que um
+  do quarto.
+
+Os times dos nove saem da regra (mesmo tipo, mesma geração, sob o teto de BST, os
+N de maior BST, ace por último) e não de uma lista curada, o que os impede de
+divergir do dex em silêncio. **A prancha *Liga* desenha Onix como ace do Brock e
+a *Batalha* usa Noctowl como ativo do Falkner; a regra dá Graveler como ace e não
+inclui Noctowl.** As duas artes são ilustrativas: composição de time é regra de
+jogo, e o canvas é a especificação visual.
 
 ## Hooks de git
 

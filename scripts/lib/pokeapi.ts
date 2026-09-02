@@ -141,6 +141,19 @@ export const moveSchema = z.object({
   priority: z.number().int(),
   type: namedResource,
   damage_class: namedResource,
+  /**
+   * O bloco que a Fase 1 não lia, e sem o qual as quatro condições do motor não
+   * têm origem. `ailment.name` é `none` na maioria dos golpes; `ailment_chance`
+   * vale 0 em **todo** golpe de status, e ali o zero significa "sempre", não
+   * "nunca" — quem normaliza é `toMoveEntry`, na fronteira.
+   *
+   * `nullable` por precaução de contrato: nenhum dos 937 chega sem `meta` hoje,
+   * e um dia sem ele é golpe sem efeito, não build quebrado.
+   */
+  meta: z.object({
+    ailment: namedResource,
+    ailment_chance: z.number().int(),
+  }).nullable(),
 })
 
 export type Move = z.infer<typeof moveSchema>

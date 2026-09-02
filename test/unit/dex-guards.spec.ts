@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   GENERATION_COUNT,
+  STRUGGLE_MOVE_ID,
   MOVES_PER_SPECIES,
   STAT_COUNT,
   TYPE_COUNT,
@@ -60,10 +61,96 @@ function validCore() {
       pp: 15,
       priority: 0,
       damageClass: 'special',
+    }, {
+      // Struggle é obrigatório no catálogo desde a Fase 4: é o golpe de reserva
+      // do motor, e o guarda recusa um core sem ele.
+      id: STRUGGLE_MOVE_ID,
+      slug: 'struggle',
+      displayName: 'Struggle',
+      type: 'normal',
+      power: 50,
+      accuracy: null,
+      pp: 1,
+      priority: 0,
+      damageClass: 'physical',
     }],
     generations: allGenerations(),
   }
 }
+
+/** Thunder Wave: o par que a união exige — classe `status`, poder nulo e
+ * condição obrigatória. */
+function statusMove() {
+  return {
+    id: 86,
+    slug: 'thunder-wave',
+    displayName: 'Thunder Wave',
+    type: 'electric',
+    power: null,
+    accuracy: 90,
+    pp: 20,
+    priority: 0,
+    damageClass: 'status',
+    ailment: { kind: 'paralysis', chance: 100 },
+  }
+}
+
+describe('isCoreData — a união de golpes', () => {
+  it('aceita golpe de status com poder nulo e condição', () => {
+    expect(isCoreData({ ...validCore(), moves: [...validCore().moves, statusMove()] })).toBe(true)
+  })
+
+  it('recusa catálogo sem Struggle', () => {
+    // Sem ele, a primeira carta que fica sem PP derruba a batalha — e o arquivo
+    // tem forma perfeita. É a mesma classe do `moveIds: []`.
+    const semStruggle = validCore().moves.filter(move => move.id !== STRUGGLE_MOVE_ID)
+
+    expect(isCoreData({ ...validCore(), moves: semStruggle })).toBe(false)
+  })
+
+  it('aceita efeito secundário num golpe de dano, e a ausência dele', () => {
+    const [thunderbolt, struggle] = validCore().moves
+    expect(isCoreData({
+      ...validCore(),
+      moves: [{ ...thunderbolt, ailment: { kind: 'paralysis', chance: 10 } }, struggle],
+    })).toBe(true)
+    expect(isCoreData(validCore())).toBe(true)
+  })
+
+  it('recusa golpe de status sem condição', () => {
+    // É o registro que o motor não sabe executar: um golpe que não tira HP e
+    // não aplica nada gasta o turno do jogador e não faz coisa alguma.
+    const { ailment: _ailment, ...semCondicao } = statusMove()
+    expect(isCoreData({ ...validCore(), moves: [...validCore().moves, semCondicao] })).toBe(false)
+  })
+
+  it('recusa golpe de status com poder', () => {
+    // O `power: null` é o que impede o golpe de entrar na fórmula de dano; um
+    // número aqui desfaz a proteção que a união inteira existe para dar.
+    expect(isCoreData({ ...validCore(), moves: [...validCore().moves, { ...statusMove(), power: 50 }] })).toBe(false)
+  })
+
+  it('recusa golpe de dano com poder nulo', () => {
+    const [thunderbolt, struggle] = validCore().moves
+    expect(isCoreData({ ...validCore(), moves: [{ ...thunderbolt, power: null }, struggle] })).toBe(false)
+  })
+
+  it('recusa a chance zero, que é a convenção crua da PokeAPI', () => {
+    // Se ela reaparecer no arquivo, alguém gravou o valor sem normalizar — e o
+    // leitor seguinte entende "nunca aplica" num Thunder Wave.
+    expect(isCoreData({
+      ...validCore(),
+      moves: [...validCore().moves, { ...statusMove(), ailment: { kind: 'paralysis', chance: 0 } }],
+    })).toBe(false)
+  })
+
+  it('recusa condição fora das quatro modeladas', () => {
+    expect(isCoreData({
+      ...validCore(),
+      moves: [...validCore().moves, { ...statusMove(), ailment: { kind: 'freeze', chance: 10 } }],
+    })).toBe(false)
+  })
+})
 
 describe('isCoreData', () => {
   it('aceita a forma completa', () => {
@@ -254,7 +341,9 @@ describe('guardas cobram as mesmas restrições do schema de escrita', () => {
     const core = validCore()
     const [first] = core.moves
     if (first === undefined) throw new Error('fixture inválida: core sem golpe')
-    return { ...core, moves: [{ ...first, ...patch }] }
+    // O resto do catálogo continua ali: trocar a lista inteira por um golpe só
+    // levaria Struggle junto, e o guarda reprovaria pelo motivo errado.
+    return { ...core, moves: [{ ...first, ...patch }, ...core.moves.slice(1)] }
   }
 
   /** `baseStats` é tupla de 6: trocar `[0]` é o que corrompe o HP de verdade. */

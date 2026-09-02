@@ -1,7 +1,7 @@
 // @vitest-environment nuxt
 import { describe, expect, it } from 'vitest'
 import { registerEndpoint } from '@nuxt/test-utils/runtime'
-import { GENERATION_COUNT, TYPE_NAMES } from '~~/shared/types/dex'
+import { GENERATION_COUNT, STRUGGLE_MOVE_ID, TYPE_NAMES } from '~~/shared/types/dex'
 import { SPECIES_COUNT } from '~~/shared/types/brand'
 import { useDex } from '~/composables/useDex'
 
@@ -18,6 +18,18 @@ const core = {
     pp: 15,
     priority: 0,
     damageClass: 'special',
+  }, {
+    // Struggle é obrigatório no catálogo desde a Fase 4: é o golpe de reserva
+    // do motor, e o guarda recusa um core sem ele.
+    id: STRUGGLE_MOVE_ID,
+    slug: 'struggle',
+    displayName: 'Struggle',
+    type: 'normal',
+    power: 50,
+    accuracy: null,
+    pp: 1,
+    priority: 0,
+    damageClass: 'physical',
   }],
   // As 9: o guarda cobra `.length(9)`, porque um `core.json` com menos é
   // justamente o deploy parcial que ele existe para recusar.
