@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SpeciesEntry } from '~~/shared/types/dex'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
-import { computed, useTemplateRef } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
 import { useElementBounding, useElementSize } from '@vueuse/core'
 
 /**
@@ -17,9 +17,15 @@ import { useElementBounding, useElementSize } from '@vueuse/core'
  *   plano promete: um HTML pré-renderizado com 18 cartas deixa 133 páginas de
  *   Kanto sem nenhuma referência apontando para elas.
  *
- * A troca é feita pelo `<ClientOnly>` da página, e não por um `onMounted` daqui:
- * o fallback dele não é hidratado, então o cliente monta a versão virtual do
- * zero em vez de reconciliar 151 cartas contra 18 e reclamar de divergência.
+ * A troca é feita pelo `<ClientOnly>` da página, e não por um `onMounted` daqui,
+ * porque é o `ClientOnly` que garante que o HTML servido e o primeiro render do
+ * cliente sejam o mesmo — a forma completa nos dois.
+ *
+ * **Isso não evita a hidratação da forma completa, evita a divergência.** O
+ * `ClientOnly` mostra o fallback enquanto `mounted` é `false`, e ele só vira
+ * `true` no `onMounted`: no primeiro render do cliente, que é a hidratação, quem
+ * está montado é a forma completa. As 151 cartas são hidratadas e descartadas um
+ * tick depois. É o preço dos 151 links no HTML, e ele é real.
  */
 const props = withDefaults(defineProps<{
   species: readonly SpeciesEntry[]
@@ -75,11 +81,39 @@ const virtualizer = useWindowVirtualizer({
   get count() {
     return rowCount.value
   },
+  // Na forma completa o virtualizador não decide nada, e `enabled: false`
+  // curto-circuita `getMeasurements` antes de ele medir 26 fileiras que ninguém
+  // vai ler. A instância continua existindo — o `useWindowVirtualizer` não é
+  // condicional —, mas para de trabalhar.
+  get enabled() {
+    return props.virtualize
+  },
   estimateSize: () => rowHeight.value,
   overscan: 3,
   get scrollMargin() {
     return scrollMargin.value
   },
+})
+
+/**
+ * `estimateSize` não invalida a medição sozinho.
+ *
+ * O memo de `getMeasurements` tem por chave
+ * `[{count, paddingStart, scrollMargin, getItemKey, enabled, lanes, laneAssignmentMode, gap}, itemSizeCacheVersion]`
+ * — e `estimateSize` não está nela. Como não há `measureElement`, o
+ * `itemSizeCache` fica vazio e **todo** tamanho sai do `estimateSize`
+ * memoizado.
+ *
+ * Passa despercebido enquanto a largura muda junto com o número de colunas,
+ * porque aí `count` muda e a chave vira outra. O caso que quebra é o
+ * redimensionamento que mantém as colunas e o topo do grid: de 900px para
+ * 1000px continuam 6 colunas, o `scrollMargin` não se mexe, e `rowHeight` sobe
+ * ~7% — as fileiras ficam posicionadas pela altura antiga, sobrepondo ou
+ * abrindo buraco. `measure()` limpa o cache e incrementa a versão, que é o
+ * outro lado da chave.
+ */
+watch(rowHeight, () => {
+  virtualizer.value.measure()
 })
 
 const rows = computed(() => virtualizer.value.getVirtualItems())

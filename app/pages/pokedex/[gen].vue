@@ -4,7 +4,7 @@ import type { Rarity } from '~~/shared/types/game'
 import { computed, ref } from 'vue'
 import { rarityOf } from '~~/shared/game/rarity'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
-import { toRegions } from '~/composables/useRegions'
+import { dexRange, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
 
 /**
@@ -18,7 +18,7 @@ import { useDex } from '~/composables/useDex'
  * progresso que ninguém pode mover.
  */
 const route = useRoute()
-const { loadGeneration, loadCore } = useDex()
+const { loadGeneration, loadCore, seedGeneration } = useDex()
 
 /**
  * A geração vem da URL, então é texto até prova em contrário.
@@ -45,7 +45,10 @@ const { data, error } = await useAsyncData(
     const [core, dexGeneration] = await Promise.all([loadCore(), loadGeneration(target)])
     const region = toRegions(core.generations).find(candidate => candidate.generation === target) ?? null
 
-    return { region, species: dexGeneration.species }
+    // `dexGeneration` inteiro, e não só `species`: é ele que o `seedGeneration`
+    // devolve ao cache na hidratação, e reconstruí-lo a partir das partes
+    // inventaria os campos que não viajaram.
+    return { region, dexGeneration }
   },
   { watch: [generation] },
 )
@@ -61,7 +64,22 @@ if (error.value) {
 }
 
 const region = computed(() => data.value?.region ?? null)
-const species = computed(() => data.value?.species ?? [])
+const species = computed(() => data.value?.dexGeneration.species ?? [])
+
+/**
+ * O que o payload trouxe entra no cache do `useDex()`.
+ *
+ * Na hidratação o handler do `useAsyncData` não roda — o resultado vem
+ * serializado —, então sem esta linha o cliente fica com a geração no payload e
+ * o cache de módulo vazio, duas cópias que não se falam. `watchEffect` e não
+ * `onMounted` porque a geração muda sem remontar a página ao navegar entre
+ * regiões.
+ */
+watchEffect(() => {
+  const target = generation.value
+  const loaded = data.value
+  if (target !== null && loaded != null) seedGeneration(target, loaded.dexGeneration)
+})
 
 /**
  * O filtro é estado local, e não da URL.
@@ -150,9 +168,17 @@ useSeoMeta({
     <div class="mx-auto w-full max-w-6xl px-6 pb-16 pt-6">
       <!--
         O servidor renderiza o grid inteiro e o cliente monta a versão
-        virtualizada por cima. O fallback do `ClientOnly` não é hidratado, então
-        não há 151 cartas a reconciliar contra 18 — e o HTML pré-renderizado sai
-        com um link para cada uma das páginas de detalhe, que é onde o SEO mora.
+        virtualizada por cima. O que isso compra é o HTML pré-renderizado saindo
+        com um link para cada página de detalhe, que é onde o SEO mora — um HTML
+        com as 18 cartas visíveis deixaria 133 espécies de Kanto sem nenhuma
+        referência apontando para elas.
+
+        **E ele custa uma hidratação inteira.** O `ClientOnly` renderiza o
+        fallback enquanto `mounted` é `false`, e `mounted` só vira `true` no
+        `onMounted` — ou seja, no primeiro render do cliente, que é a hidratação,
+        quem está na tela é o fallback. As 151 cartas são instanciadas e
+        hidratadas, e descartadas um tick depois. A troca é essa: uma hidratação
+        de 151 cartas em troca de 151 links no HTML. Vale, mas não é de graça.
       -->
       <ClientOnly>
         <DexGrid
