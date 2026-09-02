@@ -3,6 +3,7 @@ import type { SpeciesEntry } from '~~/shared/types/dex'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { computed, useTemplateRef, watch } from 'vue'
 import { useElementBounding, useElementSize } from '@vueuse/core'
+import { SPECIES_COUNT } from '~~/shared/types/brand'
 
 /**
  * O grid de espécies — o mesmo desenho nas duas formas em que ele existe.
@@ -30,7 +31,10 @@ import { useElementBounding, useElementSize } from '@vueuse/core'
 const props = withDefaults(defineProps<{
   species: readonly SpeciesEntry[]
   virtualize?: boolean
-}>(), { virtualize: false })
+  /** `#0001–0151`, para o rodapé. A faixa é da região e o grid não a conhece —
+   *  quem a calcula é a página, que sabe qual região está aberta. */
+  range?: string
+}>(), { virtualize: false, range: '' })
 
 /** Largura mínima de uma carta. Abaixo disso o nome quebra em duas linhas. */
 const MIN_CARD_WIDTH = 132
@@ -128,6 +132,39 @@ const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(${columns.value}, minmax(0, 1fr))`,
   gap: `${GAP}px`,
 }))
+
+/**
+ * Quantas cartas estão de fato no DOM — o número que a prancha estampa no
+ * rodapé (`18 de 151 renderizados`).
+ *
+ * Sai da soma das fileiras visíveis, e não de `rows.length * columns`: a última
+ * fileira quase nunca está cheia, e multiplicar contaria cartas que não existem.
+ * Na forma completa são todas, que é justamente o que o rodapé precisa dizer —
+ * ali não há virtualização nenhuma para anunciar.
+ */
+const rendered = computed(() => {
+  if (!props.virtualize) return props.species.length
+  return rows.value.reduce((total, row) => total + rowSpecies(row.index).length, 0)
+})
+
+/** A fração desenhada, que é o que a barra do rodapé mostra. */
+const renderedPercent = computed(() => {
+  if (props.species.length === 0) return 0
+  return (rendered.value / props.species.length) * 100
+})
+
+/**
+ * A frase do rodapé, montada aqui e não no template.
+ *
+ * A ressalva sobre virtualização é parte da mesma sentença, e um `<template
+ * v-if>` no meio de um parágrafo obriga a quebrar linha no HTML — o que insere
+ * espaço em branco antes do `·`. Uma string resolve os dois.
+ */
+const renderedLabel = computed(() => {
+  const counted = `${rendered.value} de ${props.species.length} renderizados`
+  if (!props.virtualize) return counted
+  return `${counted} · scroll virtualizado — o DOM nunca segura as ${SPECIES_COUNT}`
+})
 </script>
 
 <template>
@@ -166,5 +203,102 @@ const gridStyle = computed(() => ({
         />
       </div>
     </div>
+
+    <!--
+      O rodapé da prancha *Pokédex*, que a Fase 3 não tinha reproduzido.
+
+      Ele existe porque a virtualização é invisível por definição: sem esta
+      linha, um grid que segura 18 cartas e um que segura 151 são a mesma tela, e
+      a promessa central da fase — *o DOM nunca segura as 1025* — fica sem
+      nenhuma evidência para quem está olhando.
+
+      A segunda frase da prancha continua com a Fase 5: ela fala do anel vazado
+      que marca a espécie não possuída, e o anel não existe enquanto não existir
+      coleção. Fica aqui a metade que já é verdade.
+    -->
+    <footer
+      v-if="species.length > 0"
+      class="grid-footer"
+    >
+      <p class="numeric grid-footer__count">
+        {{ renderedLabel }}
+        <span class="grid-footer__note">A Pokédex é referência: mostra tudo, possuídas ou não.</span>
+      </p>
+
+      <div class="grid-footer__extent">
+        <!-- A barra é indicador de extensão, não de progresso: ela mede o que
+             está desenhado, não o que foi capturado. A prancha a pinta com o
+             verde de progresso de coleção, que não tem token no sistema — usá-lo
+             aqui gastaria o significado da Fase 5 num medidor que não fala de
+             coleção. `--accent` é o semântico que sobra, e o valor da prancha
+             está na seção de divergências do README.
+
+             `aria-hidden` porque o número ao lado já diz a mesma coisa em texto,
+             e um `progressbar` anunciando "12%" sem rótulo é ruído. -->
+        <span
+          class="grid-footer__bar"
+          aria-hidden="true"
+        >
+          <span
+            class="grid-footer__fill"
+            :style="{ width: `${renderedPercent}%` }"
+          />
+        </span>
+        <span
+          v-if="range !== ''"
+          class="numeric grid-footer__range"
+        >{{ range }}</span>
+      </div>
+    </footer>
   </div>
 </template>
+
+<style scoped>
+.grid-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.grid-footer__count {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.grid-footer__note {
+  display: block;
+  color: var(--text-faint);
+}
+
+.grid-footer__extent {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.grid-footer__bar {
+  display: block;
+  width: 150px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.grid-footer__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.grid-footer__range {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+</style>

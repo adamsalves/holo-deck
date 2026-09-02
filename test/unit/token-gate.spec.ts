@@ -12,7 +12,7 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
  * escreve um hex ou um `bg-ink-850` transforma a mesma troca num commit de
  * refatoração, e o sistema já vazou no momento em que ele foi escrito.
  *
- * As 17 pranchas do canvas usam hex inline porque são mockup, e é justamente
+ * As pranchas do canvas usam hex inline porque são mockup, e é justamente
  * essa a via de contágio: copiar da prancha para o componente copia o hex junto.
  * Um teste é a única coisa que percebe isso antes do review.
  *

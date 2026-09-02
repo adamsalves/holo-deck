@@ -122,8 +122,15 @@ const weight = computed(() => (species.value === null ? '' : `${(species.value.w
 /**
  * Sem `value` de propósito: com chaves explícitas o `UTabs` nasce sem nenhuma
  * aba marcada — os três painéis saem `data-state="inactive"` e a coluna abre
- * vazia. Sem elas ele numera por índice e seleciona a primeira, que é o
- * comportamento que a prancha desenha (*Sobre* aberta).
+ * vazia. Sem elas ele numera por índice e seleciona a primeira, que é *Sobre*.
+ *
+ * **Abrir em *Sobre* é decisão, e a prancha foi corrigida para ela.** A versão
+ * aprovada do canvas marcava *Stats* na barra e, abaixo, desenhava os quatro
+ * blocos ao mesmo tempo — as duas coisas juntas descrevem uma coluna sem abas,
+ * não abas com uma delas ativa. A varredura de 02/09 levantou a contradição e o
+ * usuário escolheu manter as abas de verdade abrindo em *Sobre*: é a leitura
+ * que a página herda da carta, onde o primeiro que se lê é a descrição. A
+ * prancha passou a desenhar só o conteúdo dela.
  */
 const tabs = [
   { label: 'Sobre', slot: 'about' as const },
@@ -306,11 +313,18 @@ useSeoMeta({
 
             <div class="about__facts">
               <dl class="facts">
+                <!-- O habitat é o único dos três que é nome e não número, e a
+                     prancha o distingue com cor. A cor que ela usa é o verde de
+                     planta — hue sem papel no sistema, e um componente não cita
+                     primitivo. `--accent` é o semântico que existe para "este
+                     valor se destaca", e é o mesmo azul que a trilha e o foco já
+                     usam nesta página. A troca está na seção de divergências do
+                     README, com o valor exato. -->
                 <div class="facts__row">
                   <dt class="numeric">
                     Habitat
                   </dt>
-                  <dd class="numeric">
+                  <dd class="numeric facts__habitat">
                     {{ species.habitat === null ? '—' : species.habitat.replace('-', ' ') }}
                   </dd>
                 </div>
@@ -392,6 +406,12 @@ useSeoMeta({
   padding: 26px 32px 40px;
   background: linear-gradient(168deg, color-mix(in oklab, var(--type) 10%, var(--surface-sunken)), var(--bg));
   border-bottom: 1px solid var(--border);
+
+  /* A coluna é o contêiner de medida da marca-d'água abaixo. Sem isto ela não
+     tem largura a que se referir: a página não tem `max-width`, então a coluna
+     é 5/12 do viewport acima de 900px e 100% abaixo — dois valores que só uma
+     query de contêiner alcança sem repetir o corte em `vw`. */
+  container-type: inline-size;
 }
 
 @media (min-width: 900px) {
@@ -412,16 +432,35 @@ useSeoMeta({
   background: radial-gradient(circle, color-mix(in oklab, var(--type) 26%, transparent), transparent 66%);
 }
 
-/* O número gigante ao fundo, como a prancha o desenha: identidade, não leitura.
-   Fica fora da árvore de acessibilidade — o número real está logo abaixo. */
+/**
+ * O número gigante ao fundo — identidade, não leitura. Fica fora da árvore de
+ * acessibilidade: o número real está logo abaixo.
+ *
+ * **Reposicionado para o que a prancha desenha.** Ela põe `0006` a 230px na
+ * margem esquerda da coluna (`left:-30px`), atravessando a arte, em branco a
+ * 2,8%. O código o tinha à direita, no topo, a 150px e na cor do tipo a 12% — do
+ * outro lado da coluna, num terço do tamanho e visível demais para o papel que
+ * a anotação lhe dá.
+ *
+ * Os 46cqw são a conta que reproduz a proporção. Quatro dígitos de mono ocupam
+ * ~2,4em, menos o que o `letter-spacing` negativo tira; a prancha põe 230px numa
+ * coluna de 560, e 230/560 é 41%. O número aqui é 46 e não 41 porque `cqw` mede
+ * a **caixa de conteúdo** do contêiner, não a borda: a coluna tem 64px de
+ * padding lateral, e 41% da largura cheia é 46% do que sobra. O teto de 230px é
+ * o valor da prancha, que a coluna alcança exatamente na largura dela.
+ *
+ * O branco a 3% vem de `--text`, e não de um `rgba` cru: é o papel que o sistema
+ * tem para "quase branco", e o portão de token não admite hex aqui.
+ */
 .hero__watermark {
   position: absolute;
-  right: -10px;
-  top: -18px;
-  font-size: 150px;
+  left: -5%;
+  top: 20%;
+  font-size: min(46cqw, 230px);
   font-weight: 700;
   line-height: 1;
-  color: color-mix(in oklab, var(--type) 12%, transparent);
+  letter-spacing: -0.04em;
+  color: color-mix(in oklab, var(--text) 3%, transparent);
   pointer-events: none;
 }
 
@@ -509,9 +548,13 @@ useSeoMeta({
   color: var(--text-muted);
 }
 
+/* 20px, que é a escala da prancha. O peso continua 700 e não 800: o canvas usa
+   800 em rótulo, mas `@nuxt/fonts` só baixa 400 e 700 da JetBrains Mono, e um
+   800 pedido sem face real vira negrito sintético. A decisão é do
+   `nuxt.config.ts`, e vale para toda a interface. */
 .hero__facts dd {
   margin-top: 5px;
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text);
 }
@@ -614,6 +657,12 @@ useSeoMeta({
   font-weight: 700;
   color: var(--text);
   text-transform: uppercase;
+}
+
+/* `.facts__row dd` é (0,1,1) e venceria uma classe solta — daí o elemento no
+   seletor, que empata a especificidade e deixa a ordem decidir. */
+.facts__row dd.facts__habitat {
+  color: var(--accent);
 }
 
 .facts__max {

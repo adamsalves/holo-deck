@@ -33,7 +33,7 @@
    *
    * A escada é monotônica de propósito, e os degraus fora da grade de dez estão
    * aqui por dois motivos que não se confundem. `880`, `850`, `450` e `350` são
-   * valores que as 17 pranchas usam: sem token, alguém escreve o hex na mão.
+   * valores que as pranchas do canvas usam: sem token, alguém escreve o hex na mão.
    *
    * `325` não aparece em prancha nenhuma. Ele é divergência consciente, como o
    * raio e o `mix-blend-mode`, e entrou porque a matriz de contraste pediu um
@@ -341,7 +341,7 @@
    *
    * O plano mapeava `--text-muted` em `ink-400` (3.34) e `--text-faint` em
    * `ink-500` (1.94) — dois papéis de texto apoiados em degraus que não
-   * sustentam texto. `#5C6484` aparece 280 vezes como texto nas 17 pranchas e
+   * sustentam texto. `#5C6484` aparece 280 vezes como texto nas pranchas e
    * reprova o AA; `ink-500` sobre `ink-950` é praticamente invisível.
    *
    * **O erro seguinte foi medir contra o fundo errado.** A primeira versão desta
@@ -364,7 +364,7 @@
    * O azul de acento — link, foco, seleção, aba ativa.
    *
    * Ele vale exatamente o mesmo que `--color-type-water` e que
-   * `--color-rarity-rare`, e isso não é acidente nem economia: as 17 pranchas
+   * `--color-rarity-rare`, e isso não é acidente nem economia: as pranchas
    * declaram `a { color:#4FA8FF }` no cabeçalho de todas, e é o mesmo azul que
    * elas dão ao tipo água e à moldura rara. O que justifica o terceiro nome é o
    * papel — quem escreve um link não está falando de água nem de raridade, e no
