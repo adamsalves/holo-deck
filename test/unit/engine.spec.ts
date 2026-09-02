@@ -205,6 +205,30 @@ describe('ordem do turno', () => {
     expect(primeiro(applyAction(comPrioridade, { kind: 'move', slot: 0 }, context).events)).toBe('player')
   })
 
+  it('um golpe de 75% de acurácia erra perto de um quarto das vezes', () => {
+    // Sem esta rolagem os 75% do Iron Tail seriam decoração, e a IA estaria
+    // otimizando dano esperado contra uma regra que não existe.
+    const ironTail = context.moves.get(231)
+    if (ironTail === undefined) throw new Error('iron-tail fora do catálogo')
+    expect(ironTail.accuracy).toBe(75)
+
+    const base = comAtivo(
+      startBattle({ gymId: gym(1), seed: 0, team: DECK }, context),
+      'player',
+      pokemon => ({ ...pokemon, slots: [{ move: ironTail, pp: 999 }, ...pokemon.slots.slice(1)] }),
+    )
+
+    const rodadas = 2000
+    let erros = 0
+    for (let seed = 0; seed < rodadas; seed++) {
+      const { events } = applyAction({ ...base, seed, rng: seed }, { kind: 'move', slot: 0 }, context)
+      if (events.some(event => event.kind === 'miss' && event.side === 'player')) erros += 1
+    }
+
+    expect(erros / rodadas).toBeGreaterThan(0.22)
+    expect(erros / rodadas).toBeLessThan(0.28)
+  })
+
   it('empate de Speed sorteia pela seed, e o sorteio é estável', () => {
     // É a regra real, e é o que mantém a batalha reproduzível: sem ela, empate
     // de Speed precisaria de um critério fixo, e um dos dois lados sempre

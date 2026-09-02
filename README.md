@@ -4,8 +4,9 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 3 — a Pokédex. Packs, coleção, deck
-> e batalha entram a partir da Fase 4. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da Fase 4 — a Pokédex e o motor de batalha,
+> ainda sem tela. Packs, coleção e deck entram a partir da Fase 5, e a tela da
+> batalha na Fase 6. O README completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -328,6 +329,70 @@ A raridade (`shared/game/rarity.ts`) e a matriz de tipos
 aqui, porque a Pokédex as exibe e nenhuma das duas depende de coleção. Os
 limiares saem do percentil sobre as 1025, não do chute: com os originais do plano
 a distribuição saía invertida, com *raro* virando o maior tier do jogo.
+
+## Motor de batalha
+
+Tudo em [`shared/game/`](shared/game/), TypeScript puro, sem uma linha de Vue —
+o que faz a suíte do motor rodar sem montar componente nenhum. É a Fase 4, e a
+tela que a consome é a Fase 6.
+
+| Módulo | O que decide |
+| --- | --- |
+| `rng.ts` | mulberry32 com seed; estado e seed são o mesmo uint32 |
+| `stats.ts` | base stat → stat de Lv50 (IV 31, EV 0, natureza neutra) |
+| `damage.ts` | a fórmula da geração V, com a ordem de modificadores fixa |
+| `status.ts` | paralisia, queimadura, envenenamento e sono — uma por vez |
+| `moveset.ts` | quais 4 dos 8 guardados entram em campo |
+| `gyms.ts` | os nove líderes e a regra que monta o time de cada um |
+| `ai.ts` | a decisão do líder: gulosa, com ruído que cai a cada ginásio |
+| `battle.ts` | estado, ação, evento e `ENGINE_VERSION` |
+| `engine.ts` | a máquina de estados, o log de ações e o replay |
+
+**O motor é puro e o `shared/` inteiro é vigiado por
+[`test/unit/shared-purity.spec.ts`](test/unit/shared-purity.spec.ts)**: só
+import relativo, só para dentro de `shared/`, sempre com `.ts` explícito, e nada
+de `Math.random`, `Date.now` ou `performance.now`. As três primeiras regras
+existem porque `shared/` viaja para o bundle do cliente **e** para o Node puro
+do `yarn data:build`; a última existe porque a batalha é salva como seed mais
+lista de ações e reconstruída por replay — um sorteio fora do gerador com seed
+não derruba nada, só faz o mesmo log produzir outra luta amanhã.
+
+Seis coisas que o motor decide e que não dá para deduzir lendo o código:
+
+- **A ordem dos modificadores de dano é fixa: crítico, aleatório, STAB,
+  efetividade.** `floor` não comuta, e trocar a ordem muda o número na tela. Com
+  o Pikachu e o Noctowl da prancha da Batalha, esta ordem produz de 62 a 74 de
+  Thunderbolt, e os **68** que a prancha estampa saem do rolo 92.
+- **A ordem de consumo do RNG é o contrato de `ENGINE_VERSION`**: decisão da IA,
+  desempate de Speed (só quando empatam), e por golpe — impedimento, acerto,
+  crítico, aleatório de dano, chance da condição, turnos de sono. O fim de turno
+  não rola nada. Uma rolagem a mais, a menos ou em outra ordem muda toda batalha
+  já gravada, e o certo é subir a versão: um log de versão anterior é
+  **recusado**, nunca reproduzido torto.
+- **As rolagens de crítico e de aleatório acontecem mesmo contra imunidade.**
+  Sair antes economizaria dois números e faria o consumo do fluxo depender do
+  tipo do defensor — o que transforma um `×0` no meio da luta em divergência de
+  replay.
+- **O `BattleLog` guarda o time.** O plano descrevia `{ gymId, seed,
+  engineVersion, ações[] }`; sem os seis ids, o replay dependeria do deck ativo
+  na hora de retomar, e trocar uma carta no meio de um ginásio faria o mesmo log
+  produzir outra luta em silêncio.
+- **Struggle não tem PP e não recebe STAB.** A PokeAPI lhe dá `pp: 1` por
+  resíduo do dado de primeira geração, e ele é sem tipo nos jogos enquanto o
+  catálogo o guarda como `normal`. Sem as duas exceções, as dez espécies que só
+  o têm atacariam uma vez por batalha — e ganhariam 50% de bônus para isso.
+- **O líder usa o golpe de status uma vez, e só com o alvo limpo.** A escolha
+  gulosa nunca o pegaria: dano esperado zero perde de qualquer ataque, e a vaga
+  que o pipeline reserva no moveset seria peso morto na mão dos nove. As faixas
+  de comportamento são cumulativas pela mesma razão — um líder do nono ginásio
+  que não usasse poção seria mais fraco que um do quarto.
+
+Os times dos nove saem da regra (mesmo tipo, mesma geração, sob o teto de BST, os
+N de maior BST, ace por último) e não de uma lista curada, o que os impede de
+divergir do dex em silêncio. **A prancha *Liga* desenha Onix como ace do Brock e
+a *Batalha* usa Noctowl como ativo do Falkner; a regra dá Graveler como ace e não
+inclui Noctowl.** As duas artes são ilustrativas: composição de time é regra de
+jogo, e o canvas é a especificação visual.
 
 ## Hooks de git
 

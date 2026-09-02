@@ -49,9 +49,13 @@ test('o grid virtualiza depois de montar — o DOM não segura as 151', async ({
   await page.goto('/pokedex/1')
   await expect(page.getByRole('link', { name: /^Bulbasaur,/ })).toBeVisible()
 
-  const noDom = await page.locator('a.dex-card').count()
-  expect(noDom).toBeGreaterThan(0)
-  expect(noDom).toBeLessThan(151)
+  // A troca de forma acontece no `onMounted`, e contar antes dela mede a
+  // velocidade da máquina em vez do virtualizador — com a suíte rodando em
+  // paralelo, a contagem pega as 151 do HTML servido e o teste reprova sem que
+  // nada esteja errado. `poll` espera a forma virtualizada aparecer, e continua
+  // reprovando se ela nunca aparecer.
+  await expect.poll(() => page.locator('a.dex-card').count()).toBeLessThan(151)
+  expect(await page.locator('a.dex-card').count()).toBeGreaterThan(0)
 
   // Rolar troca quem está no DOM sem trocar quantos.
   await page.evaluate(() => window.scrollTo(0, 3000))
@@ -117,18 +121,26 @@ test('a espécie mostra stats, relações de dano e a linha evolutiva', async ({
   // `unmount-on-hide` desligado os três ficam no DOM ao mesmo tempo, e um
   // `getByText('BST 534')` solto casa também a carta do Charizard na linha
   // evolutiva. É a mesma decisão que põe o conteúdo das três abas no HTML.
-  await page.getByRole('tab', { name: 'Stats' }).click()
   const stats = page.getByRole('tabpanel', { name: 'Stats' })
 
-  await expect(stats.getByText('BST 534')).toBeVisible()
+  // O clique só tem efeito depois da hidratação: antes dela ele cai no HTML
+  // servido, onde a aba é marcação e não componente. `toPass` repete o par
+  // clique + asserção em vez de apostar que a hidratação chegou primeiro — que
+  // é uma aposta que se perde quando a máquina está ocupada.
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Stats' }).click()
+    await expect(stats.getByText('BST 534')).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
   await expect(stats.getByText('Recebe mais dano')).toBeVisible()
   await expect(stats.getByText('×4', { exact: true })).toBeVisible()
   await expect(stats.getByText('×0', { exact: true })).toBeVisible()
 
-  await page.getByRole('tab', { name: 'Evolução' }).click()
   const evolution = page.getByRole('tabpanel', { name: 'Evolução' })
 
-  await expect(evolution.getByRole('link', { name: /Charmander/ })).toBeVisible()
+  await expect(async () => {
+    await page.getByRole('tab', { name: 'Evolução' }).click()
+    await expect(evolution.getByRole('link', { name: /Charmander/ })).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
   await expect(evolution.getByText('Nível 16')).toBeVisible()
 })
 
