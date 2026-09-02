@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { SpeciesId } from '~~/shared/types/brand'
 import { isGymId } from '~~/shared/types/brand'
 import type { MoveEntry, SpeciesEntry } from '~~/shared/types/dex'
+import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
 import type { BattleAction, BattleContext, BattleLog, BattleState } from '~~/shared/game/battle'
-import { activeOf, ENGINE_VERSION, POTION_HEAL_FRACTION } from '~~/shared/game/battle'
+import { activeOf, ENGINE_VERSION, isBattleLog, POTION_HEAL_FRACTION } from '~~/shared/game/battle'
 import { applyAction, replay, startBattle, switchOptions } from '~~/shared/game/engine'
 import { readAllSpecies, readCore, readGeneration } from '../support/generated-dex'
 
@@ -39,21 +40,51 @@ function gym(number: number) {
   return number
 }
 
-/** Joga a batalha inteira sempre com o primeiro golpe, e devolve as ações. */
-function playThrough(seed: number, gymNumber = 1): { state: BattleState, actions: BattleAction[] } {
+/**
+ * As duas políticas de jogador que os testes usam, e a diferença entre elas
+ * importa.
+ *
+ * `seca` insiste no primeiro golpe até o PP acabar — é ela que leva a batalha ao
+ * estado em que Struggle é a única saída, que é a precondição do travamento que
+ * o teste de terminação existe para pegar. `variada` troca uma vez e gasta a
+ * poção, exercitando as três formas de ação para o replay.
+ *
+ * **Escrever as duas foi consequência de plantar a regressão:** com a política
+ * variada, o defeito do Struggle sem tipo não reproduzia, e o portão teria
+ * nascido passando.
+ */
+type Policy = 'seca' | 'variada'
+
+function chooseTestAction(state: BattleState, policy: Policy): BattleAction {
+  const bench = switchOptions(state)
+  if (state.expecting === 'playerSwitch') return { kind: 'switch', index: bench[0] ?? 0 }
+  if (policy === 'seca') return { kind: 'move', slot: 0 }
+
+  const active = activeOf(state.player)
+  if (state.player.potionsLeft > 0 && active.hp < active.maxHp * 0.3) return { kind: 'item' }
+  if (state.turn === 3 && bench.length > 0) return { kind: 'switch', index: bench[0] ?? 0 }
+  return { kind: 'move', slot: 0 }
+}
+
+function playThrough(
+  seed: number,
+  gymNumber: number,
+  policy: Policy = 'variada',
+): { state: BattleState, actions: BattleAction[] } {
   let state = startBattle({ gymId: gym(gymNumber), seed, team: DECK }, context)
   const actions: BattleAction[] = []
 
   for (let guard = 0; guard < 400 && state.outcome === 'ongoing'; guard++) {
-    const action: BattleAction = state.expecting === 'playerSwitch'
-      ? { kind: 'switch', index: switchOptions(state)[0] ?? 0 }
-      : { kind: 'move', slot: 0 }
+    const action = chooseTestAction(state, policy)
     actions.push(action)
     state = applyAction(state, action, context).state
   }
 
   return { state, actions }
 }
+
+/** Os nove, para os testes que precisam varrer a Liga inteira. */
+const GYMS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 describe('startBattle', () => {
   it('monta os dois times, com HP e PP cheios', () => {
@@ -92,33 +123,71 @@ describe('startBattle', () => {
 
 describe('determinismo', () => {
   it('a mesma seed com as mesmas ações reproduz a batalha idêntica', () => {
-    const uma = playThrough(4242)
-    const outra = playThrough(4242)
+    const uma = playThrough(4242, 1)
+    const outra = playThrough(4242, 1)
 
     expect(JSON.stringify(outra.state)).toBe(JSON.stringify(uma.state))
     expect(outra.actions).toEqual(uma.actions)
   })
 
   it('seeds diferentes produzem batalhas diferentes', () => {
-    const uma = playThrough(1)
-    const outra = playThrough(2)
+    const uma = playThrough(1, 1)
+    const outra = playThrough(2, 1)
 
     expect(JSON.stringify(outra.state)).not.toBe(JSON.stringify(uma.state))
   })
 
-  it('a batalha termina, e com um lado de pé', () => {
-    // Se o motor travar — PP zerado sem Struggle, faint sem troca —, é aqui que
-    // aparece: o laço tem teto e o estado ficaria em `ongoing`.
-    for (const seed of [1, 7, 99, 1234, 65_535]) {
-      const { state } = playThrough(seed)
-      expect(['won', 'lost'], `seed ${seed}`).toContain(state.outcome)
+  it('a batalha termina nos NOVE ginásios, e com um lado de pé', () => {
+    // Este teste já existia e rodava só no ginásio 1 — faixa A, três Pokémon,
+    // sem poção e sem troca por matchup, que é a única configuração em que os
+    // dois travamentos que ele existia para pegar não podiam acontecer.
+    //
+    // O que ele deixou passar: Struggle é `normal` no catálogo e `normal → ghost`
+    // é zero, então dois lados sem PP contra a Ryme trocavam golpes de dano nulo
+    // para sempre; e a troca da faixa C alternava entre dois Pokémon sem nunca
+    // atacar. Os dois só aparecem no fim da Liga.
+    for (const gymNumber of GYMS) {
+      for (const seed of [1, 7, 22, 33, 99, 1234, 65_535]) {
+        for (const policy of ['seca', 'variada'] as const) {
+          const { state } = playThrough(seed, gymNumber, policy)
+          expect(['won', 'lost'], `ginásio ${gymNumber}, seed ${seed}, política ${policy}`)
+            .toContain(state.outcome)
+        }
+      }
+    }
+  })
+
+  it('o líder não troca em laço — a faixa C só sai para um abrigo de verdade', () => {
+    // Sem o filtro de destino, o líder do nono ginásio trocava 113 vezes por
+    // batalha (contra 3 nas faixas de baixo) e a dificuldade caía do sétimo ao
+    // nono, porque ele gastava o turno trocando em vez de atacar.
+    for (const gymNumber of [7, 8, 9]) {
+      for (const seed of [1, 22, 33]) {
+        let state = startBattle({ gymId: gym(gymNumber), seed, team: DECK }, context)
+        let trocas = 0
+
+        for (let guard = 0; guard < 400 && state.outcome === 'ongoing'; guard++) {
+          const action: BattleAction = state.expecting === 'playerSwitch'
+            ? { kind: 'switch', index: switchOptions(state)[0] ?? 0 }
+            : { kind: 'move', slot: 0 }
+          const turn = applyAction(state, action, context)
+          trocas += turn.events.filter(event => event.kind === 'switch' && event.side === 'opponent').length
+          state = turn.state
+        }
+
+        // O teto tem folga dos dois lados, e os dois números são medidos: com a
+        // correção, o máximo nestes nove pares é **9** (5 trocas forçadas pelos
+        // desmaios de um time de 6, mais as poucas de matchup); sem ela, o pior
+        // par passa de 34 e a média do Ginásio 9 vai a 113.
+        expect(trocas, `ginásio ${gymNumber}, seed ${seed}`).toBeLessThan(20)
+      }
     }
   })
 })
 
 describe('replay', () => {
   it('reconstrói o estado final a partir do log', () => {
-    const { state, actions } = playThrough(2024)
+    const { state, actions } = playThrough(2024, 6)
     const log: BattleLog = {
       gymId: state.gymId,
       seed: state.seed,
@@ -131,15 +200,33 @@ describe('replay', () => {
   })
 
   it('reconstrói também o meio da luta, turno a turno', () => {
-    // É o caso real: fechar a aba no turno 4 e voltar.
-    const { actions } = playThrough(77)
+    // É o caso real: fechar a aba no turno 4 e voltar. No ginásio 9, que é onde
+    // a IA troca e a batalha é mais longa.
+    const { actions } = playThrough(77, 9)
     const parcial = actions.slice(0, 4)
-    const log: BattleLog = { gymId: 1, seed: 77, engineVersion: ENGINE_VERSION, team: DECK, actions: parcial }
+    const log: BattleLog = { gymId: 9, seed: 77, engineVersion: ENGINE_VERSION, team: DECK, actions: parcial }
 
-    let esperado = startBattle({ gymId: gym(1), seed: 77, team: DECK }, context)
+    let esperado = startBattle({ gymId: gym(9), seed: 77, team: DECK }, context)
     for (const action of parcial) esperado = applyAction(esperado, action, context).state
 
     expect(JSON.stringify(replay(log, context))).toBe(JSON.stringify(esperado))
+  })
+
+  it('reproduz as três formas de ação, e não só o golpe', () => {
+    // Sem isto o replay estaria provado sobre um log que nunca carregou `item`
+    // nem troca voluntária — que são justamente as ações com retorno antecipado
+    // antes da rolagem de ruído da IA.
+    const { state, actions } = playThrough(2024, 6)
+    const formas = new Set(actions.map(action => action.kind))
+
+    expect(formas).toEqual(new Set(['move', 'switch', 'item']))
+    expect(JSON.stringify(replay({
+      gymId: state.gymId,
+      seed: state.seed,
+      engineVersion: ENGINE_VERSION,
+      team: DECK,
+      actions,
+    }, context))).toBe(JSON.stringify(state))
   })
 
   it('recusa log de outra versão do motor em vez de reproduzir torto', () => {
@@ -248,6 +335,51 @@ describe('ordem do turno', () => {
   })
 })
 
+describe('isBattleLog — a fronteira do save', () => {
+  // `Record<string, unknown>` e não `unknown`: os casos abaixo espalham o log
+  // válido e trocam um campo, e `unknown` não é espalhável — a fixture precisa
+  // ser um objeto de verdade, mesmo que o guarda receba `unknown`.
+  function logValido(): Record<string, unknown> {
+    return { gymId: 1, seed: 7, engineVersion: ENGINE_VERSION, team: [...DECK], actions: [{ kind: 'move', slot: 0 }] }
+  }
+
+  it('aceita o log que o motor produz', () => {
+    expect(isBattleLog(logValido())).toBe(true)
+  })
+
+  it('recusa o que volta de um JSON.parse qualquer', () => {
+    // É a fronteira que o `eslint.config.mjs` nomeia: round-trip de
+    // localStorage. Sem guarda, o objeto chega ao motor e o erro aparece dez
+    // turnos adiante, dentro de `applyAction`.
+    expect(isBattleLog(null)).toBe(false)
+    expect(isBattleLog('{}')).toBe(false)
+    expect(isBattleLog([])).toBe(false)
+    expect(isBattleLog({})).toBe(false)
+  })
+
+  it('recusa ginásio fora da Liga e time vazio', () => {
+    expect(isBattleLog({ ...logValido(), gymId: 0 })).toBe(false)
+    expect(isBattleLog({ ...logValido(), gymId: 10 })).toBe(false)
+    expect(isBattleLog({ ...logValido(), team: [] })).toBe(false)
+    expect(isBattleLog({ ...logValido(), team: [0] })).toBe(false)
+  })
+
+  it('recusa ação de kind desconhecido', () => {
+    // Sem isto, ela atravessava até o `assertNever` do motor — que agora existe,
+    // mas o certo é a forma ser recusada na porta.
+    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'fly', slot: 0 }] })).toBe(false)
+    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'move' }] })).toBe(false)
+    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'switch', index: -1 }] })).toBe(false)
+    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'item' }] })).toBe(true)
+  })
+
+  it('não julga a versão do motor — quem decide isso é o replay', () => {
+    // Log de versão anterior é bem-formado; o que fazer com a batalha perdida é
+    // decisão de quem sabe o contexto.
+    expect(isBattleLog({ ...logValido(), engineVersion: ENGINE_VERSION - 1 })).toBe(true)
+  })
+})
+
 describe('regras do turno', () => {
   it('quem perdeu o ativo escolhe quem entra, e o turno não anda até isso', () => {
     let state = startBattle({ gymId: gym(1), seed: 5, team: DECK }, context)
@@ -267,13 +399,16 @@ describe('regras do turno', () => {
       turnos += 1
     }
 
-    if (state.expecting === 'playerSwitch') {
-      const antes = state.turn
-      const depois = applyAction(state, { kind: 'switch', index: switchOptions(state)[0] ?? 1 }, context).state
-      expect(depois.turn).toBe(antes)
-      expect(depois.expecting).toBe('action')
-      expect(activeOf(depois.player).hp).toBeGreaterThan(0)
-    }
+    // A asserção precisa vir **antes** do uso: envolvida num `if`, ela deixaria o
+    // teste passar sem verificar nada no dia em que o laço acima parasse por
+    // outro motivo.
+    expect(state.expecting).toBe('playerSwitch')
+
+    const antes = state.turn
+    const depois = applyAction(state, { kind: 'switch', index: switchOptions(state)[0] ?? 1 }, context).state
+    expect(depois.turn).toBe(antes)
+    expect(depois.expecting).toBe('action')
+    expect(activeOf(depois.player).hp).toBeGreaterThan(0)
   })
 
   it('só aceita troca enquanto espera troca', () => {
@@ -328,7 +463,7 @@ describe('regras do turno', () => {
     let state = startBattle({ gymId: gym(1), seed: 3, team: DECK }, context)
     const ppInicial = activeOf(state.player).slots[0]?.pp ?? 0
 
-    const { state: depois, events } = applyAction(state, { kind: 'move', slot: 0 }, context)
+    const { state: depois } = applyAction(state, { kind: 'move', slot: 0 }, context)
     const gastou = activeOf(depois.player).slots[0]?.pp ?? 0
     expect(gastou).toBe(ppInicial - 1)
 
@@ -344,13 +479,76 @@ describe('regras do turno', () => {
       },
     }
     const semPp = applyAction(state, { kind: 'move', slot: 0 }, context)
-    const usados = semPp.events.filter(event => event.kind === 'hit' || event.kind === 'miss')
-    expect(usados.length).toBeGreaterThan(0)
-    expect(events.length).toBeGreaterThan(0)
+
+    // O teste dizia "cai em Struggle" e conferia só que **algum** evento saiu —
+    // o que passaria igual se o motor tivesse usado outro golpe. O id está no
+    // evento; é ele que prova a queda. `flatMap` em vez de `filter` porque é
+    // dentro dele que o `kind` estreita a união e `moveId` passa a existir.
+    const golpesDoJogador = semPp.events.flatMap(event =>
+      (event.kind === 'hit' || event.kind === 'miss' || event.kind === 'no-effect')
+      && event.side === 'player'
+        ? [event.moveId]
+        : [])
+
+    expect(golpesDoJogador).toEqual([STRUGGLE_MOVE_ID])
+  })
+
+  it('condição respeita imunidade de tipo — Thunder Wave não paralisa Terrestre', () => {
+    // O golpe de dano já parava no ×0 da fórmula; o de status não passa por ela.
+    // Com a regra "status primeiro" da IA, sem esta checagem o líder abria a luta
+    // aplicando a condição justamente em quem era imune.
+    const thunderWave = context.moves.get(86)
+    if (thunderWave === undefined) throw new Error('thunder-wave fora do catálogo')
+    expect(thunderWave.damageClass).toBe('status')
+
+    let state = startBattle({ gymId: gym(1), seed: 4, team: DECK }, context)
+    const terrestre = readGeneration(1).species.find(entry => entry.slug === 'onix')
+    if (terrestre === undefined) throw new Error('onix sumiu do dex')
+
+    state = {
+      ...state,
+      player: {
+        ...state.player,
+        team: state.player.team.map((pokemon, index) =>
+          (index === 0 ? { ...pokemon, slots: [{ move: thunderWave, pp: 20 }] } : pokemon)),
+      },
+      opponent: {
+        ...state.opponent,
+        team: state.opponent.team.map((pokemon, index) =>
+          (index === state.opponent.active ? { ...pokemon, types: terrestre.types } : pokemon)),
+      },
+    }
+    expect(activeOf(state.opponent).types).toContain('ground')
+
+    const { state: depois, events } = applyAction(state, { kind: 'move', slot: 0 }, context)
+
+    expect(events.some(event => event.kind === 'ailment')).toBe(false)
+    expect(events.some(event => event.kind === 'no-effect' && event.side === 'player')).toBe(true)
+    expect(activeOf(depois.opponent).condition).toBeNull()
+  })
+
+  it('o Struggle do slot não gasta PP', () => {
+    // As nove espécies que só o têm o carregam com o `pp: 1` da PokeAPI. Sem a
+    // exceção, o primeiro uso o zerava e a tela desenharia `Struggle 0/1`.
+    let state = startBattle({ gymId: gym(1), seed: 8, team: DECK }, context)
+    const struggle = context.moves.get(STRUGGLE_MOVE_ID)
+    if (struggle === undefined) throw new Error('Struggle fora do catálogo')
+
+    state = {
+      ...state,
+      player: {
+        ...state.player,
+        team: state.player.team.map((pokemon, index) =>
+          (index === 0 ? { ...pokemon, slots: [{ move: struggle, pp: 1 }] } : pokemon)),
+      },
+    }
+
+    const { state: depois } = applyAction(state, { kind: 'move', slot: 0 }, context)
+    expect(activeOf(depois.player).slots[0]?.pp).toBe(1)
   })
 
   it('a batalha acabada não aceita mais ação', () => {
-    const { state } = playThrough(9)
+    const { state } = playThrough(9, 1)
     expect(() => applyAction(state, { kind: 'move', slot: 0 }, context)).toThrow(/já acabou/)
   })
 })

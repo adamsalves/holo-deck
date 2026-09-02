@@ -357,7 +357,7 @@ do `yarn data:build`; a última existe porque a batalha é salva como seed mais
 lista de ações e reconstruída por replay — um sorteio fora do gerador com seed
 não derruba nada, só faz o mesmo log produzir outra luta amanhã.
 
-Seis coisas que o motor decide e que não dá para deduzir lendo o código:
+Oito coisas que o motor decide e que não dá para deduzir lendo o código:
 
 - **A ordem dos modificadores de dano é fixa: crítico, aleatório, STAB,
   efetividade.** `floor` não comuta, e trocar a ordem muda o número na tela. Com
@@ -377,15 +377,29 @@ Seis coisas que o motor decide e que não dá para deduzir lendo o código:
   engineVersion, ações[] }`; sem os seis ids, o replay dependeria do deck ativo
   na hora de retomar, e trocar uma carta no meio de um ginásio faria o mesmo log
   produzir outra luta em silêncio.
-- **Struggle não tem PP e não recebe STAB.** A PokeAPI lhe dá `pp: 1` por
-  resíduo do dado de primeira geração, e ele é sem tipo nos jogos enquanto o
-  catálogo o guarda como `normal`. Sem as duas exceções, as dez espécies que só
-  o têm atacariam uma vez por batalha — e ganhariam 50% de bônus para isso.
-- **O líder usa o golpe de status uma vez, e só com o alvo limpo.** A escolha
-  gulosa nunca o pegaria: dano esperado zero perde de qualquer ataque, e a vaga
-  que o pipeline reserva no moveset seria peso morto na mão dos nove. As faixas
-  de comportamento são cumulativas pela mesma razão — um líder do nono ginásio
-  que não usasse poção seria mais fraco que um do quarto.
+- **Struggle é sem tipo e sem PP — três exceções, não duas.** A PokeAPI lhe dá
+  `pp: 1` por resíduo do dado de primeira geração, e o catálogo o guarda como
+  `normal` porque é assim que ela o entrega. Sem elas, as nove espécies que só o
+  têm atacariam uma vez por batalha, ganhariam 50% de bônus para isso e — a que
+  custou mais caro — **não conseguiriam encostar num Fantasma**: `normal → ghost`
+  é zero, e dois lados sem PP numa luta de Fantasma trocavam golpes de dano nulo
+  sem a batalha terminar nunca. É por isso que o teste de terminação varre os
+  nove ginásios, e não só o primeiro.
+- **A troca da faixa C só acontece para um abrigo de verdade.** O líder foge de
+  uma matchup de ×2, mas apenas para quem não está na mesma: sem esse filtro ele
+  trocava por trocar, 113 vezes por batalha no nono ginásio, e a dificuldade
+  **caía** do sétimo ao nono porque ele gastava o turno trocando em vez de
+  atacar.
+- **Condição respeita imunidade de tipo.** Thunder Wave não paralisa Terrestre e
+  Toxic não envenena Aço. O golpe de dano já parava no `×0` da fórmula; o de
+  status não passa por ela e precisa da checagem própria.
+- **O líder usa o golpe de status enquanto o alvo estiver limpo**, e para quando
+  a condição pega. A escolha gulosa nunca o pegaria: dano esperado zero perde de
+  qualquer ataque, e a vaga que o pipeline reserva no moveset seria peso morto na
+  mão dos nove. Não é "uma vez por batalha" — se Thunder Wave errar, ele tenta de
+  novo. As faixas de comportamento são cumulativas pela mesma razão que a regra
+  existe: um líder do nono ginásio que não usasse poção seria mais fraco que um
+  do quarto.
 
 Os times dos nove saem da regra (mesmo tipo, mesma geração, sob o teto de BST, os
 N de maior BST, ace por último) e não de uma lista curada, o que os impede de

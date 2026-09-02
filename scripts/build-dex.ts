@@ -35,7 +35,7 @@ import type {
   GenerationMeta,
   IndexData,
   MoveEntry,
-  SpeciesEntry,
+  SpeciesEntry, AilmentName,
 } from '../shared/types/dex.ts'
 import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
 import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
@@ -699,9 +699,14 @@ function printReport(input: ReportInput): number {
       // Sem esta checagem, uma mudança no `meta` da PokeAPI — ou um filtro que
       // aperte demais — produz um dex bem-formado em que nenhum golpe aplica
       // condição, e o motor perde as quatro sem uma linha de erro.
-      `o catálogo cobre as ${AILMENT_NAMES.length} condições`,
-      AILMENT_NAMES.every(kind => core.moves.some(move => move.ailment?.kind === kind)),
-      AILMENT_NAMES.filter(kind => !core.moves.some(move => move.ailment?.kind === kind)).join(', '),
+      //
+      // Ela exige **golpe de status**, e não qualquer golpe com condição: com o
+      // critério frouxo, um filtro que apagasse os dez golpes de status ainda
+      // passaria, porque Relic Song sozinha cobre o sono como efeito secundário.
+      // O que a Fase 4 decidiu foi trazer os golpes de status; é isso que se mede.
+      `o catálogo cobre as ${AILMENT_NAMES.length} condições com golpe de status`,
+      AILMENT_NAMES.every(kind => coversAilment(core, kind)),
+      AILMENT_NAMES.filter(kind => !coversAilment(core, kind)).join(', '),
     ],
   ]
 
@@ -744,6 +749,11 @@ function printReport(input: ReportInput): number {
   }
 
   return failed
+}
+
+/** Se alguma entrada de status do catálogo aplica a condição. */
+function coversAilment(core: CoreData, kind: AilmentName): boolean {
+  return core.moves.some(move => move.damageClass === 'status' && move.ailment?.kind === kind)
 }
 
 function describeChain(chains: ChainsData, rootSlug: string): string {

@@ -11,6 +11,7 @@ import {
   AILMENT_NAMES,
   GENERATION_COUNT,
   MOVES_PER_SPECIES,
+  STRUGGLE_MOVE_ID,
   TYPE_COUNT,
   TYPE_NAMES,
 } from '../../shared/types/dex.ts'
@@ -134,7 +135,12 @@ export const coreSchema: z.ZodType<CoreData> = z.object({
   // defeito que passa despercebido e produz dano errado numa batalha só.
   types: z.array(typeName).length(TYPE_COUNT),
   effectiveness: z.array(z.array(effectiveness).length(TYPE_COUNT)).length(TYPE_COUNT),
-  moves: z.array(moveEntry).min(1),
+  // O `.refine` é a paridade com o guarda de leitura: quem grava um catálogo sem
+  // Struggle está gravando um dex em que a primeira carta sem PP trava a luta.
+  moves: z.array(moveEntry).min(1).refine(
+    list => list.some(move => move.id === STRUGGLE_MOVE_ID),
+    { message: 'catálogo sem Struggle — o motor fica sem golpe de reserva' },
+  ),
   generations: z.array(generationMeta).length(GENERATION_COUNT),
 })
 

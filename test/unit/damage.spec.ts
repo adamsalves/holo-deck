@@ -3,6 +3,7 @@ import type { CoreData, DamagingMoveEntry } from '~~/shared/types/dex'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
 import type { Combatant } from '~~/shared/game/damage'
 import { averageDamage, hasStab, rollDamage } from '~~/shared/game/damage'
+import { effectivenessAgainst } from '~~/shared/game/typechart'
 import { createRng } from '~~/shared/game/rng'
 import { toBattleStats } from '~~/shared/game/stats'
 import { readCore, readGeneration } from '../support/generated-dex'
@@ -88,6 +89,25 @@ describe('rollDamage', () => {
     expect(rattata.types).toContain('normal')
     expect(hasStab(rattata, struggle)).toBe(false)
     expect(hasStab(rattata, moveBySlug('quick-attack'))).toBe(true)
+  })
+
+  it('Struggle é sem tipo: tira HP até de Fantasma', () => {
+    // `normal → ghost` é zero na matriz, e o catálogo guarda Struggle como
+    // `normal` porque é assim que a PokeAPI o entrega. Lendo a matriz, os dez
+    // Pokémon que só têm Struggle não conseguiam encostar num Fantasma — e dois
+    // lados sem PP numa luta de Fantasma trocavam golpes de dano nulo para
+    // sempre, com a batalha sem terminar nunca.
+    const struggle = core.moves.find(move => move.id === STRUGGLE_MOVE_ID)
+    if (struggle === undefined || struggle.damageClass === 'status') throw new Error('Struggle sumiu do catálogo')
+
+    expect(struggle.type).toBe('normal')
+    expect(effectivenessAgainst(matrix, 'normal', ['ghost'])).toBe(0)
+
+    const gengar = combatant(1, 'gengar')
+    const roll = rollDamage(combatant(1, 'snorlax'), gengar, struggle, matrix, createRng(1))
+
+    expect(roll.effectiveness).toBe(1)
+    expect(roll.damage).toBeGreaterThan(0)
   })
 
   it('o crítico multiplica o dano do mesmo golpe', () => {

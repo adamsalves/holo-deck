@@ -79,8 +79,8 @@ export const MOVES_IN_BATTLE = 4
 /**
  * Id de Struggle, o golpe que os jogos usam quando não há nenhum utilizável.
  *
- * Ele é dado do dex — dez espécies o levam como moveset inteiro — e regra de
- * motor ao mesmo tempo, e é por isso que o id precisa estar em `shared/`: o
+ * Ele é dado do dex — nove espécies o levam como moveset inteiro, e uma décima,
+ * Pyukumuku, o leva ao lado de Toxic — e regra de motor ao mesmo tempo, e é por isso que o id precisa estar em `shared/`: o
  * build o grava e a batalha o reconhece, e um número repetido nos dois lugares
  * é como eles deixam de ser o mesmo golpe.
  *
@@ -412,6 +412,11 @@ export function isCoreData(value: unknown): value is CoreData {
 
   // Catálogo vazio não é "core sem golpes", é core que não terminou de gravar.
   if (!isArray(moves) || moves.length === 0 || !moves.every(isMoveEntry)) return false
+
+  // Struggle é o golpe de reserva do motor, e sem ele a primeira carta que fica
+  // sem PP derruba a batalha. É a mesma classe do `moveIds: []`: forma certa,
+  // deploy parcial, e o defeito aparece a dez turnos de distância da causa.
+  if (!moves.some(move => isRecord(move) && move.id === STRUGGLE_MOVE_ID)) return false
 
   // `.length(9)` no schema: uma geração a menos deixa o grid sem uma aba, e é o
   // tipo de perda que ninguém nota sem contar.

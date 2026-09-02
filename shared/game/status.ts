@@ -108,8 +108,8 @@ export function checkImpediment(condition: Condition | null, rng: RngCursor): Im
   if (condition === null) return { acts: true, condition }
 
   if (condition.kind === 'sleep') {
-    const restantes = condition.turns - 1
-    return { acts: false, condition: restantes > 0 ? { kind: 'sleep', turns: restantes } : null }
+    const remaining = condition.turns - 1
+    return { acts: false, condition: remaining > 0 ? { kind: 'sleep', turns: remaining } : null }
   }
 
   if (condition.kind === 'paralysis') {

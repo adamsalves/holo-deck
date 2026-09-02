@@ -3,7 +3,6 @@ import type { MoveEntry, SpeciesEntry } from '~~/shared/types/dex'
 import type { BattlePokemon, BattleSide } from '~~/shared/game/battle'
 import { activeOf, POTIONS_PER_SIDE, toBattlePokemon } from '~~/shared/game/battle'
 import {
-  bandOf,
   chooseAiAction,
   chooseAiSwitch,
   expectedTurnDamage,
@@ -11,6 +10,7 @@ import {
   switchesOnBadMatchup,
   usesPotion,
 } from '~~/shared/game/ai'
+import { bandOf } from '~~/shared/game/gyms'
 import { resolveMoves, selectBattleMoves } from '~~/shared/game/moveset'
 import { createRng } from '~~/shared/game/rng'
 import { readAllSpecies, readCore } from '../support/generated-dex'
@@ -172,6 +172,17 @@ describe('troca', () => {
 
     const action = chooseAiAction(9, lider, foe, core.effectiveness, createRng(1))
     expect(action).toEqual({ kind: 'switch', index: 1 })
+  })
+
+  it('não troca quando o banco inteiro está na mesma enrascada', () => {
+    // É o laço que o review achou: `chooseAiSwitch` escolhe por dano de saída e
+    // não olhava a matchup de destino, então com o time todo ameaçado o líder
+    // alternava entre dois Pokémon para sempre, sem nunca atacar — 113 trocas
+    // por batalha no Ginásio 9 contra 3 nas faixas de baixo.
+    const lider = side(['onix', 'geodude'])
+    const foe = pokemon('blastoise')
+
+    expect(chooseAiAction(9, lider, foe, core.effectiveness, createRng(1)).kind).toBe('move')
   })
 
   it('a faixa A aguenta o desaforo', () => {

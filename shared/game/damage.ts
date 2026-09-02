@@ -71,16 +71,34 @@ function baseDamage(attacker: Combatant, defender: Combatant, move: DamagingMove
 }
 
 /**
- * Se o golpe casa com um dos tipos de quem o usa.
+ * **Struggle é sem tipo**, e o catálogo o guarda como `normal` só porque é assim
+ * que a PokeAPI o entrega.
  *
- * **Struggle nunca casa.** Ele é sem tipo nos jogos e o catálogo o guarda como
- * `normal` porque a PokeAPI assim o entrega; sem esta exceção, um Pokémon normal
- * sem nenhum golpe utilizável ganharia 50% de bônus justamente na situação que
- * deveria ser a pior possível.
+ * As duas consequências disso são de sinais opostos e ambas obrigatórias. Sem a
+ * primeira, um Pokémon normal sem golpe utilizável ganharia 50% de bônus na pior
+ * situação possível. Sem a segunda — e foi este o defeito — `normal → ghost` é
+ * **zero**: dois lados sem PP numa luta de Fantasma ficavam trocando golpes de
+ * dano nulo, e a batalha não terminava nunca. Sem recuo e sem teto de turnos, o
+ * único jeito de o motor sair de lá é Struggle sempre tirar HP.
  */
+function isTypeless(move: DamagingMoveEntry): boolean {
+  return move.id === STRUGGLE_MOVE_ID
+}
+
+/** Se o golpe casa com um dos tipos de quem o usa. */
 export function hasStab(attacker: Combatant, move: DamagingMoveEntry): boolean {
-  if (move.id === STRUGGLE_MOVE_ID) return false
+  if (isTypeless(move)) return false
   return attacker.types.some(type => type === move.type)
+}
+
+/** O multiplicador de tipo do golpe — neutro para quem não tem tipo. */
+export function effectivenessOf(
+  move: DamagingMoveEntry,
+  defender: Combatant,
+  matrix: CoreData['effectiveness'],
+): number {
+  if (isTypeless(move)) return 1
+  return effectivenessAgainst(matrix, move.type, defender.types)
 }
 
 /**
@@ -100,7 +118,7 @@ export function rollDamage(
 ): DamageRoll {
   const critical = rng.chance(CRIT_CHANCE)
   const randomPercent = rng.int(RANDOM_MIN_PERCENT, RANDOM_MAX_PERCENT)
-  const effectiveness = effectivenessAgainst(matrix, move.type, defender.types)
+  const effectiveness = effectivenessOf(move, defender, matrix)
 
   if (effectiveness === 0) return { damage: 0, effectiveness, critical: false }
 
@@ -129,7 +147,7 @@ export function averageDamage(
   move: DamagingMoveEntry,
   matrix: CoreData['effectiveness'],
 ): number {
-  const effectiveness = effectivenessAgainst(matrix, move.type, defender.types)
+  const effectiveness = effectivenessOf(move, defender, matrix)
   if (effectiveness === 0) return 0
 
   const stab = hasStab(attacker, move) ? STAB_MULTIPLIER : 1

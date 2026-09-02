@@ -1,4 +1,5 @@
 import type { MoveId, SpeciesId } from '../types/brand.ts'
+import { isGymId, isSpeciesId } from '../types/brand.ts'
 import type { CoreData, MoveEntry, SpeciesEntry, TypeName } from '../types/dex.ts'
 import type { Combatant } from './damage.ts'
 import type { RngState } from './rng.ts'
@@ -139,6 +140,53 @@ export interface BattleLog {
   readonly engineVersion: number
   readonly team: readonly SpeciesId[]
   readonly actions: readonly BattleAction[]
+}
+
+/**
+ * O guarda de leitura do save.
+ *
+ * Ele existe pela mesma razão que os guardas de `shared/types/dex.ts`: o
+ * `BattleLog` volta de um `JSON.parse` do `localStorage`, que é a fronteira que
+ * o próprio `eslint.config.mjs` nomeia como a porta por onde `any` entra. Sem
+ * ele, a Fase 6 passaria um objeto qualquer para `replay` e o erro apareceria
+ * dez turnos adiante, dentro do motor.
+ *
+ * A checagem de `engineVersion` **não** está aqui de propósito: log de versão
+ * anterior é bem-formado, e recusá-lo é decisão do `replay`, que sabe dizer o
+ * que fazer com a batalha perdida. Este guarda responde só "isto tem a forma de
+ * um log".
+ */
+export function isBattleLog(value: unknown): value is BattleLog {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const log: Record<string, unknown> = { ...value }
+
+  if (!Number.isInteger(log.gymId) || typeof log.gymId !== 'number' || !isGymId(log.gymId)) return false
+  if (typeof log.seed !== 'number' || !Number.isFinite(log.seed)) return false
+  if (!Number.isInteger(log.engineVersion)) return false
+
+  if (!Array.isArray(log.team) || log.team.length === 0) return false
+  if (!log.team.every(id => typeof id === 'number' && isSpeciesId(id))) return false
+
+  if (!Array.isArray(log.actions)) return false
+  return log.actions.every(isBattleAction)
+}
+
+/**
+ * Uma ação, na forma exata que o motor executa.
+ *
+ * `index` e `slot` são checados como inteiros não negativos e nada além: quem
+ * conhece o time e o moveset é o motor, e ele já recusa alto o índice que não
+ * existe. O que este guarda impede é o `kind` desconhecido, que sem ele
+ * atravessaria até o `assertNever` do motor.
+ */
+export function isBattleAction(value: unknown): value is BattleAction {
+  if (typeof value !== 'object' || value === null) return false
+  const action: Record<string, unknown> = { ...value }
+  const slot = (field: unknown): boolean => Number.isInteger(field) && typeof field === 'number' && field >= 0
+
+  if (action.kind === 'move') return slot(action.slot)
+  if (action.kind === 'switch') return slot(action.index)
+  return action.kind === 'item'
 }
 
 /**

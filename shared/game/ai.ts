@@ -3,6 +3,7 @@ import type { CoreData, DamagingMoveEntry } from '../types/dex.ts'
 import type { BattleAction, BattlePokemon, BattleSide, BattleSlot } from './battle.ts'
 import { activeOf, benchIndexes, isFainted, toCombatant } from './battle.ts'
 import { averageDamage } from './damage.ts'
+import { bandOf } from './gyms.ts'
 import type { RngCursor } from './rng.ts'
 import { effectivenessAgainst } from './typechart.ts'
 
@@ -27,14 +28,6 @@ import { effectivenessAgainst } from './typechart.ts'
 /** Ruído: 40% no ginásio 1, 0% no 9, linear entre os dois. */
 export function noiseChance(gym: number): number {
   return 0.40 * (GYM_COUNT - gym) / (GYM_COUNT - 1)
-}
-
-export type AiBand = 'A' | 'B' | 'C'
-
-export function bandOf(gym: number): AiBand {
-  if (gym <= 3) return 'A'
-  if (gym <= 6) return 'B'
-  return 'C'
 }
 
 /** A poção entra na faixa B e fica. */
@@ -100,13 +93,17 @@ function worstIncoming(self: BattlePokemon, foe: BattlePokemon, matrix: CoreData
  * rolagem. A troca forçada acontece **depois** de um desmaio, e um sorteio ali
  * gastaria uma rolagem que o replay teria de reproduzir sem que ela decidisse
  * nada interessante.
+ *
+ * `options` existe porque as duas trocas querem coisas diferentes: a forçada
+ * aceita qualquer um que esteja de pé, e a voluntária da faixa C só aceita quem
+ * não está na mesma matchup ruim que fez o líder querer sair.
  */
 export function chooseAiSwitch(
   self: BattleSide,
   foe: BattlePokemon,
   matrix: CoreData['effectiveness'],
+  options: readonly number[] = benchIndexes(self),
 ): number | null {
-  const options = benchIndexes(self)
   if (options.length === 0) return null
 
   let best = options[0] ?? null
@@ -134,8 +131,12 @@ export function chooseAiSwitch(
  *
  * **A regra do golpe de status existe porque a escolha gulosa nunca o pegaria:**
  * dano esperado zero perde de qualquer ataque. Sem ela, a vaga que o pipeline
- * reserva no moveset seria peso morto na mão dos nove líderes. Ele é usado uma
- * vez, quando o alvo está limpo, e depois o líder volta a ser guloso.
+ * reserva no moveset seria peso morto na mão dos nove líderes.
+ *
+ * A condição é **o alvo estar limpo**, não "uma vez por batalha": se o golpe
+ * errar — Thunder Wave acerta 90% —, o líder tenta de novo no turno seguinte, e
+ * para assim que a condição pega, porque aí o alvo deixa de estar limpo. O PP é
+ * o outro teto. Dizer "usa uma vez" seria descrever um contador que não existe.
  */
 export function chooseAiAction(
   gym: number,
@@ -147,7 +148,22 @@ export function chooseAiAction(
   const active = activeOf(self)
 
   if (switchesOnBadMatchup(gym) && worstIncoming(active, foe, matrix) >= BAD_MATCHUP_EFFECTIVENESS) {
-    const target = chooseAiSwitch(self, foe, matrix)
+    // **Só troca para quem não está na mesma enrascada.** Sem este filtro o
+    // líder trocava por trocar: `chooseAiSwitch` escolhe por dano de saída e não
+    // olhava a matchup de destino, então num time inteiro ameaçado ele alternava
+    // entre dois Pokémon para sempre — medido em 113 trocas por batalha no
+    // Ginásio 9, contra 3 nas faixas de baixo, e a dificuldade **caía** do
+    // sétimo ao nono porque ele passava o turno trocando em vez de atacar.
+    //
+    // Com o filtro, a troca só acontece quando existe abrigo de verdade — e o
+    // ativo que entra não dispara a regra de novo no turno seguinte, que é o que
+    // fecha o laço.
+    const shelter = benchIndexes(self).filter((index) => {
+      const candidate = self.team[index]
+      return candidate !== undefined
+        && worstIncoming(candidate, foe, matrix) < BAD_MATCHUP_EFFECTIVENESS
+    })
+    const target = chooseAiSwitch(self, foe, matrix, shelter)
     if (target !== null) return { kind: 'switch', index: target }
   }
 
@@ -170,8 +186,8 @@ export function chooseAiAction(
   // A rolagem de ruído acontece **sempre** que há ataque a escolher, mesmo com
   // `p = 0` no nono ginásio: fazer o consumo do fluxo depender do ginásio
   // significaria que a mesma seed produz lutas diferentes conforme o adversário.
-  const aleatorio = rng.chance(noiseChance(gym))
-  if (aleatorio) {
+  const noisy = rng.chance(noiseChance(gym))
+  if (noisy) {
     const [first, ...rest] = attacks
     if (first === undefined) return { kind: 'move', slot: 0 }
     return { kind: 'move', slot: rng.pick([first, ...rest]).index }

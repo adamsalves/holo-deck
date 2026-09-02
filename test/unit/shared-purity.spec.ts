@@ -59,12 +59,19 @@ const sources = walkFiles(join(REPO_ROOT, SCANNED), SKIP, hasExtension(['.ts']))
     code: stripComments(readFileSync(join(REPO_ROOT, file), 'utf8')),
   }))
 
-function specifiersOf(code: string): string[] {
-  return [...code.matchAll(SPECIFIER)].map(match => match[1] ?? match[2] ?? match[3] ?? '')
-}
-
-function lineOf(code: string, needle: string): number {
-  return code.slice(0, code.indexOf(needle)).split('\n').length
+/**
+ * Os specifiers do arquivo, **com a linha de cada um**.
+ *
+ * A versão anterior procurava a linha com `indexOf` na hora de montar a
+ * mensagem, então dois imports do mesmo módulo apontavam os dois para a
+ * primeira linha. O índice do `matchAll` já sabe a posição certa; usá-lo custa
+ * a mesma coisa e não mente.
+ */
+function specifiersOf(code: string): { specifier: string, line: number }[] {
+  return [...code.matchAll(SPECIFIER)].map(match => ({
+    specifier: match[1] ?? match[2] ?? match[3] ?? '',
+    line: code.slice(0, match.index).split('\n').length,
+  }))
 }
 
 describe('pureza de shared/', () => {
@@ -78,12 +85,12 @@ describe('pureza de shared/', () => {
   it('não importa nada de fora de shared/', () => {
     const fora = sources.flatMap(({ file, code }) =>
       specifiersOf(code)
-        .filter((specifier) => {
+        .filter(({ specifier }) => {
           if (!specifier.startsWith('.')) return true
           const alvo = relative(join(REPO_ROOT, SCANNED), resolve(dirname(join(REPO_ROOT, file)), specifier))
           return alvo.startsWith('..') || alvo.startsWith(`..${sep}`)
         })
-        .map(specifier => `${file}:${lineOf(code, specifier)} → ${specifier}`),
+        .map(({ specifier, line }) => `${file}:${line} → ${specifier}`),
     )
 
     expect(
@@ -95,8 +102,8 @@ describe('pureza de shared/', () => {
   it('todo import relativo carrega a extensão .ts', () => {
     const semExtensao = sources.flatMap(({ file, code }) =>
       specifiersOf(code)
-        .filter(specifier => specifier.startsWith('.') && !specifier.endsWith('.ts'))
-        .map(specifier => `${file}:${lineOf(code, specifier)} → ${specifier}`),
+        .filter(({ specifier }) => specifier.startsWith('.') && !specifier.endsWith('.ts'))
+        .map(({ specifier, line }) => `${file}:${line} → ${specifier}`),
     )
 
     expect(

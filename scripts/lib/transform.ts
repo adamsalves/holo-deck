@@ -220,8 +220,12 @@ export function toTypes(pokemon: Pokemon): readonly [TypeName] | readonly [TypeN
  * motor não têm outra origem, e a prancha da Batalha desenha Thunder Wave no
  * quarto slot do Pikachu. Agora entram também os golpes de status **das quatro
  * condições modeladas** — e só eles. Congelamento, confusão, armadilha, silêncio
- * e todo golpe de status sem condição continuam fora: carregá-los custaria os
- * ~40 KB que a Fase 1 economizou, e o motor não saberia o que fazer com eles.
+ * e todo golpe de status sem condição continuam fora: o motor não saberia o que
+ * fazer com eles.
+ *
+ * O custo ficou muito abaixo do que a Fase 1 temia ao estimar ~40 KB: como o
+ * catálogo guarda só os golpes que alguma espécie referencia, `core.json` foi de
+ * 55.895 para 58.634 bytes — **2,7 KB** pelas quatro condições inteiras.
  */
 export function toMoveEntry(move: Move): MoveEntry | null {
   if (move.pp === null) return null

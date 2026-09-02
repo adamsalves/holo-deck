@@ -56,13 +56,27 @@ export interface GymLeader extends LeaderProfile {
 }
 
 /**
- * Tamanho do time e teto de BST, por faixa de três ginásios. A curva é de
- * dificuldade: mais Pokémon e mais fortes conforme a Liga avança.
+ * As três faixas da Liga, de três ginásios cada.
+ *
+ * Ela mora aqui, e não em `ai.ts`, porque a faixa é conceito da Liga: ela decide
+ * ao mesmo tempo o tamanho do time, o teto de BST e o comportamento do líder. O
+ * corte 3/6 estava escrito nos dois módulos, e duas cópias do mesmo corte é como
+ * eles deixam de concordar sem ninguém mudar nada.
  */
-function bandOf(gym: GymId): { teamSize: number, bstCap: number } {
-  if (gym <= 3) return { teamSize: 3, bstCap: 480 }
-  if (gym <= 6) return { teamSize: 4, bstCap: 540 }
-  return { teamSize: 6, bstCap: 600 }
+export type GymBand = 'A' | 'B' | 'C'
+
+export function bandOf(gym: number): GymBand {
+  if (gym <= 3) return 'A'
+  if (gym <= 6) return 'B'
+  return 'C'
+}
+
+/** Time e teto por faixa. A curva é de dificuldade: mais Pokémon e mais fortes
+ * conforme a Liga avança. */
+const BAND_RULES: Record<GymBand, { teamSize: number, bstCap: number }> = {
+  A: { teamSize: 3, bstCap: 480 },
+  B: { teamSize: 4, bstCap: 540 },
+  C: { teamSize: 6, bstCap: 600 },
 }
 
 /**
@@ -75,7 +89,7 @@ export const GYM_LEADERS: readonly GymLeader[] = PROFILES.map((profile, index) =
   if (!isGymId(gym)) {
     throw new Error(`ginásio ${gym} fora da faixa 1..${GYM_COUNT} — a lista de líderes cresceu sozinha`)
   }
-  return { ...profile, gym, generation: gym, ...bandOf(gym) }
+  return { ...profile, gym, generation: gym, ...BAND_RULES[bandOf(gym)] }
 })
 
 export function gymLeader(gym: GymId): GymLeader {

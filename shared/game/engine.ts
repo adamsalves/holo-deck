@@ -2,6 +2,7 @@ import type { SpeciesId } from '../types/brand.ts'
 import { isGymId } from '../types/brand.ts'
 import type { DamagingMoveEntry, MoveEntry } from '../types/dex.ts'
 import { STRUGGLE_MOVE_ID } from '../types/dex.ts'
+import { assertNever } from '../types/exhaustive.ts'
 import { chooseAiAction, chooseAiSwitch } from './ai.ts'
 import type {
   BattleAction,
@@ -30,6 +31,7 @@ import { resolveMoves, selectBattleMoves } from './moveset.ts'
 import type { RngCursor } from './rng.ts'
 import { createRng } from './rng.ts'
 import { checkImpediment, createCondition, effectiveSpeed, residualDamage } from './status.ts'
+import { effectivenessAgainst } from './typechart.ts'
 
 /**
  * A máquina de estados da batalha.
@@ -44,12 +46,16 @@ import { checkImpediment, createCondition, effectiveSpeed, residualDamage } from
  *
  * 1. a decisão da IA (ruído e, se ele pegar, o sorteio do golpe);
  * 2. o desempate de Speed, e só quando os dois são iguais;
- * 3. por golpe, na ordem do turno: impedimento (só a paralisia rola), acerto
- *    (pulado quando a acurácia é nula, que é "nunca erra"), crítico, aleatório
- *    de dano e, por fim, a chance da condição;
- * 4. os turnos de sono, quando a condição aplicada é sono.
+ * 3. por golpe, na ordem do turno: impedimento (só a paralisia rola) e acerto
+ *    (pulado quando a acurácia é nula, que é "nunca erra");
+ * 4. só em golpe de dano, crítico e aleatório — os dois **sempre**, inclusive
+ *    contra imunidade, que é o que impede o `×0` de mudar o fluxo;
+ * 5. a chance da condição, quando o golpe carrega uma, o alvo está limpo e não é
+ *    imune ao tipo — e, se a condição aplicada for sono, os turnos dele.
  *
- * O fim de turno não rola nada.
+ * O fim de turno não rola nada. Um golpe de status pula o passo 4 inteiro, e um
+ * golpe de dano contra alvo imune para antes do 5 — os dois são determinísticos
+ * porque dependem só do estado, que o replay reconstrói igual.
  */
 
 /** O que o motor devolve: o estado seguinte e o que aconteceu para a tela narrar. */
@@ -145,7 +151,13 @@ function moveFromSlot(
   context: BattleContext,
 ): { readonly move: MoveEntry, readonly spends: boolean } {
   const chosen = pokemon.slots[slot]
-  if (chosen !== undefined && chosen.pp > 0) return { move: chosen.move, spends: true }
+  if (chosen !== undefined && chosen.pp > 0) {
+    // Struggle **no slot** também não gasta: as nove espécies que só o têm o
+    // carregam como golpe de verdade, com o `pp: 1` que a PokeAPI entrega, e sem
+    // esta linha o primeiro uso o zerava — a tela desenharia `Struggle 0/1` e o
+    // comentário acima seria mentira na metade dos casos que ele descreve.
+    return { move: chosen.move, spends: chosen.move.id !== STRUGGLE_MOVE_ID }
+  }
 
   const struggle = context.moves.get(STRUGGLE_MOVE_ID)
   if (struggle === undefined) throw new Error('Struggle fora do catálogo — sem golpe de reserva')
@@ -233,7 +245,7 @@ function resolveMove(
     next = withSide(next, defender, withActive(defenderSide, hurt(target, roll.damage)))
   }
 
-  return applyAilment(next, attacker, move, rng, events)
+  return applyAilment(next, attacker, move, context, rng, events)
 }
 
 /**
@@ -252,6 +264,7 @@ function applyAilment(
   state: BattleState,
   attacker: SideName,
   move: MoveEntry,
+  context: BattleContext,
   rng: RngCursor,
   events: BattleEvent[],
 ): BattleState {
@@ -262,6 +275,16 @@ function applyAilment(
   const defenderSide = sideOf(state, defender)
   const target = activeOf(defenderSide)
   if (target.condition !== null || isFainted(target)) return state
+
+  // **Imunidade de tipo vale para condição também**: Thunder Wave não paralisa
+  // Terrestre, Toxic não envenena Aço. O golpe de dano já parava antes daqui, no
+  // `×0` da fórmula; o de status não passa por ela e precisa da checagem
+  // própria. Sem ela, a regra "status primeiro" da IA fazia o líder abrir a luta
+  // com o golpe contra justamente quem era imune.
+  if (effectivenessAgainst(context.matrix, move.type, target.types) === 0) {
+    events.push({ kind: 'no-effect', side: attacker, moveId: move.id })
+    return state
+  }
 
   if (!rng.chance(ailment.chance / 100)) return state
 
@@ -377,15 +400,11 @@ export function applyAction(
     rng,
   )
 
-  let next = state
-
   // Troca e item resolvem antes de qualquer golpe, como nos jogos. Entre os dois
   // lados a ordem é a do jogador primeiro: nenhum dos dois interage com o outro,
   // então ela é convenção, não regra.
-  if (action.kind === 'switch') next = switchTo(next, 'player', action.index, events)
-  if (action.kind === 'item') next = usePotion(next, 'player', events)
-  if (opponentAction.kind === 'switch') next = switchTo(next, 'opponent', opponentAction.index, events)
-  if (opponentAction.kind === 'item') next = usePotion(next, 'opponent', events)
+  let next = applyPreMove(state, 'player', action, events)
+  next = applyPreMove(next, 'opponent', opponentAction, events)
 
   const playerMove = action.kind === 'move'
     ? moveFromSlot(activeOf(next.player), action.slot, context).move
@@ -410,6 +429,32 @@ export function applyAction(
   next = settle(next, context, events)
 
   return { state: { ...next, turn: next.turn + 1, rng: rng.state() }, events }
+}
+
+/**
+ * Troca e item, antes dos golpes.
+ *
+ * É um `switch` fechado com `assertNever` e não três `if`s: com os `if`s, um
+ * `kind` novo — ou um vindo de save adulterado — caía fora dos três e virava um
+ * **turno em branco**, em silêncio, contradizendo o "ação inválida derruba" que
+ * este módulo promete.
+ */
+function applyPreMove(
+  state: BattleState,
+  side: SideName,
+  action: BattleAction,
+  events: BattleEvent[],
+): BattleState {
+  switch (action.kind) {
+    case 'switch':
+      return switchTo(state, side, action.index, events)
+    case 'item':
+      return usePotion(state, side, events)
+    case 'move':
+      return state
+    default:
+      return assertNever(action, 'ação de batalha')
+  }
 }
 
 function orderedSides(first: SideName): SideName[] {

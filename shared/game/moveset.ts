@@ -79,7 +79,8 @@ export function resolveMoves(
  * ao botão que a tela desenha.
  *
  * Menos de quatro golpes guardados devolve menos de quatro — são 19 espécies, e
- * dez delas entram com Struggle e mais nada.
+ * **nove** delas entram com Struggle e mais nada. A décima é Pyukumuku, que não
+ * sabe atacar mas sabe envenenar, e sai com Toxic ao lado dele.
  */
 export function selectBattleMoves(
   types: readonly TypeName[],
