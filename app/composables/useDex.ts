@@ -57,7 +57,7 @@ export function useDex() {
   async function loadCore(): Promise<CoreData> {
     if (core.value !== null) return core.value
 
-    const pending = corePending ?? fetchGuarded('/data/core.json', isCoreData, 'core.json')
+    const pending = corePending ?? fetchGuarded('core.json', isCoreData)
       .then((data) => {
         core.value = data
         return data
@@ -81,7 +81,7 @@ export function useDex() {
   async function loadIndex(): Promise<IndexData> {
     if (index.value !== null) return index.value
 
-    const pending = indexPending ?? fetchGuarded('/data/index.json', isIndexData, 'index.json')
+    const pending = indexPending ?? fetchGuarded('index.json', isIndexData)
       .then((data) => {
         index.value = data
         return data
@@ -97,7 +97,7 @@ export function useDex() {
   async function loadChains(): Promise<ChainsData> {
     if (chains.value !== null) return chains.value
 
-    const pending = chainsPending ?? fetchGuarded('/data/chains.json', isChainsData, 'chains.json')
+    const pending = chainsPending ?? fetchGuarded('chains.json', isChainsData)
       .then((data) => {
         chains.value = data
         return data
@@ -118,7 +118,7 @@ export function useDex() {
     if (inFlight !== undefined) return inFlight
 
     const name = `gen-${generation}.json`
-    const pending = fetchGuarded(`/data/${name}`, isGenerationData, name)
+    const pending = fetchGuarded(name, isGenerationData)
       .then((data) => {
         generations.value = { ...generations.value, [generation]: data }
         return data
@@ -131,6 +131,29 @@ export function useDex() {
     return pending
   }
 
+  /**
+   * Registra no cache uma geração que já chegou por outro caminho.
+   *
+   * `/pokedex/[gen]` resolve a geração no `useAsyncData`, e o resultado viaja no
+   * payload de SSR — 11,3 KB gzipados contra os 7,0 KB do `gen-1.json` que ele
+   * duplica, porque o `devalue` cobra o próprio overhead. Na hidratação o
+   * handler não roda, então esse dado chega ao cliente e o cache de módulo
+   * continua vazio: duas cópias da mesma geração, nenhuma das duas sabendo da
+   * outra.
+   *
+   * **Isto é defesa, não economia medida.** Com tudo pré-renderizado o cliente
+   * não chega a rebaixar `gen-N.json`: navegar para uma espécie busca o
+   * `_payload.json` dela, e o handler de `[name].vue` também não roda. Medido —
+   * num fluxo de grid → busca → espécie o único `/data/` que sai é o
+   * `index.json` da busca. O que esta função conserta é a divergência entre os
+   * dois caches, que passa a valer no dia em que uma rota deixar de ser
+   * pré-renderizada; ela não devolve bytes hoje.
+   */
+  function seedGeneration(generation: number, data: GenerationData): void {
+    if (generations.value[generation] !== undefined) return
+    generations.value = { ...generations.value, [generation]: data }
+  }
+
   async function loadFlavor(generation: number): Promise<FlavorData> {
     const cached = flavors.value[generation]
     if (cached !== undefined) return cached
@@ -139,7 +162,7 @@ export function useDex() {
     if (inFlight !== undefined) return inFlight
 
     const name = `flavor-${generation}.json`
-    const pending = fetchGuarded(`/data/${name}`, isFlavorData, name)
+    const pending = fetchGuarded(name, isFlavorData)
       .then((data) => {
         flavors.value = { ...flavors.value, [generation]: data }
         return data
@@ -176,6 +199,7 @@ export function useDex() {
     loadChains,
     loadGeneration,
     loadFlavor,
+    seedGeneration,
     findBySlug,
   }
 }
@@ -187,52 +211,27 @@ export function useDex() {
  * cacheado pela CDN (e, na Fase 8, pelo service worker). É o desenho que a
  * Fase 1 escolheu e ele continua valendo.
  *
- * No **servidor** é o mesmo arquivo em disco, lido com `node:fs`. O `$fetch`
- * relativo não serve aqui, e o motivo é estrutural: em SSR ele não sai pela
- * rede, ele chama o app h3 por dentro — e asset público não é rota do h3, é
- * middleware estático na frente dele. O caminho cai no renderizador de páginas,
- * que devolve o HTML de 404. Verificado nos três modos: em `dev` o vue-router
- * ainda avisa `No match found for location with path "/data/gen-1.json"`, na
- * pré-renderização a página sai vazia, e no `node .output/server/index.mjs` o
- * mesmo arquivo responde 200 por `curl` e falha por `$fetch`.
+ * No **servidor** é o mesmo arquivo, pedido à rota interna `/__dex/`, que o lê
+ * do `serverAssets` do Nitro. O `$fetch` de `/data/` não serve aqui, e o motivo
+ * é estrutural: em SSR ele não sai pela rede, ele chama o app h3 por dentro — e
+ * asset público não é rota do h3, é middleware estático na frente dele. O
+ * caminho cai no renderizador de páginas, que devolve o HTML de 404. Uma rota
+ * **é** rota do h3, e é isso que a torna alcançável.
+ *
+ * **A versão anterior lia o disco por `process.cwd()`, e isso quebrava em
+ * produção.** `public/` e `.output/public/` relativos ao diretório de trabalho
+ * só são a raiz do projeto no build e no `yarn preview`. Num deploy serverless o
+ * `cwd` é a raiz da função, e o dex não está lá: no preset da Vercel ele vai
+ * inteiro para `.vercel/output/static/` e a função não recebe cópia nenhuma.
+ * Como toda rota válida é pré-renderizada, a única classe de URL que chega ao
+ * servidor é a inválida — que é justamente quando o índice precisa ser lido para
+ * responder 404. O sintoma medido era `/pokemon/missingno` respondendo **500,
+ * com o caminho absoluto do servidor na linha de status e no corpo**.
  *
  * O guarda roda igual nos dois caminhos, e é ele que faz esta divisão ser
  * segura: um dos lados lendo arquivo diferente do outro reprova na leitura em
  * vez de renderizar meio dex.
  */
-async function readServerSide(path: string): Promise<unknown> {
-  const { readFile } = await import('node:fs/promises')
-  const { join } = await import('node:path')
-
-  // `public/` durante `dev` e pré-renderização, `.output/public/` num servidor
-  // Nitro já construído — nesta ordem porque a primeira é a que roda no build,
-  // que é quando estas páginas são geradas.
-  const roots = ['public', '.output/public']
-  const tried: string[] = []
-
-  for (const root of roots) {
-    const file = join(process.cwd(), root, path)
-    tried.push(file)
-    try {
-      const parsed: unknown = JSON.parse(await readFile(file, 'utf8'))
-      return parsed
-    }
-    catch (cause) {
-      // Só a ausência do arquivo justifica tentar a raiz seguinte. JSON quebrado
-      // é defeito do dex e precisa subir com a causa, não virar "não encontrado".
-      if (!isMissingFile(cause)) throw cause
-    }
-  }
-
-  throw createError({
-    statusCode: 500,
-    statusMessage: `dex não encontrado em disco: ${tried.join(', ')}`,
-  })
-}
-
-function isMissingFile(cause: unknown): boolean {
-  return typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === 'ENOENT'
-}
 
 /**
  * `$fetch` devolve `any`, e é por aí que um `any` entra num projeto que baniu a
@@ -250,15 +249,17 @@ function isMissingFile(cause: unknown): boolean {
  * esconderia a causa.
  */
 async function fetchGuarded<T>(
-  path: string,
+  name: string,
   guard: (value: unknown) => value is T,
-  label: string,
 ): Promise<T> {
-  const raw = import.meta.server ? await readServerSide(path) : await $fetch<unknown>(path)
+  // Em servidor a rota interna; no navegador o arquivo estático da CDN. Os dois
+  // devolvem o mesmo JSON e passam pelo mesmo guarda.
+  const raw = await $fetch<unknown>(import.meta.server ? `/__dex/${name}` : `/data/${name}`)
+
   if (!guard(raw)) {
     throw createError({
       statusCode: 500,
-      statusMessage: `${label} não tem a forma esperada — dex desatualizado ou build incompleto`,
+      statusMessage: `${name} não tem a forma esperada — dex desatualizado ou build incompleto`,
     })
   }
   return raw

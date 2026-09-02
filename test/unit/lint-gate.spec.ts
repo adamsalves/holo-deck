@@ -111,10 +111,27 @@ describe('portão de tipagem type-aware', () => {
       ),
     )
 
-    // `server/` ainda não existe em disco — entra na Fase 7. O glob fica armado
-    // antes para a pasta nascer já dentro do portão, em vez de nascer fora e
-    // alguém descobrir depois.
     expect([...roots].sort()).toEqual(['app', 'scripts', 'server', 'shared', 'test'])
-    expect(existsSync(join(REPO_ROOT, 'server')), 'server/ nasceu: conferir os outros três portões').toBe(false)
+
+    /**
+     * **`server/` nasceu na Fase 3, e o armado valeu.**
+     *
+     * O glob estava posto desde a Fase 0 esperando a Fase 7, e a pasta chegou
+     * antes: `server/routes/__dex/` é a rota interna que o SSR usa para ler o
+     * dex. Ela nasceu dentro do bloco type-aware, que era exatamente o ponto de
+     * armar antes — pela quinta aparição do defeito, a pasta nova não nasceu
+     * fora do portão.
+     *
+     * Este `expect` era `toBe(false)`, com a mensagem *"server/ nasceu:
+     * conferir os outros três portões"*. Ele disparou, os três foram conferidos
+     * e nenhum precisou mudar: o glob do ESLint já listava `server/**\/*.ts`, o
+     * `tsconfig.server.json` que o `nuxt prepare` gera já cobre a pasta — o que
+     * `tsconfig-gate.spec.ts` verifica sozinho —, e os aliases do Vitest não
+     * entram porque nenhum teste importa de `server/`.
+     *
+     * A asserção fica invertida em vez de apagada: a pasta ter sumido enquanto o
+     * glob continua armado é o mesmo defeito de cabeça para baixo.
+     */
+    expect(existsSync(join(REPO_ROOT, 'server')), 'server/ sumiu, e o glob continua armado').toBe(true)
   })
 })

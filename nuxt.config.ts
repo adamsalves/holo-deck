@@ -63,12 +63,10 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: 'pt-BR', class: 'dark' },
       title: 'Holo Deck',
-      // A arte oficial do herói do detalhe é a única imagem de terceiro do
-      // projeto. O handshake com o host custa mais que o download dela em
-      // conexão móvel, e ele começa antes de o HTML terminar de chegar.
-      link: [
-        { rel: 'preconnect', href: 'https://raw.githubusercontent.com', crossorigin: '' },
-      ],
+      // O `preconnect` da arte oficial **não** mora aqui: quem carrega imagem de
+      // terceiro é só `/pokemon/[name]`, e no `app.head` as outras 11 rotas
+      // pagariam um DNS+TLS que nunca usam. Ele vive num `useHead` da própria
+      // página, que é onde o custo se paga.
     },
   },
 
@@ -113,6 +111,36 @@ export default defineNuxtConfig({
       crawlLinks: true,
       routes: ['/pokedex'],
     },
+
+    /**
+     * O dex viaja **junto do servidor**, e não só em `public/`.
+     *
+     * `public/` é servido pela CDN e não é embarcado na função: conferido no
+     * preset da Vercel, onde `.vercel/output/static/data/` tem os arquivos e
+     * `.vercel/output/functions/__fallback.func/` não tem nenhum. Toda rota
+     * válida é pré-renderizada, então a função só é alcançada por URL inválida —
+     * que é justamente quando `useDex()` precisa ler o índice para responder 404.
+     * Sem esta cópia, `/pokemon/qualquer-coisa` respondia **500** em produção.
+     *
+     * `serverAssets` também é o que tira a leitura do `process.cwd()`: o caminho
+     * em disco deixa de existir como conceito, e os quatro modos — dev,
+     * pré-renderização, `node .output/server/index.mjs` e serverless — passam a
+     * ler pelo mesmo lugar. `dir` é relativo ao `srcDir` do Nitro, que no Nuxt é
+     * `server/`.
+     *
+     * Quem lê é `server/routes/__dex/[file].get.ts`, e não o composable direto:
+     * `useStorage` só enxerga estes assets dentro do contexto do Nitro. Importar
+     * `nitropack/runtime` de `app/` devolve outra instância do módulo, com o
+     * storage vazio — passa no `yarn build`, onde o Nitro empacota tudo num grafo
+     * só, e derruba o `yarn dev`, onde o Vite carrega o código de app separado.
+     *
+     * O preço é a função crescer de 3,4 MB para 5,3 MB, e ele é aceito: os
+     * arquivos entram como chunks separados e só o pedido é carregado, então o
+     * custo é de tamanho de deploy, não de cold start.
+     */
+    serverAssets: [
+      { baseName: 'dex', dir: '../public/data' },
+    ],
   },
 
   typescript: {
