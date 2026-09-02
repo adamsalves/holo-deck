@@ -19,14 +19,32 @@ const props = defineProps<{
   type: TypeName
 }>()
 
-const STAT_LABELS = ['HP', 'ATK', 'DEF', 'SpA', 'SpD', 'SPD'] as const
+/**
+ * As seis abreviações, e o nome por extenso que o leitor de tela recebe.
+ *
+ * `SpD` (defesa especial) e `SPD` (velocidade) diferiam só por caixa, em linhas
+ * vizinhas — e para um leitor de tela elas são a mesma sequência de letras.
+ * `VEL` desfaz a colisão à vista, e o nome por extenso resolve as seis de uma
+ * vez: num projeto que trocou `{{ rarity }}` cru por `RARITY_LABELS` para não
+ * ler enum em inglês no meio de uma frase em português, seis siglas mudas
+ * destoam.
+ */
+const STAT_LABELS = [
+  { short: 'HP', long: 'Pontos de saúde' },
+  { short: 'ATK', long: 'Ataque' },
+  { short: 'DEF', long: 'Defesa' },
+  { short: 'SpA', long: 'Ataque especial' },
+  { short: 'SpD', long: 'Defesa especial' },
+  { short: 'VEL', long: 'Velocidade' },
+] as const
 
 const total = computed(() => baseStatTotal(props.baseStats))
 
 const highest = computed(() => Math.max(...props.baseStats))
 
 const rows = computed(() => props.baseStats.map((value, index) => ({
-  label: STAT_LABELS[index] ?? '',
+  label: STAT_LABELS[index]?.short ?? '',
+  longLabel: STAT_LABELS[index]?.long ?? '',
   value,
   percent: (value / MAX_BASE_STAT) * 100,
   // Empate acende os dois: escolher um pelo índice mentiria sobre qual é o
@@ -38,9 +56,9 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
 <template>
   <section :data-type="type">
     <header class="stat-header">
-      <h3 class="stat-header__title">
+      <h2 class="stat-header__title">
         Base stats
-      </h3>
+      </h2>
       <p class="numeric stat-header__total">
         BST <strong class="stat-header__value">{{ total }}</strong>
         <span class="stat-header__max"> / {{ MAX_BASE_STAT_TOTAL }} máx</span>
@@ -53,19 +71,28 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
         :key="row.label"
         class="stat-row"
       >
+        <!-- Sigla à vista, nome por extenso para quem ouve. **Não** por
+             `aria-label`: um `dt` mapeia para o papel `term`, que está na lista
+             de *name from: prohibited* da ARIA 1.2 — o atributo é inválido ali e
+             o leitor de tela o ignora, deixando a sigla muda do mesmo jeito. -->
         <dt class="numeric stat-row__label">
-          {{ row.label }}
+          <span aria-hidden="true">{{ row.label }}</span>
+          <span class="sr-only">{{ row.longLabel }}</span>
         </dt>
-        <dd class="numeric stat-row__value">
-          {{ row.value }}
+        <!-- A trilha vive **dentro** do `dd`, e não como terceiro irmão: num
+             `dl`, o `div` de agrupamento só admite `dt` e `dd`, e um terceiro
+             filho torna o documento inválido. O grid não muda — o `dd` é quem
+             passa a ocupar as duas colunas. -->
+        <dd class="stat-row__cell">
+          <span class="numeric stat-row__value">{{ row.value }}</span>
+          <span class="stat-row__track">
+            <span
+              class="stat-row__fill"
+              :class="{ 'stat-row__fill--highest': row.isHighest }"
+              :style="{ width: `${row.percent}%` }"
+            />
+          </span>
         </dd>
-        <div class="stat-row__track">
-          <div
-            class="stat-row__fill"
-            :class="{ 'stat-row__fill--highest': row.isHighest }"
-            :style="{ width: `${row.percent}%` }"
-          />
-        </div>
       </div>
     </dl>
   </section>
@@ -110,9 +137,19 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
 
 .stat-row {
   display: grid;
-  grid-template-columns: 34px 34px 1fr;
+  grid-template-columns: 34px 1fr;
   align-items: center;
   gap: 10px;
+}
+
+/* O `dd` carrega valor e trilha, então ele repete a grade que o `stat-row`
+   tinha nas duas últimas colunas. */
+.stat-row__cell {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
 }
 
 .stat-row__label {
@@ -129,6 +166,7 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
 }
 
 .stat-row__track {
+  display: block;
   height: 7px;
   overflow: hidden;
   border-radius: var(--radius);
@@ -136,6 +174,7 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
 }
 
 .stat-row__fill {
+  display: block;
   height: 100%;
   border-radius: var(--radius);
   background: var(--border-strong);

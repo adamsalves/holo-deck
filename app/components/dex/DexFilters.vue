@@ -186,10 +186,31 @@ function clear() {
   line-height: 0;
 }
 
-/* Apagado, não escondido: some do resultado sem sumir da lista, para o jogador
-   ver o que ainda pode ligar. */
-.filters__type--off {
-  opacity: 0.32;
+/**
+ * Apagado, não escondido: some do resultado sem sumir da lista, para o jogador
+ * ver o que ainda pode ligar.
+ *
+ * **E apagado invertendo o preenchimento, não baixando a opacidade.** Um
+ * `opacity: 0.32` no botão apaga o fundo e o rótulo *juntos*, e o par composto
+ * despenca: medido com a fórmula da WCAG, `dragon` caía a **1,47:1** e o melhor
+ * dos 18 (`electric`) parava em 2,56:1 — abaixo até do piso de texto grande, num
+ * controle que continua clicável, então a dispensa de "componente inativo" não
+ * vale. O portão de tema não pegava porque ele mede token contra token, e
+ * opacidade não é token.
+ *
+ * Cheio = ligado, contornado = desligado. A cor do tipo fica na moldura e num
+ * véu de 10%, que é preenchimento — o papel que ela tem no sistema —, e o
+ * rótulo passa a `--text-body`.
+ *
+ * Os dois números são o resultado da medição, não estética: com `--text-muted`
+ * o pior dos 18 (`electric`, o mais claro) ficava em 3,58:1 sobre
+ * `--surface-raised`, e a 14% de véu o `--text-body` ainda parava em 4,46:1.
+ * `--text-body` a 10% põe o pior caso em **5,01:1**, com folga sobre o piso.
+ */
+.filters__type--off :deep(.type-badge) {
+  background: color-mix(in oklab, var(--type) 10%, transparent);
+  color: var(--text-body);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--type) 45%, transparent);
 }
 
 .filters__type:focus-visible {

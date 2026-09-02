@@ -15,6 +15,17 @@ export const AA_NORMAL = 4.5
 /** Limiar AA para texto grande (≥ 18.66px negrito, ou ≥ 24px). */
 export const AA_LARGE = 3
 
+/**
+ * Limiar do critério 1.4.11 — contraste de elemento não textual.
+ *
+ * Vale 3, o mesmo número de `AA_LARGE`, e mesmo assim é uma constante separada:
+ * são critérios diferentes sobre coisas diferentes — um mede texto grande, o
+ * outro mede contorno de componente e limite de controle, como o anel de foco.
+ * Escrever `AA_LARGE` num anel de foco daria o número certo pelo motivo errado,
+ * e no dia em que um dos dois mudar o outro iria junto sem ninguém notar.
+ */
+export const NON_TEXT = 3
+
 type Channels = [number, number, number]
 
 function byte(pair: string): number {

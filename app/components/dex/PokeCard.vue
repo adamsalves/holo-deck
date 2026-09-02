@@ -95,9 +95,12 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
       </div>
 
       <div class="poke-card__id">
-        <h3 class="poke-card__name">
+        <!-- `h2` e não `h3`: no grid da região o único ancestral é o `h1` do
+             cabeçalho, e pular um nível faz o leitor de tela anunciar uma
+             subseção que não existe. -->
+        <h2 class="poke-card__name">
           {{ name }}
-        </h3>
+        </h2>
         <!-- A raridade nunca é comunicada só por brilho: a etiqueta textual está
              sempre presente, inclusive com reduced-motion ligado. É regra do canvas.
              Em português, porque o documento é `lang="pt-BR"` e quem lê a carta —

@@ -20,10 +20,10 @@ const relations = computed(() => incomingDamageRelations(props.effectiveness, pr
 
 <template>
   <section>
-    <h3 class="relations__title">
+    <h2 class="relations__title">
       Relações de dano
       <span class="relations__note">— calculadas na matriz 18×18, tipo duplo multiplicativo</span>
-    </h3>
+    </h2>
 
     <div class="relations__groups">
       <div v-if="relations.weak.length > 0">
