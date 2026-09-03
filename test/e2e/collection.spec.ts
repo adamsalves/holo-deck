@@ -133,3 +133,25 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
   await expect(page.getByRole('button', { name: 'Faltando · 151' })).toBeVisible()
   await expect(page.locator('.dex-card:not(.dex-card--missing)')).toHaveCount(0)
 })
+
+/**
+ * A porta. A Fase 3 já teve um defeito desta família — a raiz não levava à
+ * Pokédex —, e a Fase 5 acrescentou duas telas: sem link, elas existem no build
+ * e não existem para quem joga. A navegação global é da Fase 6; até lá, é esta
+ * a checagem que impede uma fase inteira de ficar inalcançável.
+ */
+test('a raiz leva às três telas que já existem', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByRole('link', { name: 'Abrir pack' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Coleção' })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Abrir pack' }).click()
+  await expect(page).toHaveURL(/\/packs$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Abrir pack' })).toBeVisible()
+
+  await page.goto('/')
+  await page.getByRole('link', { name: 'Coleção' }).click()
+  await expect(page).toHaveURL(/\/collection$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Binder' })).toBeVisible()
+})
