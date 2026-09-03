@@ -1,3 +1,4 @@
+import type { SpeciesId } from './brand.ts'
 import type { Habitat, TypeName } from './dex.ts'
 
 /**
@@ -177,4 +178,46 @@ export const TYPE_LABELS: Record<TypeName, string> = {
   dragon: 'Dragão',
   dark: 'Sombrio',
   fairy: 'Fada',
+}
+
+/**
+ * Uma carta saída de um pack — o que o `PackOpener` vira e o que a coleção
+ * credita.
+ *
+ * `rarity` viaja junto com o id em vez de ser recalculada por quem recebe, e
+ * isso não é cache: é o **veredito daquele sorteio**. O slot raro+ decide o tier
+ * antes de escolher a espécie, e é esse tier que a animação escala e que o pity
+ * observa. Reconstruir a raridade a partir do id daria o mesmo valor hoje, e
+ * apagaria a diferença entre "a carta que saiu do slot raro" e "uma carta que
+ * por acaso é rara" no dia em que um slot passar a poder rebaixar.
+ *
+ * `isShiny` é por carta, não por espécie: o brilho é de **exemplar**, e a mesma
+ * espécie pode estar na coleção nas duas formas — a prancha *Coleção* mostra
+ * Gengar shiny com contagem própria, ao lado da contagem normal.
+ */
+export interface PackCard {
+  readonly speciesId: SpeciesId
+  readonly rarity: Rarity
+  readonly isShiny: boolean
+}
+
+/**
+ * O que a coleção guarda por espécie: quantas cópias, e quantas delas shiny.
+ *
+ * Os nomes são de uma letra porque este objeto é o save — `{"25":{"c":3,"s":1}}`
+ * —, e a coleção completa em nomes longos passaria de 19,9 KB para ~60 KB numa
+ * cota de 5 MB que o plano mediu inteira. É o único lugar do repositório onde
+ * abreviar se paga, e mesmo aqui o formato continua **legível no DevTools**, que
+ * foi a razão de recusar a versão empacotada em base36.
+ *
+ * `s` conta shiny e `c` conta o **total**, shiny incluído. A alternativa —
+ * contar normais em `c` e shiny em `s` — faria toda soma de "quantas tenho"
+ * virar `c + s`, e a primeira que alguém esquecesse produziria uma coleção que
+ * some cartas ao ganhar um shiny.
+ */
+export interface CollectionEntry {
+  /** Total de cópias, shiny incluído. Sempre ≥ 1 — a ausência é não ter a espécie. */
+  readonly c: number
+  /** Quantas das cópias são shiny. */
+  readonly s: number
 }
