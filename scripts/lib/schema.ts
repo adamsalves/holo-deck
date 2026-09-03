@@ -10,6 +10,7 @@ import type {
 import {
   AILMENT_NAMES,
   GENERATION_COUNT,
+  HABITAT_NAMES,
   MOVES_PER_SPECIES,
   STRUGGLE_MOVE_ID,
   TYPE_COUNT,
@@ -170,7 +171,10 @@ const speciesEntry = z.object({
   isMythical: z.boolean(),
   isBaby: z.boolean(),
   captureRate: z.number().int().nonnegative(),
-  habitat: z.string().min(1).nullable(),
+  // Fechado nos 9 da PokeAPI, e não `z.string()`: um habitat novo tem de parar
+  // o `data:build`, que é onde alguém pode escrever o rótulo em português. Solto
+  // ele atravessaria o pipeline e apareceria em inglês na aba *Sobre*.
+  habitat: z.enum(HABITAT_NAMES).nullable(),
   baseHappiness: z.number().int().nonnegative(),
   color: z.string().min(1),
   evolutionChainId: z.number().int().positive(),

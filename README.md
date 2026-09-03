@@ -67,9 +67,10 @@ nasceu, com o `exclude` herdado do `extends` anulando o `include` dele.
 
 Tema **Holo TCG**, escuro-único. Não é limitação: o foil holográfico depende de
 `mix-blend-mode: color-dodge`, que clareia — sobre fundo claro ele estoura em
-branco e o efeito deixa de existir. A especificação visual é o canvas de 17
-pranchas aprovado antes da implementação; divergir dele é decisão consciente e
-está anotada no commit que diverge.
+branco e o efeito deixa de existir. A especificação visual é o canvas de 18
+pranchas aprovado antes da implementação; divergir dele é decisão consciente,
+anotada no commit que diverge e listada em [Divergências do
+canvas](#divergências-do-canvas).
 
 Tudo mora em [`app/assets/css/main.css`](app/assets/css/main.css), em duas
 camadas — que é como o Nuxt UI 4 já se organiza, e a razão de plugarmos nele em
@@ -186,6 +187,78 @@ papéis, os chanfros, os 18 tipos e as 6 raridades em carta. Ela **lê o
 contraste em runtime — um espelho que repete valores à mão é um espelho que pode
 mentir. Existe só em desenvolvimento: o módulo em linha do `nuxt.config.ts` a
 remove do build.
+
+## Divergências do canvas
+
+O canvas é a especificação visual, e divergir dele é decisão do dono do projeto,
+não do código. Esta seção é onde as divergências aceitas ficam — antes espalhadas
+por comentário de módulo e corpo de commit, o que as tornava impossíveis de
+conferir de uma vez.
+
+A varredura de **02/09/2026** comparou as pranchas com o repositório inteiro e é
+de onde vem a lista atual. Ela também moveu a maior parte do que achou: o que
+está aqui é só o que sobrou de propósito.
+
+### O código diverge, e a prancha continua como está
+
+| divergência | por quê |
+|---|---|
+| `--radius: 3px` único | as pranchas usam `2px` 104 vezes e `3px` 65, sem papéis diferentes — é variação de mockup desenhado à mão, não decisão |
+| `mix-blend-mode` no foil | o plano escreve `background-blend-mode`; o canvas usa `mix-blend-mode`, e é o segundo que renderiza |
+| peso 700, não 800 | o canvas usa 800 em rótulo; `@nuxt/fonts` baixa 400 e 700, e um 800 sem face real vira negrito sintético |
+| `ink-325` | não aparece em prancha nenhuma. Entrou porque a matriz de contraste pediu um degrau entre o corpo e o texto grande |
+| chanfro em 4 degraus | as pranchas usam seis valores; a revisão normalizou nos quatro com papel distinto |
+| barras de stat pelo teto do dex | o mockup escala por ~165; 255 é o HP da Blissey, e uma barra acima de 100% da trilha não é uma barra |
+| `DexTypeBadge` sem chanfro | nenhuma prancha chanfra o chip de tipo, e a 11px do grid um chanfro de 9px come a última letra de VENENOSO |
+| habitat em `--accent` | a prancha *Detalhe* pinta o valor com o verde de planta (`#5FE07A`), que não tem papel no sistema. `--accent` é o semântico que existe para "este valor se destaca" |
+| habitat em português | a prancha escreve `ROUGH TERRAIN`, o identificador da PokeAPI. `--accent` faz dele o valor mais destacado do painel, e um documento `lang="pt-BR"` não destaca uma palavra em inglês — é o mesmo argumento que trocou `FLYING` por `VOADOR` nos chips. `HABITAT_LABELS` traduz os 9 |
+| marca-d'água em `--text` a 3% | a prancha usa branco a **2,8%**. `color-mix` aceita o fracionário; o 3% é o passo redondo, e a diferença é invisível no papel que a própria prancha dá ao número (identidade, não leitura) |
+| marca-d'água em `min(46cqw, 230px)` e `max(-30px, -5%)` | a prancha fixa `230px` e `left:-30px` numa coluna de 560. A página não tem `max-width`, então a coluna vai de 100% do viewport a 5/12 dele — os valores fixos só reproduziriam o desenho em 1440. A conta acompanha a coluna e para nos números da prancha |
+| `hero__facts dd` a 20px só acima de 420px de conteúdo na coluna | os 20px são a escala da prancha, medida a 1440. Entre 900 e ~1080 a coluna cai para 310–375px e o bloco de fatos dobra de altura (131px contra 44px) — a escala da prancha aplicada a uma largura que não é a dela |
+| barra do rodapé do grid em `--accent` | a prancha usa `#8BD674`, o verde de progresso de coleção. Ele **não tem token** — quando a Fase 5 trouxer progresso de verdade, ele precisa de um, e a barra de extensão não pode gastar o significado antes |
+| segundo brilho na carta de dois tipos | o canvas não o desenha, e sem ele `types[1]` chega à carta sem efeito nenhum |
+| 18 chips de tipo no filtro | a prancha trunca em 6 + `+12 tipos`; a truncagem cobra um clique por um filtro cujo valor inteiro é ser imediato |
+| linha evolutiva em grade de estágios | a prancha desenha uma fila com setas, e **Eevee tem oito filhos no mesmo degrau** |
+| condição dentro da carta, não sob a seta | mesma razão: sob a seta, um estágio que ramifica não tem onde pôr oito condições |
+| aba *Sobre* aberta, e abas que escondem | a versão aprovada marcava *Stats* na barra e desenhava os quatro blocos juntos — as duas coisas descrevem uma coluna sem abas. Decisão de 02/09: as abas ficam, abrindo em *Sobre*, e a prancha foi corrigida |
+| times de ginásio pela regra | a prancha *Liga* desenha Onix como ace do Brock e Noctowl como ativo do Falkner; a regra produz Graveler e não inclui Noctowl. Composição de time é regra de jogo, e o canvas é a especificação **visual** — as duas artes passam a ser ilustrativas |
+
+### A prancha estava errada, e foi corrigida em 02/09
+
+| o que dizia | o que vale |
+|---|---|
+| chips de tipo em inglês (`FIRE`, `FLYING`) nas 17 pranchas | o documento é `lang="pt-BR"` e quem lê a carta lê a frase inteira no mesmo idioma. As 18 pranchas passaram a `FOGO`, `VOADOR` — 75 rótulos |
+| *Regras*: "a mediana de BST é 474" | é **450**. O 474 saiu da amostra de 129 do plano; sobre as 1025 do dex gerado a mediana é 450 |
+| *Tokens*: "escala ink · 14 degraus" | são **16** — `ink-350` e `ink-325` entraram na Fase 2 |
+| *Tokens*: `--text-muted → ink-400`, `--text-faint → ink-500` | `ink-325` e `ink-350`. Os dois originais dão 3,34:1 e 1,94:1 — papéis de texto sobre degraus que não sustentam texto |
+| *Tokens*: sem `--surface-cell` | o papel existe (`ink-880`, célula de grid e pé de carta) e a própria anotação da escada já o descrevia |
+| *Tokens*: "Sistema visual · game-generations" | o repositório se chama `holo-deck` desde 26/08 |
+| *Detalhe*: barras de stat coloridas uma a uma | só o mais alto acende, na cor-luz do tipo — é o que a prancha *A carta* anota e o que o código sempre fez |
+| *Pokédex*: célula de grid em 140×172 | a carta é 5:7, que é o que a prancha *A carta* especifica; a 140 de largura isso pede 196 de altura |
+
+### Segurado até a fase que cria o dado
+
+Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
+progresso que ninguém pode mover.
+
+- **Fase 5:** a contagem `98 / 151 capturados` no cabeçalho da região e no
+  índice, o anel de não possuída, o marcador de shiny, os filtros *Possuídos* e
+  *Faltando*, e o verde de progresso que tinge o cabeçalho.
+- **Sem dado no dex:** a lista de jogos da geração (`Red · Blue · Yellow`) que a
+  prancha *Pokédex* põe no cabeçalho. `GenerationMeta` traz geração, região,
+  nome e contagem — o campo teria de nascer no pipeline.
+
+### Em aberto, para quem escrever a fase
+
+- **Sincronização.** O plano fechou *last-write-wins* por `updatedAt`, sem merge.
+  A prancha *Sync* diz o contrário, por escrito: o `updatedAt` "nunca é usado
+  para resolver conflito", e a regra dos quatro estados é "local com mutação
+  pendente vence; local limpo aceita o servidor, sem comparar relógio de
+  aparelho". São regras diferentes, e a Fase 8 não pode escolher no meio da
+  implementação.
+- **Base stat contra Lv50.** A prancha *Deck* mostra Pikachu com `HP 35` (base) e
+  a prancha *Batalha* com `110` (Lv50). Duas telas vizinhas escrevendo "HP" com
+  significados diferentes.
 
 ## Dados do jogo
 

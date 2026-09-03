@@ -28,8 +28,8 @@ defineProps<{ type: TypeName }>()
 /**
  * **Sem chanfro, e isso é correção de uma divergência da Fase 2.**
  *
- * As 17 pranchas desenham `.tchip` com `border-radius:2px` e nenhum `clip-path`
- * — em nenhuma tela o chip de tipo é chanfrado; quem carrega a assinatura é a
+ * As pranchas do canvas desenham `.tchip` com `border-radius:2px` e nenhum
+ * `clip-path` — em nenhuma o chip de tipo é chanfrado; quem carrega a assinatura é a
  * carta, o painel e o botão. O `bevel-chip` que estava aqui só ficava de pé no
  * tamanho grande: no grid da Pokédex o chip tem 11px de altura, e um chanfro de
  * 9px come o canto inteiro, cortando a última letra de VENENOSO na diagonal. É

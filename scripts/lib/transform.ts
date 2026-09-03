@@ -6,6 +6,7 @@ import type {
   DamagingMoveEntry,
   Effectiveness,
   EvolutionCondition,
+  Habitat,
   MoveAilment,
   MoveEntry,
   StatName,
@@ -19,6 +20,7 @@ import {
   TYPE_COUNT,
   TYPE_NAMES,
   isAilmentName,
+  isHabitat,
   isTypeName,
   typeIndex,
 } from '../../shared/types/dex.ts'
@@ -209,6 +211,23 @@ export function toTypes(pokemon: Pokemon): readonly [TypeName] | readonly [TypeN
     throw new Error(`${pokemon.name}: nenhum dos tipos é um dos ${TYPE_COUNT} de batalha`)
   }
   return second === undefined ? [first] : [first, second]
+}
+
+/**
+ * O habitat, ou `null` — que é o que a PokeAPI devolve da geração 6 em diante,
+ * quando ela parou de preencher o campo.
+ *
+ * Um nome fora dos 9 **para o build**, e não vira `null`. Silenciá-lo perderia
+ * um habitat de verdade sem ninguém notar; e deixá-lo passar cru chegaria à aba
+ * *Sobre* como identificador em inglês, no valor que o painel mais destaca.
+ * Parar aqui é o único momento em que dá para escrever o rótulo em
+ * `HABITAT_LABELS` antes de o dado existir na tela.
+ */
+export function toHabitat(species: Species): Habitat | null {
+  const name = species.habitat?.name
+  if (name === undefined || name === null) return null
+  if (!isHabitat(name)) throw new Error(`${species.name}: habitat desconhecido (${name})`)
+  return name
 }
 
 /**

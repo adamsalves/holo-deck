@@ -30,7 +30,15 @@ import { useElementBounding, useElementSize } from '@vueuse/core'
 const props = withDefaults(defineProps<{
   species: readonly SpeciesEntry[]
   virtualize?: boolean
-}>(), { virtualize: false })
+  /** `#0001–0151`, para o rodapé. A faixa é da região e o grid não a conhece —
+   *  quem a calcula é a página, que sabe qual região está aberta.
+   *
+   *  `null` para ausência, e não `''`: é como o resto do repositório escreve
+   *  "não tem" (`data.value?.region ?? null`, `description ?? null`,
+   *  `species.habitat === null`), e uma string vazia obriga quem lê a saber que
+   *  ela é sentinela e não conteúdo. */
+  range?: string | null
+}>(), { virtualize: false, range: null })
 
 /** Largura mínima de uma carta. Abaixo disso o nome quebra em duas linhas. */
 const MIN_CARD_WIDTH = 132
@@ -128,6 +136,51 @@ const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(${columns.value}, minmax(0, 1fr))`,
   gap: `${GAP}px`,
 }))
+
+/**
+ * Quantas cartas estão de fato no DOM — o número que a prancha estampa no
+ * rodapé (`18 de 151 renderizados`).
+ *
+ * Sai da soma das fileiras visíveis, e não de `rows.length * columns`: a última
+ * fileira quase nunca está cheia, e multiplicar contaria cartas que não existem.
+ * Na forma completa são todas, que é justamente o que o rodapé precisa dizer —
+ * ali não há virtualização nenhuma para anunciar.
+ */
+const rendered = computed(() => {
+  if (!props.virtualize) return props.species.length
+  return rows.value.reduce((total, row) => total + rowSpecies(row.index).length, 0)
+})
+
+/** A fração desenhada, que é o que a barra do rodapé mostra. */
+const renderedPercent = computed(() => {
+  if (props.species.length === 0) return 0
+  return (rendered.value / props.species.length) * 100
+})
+
+/**
+ * A frase do rodapé, montada aqui e não no template.
+ *
+ * A ressalva sobre virtualização é parte da mesma sentença, e um `<template
+ * v-if>` no meio de um parágrafo obriga a quebrar linha no HTML — o que insere
+ * espaço em branco antes do `·`. Uma string resolve os dois.
+ *
+ * **A ressalva só aparece quando a virtualização está de fato retendo alguma
+ * coisa.** `virtualize` diz que ela está ligada, não que ela está segurando: com
+ * um filtro estreito — Kanto por *Lendário* são 4 espécies — todas as fileiras
+ * cabem na janela, e a frase anunciava "scroll virtualizado" ao lado de
+ * `4 de 4` e de uma barra em 100%. Anunciar um mecanismo que não está operando é
+ * o mesmo defeito que o comentário do `addInitScript` no e2e tinha, agora em
+ * texto que o usuário lê.
+ *
+ * E sem número: a versão anterior citava `SPECIES_COUNT` (1025), que não tem
+ * referente em tela nenhuma — o grid é sempre de **uma** região, e a maior tem
+ * 156. Quem quer o número tem os dois reais na primeira metade da frase.
+ */
+const renderedLabel = computed(() => {
+  const counted = `${rendered.value} de ${props.species.length} renderizados`
+  if (!props.virtualize || rendered.value >= props.species.length) return counted
+  return `${counted} · scroll virtualizado`
+})
 </script>
 
 <template>
@@ -166,5 +219,109 @@ const gridStyle = computed(() => ({
         />
       </div>
     </div>
+
+    <!--
+      O rodapé da prancha *Pokédex*, que a Fase 3 não tinha reproduzido.
+
+      Ele existe porque a virtualização é invisível por definição: sem esta
+      linha, um grid que segura 18 cartas e um que segura 151 são a mesma tela, e
+      a promessa central da fase — *o DOM nunca segura as 1025* — fica sem
+      nenhuma evidência para quem está olhando.
+
+      A segunda frase da prancha continua com a Fase 5: ela fala do anel vazado
+      que marca a espécie não possuída, e o anel não existe enquanto não existir
+      coleção. Fica aqui a metade que já é verdade.
+    -->
+    <footer
+      v-if="species.length > 0"
+      class="grid-footer"
+    >
+      <!-- O `numeric` vai no que é número, e não no parágrafo inteiro: o
+           utilitário é tabular-nums para alinhar dígito, e a nota abaixo é
+           prosa. -->
+      <p class="grid-footer__count">
+        <span class="numeric">{{ renderedLabel }}</span>
+        <span class="grid-footer__note">A Pokédex é referência: mostra tudo, possuídas ou não.</span>
+      </p>
+
+      <div class="grid-footer__extent">
+        <!-- A barra é indicador de extensão, não de progresso: ela mede o que
+             está desenhado, não o que foi capturado. A prancha a pinta com o
+             verde de progresso de coleção, que não tem token no sistema — usá-lo
+             aqui gastaria o significado da Fase 5 num medidor que não fala de
+             coleção. `--accent` é o semântico que sobra, e o valor da prancha
+             está na seção de divergências do README.
+
+             `aria-hidden` porque o número ao lado já diz a mesma coisa em texto,
+             e um `progressbar` anunciando "12%" sem rótulo é ruído. -->
+        <span
+          class="grid-footer__bar"
+          aria-hidden="true"
+        >
+          <span
+            class="grid-footer__fill"
+            :style="{ width: `${renderedPercent}%` }"
+          />
+        </span>
+        <span
+          v-if="range !== null"
+          class="numeric grid-footer__range"
+        >{{ range }}</span>
+      </div>
+    </footer>
   </div>
 </template>
+
+<style scoped>
+.grid-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* Os dois papéis têm piso AA normal, que é o que 11px exige. `--text-faint` é o
+   único com piso de texto grande — `theme.spec.ts` escreve que usá-lo em texto
+   pequeno é erro do lado do componente, e a nota aqui tem 11px. A hierarquia
+   entre as duas linhas sai do par corpo/mudo, sem gastar o papel de rodapé. */
+.grid-footer__count {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.grid-footer__note {
+  display: block;
+  color: var(--text-muted);
+}
+
+.grid-footer__extent {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.grid-footer__bar {
+  display: block;
+  width: 150px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.grid-footer__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.grid-footer__range {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+</style>

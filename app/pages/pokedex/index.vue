@@ -5,12 +5,16 @@ import { useDex } from '~/composables/useDex'
 /**
  * O índice da Pokédex — as 9 gerações como cartas de região.
  *
- * Esta tela não tem prancha. As 17 do canvas desenham a Pokédex já **dentro** de
- * uma região, e o cabeçalho delas é a referência que este índice segue: o
- * sobretítulo `GERAÇÃO I`, o nome da região em display grande e a contagem
- * embaixo. O que a prancha põe ao lado da contagem — `98 / 151 capturados`, em
- * verde de progresso — é coleção, e coleção é Fase 5: aqui a linha diz a faixa
- * do dex, que é o que já é verdade.
+ * Esta tela foi implementada na Fase 3 **sem prancha**: as 17 do canvas de então
+ * desenhavam a Pokédex já **dentro** de uma região, e o cabeçalho delas foi a
+ * referência que este índice seguiu — o sobretítulo `GERAÇÃO I`, o nome da
+ * região em display grande e a contagem embaixo. A varredura de 02/09 fechou a
+ * lacuna: o canvas ganhou a 18ª prancha, *Pokédex — as 9 regiões*, desenhada a
+ * partir deste componente e com as faixas de dex tiradas do `core.json`.
+ *
+ * O que a prancha põe ao lado da contagem — `98 / 151 capturados`, em verde de
+ * progresso — é coleção, e coleção é Fase 5: aqui a linha diz a faixa do dex,
+ * que é o que já é verdade.
  */
 const { loadCore } = useDex()
 

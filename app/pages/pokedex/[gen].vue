@@ -66,6 +66,11 @@ if (error.value) {
 const region = computed(() => data.value?.region ?? null)
 const species = computed(() => data.value?.dexGeneration.species ?? [])
 
+/** `#0001–0151`, para o rodapé do grid — que é onde a prancha o desenha. */
+const dexRangeOfRegion = computed(() => (
+  region.value === null ? null : dexRange(region.value.firstId, region.value.lastId)
+))
+
 /**
  * O que o payload trouxe entra no cache do `useDex()`.
  *
@@ -142,13 +147,14 @@ useSeoMeta({
             <h1 class="region-header__name">
               {{ region?.label }}
             </h1>
+            <!-- Só a contagem. A prancha põe aqui `98 / 151 capturados` e a
+                 lista de jogos da geração (`Red · Blue · Yellow`); a primeira é
+                 coleção, e a segunda é dado que o dex não traz — `GenerationMeta`
+                 tem geração, região, nome e contagem, e mais nada. A faixa de
+                 dex desceu para o rodapé do grid, que é onde a prancha a
+                 desenha. -->
             <p class="numeric region-header__meta">
               {{ region?.speciesCount }} espécies
-              <span
-                class="region-header__separator"
-                aria-hidden="true"
-              >·</span>
-              {{ region === null ? '' : dexRange(region.firstId, region.lastId) }}
             </p>
           </div>
 
@@ -183,13 +189,17 @@ useSeoMeta({
       <ClientOnly>
         <DexGrid
           :species="filtered"
+          :range="dexRangeOfRegion"
           virtualize
         />
         <template #fallback>
           <!-- O servidor renderiza a lista **inteira**, não a filtrada: o
                filtro é estado do cliente, e o HTML pré-renderizado é o que
                carrega os 151 links das páginas de detalhe. -->
-          <DexGrid :species="species" />
+          <DexGrid
+            :species="species"
+            :range="dexRangeOfRegion"
+          />
         </template>
       </ClientOnly>
 
@@ -255,10 +265,5 @@ useSeoMeta({
   text-align: center;
   font-size: 14px;
   color: var(--text-muted);
-}
-
-.region-header__separator {
-  padding: 0 6px;
-  color: var(--text-faint);
 }
 </style>
