@@ -3,7 +3,6 @@ import type { SpeciesEntry } from '~~/shared/types/dex'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { computed, useTemplateRef, watch } from 'vue'
 import { useElementBounding, useElementSize } from '@vueuse/core'
-import { SPECIES_COUNT } from '~~/shared/types/brand'
 
 /**
  * O grid de espécies — o mesmo desenho nas duas formas em que ele existe.
@@ -32,9 +31,14 @@ const props = withDefaults(defineProps<{
   species: readonly SpeciesEntry[]
   virtualize?: boolean
   /** `#0001–0151`, para o rodapé. A faixa é da região e o grid não a conhece —
-   *  quem a calcula é a página, que sabe qual região está aberta. */
-  range?: string
-}>(), { virtualize: false, range: '' })
+   *  quem a calcula é a página, que sabe qual região está aberta.
+   *
+   *  `null` para ausência, e não `''`: é como o resto do repositório escreve
+   *  "não tem" (`data.value?.region ?? null`, `description ?? null`,
+   *  `species.habitat === null`), e uma string vazia obriga quem lê a saber que
+   *  ela é sentinela e não conteúdo. */
+  range?: string | null
+}>(), { virtualize: false, range: null })
 
 /** Largura mínima de uma carta. Abaixo disso o nome quebra em duas linhas. */
 const MIN_CARD_WIDTH = 132
@@ -159,11 +163,23 @@ const renderedPercent = computed(() => {
  * A ressalva sobre virtualização é parte da mesma sentença, e um `<template
  * v-if>` no meio de um parágrafo obriga a quebrar linha no HTML — o que insere
  * espaço em branco antes do `·`. Uma string resolve os dois.
+ *
+ * **A ressalva só aparece quando a virtualização está de fato retendo alguma
+ * coisa.** `virtualize` diz que ela está ligada, não que ela está segurando: com
+ * um filtro estreito — Kanto por *Lendário* são 4 espécies — todas as fileiras
+ * cabem na janela, e a frase anunciava "scroll virtualizado" ao lado de
+ * `4 de 4` e de uma barra em 100%. Anunciar um mecanismo que não está operando é
+ * o mesmo defeito que o comentário do `addInitScript` no e2e tinha, agora em
+ * texto que o usuário lê.
+ *
+ * E sem número: a versão anterior citava `SPECIES_COUNT` (1025), que não tem
+ * referente em tela nenhuma — o grid é sempre de **uma** região, e a maior tem
+ * 156. Quem quer o número tem os dois reais na primeira metade da frase.
  */
 const renderedLabel = computed(() => {
   const counted = `${rendered.value} de ${props.species.length} renderizados`
-  if (!props.virtualize) return counted
-  return `${counted} · scroll virtualizado — o DOM nunca segura as ${SPECIES_COUNT}`
+  if (!props.virtualize || rendered.value >= props.species.length) return counted
+  return `${counted} · scroll virtualizado`
 })
 </script>
 
@@ -220,8 +236,11 @@ const renderedLabel = computed(() => {
       v-if="species.length > 0"
       class="grid-footer"
     >
-      <p class="numeric grid-footer__count">
-        {{ renderedLabel }}
+      <!-- O `numeric` vai no que é número, e não no parágrafo inteiro: o
+           utilitário é tabular-nums para alinhar dígito, e a nota abaixo é
+           prosa. -->
+      <p class="grid-footer__count">
+        <span class="numeric">{{ renderedLabel }}</span>
         <span class="grid-footer__note">A Pokédex é referência: mostra tudo, possuídas ou não.</span>
       </p>
 
@@ -245,7 +264,7 @@ const renderedLabel = computed(() => {
           />
         </span>
         <span
-          v-if="range !== ''"
+          v-if="range !== null"
           class="numeric grid-footer__range"
         >{{ range }}</span>
       </div>
@@ -265,15 +284,19 @@ const renderedLabel = computed(() => {
   border-top: 1px solid var(--border);
 }
 
+/* Os dois papéis têm piso AA normal, que é o que 11px exige. `--text-faint` é o
+   único com piso de texto grande — `theme.spec.ts` escreve que usá-lo em texto
+   pequeno é erro do lado do componente, e a nota aqui tem 11px. A hierarquia
+   entre as duas linhas sai do par corpo/mudo, sem gastar o papel de rodapé. */
 .grid-footer__count {
   font-size: 11px;
   line-height: 1.5;
-  color: var(--text-muted);
+  color: var(--text-body);
 }
 
 .grid-footer__note {
   display: block;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 
 .grid-footer__extent {

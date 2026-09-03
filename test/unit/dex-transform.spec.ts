@@ -12,6 +12,7 @@ import {
   selectMoveset,
   toBaseStats,
   toEvolutionCondition,
+  toHabitat,
   toMoveEntry,
   toTypes,
 } from '~~/scripts/lib/transform'
@@ -119,6 +120,25 @@ const emptySpecies = {
   evolution_chain: { url: 'https://pokeapi.co/api/v2/evolution-chain/1/' },
   varieties: [],
 }
+
+describe('toHabitat', () => {
+  it('devolve o nome quando é um dos 9', () => {
+    expect(toHabitat({ ...emptySpecies, habitat: named('rough-terrain') })).toBe('rough-terrain')
+  })
+
+  it('devolve null quando a PokeAPI não preenche — geração 6 em diante', () => {
+    expect(toHabitat(emptySpecies)).toBeNull()
+  })
+
+  it('para o build num habitat que não conhece', () => {
+    // Não vira `null`: isso perderia um habitat de verdade sem ninguém notar. E
+    // não passa cru: chegaria à aba *Sobre* como identificador em inglês, no
+    // valor que o painel põe em `--accent`. O build é o único momento em que dá
+    // para escrever o rótulo antes de o dado existir na tela.
+    expect(() => toHabitat({ ...emptySpecies, name: 'pikachu', habitat: named('space') }))
+      .toThrow(/pikachu: habitat desconhecido \(space\)/)
+  })
+})
 
 describe('buildEffectivenessMatrix', () => {
   function relations(overrides: Partial<PokeType['damage_relations']> = {}): PokeType['damage_relations'] {

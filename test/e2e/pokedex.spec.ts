@@ -62,6 +62,14 @@ test('o grid virtualiza depois de montar — o DOM não segura as 151', async ({
   await page.waitForFunction(() => !document.querySelector('a[aria-label^="Bulbasaur,"]'))
 
   expect(await page.locator('a.dex-card').count()).toBeLessThan(151)
+
+  // O rodapé é a evidência visível dessa troca, e ele tem de contar o mesmo DOM
+  // que este teste acabou de contar — no navegador de verdade, com a largura
+  // real decidindo quantas colunas cabem. É o outro lado do
+  // `test/nuxt/dex-grid.spec.ts`, que mede a mesma regra sem layout.
+  const rendered = await page.locator('a.dex-card').count()
+  await expect(page.locator('.grid-footer__count')).toContainText(`${rendered} de 151 renderizados`)
+  await expect(page.locator('.grid-footer__count')).toContainText('scroll virtualizado')
 })
 
 test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre eles', async ({ page }) => {
@@ -96,6 +104,13 @@ test('a busca abre por atalho, filtra e navega', async ({ page }) => {
   // O atalho só existe depois da hidratação — `goto` resolve no `load`, que é
   // antes. Sem esta espera o teste falha por corrida e não por defeito.
   await expect(page.getByRole('link', { name: /^Bulbasaur,/ })).toBeVisible()
+
+  // Mas o link do Bulbasaur **não** prova hidratação: ele está no HTML servido,
+  // então fica visível antes de qualquer JavaScript rodar, e o `press` abaixo cai
+  // no vazio. O sinal que só existe depois do `onMounted` é a troca de forma do
+  // grid — as 151 do servidor virando as poucas do virtualizador. Com o servidor
+  // frio a diferença é de centenas de milissegundos, e é assim que o CI sobe.
+  await expect.poll(() => page.locator('a.dex-card').count()).toBeLessThan(151)
 
   await page.keyboard.press('ControlOrMeta+k')
 

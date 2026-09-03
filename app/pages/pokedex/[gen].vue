@@ -68,7 +68,7 @@ const species = computed(() => data.value?.dexGeneration.species ?? [])
 
 /** `#0001–0151`, para o rodapé do grid — que é onde a prancha o desenha. */
 const dexRangeOfRegion = computed(() => (
-  region.value === null ? '' : dexRange(region.value.firstId, region.value.lastId)
+  region.value === null ? null : dexRange(region.value.firstId, region.value.lastId)
 ))
 
 /**

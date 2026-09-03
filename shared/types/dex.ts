@@ -33,6 +33,22 @@ export type TypeName = typeof TYPE_NAMES[number]
 export const TYPE_COUNT = TYPE_NAMES.length
 
 /**
+ * Os 9 habitats da PokeAPI, em ordem alfabética — o conjunto inteiro, e ele é
+ * fechado: a API parou de preencher o campo na geração 6 e nenhum nome novo
+ * entrou desde então.
+ *
+ * Existe como tupla pela mesma razão que `REGION_NAMES`: é o que permite
+ * `HABITAT_LABELS` ser um `Record` completo, e um habitat novo sem rótulo
+ * escrito deixa de compilar em vez de aparecer em inglês na tela.
+ */
+export const HABITAT_NAMES = [
+  'cave', 'forest', 'grassland', 'mountain', 'rare',
+  'rough-terrain', 'sea', 'urban', 'waters-edge',
+] as const
+
+export type Habitat = typeof HABITAT_NAMES[number]
+
+/**
  * Ordem fixa de `baseStats`. Existe como constante porque o array `stats[]` da
  * PokeAPI **não** garante ordem — ler por índice é a forma silenciosa de trocar
  * Ataque por Defesa numa espécie só, e nenhum teste de contagem pegaria isso.
@@ -213,7 +229,10 @@ export interface CoreData {
 
 /**
  * Uma espécie no grid. `habitat` é `null` da geração 6 em diante — a PokeAPI
- * parou de preencher o campo, e inventar um valor mentiria na aba Sobre.
+ * parou de preencher o campo, e inventar um valor mentiria na aba Sobre. Quando
+ * não é nulo é um dos 9 de `HABITAT_NAMES`, e não uma string qualquer: o painel
+ * *Sobre* o traduz por `HABITAT_LABELS`, e um valor fora da lista não teria
+ * rótulo em português para mostrar.
  */
 export interface SpeciesEntry {
   readonly id: SpeciesId
@@ -227,7 +246,7 @@ export interface SpeciesEntry {
   readonly isMythical: boolean
   readonly isBaby: boolean
   readonly captureRate: number
-  readonly habitat: string | null
+  readonly habitat: Habitat | null
   readonly baseHappiness: number
   readonly color: string
   readonly evolutionChainId: number
@@ -332,6 +351,11 @@ export function typeIndex(name: string): number {
  */
 export function isTypeName(value: string): value is TypeName {
   return TYPE_NAMES.some(known => known === value)
+}
+
+/** Mesma mecânica de `isTypeName`, e pela mesma razão de tipagem. */
+export function isHabitat(value: string): value is Habitat {
+  return HABITAT_NAMES.some(known => known === value)
 }
 
 /**
@@ -506,7 +530,9 @@ function isSpeciesEntry(value: unknown): value is SpeciesEntry {
     && typeof value.isMythical === 'boolean'
     && typeof value.isBaby === 'boolean'
     && isNonNegativeInt(value.captureRate)
-    && (value.habitat === null || isText(value.habitat))
+    // `typeof` e não `isText`, que devolve `boolean` e não estreita — `isHabitat`
+    // pede `string`. A vazia continua recusada: `''` não está nos 9.
+    && (value.habitat === null || (typeof value.habitat === 'string' && isHabitat(value.habitat)))
     && isNonNegativeInt(value.baseHappiness)
     && isText(value.color)
     && isPositiveInt(value.evolutionChainId)

@@ -67,7 +67,7 @@ nasceu, com o `exclude` herdado do `extends` anulando o `include` dele.
 
 Tema **Holo TCG**, escuro-único. Não é limitação: o foil holográfico depende de
 `mix-blend-mode: color-dodge`, que clareia — sobre fundo claro ele estoura em
-branco e o efeito deixa de existir. A especificação visual é o canvas de 17
+branco e o efeito deixa de existir. A especificação visual é o canvas de 18
 pranchas aprovado antes da implementação; divergir dele é decisão consciente,
 anotada no commit que diverge e listada em [Divergências do
 canvas](#divergências-do-canvas).
@@ -211,6 +211,10 @@ está aqui é só o que sobrou de propósito.
 | barras de stat pelo teto do dex | o mockup escala por ~165; 255 é o HP da Blissey, e uma barra acima de 100% da trilha não é uma barra |
 | `DexTypeBadge` sem chanfro | nenhuma prancha chanfra o chip de tipo, e a 11px do grid um chanfro de 9px come a última letra de VENENOSO |
 | habitat em `--accent` | a prancha *Detalhe* pinta o valor com o verde de planta (`#5FE07A`), que não tem papel no sistema. `--accent` é o semântico que existe para "este valor se destaca" |
+| habitat em português | a prancha escreve `ROUGH TERRAIN`, o identificador da PokeAPI. `--accent` faz dele o valor mais destacado do painel, e um documento `lang="pt-BR"` não destaca uma palavra em inglês — é o mesmo argumento que trocou `FLYING` por `VOADOR` nos chips. `HABITAT_LABELS` traduz os 9 |
+| marca-d'água em `--text` a 3% | a prancha usa branco a **2,8%**. `color-mix` aceita o fracionário; o 3% é o passo redondo, e a diferença é invisível no papel que a própria prancha dá ao número (identidade, não leitura) |
+| marca-d'água em `min(46cqw, 230px)` e `max(-30px, -5%)` | a prancha fixa `230px` e `left:-30px` numa coluna de 560. A página não tem `max-width`, então a coluna vai de 100% do viewport a 5/12 dele — os valores fixos só reproduziriam o desenho em 1440. A conta acompanha a coluna e para nos números da prancha |
+| `hero__facts dd` a 20px só acima de 420px de conteúdo na coluna | os 20px são a escala da prancha, medida a 1440. Entre 900 e ~1080 a coluna cai para 310–375px e o bloco de fatos dobra de altura (131px contra 44px) — a escala da prancha aplicada a uma largura que não é a dela |
 | barra do rodapé do grid em `--accent` | a prancha usa `#8BD674`, o verde de progresso de coleção. Ele **não tem token** — quando a Fase 5 trouxer progresso de verdade, ele precisa de um, e a barra de extensão não pode gastar o significado antes |
 | segundo brilho na carta de dois tipos | o canvas não o desenha, e sem ele `types[1]` chega à carta sem efeito nenhum |
 | 18 chips de tipo no filtro | a prancha trunca em 6 + `+12 tipos`; a truncagem cobra um clique por um filtro cujo valor inteiro é ser imediato |

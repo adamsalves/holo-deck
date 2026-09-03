@@ -1,4 +1,4 @@
-import type { TypeName } from './dex.ts'
+import type { Habitat, TypeName } from './dex.ts'
 
 /**
  * Tipos do jogo — o que a Pokédex não conhece.
@@ -136,6 +136,28 @@ export function generationLabel(generation: number): string {
  * em `dex.ts` porque a PokeAPI não entrega isto: `dex.ts` é o contrato do que
  * vem de fora, e o nome que o jogador lê é coisa que este jogo inventa.
  */
+/**
+ * Os 9 habitats em português. Mesma razão que `TYPE_LABELS`, e o mesmo caso: o
+ * painel *Sobre* põe o habitat em `--accent`, o que faz dele o valor mais
+ * destacado de um documento `lang="pt-BR"` — `ROUGH TERRAIN` ali é exatamente o
+ * `FLYING` que o canvas trocou por `VOADOR`.
+ *
+ * `rare` não é "raro" no sentido da escada de raridade: na PokeAPI é o habitat
+ * dos que não moram em lugar nenhum comum, e "incomum" mediria a mesma coisa que
+ * `RARITY_LABELS.uncommon`. "Ermo" nomeia o lugar, que é o que a coluna diz.
+ */
+export const HABITAT_LABELS: Record<Habitat, string> = {
+  'cave': 'Caverna',
+  'forest': 'Floresta',
+  'grassland': 'Campo',
+  'mountain': 'Montanha',
+  'rare': 'Ermo',
+  'rough-terrain': 'Terreno acidentado',
+  'sea': 'Mar',
+  'urban': 'Urbano',
+  'waters-edge': 'Beira d\'água',
+}
+
 export const TYPE_LABELS: Record<TypeName, string> = {
   normal: 'Normal',
   fighting: 'Lutador',

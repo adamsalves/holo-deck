@@ -21,6 +21,7 @@ import {
   selectMoveset,
   toBaseStats,
   toEvolutionCondition,
+  toHabitat,
   toMoveEntry,
   toTypes,
 } from './lib/transform.ts'
@@ -277,7 +278,7 @@ function buildSpeciesEntry(
     isMythical: species.is_mythical,
     isBaby: species.is_baby,
     captureRate: species.capture_rate,
-    habitat: species.habitat?.name ?? null,
+    habitat: toHabitat(species),
     baseHappiness: species.base_happiness ?? 0,
     color: species.color.name,
     evolutionChainId: resourceId(species.evolution_chain.url),
