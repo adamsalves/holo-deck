@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/adamsalves/holo-deck/compare/v0.5.0...v0.5.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* **pokedex:** a varredura das pranchas, e o que ela moveu dos dois lados ([e919ab6](https://github.com/adamsalves/holo-deck/commit/e919ab6dbc8476dd45006d8460943144dd34d58a))
+* **pokedex:** o app e as pranchas voltam a concordar ([30446b8](https://github.com/adamsalves/holo-deck/commit/30446b8de9b1b936d5f3dae2c7afa390e8dff043))
+* **pokedex:** o painel Sobre volta às duas colunas da prancha ([0e5aea9](https://github.com/adamsalves/holo-deck/commit/0e5aea96b610194c5a20b98ef6005c720137313f))
+* **pokedex:** o que o review achou, e o portão que faltava para vê-lo ([07aff82](https://github.com/adamsalves/holo-deck/commit/07aff827d8c4204c2e52a5f9fe7d90697ce2a96c))
+
 ## [0.5.0](https://github.com/adamsalves/holo-deck/compare/v0.4.0...v0.5.0) (2026-09-02)
 
 
