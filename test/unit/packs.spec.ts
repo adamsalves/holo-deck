@@ -125,6 +125,29 @@ describe('composição do pack', () => {
     }
   })
 
+  /**
+   * A ordem de revelação é embaralhada, e este teste é o que impede o
+   * embaralhamento de virar no-op sem ninguém ver — todos os outros contam por
+   * tier, que é invariante à ordem.
+   *
+   * A prancha *Abertura de pack* põe o Gyarados RARO na quarta posição de dez.
+   * Sem embaralhar, os slots sairiam em blocos e o raro+ seria **sempre** o
+   * décimo: um tell perfeito, que apaga o suspense das nove primeiras.
+   */
+  it('embaralha a ordem, e não entrega o raro+ sempre por último', () => {
+    const positions = new Set(
+      Array.from({ length: 200 }, (_, seed) =>
+        openPack({ seed: seed + 1, pity: 0, pool }).cards
+          .findIndex(card => card.rarity !== 'common' && card.rarity !== 'uncommon')),
+    )
+
+    // Com 200 aberturas, dez posições possíveis e ordem uniforme, ver menos que
+    // metade delas é praticamente impossível — e ver uma só é o sintoma exato de
+    // o embaralhamento ter sumido.
+    expect(positions.size).toBeGreaterThan(5)
+    expect(positions.has(PACK_SIZE - 1)).toBe(true)
+  })
+
   it('a mesma seed abre o mesmo pack', () => {
     const first = openPack({ seed: 4242, pity: 3, pool })
     const second = openPack({ seed: 4242, pity: 3, pool })

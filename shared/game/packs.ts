@@ -1,7 +1,7 @@
 import type { SpeciesId } from '../types/brand.ts'
 import type { IndexData } from '../types/dex.ts'
 import type { PackCard, Rarity } from '../types/game.ts'
-import type { RngState } from './rng.ts'
+import type { RngCursor, RngState } from './rng.ts'
 import { createRng } from './rng.ts'
 import { rarityFrom } from './rarity.ts'
 
@@ -201,7 +201,39 @@ export function openPack({ seed, pity, pool }: PackInput): PackResult {
 
   const hit = cards.some(card => isPityTier(card.rarity))
 
-  return { cards, pity: hit ? 0 : pity + 1, forcedByPity: forced }
+  return { cards: shuffle(cards, rng), pity: hit ? 0 : pity + 1, forcedByPity: forced }
+}
+
+/**
+ * Embaralha a ordem em que as dez são reveladas — Fisher-Yates, sobre o mesmo
+ * cursor de RNG.
+ *
+ * **A ordem sai da prancha, não do gosto.** A tira de *Abertura de pack* mostra
+ * `4 / 10 reveladas` com o Gyarados RARO na **quarta** posição, entre comuns. Os
+ * slots são sorteados em blocos — seis comuns, três incomuns, um raro+ — e
+ * revelar nessa ordem poria o raro+ sempre por último, o que dá ao jogador um
+ * tell perfeito: as nove primeiras cartas deixam de ter qualquer suspense
+ * porque ele já sabe que nenhuma delas pode ser a boa.
+ *
+ * Embaralhar não toca em taxa nenhuma: a composição continua 6/3/1, e todo teste
+ * de distribuição conta por tier, que é invariante à ordem.
+ */
+function shuffle<T>(items: readonly T[], rng: RngCursor): readonly T[] {
+  const result = [...items]
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swap = rng.int(0, index)
+    const held = result[index]
+    const other = result[swap]
+    // Por contrato os dois índices estão dentro da lista; a leitura é guardada
+    // porque `noUncheckedIndexedAccess` a tipa como possivelmente ausente, e as
+    // alternativas seriam um `!` ou um `as` — os dois proibidos pelo lint.
+    if (held === undefined || other === undefined) continue
+    result[index] = other
+    result[swap] = held
+  }
+
+  return result
 }
 
 /**

@@ -65,6 +65,26 @@ const TEXT_ROLES = [
 const UI_ROLES = [
   { token: '--accent', minimum: AA_NORMAL },
   { token: '--focus', minimum: NON_TEXT },
+  /**
+   * O degrau alto do progresso carrega **texto**, e não só barra: a prancha
+   * *Pokédex* escreve o `98` de `98 / 151 capturados` e o `GERAÇÃO I` do
+   * cabeçalho nele. Os dois de baixo só preenchem barra, e o piso deles é o 3:1
+   * do critério 1.4.11 — mas os dois apontam para tokens que já passam AA por
+   * outro papel, então o piso baixo aqui é o teto do que eles precisam, não uma
+   * concessão.
+   */
+  { token: '--progress-high', minimum: AA_NORMAL },
+  { token: '--progress-mid', minimum: NON_TEXT },
+  { token: '--progress-low', minimum: NON_TEXT },
+  /**
+   * Os três papéis que a Fase 5 promoveu de primitivo a nome. Todos carregam
+   * texto: `--shiny` na etiqueta SHINY e na contagem do cabeçalho, `--forge` no
+   * título do painel, `--deficit` no `custa 1.600 pó` que o jogador não pode
+   * pagar.
+   */
+  { token: '--shiny', minimum: AA_NORMAL },
+  { token: '--forge', minimum: AA_NORMAL },
+  { token: '--deficit', minimum: AA_NORMAL },
 ]
 
 /** Todo papel de cor que a matriz de contraste cobra, seja qual for o nome. */
@@ -123,7 +143,7 @@ describe('contraste do tema', () => {
     const declarados = new Set(
       declarations(themeSource())
         .map(({ name }) => name)
-        .filter(name => /^--(?:text(?:-[\w-]+)?|accent|focus)$/.test(name)),
+        .filter(name => /^--(?:text(?:-[\w-]+)?|accent|focus|progress-(?:high|mid|low)|shiny|forge|deficit)$/.test(name)),
     )
 
     // Um papel novo entrar no tema e não entrar na matriz seria um papel sem

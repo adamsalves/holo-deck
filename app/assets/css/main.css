@@ -101,6 +101,25 @@
   --color-rarity-legendary: #FFC24D;
 
   /**
+   * O verde de progresso de coleção — o único hex novo da Fase 5.
+   *
+   * Ele estava nas pranchas desde o canvas aprovado e **não tinha token**: a
+   * varredura de 02/09 registrou isso como pendência, e a Fase 2 não podia
+   * resolvê-la porque não existia progresso para tingir. Esta é a fase que cria
+   * o dado, então é esta que paga o token.
+   *
+   * Ele não é `--color-rarity-uncommon` nem `--color-type-grass`, apesar de os
+   * três serem verdes. Papel diferente: um diz tier, o outro diz elemento, e
+   * este diz **quanto do dex já foi capturado** — reusar qualquer um dos dois
+   * faria a barra de progresso de Kanto parecer estar falando de incomuns.
+   *
+   * Os três lugares em que a prancha o usa são o mesmo papel: a barra cheia, o
+   * `98` de `98 / 151 capturados`, e o `GERAÇÃO I` do cabeçalho da região — que
+   * é verde justamente porque aquele cabeçalho passa a contar coleção.
+   */
+  --color-progress: #8BD674;
+
+  /**
    * A escada de chanfro — a assinatura da silhueta, no canto superior-esquerdo e
    * no inferior-direito.
    *
@@ -391,6 +410,77 @@
    * componente redescobre.
    */
   --ease-out: cubic-bezier(0.2, 0.85, 0.25, 1);
+
+  /**
+   * Os três degraus da barra de progresso de coleção.
+   *
+   * As pranchas *Coleção* e *Hub* desenham a mesma fileira de nove regiões com
+   * três cores — verde em Kanto a 65%, azul em Johto a 31%, neutro em Hoenn a
+   * 7% — e sem preenchimento nenhum de Sinnoh em diante, que está a zero. Como
+   * as duas pranchas mostram os mesmos três pontos, o canvas não distingue
+   * sozinho entre *escala de progresso* e *cor da região*; a decisão foi por
+   * escala, e ela é a que o resto do sistema já sustenta.
+   *
+   * **Só o degrau alto é hex novo.** O médio é o acento e o baixo é o degrau de
+   * texto apagado — os dois que a prancha desenha são vizinhos desses valores, e
+   * inventar dois hexes para a diferença seria pagar em token o que é variação
+   * de mockup desenhado à mão. Ver `--radius`, onde o mesmo argumento normalizou
+   * 2px e 3px num valor só.
+   *
+   * Os limiares moram em `shared/game/progress.ts`, e não aqui: quem escreve a
+   * regra é o código que a testa, e uma faixa declarada só em CSS é uma faixa
+   * que nenhum portão alcança.
+   */
+  --progress-high: var(--color-progress);
+  --progress-mid: var(--accent);
+  --progress-low: var(--color-ink-325);
+
+  /**
+   * A trilha vazia atrás de qualquer uma das três.
+   *
+   * Aponta para `--surface-raised`, que o próprio tema já descreve como "trilho
+   * de barra" — apontar direto para `ink-800` seria pular a camada semântica no
+   * único arquivo que existe para tê-la.
+   */
+  --progress-track: var(--surface-raised);
+
+  /**
+   * O brilho de shiny — o ciano de gelo, promovido a papel.
+   *
+   * Shiny **não é um degrau da escada de raridade**: ele rola sobre qualquer
+   * tier, inclusive comum, e por isso pinta *por cima* do que a raridade já
+   * decidiu. Um Gengar shiny é ultra e é shiny ao mesmo tempo, e a prancha
+   * *Coleção* mostra exatamente isso — moldura ciano, contagem própria no
+   * cabeçalho, e a etiqueta `SHINY` no lugar da de raridade.
+   *
+   * Ele reusa `--color-type-ice` em vez de trazer um hex: o valor é o mesmo que
+   * a prancha desenha, e o que faltava era o **nome**. Um componente escrevendo
+   * `--color-type-ice` diria que shiny é gelo, que é a leitura errada.
+   */
+  --shiny: var(--color-type-ice);
+
+  /**
+   * O acento da forja.
+   *
+   * A prancha marca o painel *Forjar* no roxo de ultra, e a razão é legível na
+   * própria tela: a forja é a superfície que promete a carta que o sorteio não
+   * deu, e o roxo é a cor que o jogo já usa para "isto é o topo da escada".
+   *
+   * Tem nome próprio porque **não é ultra**. Forjar um comum a 20 pó usa o mesmo
+   * painel, e um componente lendo `--color-rarity-ultra` ali afirmaria uma
+   * raridade que a tela não está exibindo.
+   */
+  --forge: var(--color-rarity-ultra);
+
+  /**
+   * O vermelho do que falta — o número que o jogador não pode pagar.
+   *
+   * A prancha escreve `custa 1.600 pó` com o número em vermelho **porque o
+   * saldo é 340**. É sinal de déficit, não de erro nem de perigo: nada quebrou,
+   * e chamá-lo de `--error` faria a primeira mensagem de erro de verdade herdar
+   * o significado de "você ainda não juntou pó suficiente".
+   */
+  --deficit: var(--color-type-fighting);
 
   --text: var(--color-ink-50); /* 17.19 / 14.62 — primário */
   --text-body: var(--color-ink-200); /* 7.57 / 6.43 — corpo */
