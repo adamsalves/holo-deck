@@ -90,9 +90,18 @@ const index = Array.from({ length: SPECIES_COUNT }, (_, position) => ({
   displayName: `Species ${position + 1}`,
   generation: Math.min(GENERATION_COUNT, Math.floor(position / 151) + 1),
   types: ['electric'],
+  bst: 318,
+  isLegendary: false,
+  isMythical: false,
 }))
-index[24] = { id: 25, slug: 'pikachu', displayName: 'Pikachu', generation: 1, types: ['electric'] }
-index[5] = { id: 6, slug: 'charizard', displayName: 'Charizard', generation: 1, types: ['fire', 'flying'] }
+index[24] = {
+  id: 25, slug: 'pikachu', displayName: 'Pikachu', generation: 1, types: ['electric'],
+  bst: 320, isLegendary: false, isMythical: false,
+}
+index[5] = {
+  id: 6, slug: 'charizard', displayName: 'Charizard', generation: 1, types: ['fire', 'flying'],
+  bst: 534, isLegendary: false, isMythical: false,
+}
 
 let coreHits = 0
 registerEndpoint('/data/core.json', () => {
@@ -201,6 +210,9 @@ describe('useDex', () => {
       displayName: 'Charizard',
       generation: 1,
       types: ['fire', 'flying'],
+      bst: 534,
+      isLegendary: false,
+      isMythical: false,
     })
   })
 

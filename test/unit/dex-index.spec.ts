@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GENERATION_COUNT, isIndexData } from '~~/shared/types/dex'
+import { baseStatTotal, rarityFrom, rarityOf } from '~~/shared/game/rarity'
 import { readAllSpecies, readGeneration, readIndex } from '../support/generated-dex'
 
 /**
@@ -45,6 +46,53 @@ describe('índice do dex', () => {
     })
 
     expect(divergentes.map(entry => entry.slug)).toEqual([])
+  })
+
+  /**
+   * Os três campos da Fase 5, conferidos contra a mesma fonte.
+   *
+   * `bst` é o único campo do índice que é **cálculo** e não cópia, e por isso é
+   * o único que pode divergir sem ninguém renomear nada: basta alguém somar
+   * diferente de um lado. Conferir a soma aqui é o que impede o índice de
+   * afirmar uma raridade que `gen-N.json` não sustenta.
+   */
+  it('concorda com gen-N.json em BST e nas duas marcas', () => {
+    const porId = new Map(species.map(entry => [entry.id, entry]))
+
+    const divergentes = index.filter((entry) => {
+      const source = porId.get(entry.id)
+      return source === undefined
+        || entry.bst !== baseStatTotal(source.baseStats)
+        || source.isLegendary !== entry.isLegendary
+        || source.isMythical !== entry.isMythical
+    })
+
+    expect(divergentes.map(entry => entry.slug)).toEqual([])
+  })
+
+  /**
+   * A propriedade da qual a Fase 5 inteira depende, afirmada diretamente.
+   *
+   * As duas conferências acima olham campo a campo; esta olha o **veredito**. O
+   * pack sorteia lendo o índice e o binder conta tier lendo o índice, enquanto a
+   * Pokédex colore moldura lendo `gen-N.json` — se os dois caminhos discordarem,
+   * uma carta muda de raridade ao trocar de tela, e nenhum dos dois lados está
+   * obviamente errado no diff.
+   */
+  it('produz a mesma raridade pelos dois caminhos, para as 1025', () => {
+    const porId = new Map(species.map(entry => [entry.id, entry]))
+
+    const divergentes = index.flatMap((entry) => {
+      const source = porId.get(entry.id)
+      if (source === undefined) return [`${entry.slug} não está em gen-N.json`]
+
+      const doIndice = rarityFrom(entry)
+      const daEspecie = rarityOf(source)
+
+      return doIndice === daEspecie ? [] : [`${entry.slug}: índice ${doIndice} ≠ gen ${daEspecie}`]
+    })
+
+    expect(divergentes).toEqual([])
   })
 
   /**

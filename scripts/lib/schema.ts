@@ -18,6 +18,7 @@ import {
 } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
 import { isMoveId, isSpeciesId, SPECIES_COUNT } from '../../shared/types/brand.ts'
+import { MAX_BASE_STAT_TOTAL } from '../../shared/game/rarity.ts'
 
 /**
  * Validação da **saída** — o que vai para `public/data/`.
@@ -199,6 +200,11 @@ export const indexSchema: z.ZodType<IndexData> = z.array(z.object({
   displayName: z.string().min(1),
   generation: z.number().int().min(1).max(GENERATION_COUNT),
   types: speciesTypes,
+  // O teto é o do dex — Arceus soma 720. `MAX_BASE_STAT_TOTAL` é o mesmo número
+  // que a barra de BST da prancha *Detalhe* usa como escala.
+  bst: z.number().int().positive().max(MAX_BASE_STAT_TOTAL),
+  isLegendary: z.boolean(),
+  isMythical: z.boolean(),
 })).length(SPECIES_COUNT)
 
 const evolutionCondition = z.object({
