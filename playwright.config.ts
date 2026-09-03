@@ -1,6 +1,20 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 3000
+/**
+ * A porta, configurável — e a razão de ela ter deixado de ser uma constante.
+ *
+ * O `reuseExistingServer` abaixo é o padrão local do Playwright e é útil: ele
+ * reaproveita um `yarn preview` que já esteja de pé. Só que ele não confere
+ * **quem** atende — ele confere que alguém atende. Nesta máquina havia um
+ * Grafana na 3000, e a suíte inteira rodou contra ele: nove testes falharam
+ * dizendo que o `<h1>Pokédex</h1>` não existia, o que era verdade, porque a
+ * página era outra.
+ *
+ * Com a porta vindo do ambiente, o contorno é `PORT=3100 yarn test:e2e`, e o
+ * `yarn preview` herda a mesma variável — os dois lados não têm como discordar.
+ * No CI nada muda: `reuseExistingServer` já é `false` lá, e a 3000 está livre.
+ */
+const PORT = Number(process.env.PORT ?? 3000)
 const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({

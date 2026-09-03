@@ -38,7 +38,21 @@ const props = withDefaults(defineProps<{
    *  `species.habitat === null`), e uma string vazia obriga quem lê a saber que
    *  ela é sentinela e não conteúdo. */
   range?: string | null
-}>(), { virtualize: false, range: null })
+  /**
+   * Quem o jogador possui, e quem ele possui em shiny.
+   *
+   * `Set` de id, e não uma função de consulta: o grid pergunta uma vez por
+   * carta visível e um `Set` responde em tempo constante sem o componente
+   * precisar segurar um closure que muda de identidade a cada render.
+   *
+   * `null` — o padrão — significa **sem coleção carregada**, e é o que mantém
+   * este componente utilizável fora do jogo: o fallback de SSR renderiza as 151
+   * cartas sem anel nenhum, que é exatamente o HTML que o servidor pode
+   * produzir sobre um save que ele não tem.
+   */
+  ownedIds?: ReadonlySet<number> | null
+  shinyIds?: ReadonlySet<number> | null
+}>(), { virtualize: false, range: null, ownedIds: null, shinyIds: null })
 
 /** Largura mínima de uma carta. Abaixo disso o nome quebra em duas linhas. */
 const MIN_CARD_WIDTH = 132
@@ -193,6 +207,8 @@ const renderedLabel = computed(() => {
         v-for="entry in species"
         :key="entry.id"
         :species="entry"
+        :owned="ownedIds === null ? null : ownedIds.has(entry.id)"
+        :shiny="shinyIds?.has(entry.id) ?? false"
       />
     </div>
 
@@ -216,6 +232,8 @@ const renderedLabel = computed(() => {
           v-for="entry in rowSpecies(row.index)"
           :key="entry.id"
           :species="entry"
+          :owned="ownedIds === null ? null : ownedIds.has(entry.id)"
+          :shiny="shinyIds?.has(entry.id) ?? false"
         />
       </div>
     </div>

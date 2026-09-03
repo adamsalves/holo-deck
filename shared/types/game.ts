@@ -221,3 +221,15 @@ export interface CollectionEntry {
   /** Quantas das cópias são shiny. */
   readonly s: number
 }
+
+/**
+ * O filtro de posse da Pokédex — *Todos*, *Possuídos*, *Faltando*.
+ *
+ * Exclusivo, e não cumulativo como tipo e raridade: os dois recortes
+ * **particionam** o dex, então ligar ambos é o mesmo que ligar nenhum. Vive aqui
+ * e não no componente porque a prancha *Pokédex* e a *Coleção* desenham a mesma
+ * ideia, e a segunda tela que precisar dela não deve redeclarar o vocabulário.
+ */
+export const OWNERSHIP_FILTERS = ['all', 'owned', 'missing'] as const
+
+export type OwnershipFilter = typeof OWNERSHIP_FILTERS[number]

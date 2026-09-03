@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TypeName } from '~~/shared/types/dex'
-import type { Rarity } from '~~/shared/types/game'
+import type { OwnershipFilter, Rarity } from '~~/shared/types/game'
 import { computed } from 'vue'
 import { TYPE_NAMES } from '~~/shared/types/dex'
 import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
@@ -9,12 +9,17 @@ import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
  * A linha de filtros da prancha *Pokédex*.
  *
  * Ela desenha três grupos: posse (*Todos · 151*, *Possuídos · 98*, *Faltando ·
- * 53*), tipo e raridade. **O primeiro não está aqui**, e não por esquecimento:
- * posse é coleção, e coleção é Fase 5. Um filtro *Possuídos* que devolve zero
+ * 53*), tipo e raridade. Os dois últimos saem do dex — tipo vem da espécie,
+ * raridade sai de BST e das marcas — e chegaram na Fase 3.
+ *
+ * **O de posse chegou na Fase 5**, que é a que criou a coleção. Ele ficou de
+ * fora antes por decisão registrada aqui: um filtro *Possuídos* que devolve zero
  * sempre não é um filtro incompleto, é um filtro mentiroso.
  *
- * Os outros dois saem do dex — tipo vem da espécie, raridade sai de BST e das
- * marcas — e por isso chegam agora.
+ * Ele é **exclusivo** enquanto os outros dois são cumulativos, e isso não é
+ * inconsistência: *possuído* e *faltando* particionam o mesmo conjunto, então
+ * ligar os dois é o mesmo que ligar nenhum. Tipo e raridade somam; posse
+ * escolhe.
  *
  * A prancha mostra 6 tipos e um `+12 tipos`. Aqui aparecem os 18, quebrando
  * linha: a truncagem economiza altura e cobra um clique para um filtro cujo
@@ -22,13 +27,25 @@ import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
  */
 const types = defineModel<readonly TypeName[]>('types', { required: true })
 const rarities = defineModel<readonly Rarity[]>('rarities', { required: true })
+const owned = defineModel<OwnershipFilter>('owned', { required: true })
 
 const props = defineProps<{
   total: number
   shown: number
+  /**
+   * Quantas o jogador possui na fatia em exibição, ou `null` quando a coleção
+   * ainda não carregou. `null` e não `0`: enquanto o save não chegou, escrever
+   * `Possuídos · 0` afirmaria uma coleção vazia que ninguém verificou.
+   */
+  ownedCount?: number | null
 }>()
 
-const active = computed(() => types.value.length > 0 || rarities.value.length > 0)
+const hasCollection = computed(() => props.ownedCount !== null && props.ownedCount !== undefined)
+
+const missingCount = computed(() => props.total - (props.ownedCount ?? 0))
+
+const active = computed(() =>
+  types.value.length > 0 || rarities.value.length > 0 || owned.value !== 'all')
 
 function toggleType(type: TypeName) {
   types.value = types.value.includes(type)
@@ -45,6 +62,7 @@ function toggleRarity(rarity: Rarity) {
 function clear() {
   types.value = []
   rarities.value = []
+  owned.value = 'all'
 }
 </script>
 
@@ -61,6 +79,30 @@ function clear() {
     >
       Todos · <span class="numeric">{{ active ? `${props.shown} de ${props.total}` : props.total }}</span>
     </button>
+
+    <!-- Posse. Só aparece quando há coleção carregada: o grupo inteiro some em
+         vez de mostrar dois filtros zerados enquanto o save não chegou. -->
+    <template v-if="hasCollection">
+      <button
+        type="button"
+        class="filters__chip filters__chip--owned"
+        :class="{ 'filters__chip--on': owned === 'owned' }"
+        :aria-pressed="owned === 'owned'"
+        @click="owned = owned === 'owned' ? 'all' : 'owned'"
+      >
+        Possuídos · <span class="numeric">{{ props.ownedCount }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="filters__chip"
+        :class="{ 'filters__chip--on': owned === 'missing' }"
+        :aria-pressed="owned === 'missing'"
+        @click="owned = owned === 'missing' ? 'all' : 'missing'"
+      >
+        Faltando · <span class="numeric">{{ missingCount }}</span>
+      </button>
+    </template>
 
     <span
       class="filters__divider"

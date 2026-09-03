@@ -18,8 +18,19 @@ import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
  * `aria-label` do link: uma frase com número, nome, tipos e raridade, que é o
  * que o leitor de tela anuncia no lugar do conteúdo visual — sem duplicar texto
  * na tela nem espremer mais uma linha numa carta de 140px.
+ *
+ * A posse chegou na Fase 5, em dois sinais que a prancha desenha e que a Fase 3
+ * segurou por não haver coleção: o **anel vazado** de quem não se tem, e o
+ * marcador de shiny. Os dois entram no `aria-label` pela mesma razão que a
+ * raridade entrou — a Pokédex é referência, mostra tudo, e distinguir o que se
+ * tem do que falta não pode depender de enxergar uma borda tracejada.
  */
-const props = defineProps<{ species: SpeciesEntry }>()
+const props = withDefaults(defineProps<{
+  species: SpeciesEntry
+  /** `null` enquanto o save não carregou. Ver `ownedInRegion` em `[gen].vue`. */
+  owned?: boolean | null
+  shiny?: boolean
+}>(), { owned: null, shiny: false })
 
 const rarity = computed(() => rarityOf(props.species))
 
@@ -35,6 +46,8 @@ const label = computed(() => [
   `número ${props.species.id}`,
   typeLabels.value.join(' e '),
   RARITY_LABELS[rarity.value],
+  ...(props.owned === false ? ['não capturado'] : []),
+  ...(props.shiny ? ['shiny'] : []),
 ].join(', '))
 </script>
 
@@ -43,6 +56,7 @@ const label = computed(() => [
     :to="`/pokemon/${species.slug}`"
     :aria-label="label"
     class="dex-card"
+    :class="{ 'dex-card--missing': owned === false, 'dex-card--shiny': shiny }"
   >
     <DexPokeCard
       :dex-number="species.id"
@@ -92,6 +106,31 @@ const label = computed(() => [
 .dex-card:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
+}
+
+/**
+ * O anel vazado de quem ainda não foi capturado.
+ *
+ * A carta continua **legível**, e é decisão do canvas: a Pokédex é referência
+ * antes de ser coleção, e apagar a arte de 900 espécies transformaria a tela
+ * numa lista de silhuetas. O que muda é a moldura — tracejada e sem preencher —
+ * e uma leve dessaturação, o suficiente para o olho separar as duas classes ao
+ * varrer o grid sem esconder nenhuma delas.
+ */
+.dex-card--missing :deep(.poke-card) {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+.dex-card--missing :deep(.poke-card) img {
+  filter: saturate(0.35) opacity(0.65);
+}
+
+/* Shiny pinta por cima da raridade, como no binder: é tratamento de exemplar,
+   não degrau da escada. */
+.dex-card--shiny :deep(.poke-card) {
+  border-color: var(--shiny);
+  box-shadow: 0 0 26px -12px var(--shiny);
 }
 
 .dex-card__types {

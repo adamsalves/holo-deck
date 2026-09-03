@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import type { Region } from '~~/shared/dex/regions'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
+import { progressLabel } from '~~/shared/game/progress'
+import { isSpeciesId } from '~~/shared/types/brand'
+import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from '~/composables/useDex'
 
 /**
@@ -12,11 +17,33 @@ import { useDex } from '~/composables/useDex'
  * lacuna: o canvas ganhou a 18ª prancha, *Pokédex — as 9 regiões*, desenhada a
  * partir deste componente e com as faixas de dex tiradas do `core.json`.
  *
- * O que a prancha põe ao lado da contagem — `98 / 151 capturados`, em verde de
- * progresso — é coleção, e coleção é Fase 5: aqui a linha diz a faixa do dex,
- * que é o que já é verdade.
+ * `98 / 151 capturados` e a barra de progresso chegaram na Fase 5, que é a que
+ * criou a coleção. Antes disso a linha dizia só a faixa do dex, porque era o que
+ * já era verdade.
  */
 const { loadCore } = useDex()
+const collection = useCollectionStore()
+
+/**
+ * A coleção mora em `localStorage`, logo não existe no servidor. Antes de montar
+ * a contagem é `null` e a linha volta a dizer só a faixa — escrever `0 / 151`
+ * afirmaria uma coleção vazia que ninguém verificou, e mudaria de número na
+ * hidratação.
+ */
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
+
+function ownedIn(region: Region): number | null {
+  if (!mounted.value) return null
+
+  let owned = 0
+  for (let id = region.firstId; id <= region.lastId; id += 1) {
+    if (isSpeciesId(id) && collection.has(id)) owned += 1
+  }
+  return owned
+}
 
 /**
  * `transform` não é otimização de gosto — é o que impede os 54 KB de `core.json`
@@ -69,13 +96,27 @@ useSeoMeta({
           <span class="numeric region-card__generation">{{ region.generationLabel }}</span>
           <span class="region-card__name">{{ region.label }}</span>
           <span class="numeric region-card__range">
-            {{ region.speciesCount }} espécies
+            <template v-if="ownedIn(region) !== null">
+              <span class="region-card__owned">{{ ownedIn(region) }}</span>
+              / {{ region.speciesCount }} capturados
+            </template>
+            <template v-else>
+              {{ region.speciesCount }} espécies
+            </template>
             <span
               class="region-card__separator"
               aria-hidden="true"
             >·</span>
             {{ dexRange(region.firstId, region.lastId) }}
           </span>
+
+          <CollectionProgressBar
+            v-if="ownedIn(region) !== null"
+            :owned="ownedIn(region) ?? 0"
+            :total="region.speciesCount"
+            :label="`Progresso em ${region.label}: ${progressLabel(ownedIn(region) ?? 0, region.speciesCount)}`"
+            class="mt-1"
+          />
         </NuxtLink>
       </li>
     </ul>
@@ -99,6 +140,13 @@ useSeoMeta({
 .region-card:focus-visible {
   background: var(--surface-raised);
   border-color: var(--border-strong);
+}
+
+/* O numerador em verde, como no cabeçalho da região: o número que se move é o
+   que se destaca. */
+.region-card__owned {
+  color: var(--progress-high);
+  font-weight: 800;
 }
 
 .region-card__generation {
