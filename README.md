@@ -4,9 +4,9 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 4 — a Pokédex e o motor de batalha,
-> ainda sem tela. Packs, coleção e deck entram a partir da Fase 5, e a tela da
-> batalha na Fase 6. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da Fase 5 — a Pokédex, o motor de batalha
+> (ainda sem tela) e o ciclo de pack e coleção. Deck, Liga, loja e a tela da
+> batalha entram na Fase 6. O README completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -26,9 +26,18 @@ yarn typecheck   # vue-tsc sobre app/, shared/, scripts/, test/ e os configs
 yarn test        # Vitest — unitários, headless
 yarn build       # saída Nitro em .output/
 yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
-                 # `yarn preview`, que serve .output/
+                 # `yarn preview`, que serve .output/. Se a 3000 estiver ocupada
+                 # nesta máquina, use `PORT=3100 yarn test:e2e` — ver abaixo
 yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver abaixo
 ```
+
+O `reuseExistingServer` do Playwright reaproveita um servidor que já esteja de
+pé na porta configurada — e ele confere que **alguém** atende, não **quem**. Um
+serviço alheio na 3000 faz a suíte inteira rodar contra ele e reprovar dizendo
+que a página não tem os elementos certos, o que é verdade e não é o defeito. Por
+isso a porta vem de `process.env.PORT`: o `yarn preview` herda a mesma variável,
+e os dois lados não têm como discordar. No CI nada muda — lá o
+`reuseExistingServer` já é `false`.
 
 Os quatro projetos que o `nuxt prepare` gera não cobrem `test/`, `scripts/` nem
 os arquivos de configuração; quem fecha essa lacuna é o
@@ -78,13 +87,28 @@ vez de manter um sistema paralelo:
 
 | | |
 |---|---|
-| **Primitivos** | a escada `ink` de 16 degraus, as 18 cores de tipo, as 5 de raridade, os 4 chanfros, o raio e as duas famílias |
-| **Semânticos** | `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` `--text` `--text-body` `--text-muted` `--text-faint` |
+| **Primitivos** | a escada `ink` de 16 degraus, as 18 cores de tipo, as 5 de raridade, o verde de progresso, os 4 chanfros, o raio e as duas famílias |
+| **Semânticos** | superfície e fio: `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` · texto: `--text` `--text-body` `--text-muted` `--text-faint` · papel: `--accent` `--focus` `--shiny` `--forge` `--deficit` `--progress-high` `--progress-mid` `--progress-low` `--progress-track` |
 
 Dois deles — `--surface-sunken` e `--text-faint` — estão declarados à frente do
 consumidor, e o portão de tema reprova qualquer terceiro que apareça: token sem
 leitor é receita não verificada, e as duas exceções ficam escritas no teste em
 vez de descobertas depois.
+
+Os cinco papéis da última linha entraram na Fase 5, e quatro deles nasceram de o
+portão de token ter **recusado** um componente lendo primitivo — ele estava
+certo, e a recusa é o que os transformou em nome:
+
+| token | por que tem nome próprio |
+|---|---|
+| `--color-progress` (`#8BD674`) | o único hex novo da fase. Não é `rarity-uncommon` nem `type-grass`, apesar de os três serem verdes: um diz tier, outro diz elemento, e este diz **quanto do dex já foi capturado** |
+| `--shiny` | shiny rola sobre qualquer tier e pinta *por cima* da raridade. Um componente escrevendo `--color-type-ice` afirmaria que shiny é gelo |
+| `--forge` | forjar um comum a 20 pó usa o mesmo painel roxo; ler `--color-rarity-ultra` ali afirmaria uma raridade que a tela não está exibindo |
+| `--deficit` | é o número que o jogador **não pode pagar**, não um erro. `--error` faria a primeira mensagem de erro de verdade herdar o significado de "junte mais pó" |
+
+Os três degraus de progresso e os cinco papéis entraram também na matriz de
+contraste, que hoje cobra `--accent`, `--focus` e os `--text-*` sobre **todas** as
+superfícies descobertas no tema.
 
 **Regra dura: componente consome semântico. Nunca primitivo, nunca hex cru.** As
 pranchas do canvas usam hex inline porque são mockup, e copiar da prancha para o
@@ -215,13 +239,17 @@ está aqui é só o que sobrou de propósito.
 | marca-d'água em `--text` a 3% | a prancha usa branco a **2,8%**. `color-mix` aceita o fracionário; o 3% é o passo redondo, e a diferença é invisível no papel que a própria prancha dá ao número (identidade, não leitura) |
 | marca-d'água em `min(46cqw, 230px)` e `max(-30px, -5%)` | a prancha fixa `230px` e `left:-30px` numa coluna de 560. A página não tem `max-width`, então a coluna vai de 100% do viewport a 5/12 dele — os valores fixos só reproduziriam o desenho em 1440. A conta acompanha a coluna e para nos números da prancha |
 | `hero__facts dd` a 20px só acima de 420px de conteúdo na coluna | os 20px são a escala da prancha, medida a 1440. Entre 900 e ~1080 a coluna cai para 310–375px e o bloco de fatos dobra de altura (131px contra 44px) — a escala da prancha aplicada a uma largura que não é a dela |
-| barra do rodapé do grid em `--accent` | a prancha usa `#8BD674`, o verde de progresso de coleção. Ele **não tem token** — quando a Fase 5 trouxer progresso de verdade, ele precisa de um, e a barra de extensão não pode gastar o significado antes |
+| barra do rodapé do grid em `--accent` | a prancha usa `#8BD674`, o verde de progresso. Ele ganhou token na Fase 5 (`--progress-high`), e a barra continua em `--accent` de propósito: ela mede **posição de rolagem**, não coleção, e gastar ali o verde que significa "capturado" tornaria as duas leituras indistinguíveis no mesmo grid |
 | segundo brilho na carta de dois tipos | o canvas não o desenha, e sem ele `types[1]` chega à carta sem efeito nenhum |
 | 18 chips de tipo no filtro | a prancha trunca em 6 + `+12 tipos`; a truncagem cobra um clique por um filtro cujo valor inteiro é ser imediato |
 | linha evolutiva em grade de estágios | a prancha desenha uma fila com setas, e **Eevee tem oito filhos no mesmo degrau** |
 | condição dentro da carta, não sob a seta | mesma razão: sob a seta, um estágio que ramifica não tem onde pôr oito condições |
 | aba *Sobre* aberta, e abas que escondem | a versão aprovada marcava *Stats* na barra e desenhava os quatro blocos juntos — as duas coisas descrevem uma coluna sem abas. Decisão de 02/09: as abas ficam, abrindo em *Sobre*, e a prancha foi corrigida |
 | times de ginásio pela regra | a prancha *Liga* desenha Onix como ace do Brock e Noctowl como ativo do Falkner; a regra produz Graveler e não inclui Noctowl. Composição de time é regra de jogo, e o canvas é a especificação **visual** — as duas artes passam a ser ilustrativas |
+| barra de progresso em 3 degraus, com só um hex novo | a prancha desenha `#8BD674`, `#58ABF6` e `#B5B9C4`. O médio virou `--accent` e o baixo virou `ink-325` — os dois desenhados são vizinhos de valores que já existem, e inventar dois hexes para a diferença seria pagar em token o que é variação de mockup. Mesmo argumento que normalizou `2px`/`3px` num `--radius` só |
+| separador de milhar em toda parte | a prancha escreve `custa 1.600 pó` e `FALTAM 1.260 PÓ`, e `1600` na tabela ao lado — inconsistência do mockup. Vale o separador em todo lugar: duas grafias do mesmo valor na mesma tela é pior que discordar de um canto da prancha |
+| `PackOpener` em CSS, sem `motion-v` | o plano nomeia a biblioteca; a cascata é uma propriedade transformada com atraso por índice, o "foil só depois dos 90°" é um passo de keyframe a 50%, e `prefers-reduced-motion` desliga tudo por media query |
+| carta não-possuída legível, não silhueta | a prancha anota "anel vazado"; aqui é moldura tracejada mais dessaturação leve. A Pokédex é **referência** antes de ser coleção, e apagar a arte de 900 espécies transformaria a tela numa lista de sombras |
 
 ### A prancha estava errada, e foi corrigida em 02/09
 
@@ -241,9 +269,13 @@ está aqui é só o que sobrou de propósito.
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
 progresso que ninguém pode mover.
 
-- **Fase 5:** a contagem `98 / 151 capturados` no cabeçalho da região e no
-  índice, o anel de não possuída, o marcador de shiny, os filtros *Possuídos* e
-  *Faltando*, e o verde de progresso que tinge o cabeçalho.
+- ~~**Fase 5:** a contagem `98 / 151 capturados`, o anel de não possuída, o
+  marcador de shiny, os filtros *Possuídos* e *Faltando*, e o verde de
+  progresso.~~ **Entregue na Fase 5.**
+- **Fase 6:** a faixa de retomar batalha no Hub, a barra de navegação global
+  (`Base · Pokédex · Coleção · Deck · Liga`, mais Packs, Ajustes e Regras), o
+  saldo de moedas e o contador do pack diário. Até lá a raiz é a porta, com um
+  link para cada uma das três telas que existem.
 - **Sem dado no dex:** a lista de jogos da geração (`Red · Blue · Yellow`) que a
   prancha *Pokédex* põe no cabeçalho. `GenerationMeta` traz geração, região,
   nome e contagem — o campo teria de nascer no pipeline.
@@ -259,6 +291,16 @@ progresso que ninguém pode mover.
 - **Base stat contra Lv50.** A prancha *Deck* mostra Pikachu com `HP 35` (base) e
   a prancha *Batalha* com `110` (Lv50). Duas telas vizinhas escrevendo "HP" com
   significados diferentes.
+- **Tipo como texto em painel.** `dragon` dá 3,99 sobre `--surface-raised`. Hoje
+  a cor de tipo é só preenchimento e o único texto que ela carrega fica sobre
+  `--bg`, onde passa. A Fase 6 é a que põe nome de tipo em painel, e é ela que
+  precisa decidir — ver a issue #11 e o portão em `test/unit/theme.spec.ts`.
+
+Uma das perguntas desta lista **foi respondida na Fase 5**, e fica registrada
+aqui porque o canvas não a respondia sozinho: as barras de progresso por região
+aparecem em três cores sempre nas mesmas regiões, o que não distingue *escala de
+progresso* de *cor da região*. Decidido: **escala**, com cortes em 50% e 15%,
+e a regra mora em `shared/game/progress.ts` para `/rules` poder lê-la.
 
 ## Dados do jogo
 
@@ -293,11 +335,23 @@ pipeline muda**; para jogar ou desenvolver, os arquivos commitados bastam.
 | `core.json`         | matriz de efetividade 18×18, catálogo de golpes — de dano e os 10 de status —, gerações |
 | `chains.json`       | as 541 cadeias de evolução já resolvidas em árvore    |
 | `gen-N.json`        | as espécies da geração N — o que o grid precisa       |
-| `index.json`        | id, slug, nome, geração e tipos das 1025 — o que a busca global indexa e o que faz `/pokemon/[name]` achar a geração de um slug sem abrir os nove arquivos |
+| `index.json`        | id, slug, nome, geração, tipos, BST e as duas marcas das 1025 — o que a busca global indexa, o que faz `/pokemon/[name]` achar a geração de um slug sem abrir os nove arquivos, e o que dá ao pack e ao binder a raridade de qualquer espécie |
 | `flavor-N.json`     | as descrições, **em arquivo separado**: pesam mais que todo o resto do dex junto, e só a página de detalhe as usa |
 | `sprites/{id}.webp` | miniatura de 128 px, recortada no alpha               |
 
-Seis coisas que o pipeline decide e que não dá para deduzir lendo a saída:
+Sete coisas que o pipeline decide e que não dá para deduzir lendo a saída:
+
+- **O índice guarda os insumos da raridade, não a raridade.** `bst`,
+  `isLegendary` e `isMythical` entraram na Fase 5, porque o pack sorteia sobre as
+  1025 de uma vez e o binder conta tier de espécie de qualquer geração — e nenhum
+  dos dois pode abrir 319 KB de `gen-N.json` para saber a que faixa pertence um
+  id. Guardar `rarity` já calculada poria os limiares num JSON gerado que ninguém
+  rebuilda ao mexer neles; a regra continua sendo `rarityFrom()`. Custo medido:
+  92 → 141 KB crus, **15,1 → 18,5 KB comprimido**, porque `isLegendary:false`
+  repetido 1025 vezes é quase de graça no gzip. O portão de `dex-index.spec.ts`
+  confere os campos contra `gen-N.json` **e** o veredito de raridade pelos dois
+  caminhos — sem o segundo, uma carta poderia mudar de raridade ao trocar de
+  tela sem nenhum dos lados parecer errado no diff.
 
 - **A versão de um moveset vem do campo `order`, nunca do id do version group.**
   `blue-japan` tem id 29 e `scarlet-violet` tem 25 — a PokeAPI cadastrou o
@@ -349,10 +403,15 @@ Busca global em `Cmd/Ctrl+K`, em qualquer uma das três. Ela indexa nome, númer
 tipo — dá para procurar por `venenoso` ou por `0150` — e só baixa o `index.json`
 quando abre pela primeira vez.
 
-O grid filtra por tipo e por raridade: **OU** dentro de cada grupo, **E** entre
-os dois. A prancha desenha um terceiro grupo — *Possuídos* e *Faltando* — que não
-está aqui: posse é coleção, e coleção é Fase 5. Um filtro *Possuídos* que devolve
-zero sempre não seria um filtro incompleto, seria um filtro mentiroso.
+O grid filtra por tipo, por raridade e por **posse**. Tipo e raridade são
+cumulativos — **OU** dentro de cada grupo, **E** entre eles. Posse é
+**exclusiva**, e isso não é inconsistência: *Possuídos* e *Faltando* particionam
+o mesmo conjunto, então ligar os dois é o mesmo que ligar nenhum.
+
+O grupo de posse chegou na Fase 5, que é a que criou a coleção; antes dele um
+filtro *Possuídos* que devolve zero sempre não seria um filtro incompleto, seria
+um filtro mentiroso. Enquanto o save não carregou, a contagem é `null` e o grupo
+inteiro não aparece — `0` afirmaria uma coleção vazia que ninguém verificou.
 
 Quatro decisões desta fase que não se deduzem lendo o código:
 
@@ -402,6 +461,129 @@ A raridade (`shared/game/rarity.ts`) e a matriz de tipos
 aqui, porque a Pokédex as exibe e nenhuma das duas depende de coleção. Os
 limiares saem do percentil sobre as 1025, não do chute: com os originais do plano
 a distribuição saía invertida, com *raro* virando o maior tier do jogo.
+
+## Pack, coleção e forja
+
+O ciclo da Fase 5: abrir pack → creditar coleção → moer duplicata em pó → forjar
+a carta que faltou.
+
+| Rota          | O que é                                                  |
+| ------------- | -------------------------------------------------------- |
+| `/packs`      | a abertura carta a carta, com as taxas no cabeçalho      |
+| `/collection` | o binder: progresso por região, filtros, pó e forja      |
+
+A regra inteira mora em [`shared/game/`](shared/game/), headless como o motor —
+100 mil aberturas rodam em ~100 ms sem montar componente nenhum.
+
+| Módulo       | O que decide                                                |
+| ------------ | ----------------------------------------------------------- |
+| `packs.ts`   | 10 cartas (6/3/1), o slot raro+, o pity e o shiny           |
+| `dust.ts`    | pó por duplicata e custo de forja, na razão 4×              |
+| `progress.ts`| a fração capturada e o degrau que ela pinta                 |
+| `economy.ts` | por enquanto só os packs de boas-vindas; o resto é Fase 6   |
+
+### Os números, e de onde eles saem
+
+| | |
+| --- | --- |
+| composição | 6 comuns, 3 incomuns, 1 raro+ |
+| slot raro+ | raro 80% · ultra 15% · lendário 4,5% · mítico 0,5% |
+| shiny | 1/256 **por carta** — 3,84% por pack, ou um a cada ~26 |
+| pity | 10 packs sem ultra+ garantem o próximo |
+| forja | 5/15/50/150/400 de pó; custo = pó × 4 |
+
+O pity em 10 saiu de conta, não de gosto. A chance de um pack não trazer ultra+ é
+`1 − 0,20 = 0,80`, então uma seca de N packs tem chance `0,8^N`: a 10 ela pega
+**uma seca em nove** (10,7%), e a 20 pegaria uma em 87 — rede que quase ninguém
+encosta, e uma proteção que não se sente é uma proteção que não existe.
+
+**Cuidado com a unidade:** "1 em 9" é por **ciclo**, não por pack. Medida por
+pack a rede dispara em ~2,3%, porque um ciclo dura 4,6 packs em média. Os dois
+números descrevem a mesma coisa, e confundi-los faz um portão correto reprovar
+código correto — foi o que aconteceu na primeira versão do teste estatístico, e é
+por isso que ele hoje mede pesos puros e rede em série em blocos separados.
+
+### Decisões que não se deduzem lendo o código
+
+- **A ordem de revelação é embaralhada.** Os slots são sorteados em blocos, então
+  revelar nessa ordem poria o raro+ sempre por último — um tell perfeito, que
+  apaga o suspense das nove primeiras cartas. A prancha põe o raro na quarta
+  posição de dez, e é isso que o Fisher-Yates reproduz. Tem portão próprio: todos
+  os outros testes contam por tier, que é invariante à ordem.
+- **Sem repetir espécie dentro do mesmo pack.** Com reposição a colisão é de ~3%
+  e não distorce taxa nenhuma, mas a mesma carta duas vezes numa tira de dez lê
+  como defeito, não como sorte.
+- **Moer consome as normais antes das shiny**, e aceita moer até a última cópia —
+  a Fase 6 diz que moer uma carta do deck ativo esvazia o slot, e um limite aqui
+  contradiria aquela regra antes de ela chegar.
+- **Forjar credita a carta antes de debitar o pó**, pela ordem de escrita do
+  plano: uma falha no meio dá carta de graça em vez de cobrar sem entregar. A
+  carta forjada nunca é shiny — brilho é sorte de pack.
+- **O `PackOpener` é CSS, não `motion-v`.** O plano nomeia a biblioteca; o que
+  ela faria é uma `@keyframes` de `rotateY` com atraso por índice. O "o foil só
+  acende depois dos 90°" da prancha é um passo de keyframe a 50%, e
+  `prefers-reduced-motion` desliga tudo por media query.
+- **Três packs de boas-vindas**, e eles chegaram uma fase antes do plano. O jogo
+  tem um ciclo fechado na partida — carta para deck, deck para ginásio, ginásio
+  para moeda, moeda para pack — e sem uma concessão inicial nenhuma porta abre.
+  A loja e o pack diário continuam na Fase 6.
+- **O binder não virtualiza; ele usa `content-visibility`.** A Pokédex virtualiza
+  porque suas fileiras têm altura uniforme. A carta do binder não tem: a linha
+  `2 dup · 10 pó` só aparece quando há duplicata, e uma fileira com repetida é
+  ~22px mais alta que uma sem — um `estimateSize` único posicionaria as fileiras
+  erradas depois da primeira divergência. `content-visibility: auto` pula estilo,
+  layout e pintura do que está fora da janela sem exigir altura uniforme, e é o
+  que faz as 1025 caberem. **Virtualizar de verdade depende de uniformizar a
+  altura da carta, que é decisão de canvas** — fica para a Fase 6, junto com o
+  deck, que desenha a mesma carta. Registrado na
+  [issue #24](https://github.com/adamsalves/holo-deck/issues/24).
+
+## O save
+
+Um documento só, versionado, em `holodeck:save`.
+
+O plano cita duas formas em seções diferentes — `pinia-plugin-persistedstate` com
+uma chave por store, e um `SaveDriver` sobre save único — e elas não se compõem.
+Ganhou a segunda, que é a única que sustenta o que vem depois: um `schemaVersion`
+cobrindo o save inteiro, uma cadeia de migração que enxerga todas as seções ao
+mesmo tempo, e os ~21 KB que a Fase 7 sobe numa requisição só.
+
+```
+shared/save/schema.ts        forma, guarda e migração — puro, não sabe que localStorage existe
+app/utils/save-driver        LocalStorageDriver: a única camada que toca o navegador
+app/plugins/save.client      o único lugar que faz IO de save
+app/components/SaveRecoveryNotice.vue  o aviso, que é a outra metade da regra
+app/stores/*                 regra e estado; não tocam disco
+```
+
+**A regra inegociável é nunca apagar, e ela tem duas metades.** Toda leitura que
+dá errado copia o save cru para `holodeck:backup:<instante>` e devolve save limpo
+**com motivo** — nunca um `null`, que a tela confundiria com jogador novo. O
+instante entra na chave e não no valor: senão a segunda recuperação apagaria a
+cópia que a primeira salvou.
+
+A segunda metade é **avisar**. Quem abre a coleção e a encontra vazia não tem
+como distinguir "o save estava ilegível e foi guardado" de "o jogo apagou tudo",
+e as duas hipóteses levam a ações opostas porque só a primeira tem conserto —
+por isso o motivo sobe até `$saveRecovery` e o `SaveRecoveryNotice` o mostra
+acima do layout, com o endereço da cópia. Começar limpo em silêncio seria
+guardar o backup para ninguém.
+
+Guardar **tudo** que nunca entendemos não é a mesma regra: ficam as três cópias
+mais recentes (`MAX_BACKUPS`), podadas pelo instante da chave antes de cada
+gravação nova. Uma cota de 5 MB e um save de 21 KB que falhe em todo boot
+enchem o armazenamento em algumas centenas de aberturas, derrubando justamente
+a gravação do save novo.
+
+O guarda de leitura recusa contagem sem ordem de grandeza — o save é texto num
+navegador que o jogador controla, e um `c: 1e15` vira pó infinito na primeira
+moagem. Recusar manda o cru para o backup em vez de reescrevê-lo menor em
+silêncio; `schemaVersion` fica de fora do teto, porque número alto ali é o caso
+normal de quem voltou de uma build nova e tem tratamento próprio.
+
+Foi essa fronteira, escrita antes de haver backend, que faz a Fase 7 custar uma
+implementação nova (`HttpDriver`, `SyncDriver`) em vez de uma reescrita —
+nenhuma store muda de forma.
 
 ## Motor de batalha
 

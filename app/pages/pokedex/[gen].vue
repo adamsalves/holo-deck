@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { TypeName } from '~~/shared/types/dex'
-import type { Rarity } from '~~/shared/types/game'
-import { computed, ref } from 'vue'
+import type { OwnershipFilter, Rarity } from '~~/shared/types/game'
+import { computed, onMounted, ref } from 'vue'
 import { rarityOf } from '~~/shared/game/rarity'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
+import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from '~/composables/useDex'
 
 /**
@@ -96,6 +97,33 @@ watchEffect(() => {
  */
 const selectedTypes = ref<readonly TypeName[]>([])
 const selectedRarities = ref<readonly Rarity[]>([])
+const selectedOwnership = ref<OwnershipFilter>('all')
+
+/**
+ * A coleção, para o cabeçalho e para o filtro de posse.
+ *
+ * Ela mora em `localStorage`, então no servidor é sempre vazia — e é por isso
+ * que a contagem sai como `null` até o cliente hidratar, em vez de `0`. Zero
+ * afirmaria uma coleção vazia; `null` diz "ainda não sei", e a tela some com o
+ * grupo em vez de mentir por um instante.
+ */
+const collection = useCollectionStore()
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
+
+const ownedIds = computed<ReadonlySet<number> | null>(() =>
+  (mounted.value
+    ? new Set(species.value.filter(entry => collection.has(entry.id)).map(entry => entry.id))
+    : null))
+
+const shinyIds = computed<ReadonlySet<number> | null>(() =>
+  (mounted.value
+    ? new Set(species.value.filter(entry => collection.shinies(entry.id) > 0).map(entry => entry.id))
+    : null))
+
+const ownedInRegion = computed(() => ownedIds.value?.size ?? null)
 
 /**
  * Tipo é OU dentro do grupo (planta *ou* fogo), e o mesmo vale para raridade;
@@ -109,7 +137,12 @@ const filtered = computed(() => species.value.filter((entry) => {
   const byRarity = selectedRarities.value.length === 0
     || selectedRarities.value.includes(rarityOf(entry))
 
-  return byType && byRarity
+  // Posse é exclusiva: os dois recortes particionam o dex, então `all` não
+  // filtra nada e os outros dois nunca se somam.
+  const byOwnership = selectedOwnership.value === 'all'
+    || (selectedOwnership.value === 'owned') === collection.has(entry.id)
+
+  return byType && byRarity && byOwnership
 }))
 
 useSeoMeta({
@@ -141,20 +174,29 @@ useSeoMeta({
 
         <div class="region-header__row">
           <div>
+            <!-- O verde tinge o sobretítulo porque este cabeçalho passou a
+                 contar coleção. Era a última pendência do canvas sem token, e a
+                 Fase 5 é a que criou o dado que ele significa. -->
             <p class="numeric region-header__generation">
               {{ region?.generationLabel }}
             </p>
             <h1 class="region-header__name">
               {{ region?.label }}
             </h1>
-            <!-- Só a contagem. A prancha põe aqui `98 / 151 capturados` e a
-                 lista de jogos da geração (`Red · Blue · Yellow`); a primeira é
-                 coleção, e a segunda é dado que o dex não traz — `GenerationMeta`
-                 tem geração, região, nome e contagem, e mais nada. A faixa de
-                 dex desceu para o rodapé do grid, que é onde a prancha a
-                 desenha. -->
+            <!-- `98 / 151 capturados` chegou com a Fase 5. O que continua
+                 fora é a lista de jogos da geração (`Red · Blue · Yellow`) que a
+                 prancha põe ao lado: é dado que o dex não traz —
+                 `GenerationMeta` tem geração, região, nome e contagem, e mais
+                 nada. A faixa de dex desceu para o rodapé do grid, que é onde a
+                 prancha a desenha. -->
             <p class="numeric region-header__meta">
-              {{ region?.speciesCount }} espécies
+              <template v-if="ownedInRegion !== null">
+                <span class="region-header__owned">{{ ownedInRegion }}</span>
+                / {{ region?.speciesCount }} capturados
+              </template>
+              <template v-else>
+                {{ region?.speciesCount }} espécies
+              </template>
             </p>
           </div>
 
@@ -164,8 +206,10 @@ useSeoMeta({
         <DexFilters
           v-model:types="selectedTypes"
           v-model:rarities="selectedRarities"
+          v-model:owned="selectedOwnership"
           :total="species.length"
           :shown="filtered.length"
+          :owned-count="ownedInRegion"
           class="mt-6"
         />
       </div>
@@ -190,6 +234,8 @@ useSeoMeta({
         <DexGrid
           :species="filtered"
           :range="dexRangeOfRegion"
+          :owned-ids="ownedIds"
+          :shiny-ids="shinyIds"
           virtualize
         />
         <template #fallback>
@@ -242,7 +288,14 @@ useSeoMeta({
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--progress-high);
+}
+
+/* O numerador em verde, o denominador em texto de metadado — é como a prancha
+   escreve `98 / 151 capturados`: o número que se move é o que se destaca. */
+.region-header__owned {
+  color: var(--progress-high);
+  font-weight: 800;
 }
 
 .region-header__name {

@@ -50,6 +50,30 @@ export const MAX_BASE_STAT = 255
 export const MAX_BASE_STAT_TOTAL = 720
 
 /**
+ * Os três insumos da raridade, nomeados — e a razão de eles terem nome.
+ *
+ * A regra sempre leu BST e as duas marcas de dentro de um `SpeciesEntry`, que só
+ * existe em `gen-N.json`. A Fase 5 quebra essa premissa: o pack sorteia sobre as
+ * 1025 de uma vez e o binder conta tier de espécie de qualquer geração, e nenhum
+ * dos dois pode carregar os nove arquivos (319 KB) para descobrir a que faixa
+ * pertence um id. Quem os serve é o índice, que passa a trazer os mesmos três
+ * campos — ver `SearchEntry`.
+ *
+ * O tipo existe para os dois caminhos entrarem pela **mesma porta**. A
+ * alternativa seria o índice guardar a raridade já calculada, e aí a regra
+ * viveria em dois lugares: neste arquivo e num JSON gerado que ninguém rebuilda
+ * ao mexer nos limiares. É o defeito de *spec espalhada* que o plano rastreia, e
+ * o jeito de não tê-lo é o índice guardar **fato** e a regra continuar sendo
+ * função.
+ */
+export interface RarityInputs {
+  /** A soma dos seis base stats. Ver `baseStatTotal`. */
+  readonly bst: number
+  readonly isLegendary: boolean
+  readonly isMythical: boolean
+}
+
+/**
  * As duas marcas vêm antes do BST, e não depois.
  *
  * Não é desempate: é a regra. Cosmog é lendário com BST 200 e cairia em *comum*
@@ -61,17 +85,31 @@ export const MAX_BASE_STAT_TOTAL = 720
  * não marca nenhuma espécie com as duas, mas a ordem precisa estar escrita: um
  * `if` que dependa de os dados nunca discordarem é um `if` que já quebrou.
  */
-export function rarityOf(
-  species: Pick<SpeciesEntry, 'baseStats' | 'isLegendary' | 'isMythical'>,
-): Rarity {
-  if (species.isMythical) return 'mythic'
-  if (species.isLegendary) return 'legendary'
+export function rarityFrom({ bst, isLegendary, isMythical }: RarityInputs): Rarity {
+  if (isMythical) return 'mythic'
+  if (isLegendary) return 'legendary'
 
-  const bst = baseStatTotal(species.baseStats)
   const [uncommon, rare, ultra] = RARITY_THRESHOLDS
 
   if (bst < uncommon) return 'common'
   if (bst < rare) return 'uncommon'
   if (bst < ultra) return 'rare'
   return 'ultra'
+}
+
+/**
+ * A mesma regra, para quem já tem a espécie inteira em mãos — as quatro
+ * superfícies da Pokédex, que leem `gen-N.json` e nunca viram o índice.
+ *
+ * É adaptador, não segunda implementação: a decisão continua em `rarityFrom`, e
+ * o que muda é só de onde vem o BST.
+ */
+export function rarityOf(
+  species: Pick<SpeciesEntry, 'baseStats' | 'isLegendary' | 'isMythical'>,
+): Rarity {
+  return rarityFrom({
+    bst: baseStatTotal(species.baseStats),
+    isLegendary: species.isLegendary,
+    isMythical: species.isMythical,
+  })
 }

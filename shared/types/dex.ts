@@ -270,6 +270,21 @@ export interface SpeciesEntry {
  * `Mr. Mime`, `nidoran-f` vira `Nidoran♀`. `types` está porque a paleta desenha
  * os mesmos chips do grid, e sem eles ela seria a única superfície do sistema
  * que lista espécie sem dizer o tipo.
+ *
+ * **Os três últimos campos entraram na Fase 5**, pelo mesmo argumento que trouxe
+ * `generation`: o pack sorteia sobre as 1025 e o binder conta tier de espécie de
+ * qualquer geração, e a única alternativa era carregar os nove `gen-N.json` para
+ * saber a que faixa pertence um id. Eles são **fato da API**, não raridade
+ * calculada — a regra que os lê continua sendo `rarityFrom()`, em
+ * `shared/game/rarity.ts`. Guardar aqui o veredito em vez dos insumos poria os
+ * limiares num JSON gerado que ninguém rebuilda ao mexer neles.
+ *
+ * `bst` é soma, e não os seis stats: quem quer a barra por stat já está numa
+ * página que carregou a geração inteira. Custa ~10 bytes por linha contra ~40.
+ *
+ * O índice cresceu de 92 KB para 141 KB crus com os três — e de **15,1 KB para
+ * 18,5 KB comprimido**, que é o número que importa, porque `isLegendary:false`
+ * repetido 1025 vezes é quase de graça depois do gzip. Medido, não estimado.
  */
 export interface SearchEntry {
   readonly id: SpeciesId
@@ -277,6 +292,10 @@ export interface SearchEntry {
   readonly displayName: string
   readonly generation: number
   readonly types: readonly [TypeName] | readonly [TypeName, TypeName]
+  /** Soma dos seis base stats — o eixo em que a raridade é medida. */
+  readonly bst: number
+  readonly isLegendary: boolean
+  readonly isMythical: boolean
 }
 
 /** `index.json` — as 1025 linhas acima, na ordem do dex nacional. */
@@ -561,6 +580,9 @@ function isSearchEntry(value: unknown): value is SearchEntry {
     && isText(value.slug)
     && isText(value.displayName)
     && isGenerationNumber(value.generation)
+    && isPositiveInt(value.bst)
+    && typeof value.isLegendary === 'boolean'
+    && typeof value.isMythical === 'boolean'
 }
 
 export function isChainsData(value: unknown): value is ChainsData {

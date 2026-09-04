@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
+import { progressLabel } from '~~/shared/game/progress'
+import { isSpeciesId } from '~~/shared/types/brand'
+import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from '~/composables/useDex'
 
 /**
@@ -12,11 +16,23 @@ import { useDex } from '~/composables/useDex'
  * lacuna: o canvas ganhou a 18ª prancha, *Pokédex — as 9 regiões*, desenhada a
  * partir deste componente e com as faixas de dex tiradas do `core.json`.
  *
- * O que a prancha põe ao lado da contagem — `98 / 151 capturados`, em verde de
- * progresso — é coleção, e coleção é Fase 5: aqui a linha diz a faixa do dex,
- * que é o que já é verdade.
+ * `98 / 151 capturados` e a barra de progresso chegaram na Fase 5, que é a que
+ * criou a coleção. Antes disso a linha dizia só a faixa do dex, porque era o que
+ * já era verdade.
  */
 const { loadCore } = useDex()
+const collection = useCollectionStore()
+
+/**
+ * A coleção mora em `localStorage`, logo não existe no servidor. Antes de montar
+ * a contagem é `null` e a linha volta a dizer só a faixa — escrever `0 / 151`
+ * afirmaria uma coleção vazia que ninguém verificou, e mudaria de número na
+ * hidratação.
+ */
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
 
 /**
  * `transform` não é otimização de gosto — é o que impede os 54 KB de `core.json`
@@ -32,6 +48,33 @@ const { data: regions } = await useAsyncData(
   () => loadCore(),
   { transform: core => toRegions(core.generations) },
 )
+
+/**
+ * As nove regiões já com a contagem — uma varredura por render, não cinco por
+ * região.
+ *
+ * A versão anterior era uma função chamada direto do template, e o template a
+ * chamava cinco vezes por cartão (o `v-if`, o número, o `v-if` da barra, o
+ * `owned` e o rótulo dela). Nove regiões × cinco chamadas × até 251 ids é perto
+ * de nove mil consultas à coleção **a cada render**, para produzir nove
+ * números — o mesmo desperdício que o `Map` de `useCollection` existe para
+ * evitar, escrito de outro jeito.
+ *
+ * A contagem sai da faixa de id, e não do campo `generation` como no binder,
+ * porque esta tela lê `core.json` e nunca abre o índice: aqui a faixa é o único
+ * dado disponível. Os dois caminhos dão o mesmo número, e é o e2e que compara a
+ * Pokédex com o binder para que continuem dando.
+ */
+const rows = computed(() => (regions.value ?? []).map((region) => {
+  if (!mounted.value) return { ...region, owned: null }
+
+  let owned = 0
+  for (let id = region.firstId; id <= region.lastId; id += 1) {
+    if (isSpeciesId(id) && collection.has(id)) owned += 1
+  }
+
+  return { ...region, owned }
+}))
 
 useSeoMeta({
   title: 'Pokédex — Holo Deck',
@@ -59,7 +102,7 @@ useSeoMeta({
 
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <li
-        v-for="region in regions ?? []"
+        v-for="region in rows"
         :key="region.generation"
       >
         <NuxtLink
@@ -69,13 +112,27 @@ useSeoMeta({
           <span class="numeric region-card__generation">{{ region.generationLabel }}</span>
           <span class="region-card__name">{{ region.label }}</span>
           <span class="numeric region-card__range">
-            {{ region.speciesCount }} espécies
+            <template v-if="region.owned !== null">
+              <span class="region-card__owned">{{ region.owned }}</span>
+              / {{ region.speciesCount }} capturados
+            </template>
+            <template v-else>
+              {{ region.speciesCount }} espécies
+            </template>
             <span
               class="region-card__separator"
               aria-hidden="true"
             >·</span>
             {{ dexRange(region.firstId, region.lastId) }}
           </span>
+
+          <CollectionProgressBar
+            v-if="region.owned !== null"
+            :owned="region.owned"
+            :total="region.speciesCount"
+            :label="`Progresso em ${region.label}: ${progressLabel(region.owned, region.speciesCount)}`"
+            class="mt-1"
+          />
         </NuxtLink>
       </li>
     </ul>
@@ -99,6 +156,13 @@ useSeoMeta({
 .region-card:focus-visible {
   background: var(--surface-raised);
   border-color: var(--border-strong);
+}
+
+/* O numerador em verde, como no cabeçalho da região: o número que se move é o
+   que se destaca. */
+.region-card__owned {
+  color: var(--progress-high);
+  font-weight: 800;
 }
 
 .region-card__generation {

@@ -40,6 +40,7 @@ import type {
 } from '../shared/types/dex.ts'
 import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
 import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
+import { baseStatTotal } from '../shared/game/rarity.ts'
 
 /**
  * Rastreia a PokeAPI uma única vez e gera o dex que o jogo consome.
@@ -505,6 +506,11 @@ async function main(): Promise<void> {
       displayName: entry.displayName,
       generation: data.generation,
       types: entry.types,
+      // Os três insumos de raridade. Somar aqui, e não guardar os seis stats, é
+      // o que mantém o índice em uma linha por espécie — ver `SearchEntry`.
+      bst: baseStatTotal(entry.baseStats),
+      isLegendary: entry.isLegendary,
+      isMythical: entry.isMythical,
     })),
   )
   // Só o build completo produz um índice de 1025 — um ensaio `--gen 1` grava 151
