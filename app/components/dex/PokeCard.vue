@@ -16,13 +16,29 @@ import { useFoil } from '~/composables/useFoil'
  * significa nenhum listener: o foil fica no repouso, que é exatamente o gradiente
  * estático que o canvas desenha nas cartas do grid.
  */
+/**
+ * O link é **um objeto ou nada**, e não `to` mais `label` soltos.
+ *
+ * Um link sem nome acessível é um link que o leitor de tela anuncia como o
+ * destino cru, e a carta não tem texto próprio dentro dele para servir de nome —
+ * ele cobre a carta, não a envolve. Dois campos independentes tornariam esse
+ * estado representável, e ele passaria em review porque a tela continua certa.
+ */
+export interface CardLink {
+  readonly to: string
+  /** A frase que substitui o conteúdo visual. Ver `DexCard` e `CollectionCard`. */
+  readonly label: string
+}
+
 const props = withDefaults(defineProps<{
   dexNumber: number
   name: string
   types: readonly [TypeName] | readonly [TypeName, TypeName]
   rarity: Rarity
   interactive?: boolean
-}>(), { interactive: false })
+  /** Quando presente, a carta inteira navega — menos o que o rodapé levantar. */
+  link?: CardLink | null
+}>(), { interactive: false, link: null })
 
 /**
  * O foil mede a **moldura**, não a carta.
@@ -86,6 +102,16 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
         class="poke-card__glow poke-card__glow--second"
         :data-type="secondaryType"
         aria-hidden="true"
+      />
+
+      <!-- O link **cobre** a carta em vez de envolvê-la, e é isso que permite o
+           rodapé hospedar um botão sem aninhar interativos. Quem precisa ficar
+           acima dele sobe de camada: ver `.poke-card__link` no estilo. -->
+      <NuxtLink
+        v-if="link"
+        :to="link.to"
+        :aria-label="link.label"
+        class="poke-card__link"
       />
 
       <span class="poke-card__number numeric">{{ dexLabel }}</span>
@@ -184,6 +210,42 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 
 .poke-card--dual .poke-card__glow--second {
   left: 66%;
+}
+
+/**
+ * A camada do link, e o contrato que ela publica.
+ *
+ * `inset: 0` cobre a carta inteira, e o `z-index: 1` é o que a põe acima do
+ * número, da arte e do nome — os três são `position: relative`, então sem ele a
+ * ordem do DOM os deixaria por cima e o clique morreria no texto.
+ *
+ * **O rodapé é a exceção, de propósito.** Quem monta um rodapé com ação — o
+ * botão de moer do binder, o de remover do slot de deck — sobe para `z-index: 2`
+ * e passa a receber o próprio clique. É esse degrau que substitui o `<button>`
+ * dentro de `<a>` que o HTML não admite, e é por isso que o rodapé pôde voltar
+ * para dentro da carta, onde a prancha sempre o desenhou.
+ *
+ * O foil fica acima dos dois sem disputar: ele é `pointer-events: none` e vem
+ * depois no DOM.
+ */
+.poke-card__link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/**
+ * O anel de foco mora na moldura, que é o único retângulo não recortado.
+ *
+ * `.poke-card` carrega o chanfro por `clip-path` e `overflow: hidden`: um
+ * `outline` no próprio link seria cortado nos quatro cantos. O `:has()` traz o
+ * estado de foco de dentro para fora, que é exatamente o que a moldura já
+ * existia para permitir — ela não gira e não recorta.
+ */
+.poke-card-frame:has(.poke-card__link:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: var(--radius);
 }
 
 .poke-card__number {

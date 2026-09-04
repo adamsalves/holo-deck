@@ -54,20 +54,20 @@ test('o grid virtualiza depois de montar — o DOM não segura as 151', async ({
   // paralelo, a contagem pega as 151 do HTML servido e o teste reprova sem que
   // nada esteja errado. `poll` espera a forma virtualizada aparecer, e continua
   // reprovando se ela nunca aparecer.
-  await expect.poll(() => page.locator('a.dex-card').count()).toBeLessThan(151)
-  expect(await page.locator('a.dex-card').count()).toBeGreaterThan(0)
+  await expect.poll(() => page.locator('.dex-card').count()).toBeLessThan(151)
+  expect(await page.locator('.dex-card').count()).toBeGreaterThan(0)
 
   // Rolar troca quem está no DOM sem trocar quantos.
   await page.evaluate(() => window.scrollTo(0, 3000))
   await page.waitForFunction(() => !document.querySelector('a[aria-label^="Bulbasaur,"]'))
 
-  expect(await page.locator('a.dex-card').count()).toBeLessThan(151)
+  expect(await page.locator('.dex-card').count()).toBeLessThan(151)
 
   // O rodapé é a evidência visível dessa troca, e ele tem de contar o mesmo DOM
   // que este teste acabou de contar — no navegador de verdade, com a largura
   // real decidindo quantas colunas cabem. É o outro lado do
   // `test/nuxt/dex-grid.spec.ts`, que mede a mesma regra sem layout.
-  const rendered = await page.locator('a.dex-card').count()
+  const rendered = await page.locator('.dex-card').count()
   await expect(page.locator('.grid-footer__count')).toContainText(`${rendered} de 151 renderizados`)
   await expect(page.locator('.grid-footer__count')).toContainText('scroll virtualizado')
 })
@@ -89,7 +89,7 @@ test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre ele
 
   // Ligar raridade restringe — é E entre os grupos.
   await page.getByRole('button', { name: 'Raro', exact: true }).click()
-  const comRaridade = await page.locator('a.dex-card').count()
+  const comRaridade = await page.locator('.dex-card').count()
   expect(comRaridade).toBeGreaterThan(0)
   expect(comRaridade).toBeLessThan(44)
 
@@ -110,7 +110,7 @@ test('a busca abre por atalho, filtra e navega', async ({ page }) => {
   // no vazio. O sinal que só existe depois do `onMounted` é a troca de forma do
   // grid — as 151 do servidor virando as poucas do virtualizador. Com o servidor
   // frio a diferença é de centenas de milissegundos, e é assim que o CI sobe.
-  await expect.poll(() => page.locator('a.dex-card').count()).toBeLessThan(151)
+  await expect.poll(() => page.locator('.dex-card').count()).toBeLessThan(151)
 
   await page.keyboard.press('ControlOrMeta+k')
 

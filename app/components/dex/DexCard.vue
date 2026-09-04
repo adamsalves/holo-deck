@@ -37,9 +37,9 @@ const rarity = computed(() => rarityOf(props.species))
 const typeLabels = computed(() => props.species.types.map(type => TYPE_LABELS[type]))
 
 /**
- * A frase que o leitor de tela ouve. `aria-label` no link substitui o conteúdo
- * interno, então ela precisa carregar tudo — inclusive a raridade, que na tela
- * está na cor da moldura.
+ * A frase que o leitor de tela ouve. O link cobre a carta e não tem texto dentro,
+ * então o `aria-label` é o **único** nome que ele tem — precisa carregar tudo,
+ * inclusive a raridade, que na tela está só na cor da moldura.
  */
 const label = computed(() => [
   props.species.displayName,
@@ -52,9 +52,7 @@ const label = computed(() => [
 </script>
 
 <template>
-  <NuxtLink
-    :to="`/pokemon/${species.slug}`"
-    :aria-label="label"
+  <div
     class="dex-card"
     :class="{ 'dex-card--missing': owned === false, 'dex-card--shiny': shiny }"
   >
@@ -63,6 +61,7 @@ const label = computed(() => [
       :name="species.displayName"
       :types="species.types"
       :rarity="rarity"
+      :link="{ to: `/pokemon/${species.slug}`, label }"
     >
       <template #art>
         <!-- Miniatura de 128px gerada no build: é ela que faz o grid custar
@@ -90,22 +89,16 @@ const label = computed(() => [
         </span>
       </template>
     </DexPokeCard>
-  </NuxtLink>
+  </div>
 </template>
 
 <style scoped>
+/* O link deixou de ser esta raiz e passou a ser uma camada dentro da carta, para
+   o rodapé poder hospedar ação sem aninhar interativo. O anel de foco foi junto:
+   ele agora mora na moldura da `PokeCard`, que é o retângulo que o chanfro não
+   recorta. Ver `.poke-card__link`. */
 .dex-card {
   display: block;
-  text-decoration: none;
-  color: inherit;
-  /* O chanfro da carta é feito por `clip-path`, que corta o próprio anel de
-     foco. O anel fica no link, que é retângulo, e por isso continua visível. */
-  border-radius: var(--radius);
-}
-
-.dex-card:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
 }
 
 /**
