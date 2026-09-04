@@ -3,6 +3,7 @@ import { watch } from 'vue'
 import { SCHEMA_VERSION } from '~~/shared/save/schema'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { useCollectionStore } from '~~/app/stores/collection'
+import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
 
@@ -24,11 +25,16 @@ import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
 export default defineNuxtPlugin(async (nuxtApp) => {
   const driver = new LocalStorageDriver(browserStorage())
   const collection = useCollectionStore(nuxtApp.$pinia)
+  const deck = useDeckStore(nuxtApp.$pinia)
   const progress = useProgressStore(nuxtApp.$pinia)
 
   const { data, recovered } = await driver.load()
 
+  // A coleção antes do deck, e a ordem importa: a store do deck observa a
+  // coleção para esvaziar slot de carta moída, e hidratá-la primeiro faria a
+  // observação rodar contra uma coleção ainda vazia e limpar o deck salvo.
   collection.hydrate(data.collection, data.dust)
+  deck.hydrate(data.deck)
   progress.hydrate(data.progress)
 
   function compose(): SaveData {
@@ -37,6 +43,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       schemaVersion: SCHEMA_VERSION,
       collection: entries,
       dust,
+      deck: deck.snapshot(),
       progress: progress.snapshot(),
     }
   }
@@ -50,7 +57,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
    * compõe as duas é mais curta e não tem ordem.
    */
   watch(
-    () => [collection.entries, collection.dust, progress.pity, progress.welcomeClaimed],
+    () => [collection.entries, collection.dust, deck.slots, progress.pity, progress.welcomeClaimed],
     () => { void driver.save(compose()) },
     { deep: true },
   )
