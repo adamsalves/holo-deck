@@ -145,7 +145,10 @@ describe('moer uma carta que está no deck', () => {
 
 describe('a travessia do save', () => {
   it('devolve e recebe os seis slots', () => {
+    // As duas espécies possuídas: `hydrate` filtra por posse, então um save com
+    // carta que a coleção não tem não é o caso *deste* teste — é o do próximo.
     own(PIKACHU)
+    own(SQUIRTLE)
     const deck = useDeckStore()
     deck.place(0, PIKACHU)
 
@@ -153,6 +156,31 @@ describe('a travessia do save', () => {
 
     deck.hydrate([null, null, SQUIRTLE, null, null, null])
     expect(deck.slots).toEqual([null, null, SQUIRTLE, null, null, null])
+    expect(deck.filled).toBe(1)
+  })
+
+  /**
+   * **O boot não é coberto pelo observador, e este teste é o que prova.**
+   *
+   * O observador é `flush: 'pre'`: ele acorda no tick seguinte. Um save que
+   * escalou uma carta e depois a perdeu chega com a órfã dentro, e medido
+   * **síncrono** — sem `nextTick` — o deck ainda a segurava. O e2e só passava
+   * porque media depois do tick.
+   *
+   * Pendurar a invariante no agendamento do Vue seria deixá-la quebrar no dia em
+   * que alguém trocasse o `flush` por `'sync'` — decisão razoável, para o save
+   * gravar no mesmo tick —, e aí o observador rodaria **antes** de `hydrate`, que
+   * é quando ele não tem nada para ver. A órfã sobreviveria para sempre.
+   *
+   * A ausência de `await nextTick()` aqui é o teste, e não descuido.
+   */
+  it('descarta na entrada a carta que a coleção não tem — sem esperar tick', () => {
+    own(SQUIRTLE)
+    const deck = useDeckStore()
+
+    deck.hydrate([PIKACHU, SQUIRTLE, null, null, null, null])
+
+    expect(deck.slots).toEqual([null, SQUIRTLE, null, null, null, null])
     expect(deck.filled).toBe(1)
   })
 

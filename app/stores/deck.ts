@@ -99,9 +99,28 @@ export const useDeckStore = defineStore('deck', () => {
     return slots.value
   }
 
-  /** O que o plugin de save carregou. Substitui, não mescla. */
+  /**
+   * O que o plugin de save carregou. Substitui, não mescla — e **descarta na
+   * entrada a carta que a coleção não tem**.
+   *
+   * O filtro não é redundante com o observador acima, e descobri isso pelo
+   * caminho certo: perguntando por que o e2e passava. O observador é `flush:
+   * 'pre'`, então ele roda **no tick seguinte**; síncrono, logo depois de
+   * hidratar, o deck ainda segurava a espécie órfã. O e2e só passava porque
+   * mediu depois do tick.
+   *
+   * Deixar assim seria pendurar a invariante no agendamento do Vue: um dia
+   * alguém troca o `flush` por `'sync'` — decisão razoável, para o save gravar
+   * no mesmo tick — e o observador passa a rodar **antes** de `hydrate`, que é
+   * quando ele não tem nada para ver. A órfã sobreviveria para sempre, e nada
+   * acusaria.
+   *
+   * Com o filtro aqui a regra vale na entrada, sem depender de quando o
+   * observador acorda. Ele continua existindo para o que acontece **depois**:
+   * moer com o jogo aberto.
+   */
   function hydrate(saved: DeckSlots): void {
-    slots.value = [...saved]
+    slots.value = saved.map(id => (id !== null && collection.has(id) ? id : null))
   }
 
   return {

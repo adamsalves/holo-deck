@@ -30,9 +30,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   const { data, recovered } = await driver.load()
 
-  // A coleção antes do deck, e a ordem importa: a store do deck observa a
-  // coleção para esvaziar slot de carta moída, e hidratá-la primeiro faria a
-  // observação rodar contra uma coleção ainda vazia e limpar o deck salvo.
+  // A coleção antes do deck, porque `deck.hydrate` **lê** a coleção: ele
+  // descarta na entrada a espécie que o save escalou e a coleção não tem mais.
+  // O observador da store do deck não cobre este caso — ele é `flush: 'pre'` e
+  // acorda um tick depois, o que basta para moer com o jogo aberto e não para
+  // o boot. Ver o comentário de `hydrate`.
   collection.hydrate(data.collection, data.dust)
   deck.hydrate(data.deck)
   progress.hydrate(data.progress)
