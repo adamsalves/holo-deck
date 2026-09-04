@@ -1,6 +1,7 @@
 import type { MoveId, SpeciesId } from '../types/brand.ts'
 import { isGymId, isSpeciesId } from '../types/brand.ts'
 import type { CoreData, MoveEntry, SpeciesEntry, TypeName } from '../types/dex.ts'
+import { isDexVersion } from '../types/dex.ts'
 import type { Combatant } from './damage.ts'
 import type { RngState } from './rng.ts'
 import { toBattleStats } from './stats.ts'
@@ -117,6 +118,9 @@ export interface BattleState {
   /** O cursor do RNG **agora** — é o que faz retomar não repetir rolagem. */
   readonly rng: RngState
   readonly engineVersion: number
+  /** Qual dex montou esta batalha. Carimbado do `BattleContext` na largada, e é
+   * o que o log leva embora — ver `dexVersion` em `BattleLog`. */
+  readonly dexVersion: string
   readonly turn: number
   readonly player: BattleSide
   readonly opponent: BattleSide
@@ -138,8 +142,46 @@ export interface BattleLog {
   readonly gymId: number
   readonly seed: RngState
   readonly engineVersion: number
+  /**
+   * Qual dex, e é a segunda trava — a que faltava.
+   *
+   * `engineVersion` cobre a ordem de consumo do RNG; ela não cobre a **entrada**
+   * do motor. `selectBattleMoves` escolhe os 4 golpes lendo o catálogo e
+   * `buildGymTeam` monta o time do líder lendo as espécies da geração: mudou
+   * qualquer um dos dois entre gravar e retomar, este mesmo log reproduz outra
+   * luta — outro moveset, outro adversário — sem erro e sem aviso. Era a issue
+   * #18, e o PR #17 foi a prova de que não é hipótese: os golpes de status
+   * tiraram o oitavo golpe de 309 espécies.
+   *
+   * Divergiu, **descarta a batalha em andamento** — exatamente a regra que
+   * `engineVersion` já aplica, e pela mesma razão: perder uma luta é aceitável,
+   * perder coleção não.
+   */
+  readonly dexVersion: string
   readonly team: readonly SpeciesId[]
   readonly actions: readonly BattleAction[]
+}
+
+/**
+ * O log da batalha em andamento, a partir do estado e das ações do jogador.
+ *
+ * O time sai de `state.player.team` e não de quem chamou: a ordem dos seis nunca
+ * muda durante a luta — trocar mexe em `active`, não na lista —, então o estado
+ * já é a fonte, e receber o time por fora seria a segunda chance de ele
+ * discordar do que está em campo.
+ */
+export function toBattleLog(
+  state: BattleState,
+  actions: readonly BattleAction[],
+): BattleLog {
+  return {
+    gymId: state.gymId,
+    seed: state.seed,
+    engineVersion: state.engineVersion,
+    dexVersion: state.dexVersion,
+    team: state.player.team.map(pokemon => pokemon.speciesId),
+    actions: [...actions],
+  }
 }
 
 /**
@@ -163,6 +205,10 @@ export function isBattleLog(value: unknown): value is BattleLog {
   if (!Number.isInteger(log.gymId) || typeof log.gymId !== 'number' || !isGymId(log.gymId)) return false
   if (typeof log.seed !== 'number' || !Number.isFinite(log.seed)) return false
   if (!Number.isInteger(log.engineVersion)) return false
+  // Forma, e não igualdade: recusar a versão divergente é decisão de `replay`,
+  // que sabe o que fazer com a batalha perdida. O mesmo critério de
+  // `engineVersion`, agora que são duas travas.
+  if (!isDexVersion(log.dexVersion)) return false
 
   if (!Array.isArray(log.team) || log.team.length === 0) return false
   if (!log.team.every(id => typeof id === 'number' && isSpeciesId(id))) return false
@@ -195,6 +241,9 @@ export function isBattleAction(value: unknown): value is BattleAction {
  * teste.
  */
 export interface BattleContext {
+  /** A versão do dex que estas quatro entradas formam. Vem de `core.json` e é o
+   * que `startBattle` carimba no estado. */
+  readonly dexVersion: string
   readonly matrix: CoreData['effectiveness']
   readonly moves: ReadonlyMap<number, MoveEntry>
   readonly speciesById: (id: SpeciesId) => SpeciesEntry | undefined

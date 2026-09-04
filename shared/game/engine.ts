@@ -128,6 +128,10 @@ export function startBattle(setup: BattleSetup, context: BattleContext): BattleS
     seed: setup.seed,
     rng: setup.seed,
     engineVersion: ENGINE_VERSION,
+    // Do contexto, e não do `setup`: quem sabe qual dex está em campo é quem
+    // carrega o dex. Um `dexVersion` vindo do chamador seria um número que ele
+    // poderia digitar diferente do arquivo que acabou de ler.
+    dexVersion: context.dexVersion,
     turn: 1,
     player: buildSide(setup.team, context),
     opponent: buildSide(opponentTeam.map(species => species.id), context),
@@ -475,12 +479,29 @@ export function replay(log: BattleLog, context: BattleContext): BattleState {
       `log da versão ${log.engineVersion} não reproduz no motor ${ENGINE_VERSION}`,
     )
   }
+  if (log.dexVersion !== context.dexVersion) {
+    throw new Error(
+      `log do dex ${log.dexVersion} não reproduz sobre o dex ${context.dexVersion}`,
+    )
+  }
 
   let state = startBattle({ gymId: log.gymId, seed: log.seed, team: log.team }, context)
   for (const action of log.actions) {
     state = applyAction(state, action, context).state
   }
   return state
+}
+
+/**
+ * Se este log ainda reproduz — as duas travas, perguntadas sem exceção.
+ *
+ * `replay` derruba, e está certo: chegar lá com um log incompatível é defeito de
+ * quem chamou. Só que **descartar a batalha de uma build anterior é o caminho
+ * normal**, não o excepcional, e a store precisa perguntar antes em vez de usar
+ * `try/catch` como fluxo. As duas versões vivem num lugar só, e é este.
+ */
+export function replayable(log: BattleLog, context: BattleContext): boolean {
+  return log.engineVersion === ENGINE_VERSION && log.dexVersion === context.dexVersion
 }
 
 /** Os índices do banco que o jogador pode mandar entrar. */

@@ -15,6 +15,7 @@ import {
   STRUGGLE_MOVE_ID,
   TYPE_COUNT,
   TYPE_NAMES,
+  isDexVersion,
 } from '../../shared/types/dex.ts'
 import type { MoveId, SpeciesId } from '../../shared/types/brand.ts'
 import { isMoveId, isSpeciesId, SPECIES_COUNT } from '../../shared/types/brand.ts'
@@ -133,6 +134,10 @@ const generationMeta = z.object({
 })
 
 export const coreSchema: z.ZodType<CoreData> = z.object({
+  // O mesmo predicado do guarda de leitura, e não uma segunda regex: as duas
+  // pontas concordarem sobre o que é um `dexVersion` é o que faz o build gravar
+  // exatamente o que a tela aceita.
+  dexVersion: z.string().refine(isDexVersion, { message: 'dexVersion fora do formato' }),
   // `.length(TYPE_COUNT)` em vez de `.min(1)`: uma matriz com 17 linhas é o
   // defeito que passa despercebido e produz dano errado numa batalha só.
   types: z.array(typeName).length(TYPE_COUNT),

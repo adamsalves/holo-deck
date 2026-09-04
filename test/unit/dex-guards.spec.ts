@@ -49,6 +49,7 @@ function allGenerations() {
 
 function validCore() {
   return {
+    dexVersion: '19c9dc2a',
     types: [...TYPE_NAMES],
     effectiveness: matrix(),
     moves: [{

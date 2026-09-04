@@ -217,14 +217,47 @@ export interface GenerationMeta {
 }
 
 /**
+ * A impressão digital do dex gerado, em hexadecimal curto.
+ *
+ * Oito caracteres, que é o tamanho do sha curto que o repositório já usa para
+ * commit. Não é chave criptográfica: o que ela precisa fazer é diferir quando o
+ * dado difere, e 32 bits dão colisão em ~1 por 4 bilhões entre dois builds
+ * quaisquer — ordens de grandeza abaixo de qualquer sequência de deploys real.
+ */
+export const DEX_VERSION_LENGTH = 8
+
+/**
  * `core.json` — carregado uma vez e usado por toda tela. A matriz é indexada por
  * posição em `TYPE_NAMES`: `effectiveness[atacante][defensor]`.
  */
 export interface CoreData {
+  /**
+   * Qual dex é este — o hash de **tudo** que o build emite, não só deste arquivo.
+   *
+   * Ele mora em `core.json` porque é o arquivo que toda tela já carrega, e cobre
+   * as nove gerações porque é isso que a issue #18 pede de verdade: o replay de
+   * uma batalha tem duas entradas no dex, e só uma delas está aqui.
+   * `selectBattleMoves` lê o catálogo de golpes deste arquivo, mas `buildGymTeam`
+   * monta o time do líder a partir de `gen-N.json` — um hash só de `core.json`
+   * deixaria passar a mudança de base stat, de tipo ou de moveset que troca o
+   * adversário, que é exatamente a divergência silenciosa que se quer impedir.
+   *
+   * O contrato da Fase 6 travou "hash curto de core.json" e subestimou o alcance;
+   * a decisão de 04/09 corrigiu para o dex inteiro, ao mesmo custo.
+   */
+  readonly dexVersion: string
   readonly types: readonly TypeName[]
   readonly effectiveness: readonly (readonly Effectiveness[])[]
   readonly moves: readonly MoveEntry[]
   readonly generations: readonly GenerationMeta[]
+}
+
+/** Hexadecimal minúsculo, no comprimento exato. Um `dexVersion` vazio ou
+ * truncado é build incompleto, e ele é o que decide descartar uma batalha. */
+export function isDexVersion(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length === DEX_VERSION_LENGTH
+    && /^[0-9a-f]+$/.test(value)
 }
 
 /**
@@ -443,7 +476,9 @@ function isEffectiveness(value: unknown): value is Effectiveness {
 export function isCoreData(value: unknown): value is CoreData {
   if (!isRecord(value)) return false
 
-  const { types, effectiveness, moves, generations } = value
+  const { dexVersion, types, effectiveness, moves, generations } = value
+
+  if (!isDexVersion(dexVersion)) return false
 
   if (!isArray(types) || types.length !== TYPE_COUNT) return false
   if (!types.every((t, i) => t === TYPE_NAMES[i])) return false
