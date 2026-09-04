@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.6.0](https://github.com/adamsalves/holo-deck/compare/v0.5.1...v0.6.0) (2026-09-04)
+
+
+### Features
+
+* **collection:** o binder, a forja, a abertura de pack e o verde que faltava um token ([c0fce57](https://github.com/adamsalves/holo-deck/commit/c0fce57e97071c8199eb1d21608258ec5b3c4a52))
+* **dex:** a raridade do índice, para o pack não carregar as nove gerações ([8e78162](https://github.com/adamsalves/holo-deck/commit/8e78162c9f7b05a4579186c870fa54103cfbf583))
+* Fase 5 — Coleção e Packs ([cb4a3f6](https://github.com/adamsalves/holo-deck/commit/cb4a3f69f2cdf2463da876145215962c912f819e))
+* **game:** o pack de dez, o pó e a forja ([d4fb147](https://github.com/adamsalves/holo-deck/commit/d4fb1470ebe9fabfed3c957141e0dfa8c48e100f))
+* **pokedex:** a coleção chega ao grid, e o e2e do ciclo inteiro ([cbf70e5](https://github.com/adamsalves/holo-deck/commit/cbf70e50d132232e7c852880db3308356d4c7f8f))
+* **save:** o save local, a migração e as duas stores da coleção ([565073f](https://github.com/adamsalves/holo-deck/commit/565073f1dc70b5997545a93ec13a58e19e451f3f))
+
+
+### Bug Fixes
+
+* **collection:** o contador entre packs, o aviso de save, e o portão que nasceu torto ([2ca791d](https://github.com/adamsalves/holo-deck/commit/2ca791dabfc3e18a63fc4ad66c950c62c330be27))
+
 ## [0.5.1](https://github.com/adamsalves/holo-deck/compare/v0.5.0...v0.5.1) (2026-09-03)
 
 
