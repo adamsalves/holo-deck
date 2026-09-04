@@ -280,6 +280,17 @@ está aqui é só o que sobrou de propósito.
 | `×2` de efetividade fora da carta do deck | a prancha o põe na linha do número de cada carta; ele está na coluna de cobertura logo abaixo, por tipo, que é onde informa mais — duas cartas do mesmo tipo dão a mesma linha. Na carta ficou o que muda decisão: a faixa `LEVA ×2` |
 | chip de resumo em `--accent`, não no amarelo de terrestre | a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa: cor de tipo é preenchimento de tipo. A tela já tem dois níveis — `--deficit` no risco concreto, `--accent` no resumo |
 
+### Decidido no PR da Liga, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| carta de ginásio bloqueado legível | a prancha pinta o nome do líder num degrau de superfície sobre outro degrau de superfície — **1,5:1**, que some. É a mesma classe que a Fase 2 resolveu quando `--text-muted` e `--text-faint` deixaram de apontar para degraus que não sustentam texto. O cadeado e a moldura tracejada já dizem "fechado" |
+| barra de HP em dois estados, não em três | a prancha desenha a do adversário em verde e a do jogador em amarelo com frações quase iguais (61% e 58%) — não é limiar, é estética de mockup. O corte aqui é `POTION_HP_THRESHOLD`, a mesma fração em que o líder da faixa B decide gastar a poção: a barra passa a mostrar a regra que o motor executa |
+| `TROCAR` deixou de ser botão | a prancha o desenha ao lado de `ITEM`, e um botão `TROCAR` abriria um segundo painel para escolher entre cartas que já estão na tela, no banco, a 30 cm dele. A troca é o clique no próprio banco; `POÇÃO` continua botão porque não tem superfície própria |
+| `?` no time do líder | a prancha *Hub* desenha dois sprites e um slot com `?`, mas destaca o **ace** entre os dois visíveis — o `?` é o terceiro membro que o mockup não tinha arte para desenhar, e não um ace escondido. Aqui aparecem os `teamSize` que a regra produz, com o ace destacado |
+| `Seu deck: N ajustes` conta as cartas que apanham ×2 | a prancha escreve `1 ajuste` e não define o que conta. Esta é a única leitura que o código já produz — a mesma `coverage.incoming` que o deck builder desenha como faixa `LEVA ×2` na carta, e a que a anotação da prancha *Batalha* descreve ("Machop caiu exatamente como o deck builder avisou") |
+| `N ajustes` em `--deficit`, não no amarelo de terrestre | mesmo argumento do chip de resumo do deck builder: a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa |
+
 ### Segurado até a fase que cria o dado
 
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
@@ -288,14 +299,15 @@ progresso que ninguém pode mover.
 - ~~**Fase 5:** a contagem `98 / 151 capturados`, o anel de não possuída, o
   marcador de shiny, os filtros *Possuídos* e *Faltando*, e o verde de
   progresso.~~ **Entregue na Fase 5.**
-- **Fase 6:** a faixa de retomar batalha no Hub, a barra de navegação global
-  (`Base · Pokédex · Coleção · Deck · Liga`, mais Packs, Ajustes e Regras), o
-  saldo de moedas e o contador do pack diário. Até lá a raiz é a porta, com um
-  link para cada uma das quatro telas que existem.
-- **A Liga:** contra qual ginásio o `/deck` lê a cobertura. Enquanto ela não
-  existe, todo jogador tem zero insígnias e o próximo ginásio **é** o primeiro —
-  o número não é inventado, é o único verdadeiro, e o que a Liga troca é uma
-  constante em `useDeck`.
+- ~~**Fase 6:** a faixa de retomar batalha no Hub, o saldo de moedas e o painel
+  do próximo ginásio.~~ **Entregues no PR da Liga.** Continuam segurados a **barra
+  de navegação global** e o **contador do pack diário**: a primeira liga destinos
+  que só existem no PR da loja (`/rules`, `/settings`, `/packs` como loja) e o
+  segundo depende da economia que chega junto com ela. Até lá a fileira de portas
+  do Hub continua, agora com a Liga.
+- ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
+  constante de `useDeck` virou `progress.nextGym`, que foi exatamente a troca de
+  uma linha que o comentário dela prometia.
 - **Sem dado no dex:** a lista de jogos da geração (`Red · Blue · Yellow`) que a
   prancha *Pokédex* põe no cabeçalho. `GenerationMeta` traz geração, região,
   nome e contagem — o campo teria de nascer no pipeline.
@@ -599,6 +611,104 @@ antes de `hydrate`, que é quando ele não tem nada para ver.
 O portão desse caso **não** espera tick, e a ausência do `await nextTick()` nele
 é o teste.
 
+## A Liga e a batalha
+
+Nove ginásios em sequência, uma batalha por turnos e a economia que ela paga.
+
+| Rota              | O que é                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `/league`         | a trilha dos nove, o estado de cada um e o painel do próximo        |
+| `/battle/[gymId]` | o campo, os quatro golpes, o registro do turno e o banco            |
+| `/`               | o Hub: retomar batalha, próximo ginásio e coleção                   |
+
+A regra continua em `shared/game/` — o motor é a Fase 4 e a economia é
+[`economy.ts`](shared/game/economy.ts). As telas escolhem a ação, narram o que
+voltou e desenham.
+
+### A economia, e os três números que a fase fechou
+
+| Fonte | Valor |
+| --- | --- |
+| Ginásio, primeira vitória | `200 + 100 × ginásio` — 300 no 1º, 1.100 no 9º, **6.300 na campanha** |
+| Ginásio, revanche | **25%** da recompensa |
+| Vitória imaculada | **+25%** sobre o que está sendo pago |
+
+**A revanche existe porque sem ela a economia bate num muro.** Depois do nono
+ginásio a renda cairia para um pack por dia, para sempre, e completar as 1025 é
+projeto de centenas de packs — a campanha viraria uma fração pequena que acaba e
+some. A 25% ela mantém a Liga rendendo sem tornar a estreia irrelevante: um ciclo
+completo de revanches paga 1.575 contra os 6.300 da campanha.
+
+**O bônus de imaculada não existia em número nenhum** — o plano escreveu "bônus"
+e nenhuma prancha o desenha. Decidido em 04/09 na mesma taxa da revanche, e a
+igualdade é deliberada: `/rules` explica uma fração só. Ele incide sobre o que
+está sendo pago e não sobre o valor cheio, senão uma revanche imaculada valeria
+mais que uma estreia normal. Campanha imaculada: 7.875.
+
+**Pack diário e o preço de 150 na loja continuam fora do módulo.** A tabela do
+contrato da fase punha `economy.ts` "completo" aqui, e a decisão de 04/09
+corrigiu: eles só ganham consumidor com a loja, e constante de economia sem quem
+a leia é o que o repositório recusa desde a Fase 0.
+
+### Insígnia é contador, não lista
+
+O desbloqueio é sequencial — cada líder só abre com a insígnia anterior —, então
+todo conjunto legítimo de vencidos é um prefixo de 1..9. Uma lista conseguiria
+representar `[9]`: insígnia do nono sem ter passado pelo primeiro, estado que o
+jogo não produz e que um save editado à mão produz de graça. O contador não tem
+como dizer isso.
+
+A trava é cobrada na **store**, e a página da batalha a consulta antes de montar
+o campo: `/battle/9` é uma URL, e um botão desabilitado na Liga não estaria lá
+para impedir quem a digita.
+
+Com as nove insígnias, `nextGym` continua devolvendo o nono em vez de `null`.
+Não há "próximo", e um nulo obrigaria toda tela a tratar um caso que só significa
+"você terminou" — inclusive o deck builder, que ficaria sem contra quem ler
+cobertura. Quem precisa da diferença lê `leagueComplete`.
+
+### A batalha é o log, e o estado é reproduzido
+
+A store guarda duas coisas que não são a mesma:
+
+| o quê | onde vive | tamanho |
+| --- | --- | --- |
+| `BattleLog` — seed, versões, time e ações | no save, gravado a cada turno | ~0,2 KB |
+| `BattleState` — HP, PP, condição, cursor do RNG | só em memória, reproduzido | — |
+
+O plugin de save roda **antes do mount e não tem dex nenhum**, então `hydrate`
+guarda o log cru e quem traz `core.json` chama `resume`. Reconstruir na
+hidratação pediria o catálogo mais um `gen-N.json` por geração do time antes da
+primeira pintura da tela.
+
+Retomar é o que o Hub faz ao abrir, e é lá que a batalha de uma build anterior é
+descartada — `replayable` confere motor e dex antes de reproduzir, e a faixa
+simplesmente não aparece. **Descartar é o caminho normal, não o excepcional**, e
+é por isso que a pergunta existe em vez de um `try/catch` em volta do `replay`.
+
+O fim da luta **paga antes de apagar o log**, nessa ordem: uma falha entre as
+duas linhas deixa o jogador com a recompensa e uma batalha para refazer pelo
+valor de revanche, e a ordem inversa apagaria a luta sem pagar por ela. Derrota
+não cobra nada — revanche imediata, nada é perdido.
+
+### Quatro decisões de tela que o código não deduz sozinho
+
+- **A leitura grande do centro segue o golpe em foco**, e a linha de baixo abre a
+  conta tipo a tipo. É o que transforma `×2.0` numa explicação em vez de um
+  número.
+- **O golpe que não afeta continua clicável.** O motor executa, gasta o turno e
+  narra `não afetou`; a interface ensina no ponto de decisão, e desabilitar o
+  botão esconderia o `×0` em vez de mostrá-lo. Sem PP é outro caso — aí não há
+  golpe, e o motor cai em Struggle.
+- **A narração caminha pelos eventos mantendo o cursor de cada lado.** Ler o
+  ativo depois do turno nomearia o Pokémon errado duas vezes: o motor resolve
+  troca antes dos golpes e troca de novo no fim, quando alguém cai. O time nunca
+  muda de ordem, então o índice é a referência estável.
+- **O sprite animado vem do id, não do repositório.** É a regra que o plano já
+  escrevia para a arte oficial; gerar as 1025 animações custaria ~27 MB
+  commitados para uma tela que mostra dois Pokémon por vez. Nem todas existem no
+  conjunto, e o recuo é a miniatura local de 128 px.
+
 ## O save
 
 Um documento só, versionado, em `holodeck:save`.
@@ -649,8 +759,8 @@ nenhuma store muda de forma.
 ## Motor de batalha
 
 Tudo em [`shared/game/`](shared/game/), TypeScript puro, sem uma linha de Vue —
-o que faz a suíte do motor rodar sem montar componente nenhum. É a Fase 4, e a
-tela que a consome é a Fase 6.
+o que faz a suíte do motor rodar sem montar componente nenhum. É a Fase 4, e
+quem o consome é `/battle/[gymId]` — ver *A Liga e a batalha*.
 
 | Módulo | O que decide |
 | --- | --- |
@@ -679,6 +789,15 @@ Oito coisas que o motor decide e que não dá para deduzir lendo o código:
   efetividade.** `floor` não comuta, e trocar a ordem muda o número na tela. Com
   o Pikachu e o Noctowl da prancha da Batalha, esta ordem produz de 62 a 74 de
   Thunderbolt, e os **68** que a prancha estampa saem do rolo 92.
+- **`ENGINE_VERSION` não é a única trava — `dexVersion` é a outra.** A primeira
+  cobre a ordem de consumo do RNG; ela não cobre a **entrada** do motor.
+  `selectBattleMoves` lê o catálogo de `core.json` e `buildGymTeam` monta o time
+  do líder a partir de `gen-N.json`: mudou qualquer um dos dois entre gravar e
+  retomar, o mesmo log reproduz outra luta — outro moveset, outro adversário —
+  sem erro e sem aviso. O build carimba o dex inteiro num sha-256 truncado em 8,
+  o log o carrega, e `replay` o recusa como já recusava a versão do motor. O
+  contrato da fase travou "hash de `core.json`" e subestimou o alcance; a decisão
+  de 04/09 corrigiu para o dex inteiro, ao mesmo custo. Fecha a issue #18.
 - **A ordem de consumo do RNG é o contrato de `ENGINE_VERSION`**: decisão da IA,
   desempate de Speed (só quando empatam), e por golpe — impedimento, acerto,
   crítico, aleatório de dano, chance da condição, turnos de sono. O fim de turno

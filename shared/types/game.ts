@@ -1,5 +1,5 @@
 import type { SpeciesId } from './brand.ts'
-import type { Habitat, TypeName } from './dex.ts'
+import type { AilmentName, Habitat, TypeName } from './dex.ts'
 
 /**
  * Tipos do jogo — o que a Pokédex não conhece.
@@ -157,6 +157,26 @@ export const HABITAT_LABELS: Record<Habitat, string> = {
   'sea': 'Mar',
   'urban': 'Urbano',
   'waters-edge': 'Beira d\'água',
+}
+
+/**
+ * As quatro condições em português, por extenso.
+ *
+ * `CONDITION_LABELS`, em `shared/game/status.ts`, é a versão de três letras que
+ * cabe na etiqueta da carta em campo (`PAR`); esta é a que a carta de golpe
+ * escreve por extenso — `STATUS · paralisia · ACC 90`, como a prancha *Batalha*.
+ * São dois papéis e dois tamanhos, e derivar um do outro daria `PAR` truncado ou
+ * `paralisia` estourando a etiqueta.
+ *
+ * Mora aqui e não em `status.ts` pelo mesmo motivo de `TYPE_LABELS`: `dex.ts`
+ * guarda o que vem da PokeAPI e `status.ts` guarda a regra; o texto que o
+ * jogador lê é coisa que este módulo inventa.
+ */
+export const AILMENT_LABELS: Record<AilmentName, string> = {
+  paralysis: 'paralisia',
+  burn: 'queimadura',
+  poison: 'envenenamento',
+  sleep: 'sono',
 }
 
 export const TYPE_LABELS: Record<TypeName, string> = {

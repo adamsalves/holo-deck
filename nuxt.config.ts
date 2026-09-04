@@ -109,7 +109,22 @@ export default defineNuxtConfig({
   nitro: {
     prerender: {
       crawlLinks: true,
-      routes: ['/pokedex'],
+      /**
+       * A Liga e os nove ginásios entram à mão, e o rastreador não os alcança.
+       *
+       * O corpo das duas telas é `<ClientOnly>` — insígnia e deck moram no
+       * `localStorage` —, então os links para `/battle/N` não existem no HTML
+       * servido. Sem esta lista, `/battle/3` seria a primeira rota válida do
+       * repositório a **não** ser pré-renderizada, e a premissa que sustenta o
+       * `useDex()` do servidor cairia junto: hoje a única classe de URL que
+       * chega à função é a inválida, que é quando ela precisa ler o índice para
+       * responder 404.
+       */
+      routes: [
+        '/pokedex',
+        '/league',
+        ...Array.from({ length: 9 }, (_, index) => `/battle/${index + 1}`),
+      ],
     },
 
     /**

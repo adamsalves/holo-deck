@@ -11,6 +11,7 @@ import type { SearchEntry } from '~~/shared/types/dex'
 import type { SpeciesId } from '~~/shared/types/brand'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
+import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from './useDex'
 
 /**
@@ -60,24 +61,11 @@ export interface DeckView {
   readonly isStrong: (entry: SearchEntry) => boolean
 }
 
-/**
- * Contra qual ginásio a cobertura é lida.
- *
- * **É o primeiro, e é assim porque a Liga ainda não existe.** O plano manda ler
- * "contra o próximo ginásio", e quem sabe qual é o próximo é o progresso de
- * campanha — que chega no PR da Liga junto com a tela que o move. Enquanto ele
- * não existe, todo jogador tem zero insígnias e o próximo ginásio **é** o
- * primeiro: o número não é inventado, é o único verdadeiro.
- *
- * O que a Liga troca aqui é uma linha — esta constante vira a leitura do
- * progresso. O que ela não precisa mexer é em nada abaixo dela.
- */
-const NEXT_GYM_INDEX = 0
-
 export async function useDeck(): Promise<DeckView> {
   const { loadCore, loadGeneration, loadIndex } = useDex()
   const collection = useCollectionStore()
   const deck = useDeckStore()
+  const progress = useProgressStore()
 
   /**
    * **Os dois `useAsyncData` são registrados antes de qualquer `await`, e isso
@@ -186,9 +174,20 @@ export async function useDeck(): Promise<DeckView> {
       return { index, entry, stats }
     }))
 
+  /**
+   * Contra qual ginásio a cobertura é lida — **o próximo da campanha**.
+   *
+   * Era uma constante no primeiro slot, com a razão escrita de que a Liga ainda
+   * não existia: sem insígnia, o próximo ginásio *é* o primeiro, e o número não
+   * era inventado, era o único verdadeiro. A Liga chegou, e o que ela trocou foi
+   * exatamente a linha que aquele comentário prometia — nada abaixo dela mudou.
+   *
+   * Com as nove insígnias o próximo continua sendo o nono: ver `nextGym` na
+   * store de progresso.
+   */
   const leader = computed(() => {
-    const next = GYM_LEADERS[NEXT_GYM_INDEX]
-    if (next === undefined) throw new Error('a Liga ficou sem líderes')
+    const next = GYM_LEADERS[progress.nextGym - 1]
+    if (next === undefined) throw new Error(`a Liga ficou sem o ginásio ${progress.nextGym}`)
     return next
   })
 

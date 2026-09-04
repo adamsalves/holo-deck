@@ -511,6 +511,36 @@
    */
   --deficit: var(--color-type-fighting);
 
+  /**
+   * O ouro da Liga — saldo, recompensa e insígnia conquistada.
+   *
+   * As pranchas *Hub* e *Liga* pintam de `#FFC24D` quatro coisas que são a mesma
+   * ideia: o saldo de moedas na barra superior, o `+400` do prêmio, a moldura do
+   * ginásio vencido e a barra de insígnias. É o valor de `--color-rarity-legendary`,
+   * e o que faltava era o **nome** — pelo mesmo motivo de `--shiny` e `--forge`.
+   *
+   * Tem nome próprio porque **insígnia não é raridade**. Um componente lendo
+   * `--color-rarity-legendary` para pintar o saldo afirmaria que moeda é um
+   * degrau da escada de raridade, e o portão de token recusaria a leitura antes
+   * mesmo de alguém notar a afirmação.
+   */
+  --coin: var(--color-rarity-legendary);
+
+  /**
+   * A barra de HP, e ela tem **dois** estados e não três.
+   *
+   * O verde é o que a prancha *Batalha* desenha na barra cheia, e o vermelho é
+   * `--deficit`, que já significa "o que falta". O corte entre os dois não é
+   * estético: é `POTION_HP_THRESHOLD`, a mesma fração em que o líder da faixa B
+   * decide gastar a poção. A barra passa a ensinar a regra em vez de decorá-la,
+   * e o limiar continua morando em `shared/game/ai.ts` — onde um portão o
+   * alcança —, não aqui.
+   *
+   * Nome próprio pela razão de sempre: `--color-type-grass` num painel de HP
+   * afirmaria que aquele Pokémon é do tipo planta.
+   */
+  --hp: var(--color-type-grass);
+
   --text: var(--color-ink-50); /* 17.19 / 14.62 — primário */
   --text-body: var(--color-ink-200); /* 7.57 / 6.43 — corpo */
   --text-muted: var(--color-ink-325); /* 6.07 / 5.16 — rótulo, metadado */
