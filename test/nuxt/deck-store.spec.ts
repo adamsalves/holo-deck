@@ -190,15 +190,22 @@ describe('a travessia do save', () => {
    * O save é um documento lido de `JSON.parse`, e ficar com o array dele faria a
    * store e o documento compartilharem memória — a primeira jogada mutaria o
    * objeto que o driver acabou de validar.
+   *
+   * **A asserção é de identidade, e a primeira versão dela não era.** Ela media
+   * se `doSave` continuava intacto depois de um `place` — e `place` devolve um
+   * array novo via `.map`, nunca mutando no lugar, então `slots.value = saved`
+   * sem cópia deixava o teste verde. Ele documentava uma propriedade que nenhuma
+   * mutação deste módulo consegue violar. `not.toBe` afirma o mecanismo real:
+   * são dois arrays.
    */
   it('não fica com a lista que recebeu', () => {
     own(PIKACHU)
     const deck = useDeckStore()
 
-    const doSave = [null, null, null, null, null, null]
+    const doSave = [PIKACHU, null, null, null, null, null]
     deck.hydrate(doSave)
-    deck.place(0, PIKACHU)
 
-    expect(doSave).toEqual([null, null, null, null, null, null])
+    expect(deck.slots).toEqual(doSave)
+    expect(deck.slots).not.toBe(doSave)
   })
 })

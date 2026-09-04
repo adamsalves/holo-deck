@@ -157,6 +157,13 @@ const label = computed(() => [
   font-size: 9px;
   line-height: 1.2;
   text-align: left;
+
+  /* Uma linha, sempre. `2 dup · 1.600 pó` numa carta estreita quebraria em duas
+     e a altura voltaria a divergir — pelo texto, não pela estrutura, que é
+     justamente o que os portões deste componente não veriam. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .binder-card__rarity {

@@ -166,7 +166,20 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   overflow: hidden;
   box-sizing: border-box;
   aspect-ratio: 5 / 7;
-  padding: 9px 0 11px;
+
+  /**
+   * As duas medidas internas viram **contrato publicado**, e não números que
+   * cada consumidor redescobre.
+   *
+   * Quem monta um rodapé que precisa sangrar até a borda — a faixa `LEVA ×2` do
+   * slot de deck é o primeiro caso — precisa saber de quanto é o recuo para
+   * anulá-lo. Copiar `9px` e `11px` no componente de fora funciona até o dia em
+   * que estes mudarem aqui, e aí o desalinhamento aparece numa tela só.
+   */
+  --card-gutter: 9px;
+  --card-foot: 11px;
+
+  padding: 9px 0 var(--card-foot);
 
   /* `--card-surface` é o gradiente do tema, já tingido pela cor do tipo — o
      `data-type` deste mesmo elemento é quem o resolve. */
@@ -225,8 +238,15 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
  * dentro de `<a>` que o HTML não admite, e é por isso que o rodapé pôde voltar
  * para dentro da carta, onde a prancha sempre o desenhou.
  *
- * O foil fica acima dos dois sem disputar: ele é `pointer-events: none` e vem
- * depois no DOM.
+ * O foil fecha a escada em `z-index: 3`, e **precisa ser explícito**. Com ele em
+ * `auto` a ordem do DOM o punha no degrau 0: o link (1) e o rodapé com ação (2)
+ * pintavam por cima dele, enquanto o rodapé sem ação (auto) pintava por baixo —
+ * os dois estados do mesmo slot com blend diferente numa carta rara+, que é o
+ * oposto do que o rodapé único se propôs a unificar. Ele não disputa clique:
+ * `pointer-events: none`.
+ *
+ * A escada inteira, de baixo para cima: conteúdo (auto) · link (1) · rodapé com
+ * ação (2) · foil (3).
  */
 .poke-card__link {
   position: absolute;
@@ -251,7 +271,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 .poke-card__number {
   position: relative;
   align-self: flex-start;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
   font-size: 9px;
   /* `--text-muted`, e não `--text-faint`: a 9px isto é texto pequeno, e
      `--text-faint` é papel de texto grande — sobre o topo da carta ele dá
@@ -267,7 +287,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
 }
 
 .poke-card__art :deep(img) {
@@ -278,7 +298,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 
 .poke-card__id {
   position: relative;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
 }
 
 .poke-card__name {
@@ -307,6 +327,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 .poke-card__foil {
   position: absolute;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
   mix-blend-mode: color-dodge;
   opacity: var(--foil-strength);

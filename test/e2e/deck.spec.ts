@@ -56,6 +56,82 @@ test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ 
   // deck só chega até aqui através da migração para o schema 2.
   await page.reload()
   await expect(page.locator('.deck-slot--empty')).toHaveCount(5)
+
+  /**
+   * **E a linha de stats traz número, não travessão.**
+   *
+   * Esta asserção existe por um defeito que passou por 499 unitários e 4 e2e: os
+   * stats de Lv50 vinham de um `useAsyncData` de chave estática, e numa rota
+   * pré-renderizada o cliente casava com o mapa vazio que o servidor pôs no
+   * payload e nunca buscava. A tela abria com `—` nos seis slots em **toda carga
+   * fria** — e o único e2e que recarregava só contava `.deck-slot--empty`.
+   *
+   * Contar slot vazio não vê conteúdo de slot cheio. É a asserção que faltava.
+   */
+  const stats = page.locator('.deck-slot__foot').first()
+  await expect(stats).toBeVisible()
+  await expect(stats).toHaveText(/HP \d+/)
+  await expect(stats).not.toHaveText(/—/)
+})
+
+/**
+ * A faixa `LEVA ×2` e a linha de stats, que dividem o pé da carta.
+ *
+ * A faixa era `position: absolute; bottom: 0` e cobria 9,5px da linha de stats —
+ * medido no navegador, porque `happy-dom` não resolve caixa. Escondia a metade
+ * inferior de `HP 145 / ATK 100` justamente na carta que apanha, que é a que o
+ * jogador mais precisa ler antes de trocar.
+ *
+ * Ela passou para o fluxo, logo abaixo dos stats, e por construção não tem mais
+ * como sobrepor. O que este teste guarda é a consequência que a mudança podia
+ * quebrar: **a fileira de seis continua com a mesma altura**, porque a arte é
+ * `flex: 1` e encolhe no lugar.
+ *
+ * O caso é plantado no formato real do save: uma espécie voadora contra Brock,
+ * que é de pedra. Sortear até cair uma seria um teste que às vezes não testa.
+ */
+test('a faixa de alerta divide o pé da carta com os stats, sem cobri-los', async ({ page }) => {
+  await openWelcomePack(page)
+  await page.goto('/deck')
+  await expect.poll(() => page.locator('.deck__pick').count()).toBeGreaterThan(5)
+
+  // Pidgey (#16) é normal/voador e apanha ×2 de pedra — o alerta contra Brock.
+  await page.evaluate(() => {
+    const raw = localStorage.getItem('holodeck:save')
+    if (raw === null) throw new Error('sem save depois de abrir um pack')
+
+    const save: unknown = JSON.parse(raw)
+    if (typeof save !== 'object' || save === null || !('collection' in save)) {
+      throw new Error('save sem coleção')
+    }
+
+    const { collection } = save
+    if (typeof collection !== 'object' || collection === null) throw new Error('coleção ilegível')
+
+    localStorage.setItem('holodeck:save', JSON.stringify({
+      ...save,
+      collection: { ...collection, 16: { c: 1, s: 0 } },
+      deck: [16, null, null, null, null, null],
+    }))
+  })
+  await page.reload()
+
+  const faixa = page.locator('.deck-slot__warning').first()
+  await expect(faixa).toBeVisible()
+  await expect(faixa).toHaveText('LEVA ×2')
+
+  const stats = page.locator('.deck-slot__foot').first()
+  await expect(stats).toHaveText(/HP \d+/)
+
+  // As duas caixas não se cruzam: a faixa começa depois de o rodapé terminar.
+  const [caixaFaixa, caixaStats] = await Promise.all([faixa.boundingBox(), stats.boundingBox()])
+  if (caixaFaixa === null || caixaStats === null) throw new Error('faixa ou rodapé sem caixa')
+  expect(caixaFaixa.y).toBeGreaterThanOrEqual(caixaStats.y + caixaStats.height)
+
+  // E os seis slots continuam com a mesma altura, apesar de um deles ter faixa.
+  const alturas = await page.locator('.deck-slot').evaluateAll(slots =>
+    slots.map(slot => Math.round(slot.getBoundingClientRect().height)))
+  expect(new Set(alturas).size, `alturas divergentes: ${alturas.join(', ')}`).toBe(1)
 })
 
 test('a leitura de cobertura só aparece com carta, e nomeia o líder', async ({ page }) => {

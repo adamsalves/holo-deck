@@ -90,10 +90,15 @@ export function isBattleReady(deck: DeckSlots): boolean {
  * Põe uma carta num slot, tirando-a de onde ela estivesse.
  *
  * A troca acontece **aqui** e não em quem chama, porque é ela que mantém a regra
- * de não repetir verdadeira sem precisar recusar nada: arrastar a carta do slot 2
- * para o slot 5 é a mesma ação que pô-la no 5, e um `place` que só escrevesse no
- * destino deixaria a espécie nos dois lugares. Slot ocupado troca de conteúdo —
- * é o que a prancha desenha ao soltar uma carta sobre outra.
+ * de não repetir verdadeira sem precisar recusar nada: pôr no slot 5 uma carta
+ * que está no 2 é uma ação só, e um `place` que escrevesse apenas no destino
+ * deixaria a espécie nos dois lugares.
+ *
+ * **A tela ainda não oferece esse caminho** — a coluna de picks exclui o que já
+ * está no deck, e nenhum slot é arrastável. A regra existe como defesa da
+ * fronteira, não como descrição de interação: ela é o que impede um save
+ * adulterado, ou um arrastar entre slots que uma fase futura acrescente, de
+ * produzir um time com duas cópias da mesma espécie.
  */
 export function place(deck: DeckSlots, slot: number, id: SpeciesId): DeckSlots {
   if (!Number.isInteger(slot) || slot < 0 || slot >= DECK_SIZE) return deck
@@ -130,12 +135,17 @@ export interface CoverageCard {
   readonly types: readonly TypeName[]
 }
 
-/** Um tipo do deck, e quanto ele multiplica contra o próximo ginásio. */
+/**
+ * Um tipo do deck, e quanto ele multiplica contra o próximo ginásio.
+ *
+ * **Sem a lista de quais cartas trazem o tipo.** Ela existiu no primeiro corte e
+ * saiu: nenhuma tela a lia, e campo declarado que ninguém consome é receita não
+ * verificada — o mesmo argumento que o tema faz sobre token nunca usado. Se a
+ * leitura por carta voltar a ser pedida, o `byType` abaixo já a tem em mãos.
+ */
 export interface OutgoingCoverage {
   readonly type: TypeName
   readonly multiplier: number
-  /** As cartas que trazem esse tipo — o que a tela nomeia ao explicar a linha. */
-  readonly cards: readonly SpeciesId[]
 }
 
 /** Uma carta do deck que apanha do tipo do líder. */
@@ -172,24 +182,22 @@ export function deckCoverage(
   cards: readonly CoverageCard[],
   leaderType: TypeName,
 ): DeckCoverage {
-  const byType = new Map<TypeName, SpeciesId[]>()
+  const types = new Set<TypeName>()
   for (const card of cards) {
-    for (const type of card.types) {
-      const holders = byType.get(type)
-      if (holders === undefined) byType.set(type, [card.id])
-      else holders.push(card.id)
-    }
+    for (const type of card.types) types.add(type)
   }
 
-  const outgoing = [...byType.entries()]
-    .map(([type, holders]) => ({
+  const outgoing = [...types]
+    .map(type => ({
       type,
       multiplier: effectivenessAgainst(matrix, type, [leaderType]),
-      cards: holders,
     }))
     // Decrescente: o que resolve o ginásio vem primeiro, e o ×0.5 que pede troca
     // fica no fim, que é onde a prancha o põe.
-    .sort((a, b) => b.multiplier - a.multiplier || a.type.localeCompare(b.type))
+    // Comparação de código, e não `localeCompare`: `shared/` é a camada que não
+    // pode depender de ambiente, e a locale do processo é ambiente. Os nomes de
+    // tipo são ASCII, então o resultado é o mesmo — o que muda é a garantia.
+    .sort((a, b) => b.multiplier - a.multiplier || (a.type < b.type ? -1 : 1))
 
   const incoming = cards
     .map(card => ({

@@ -254,12 +254,14 @@ describe('contraste do tema', () => {
    * defeito enquanto a cor de tipo fosse só preenchimento — chip, brilho, barra —
    * e o único texto que ela carregasse caísse sobre `--bg`.
    *
-   * A Fase 6 é quem estreia o consumidor que a lista previa: o painel de cobertura
-   * do `/deck` escreve o nome do tipo como texto sobre `--surface`. A saída foi
-   * clarear `dragon` (+3 pontos de L), e não restringir o consumidor à superfície
-   * escura onde a cor original passa — porque a segunda obrigaria este portão a
-   * saber em qual superfície cada texto cai, sem traçar a cascata. É o defeito
-   * recorrente deste repositório, e não vale plantá-lo de propósito.
+   * A Fase 6 decidiu, como a issue #11 mandava — e decidiu **limpar a exceção em
+   * vez de carregá-la**. Não porque um consumidor tenha chegado: nenhuma tela
+   * deste repositório pinta nome de tipo na cor do tipo, nem depois do deck
+   * builder. Porque uma lista de tipos que não sustentam texto é um registro que
+   * envelhece, e a alternativa que preservaria o hex do canvas — restringir
+   * tipo-como-texto às superfícies escuras — obrigaria **este portão** a saber em
+   * qual superfície cada texto cai, sem traçar a cascata. É o defeito recorrente
+   * do repositório, e não vale plantá-lo de propósito.
    *
    * Com a lista vazia a regra é mecânica: **18 tipos × toda superfície ≥ AA**. Um
    * tipo novo, uma superfície nova ou uma cor repontada reprovam sozinhos, e a

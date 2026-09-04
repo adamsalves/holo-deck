@@ -67,8 +67,16 @@ const visible = computed(() => {
   })
 })
 
-/** O primeiro slot vazio, ou `-1` com o deck cheio. */
-const firstEmpty = computed(() => view.slots.value.findIndex(slot => slot.entry === null))
+/**
+ * O primeiro slot vazio, ou `-1` com o deck cheio.
+ *
+ * Lê `deck.slots`, que é a **verdade**, e não `view.slots`, que é a projeção dela
+ * contra o índice. Hoje as duas concordam porque o índice resolve as 1025; se ele
+ * chegasse vazio, toda `slot.entry` seria `null`, isto devolveria `0` e escalar
+ * sobrescreveria um slot ocupado. Perguntar posse de slot ao objeto que sabe de
+ * arte é o tipo de acoplamento que só quebra no dia ruim.
+ */
+const firstEmpty = computed(() => deck.slots.findIndex(id => id === null))
 
 /**
  * Clicar escala; arrastar escolhe o slot.
@@ -166,7 +174,15 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
                   :key="line.type"
                   class="deck__line"
                 >
-                  <span class="numeric text-[11px] text-toned">{{ TYPE_LABELS[line.type] }}</span>
+                  <!-- O nome acompanha o degrau da linha, como a prancha
+                       desenha: `lutador` sai em `--deficit` junto com a barra e
+                       o multiplicador quando o tipo não resolve o ginásio. É cor
+                       de **resultado**, não de tipo — a cor do tipo continua
+                       sendo preenchimento, e nenhuma tela a usa como texto. -->
+                  <span
+                    class="numeric text-[11px]"
+                    :data-level="line.multiplier > 1 ? 'good' : line.multiplier < 1 ? 'bad' : 'flat'"
+                  >{{ TYPE_LABELS[line.type] }}</span>
                   <span
                     class="deck__bar"
                     :data-level="line.multiplier > 1 ? 'good' : line.multiplier < 1 ? 'bad' : 'flat'"
@@ -298,11 +314,17 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               <span class="numeric deck__pick-number">
                 #{{ String(entry.id).padStart(4, '0') }}
               </span>
+              <!-- `draggable="false"`: a imagem é arrastável por padrão, e o
+                   `dragstart` dela carregaria a URL do sprite no `dataTransfer`.
+                   O `setData` do botão deve sobrescrever, mas isso varia por
+                   navegador — e a falha é silenciosa, porque `Number(url)` dá
+                   `NaN` e o slot descarta calado. -->
               <img
                 :src="`/sprites/${entry.id}.webp`"
                 alt=""
                 width="128"
                 height="128"
+                draggable="false"
                 loading="lazy"
                 decoding="async"
               >
@@ -439,6 +461,8 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
    mede vantagem, que é a mesma família de leitura que o progresso mede. */
 [data-level="good"] { color: var(--progress-high); }
 [data-level="bad"] { color: var(--deficit); }
+/* `--text-muted` e não `--text-faint`: aqui o degrau neutro carrega **texto** de
+   11px, e `--text-faint` é papel de texto grande. */
 [data-level="flat"] { color: var(--text-muted); }
 
 .deck__bar[data-level="good"] > span { background: var(--progress-high); }
@@ -504,14 +528,36 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
   margin: 0;
   padding: 0;
   list-style: none;
-
-  /* A mesma saída do binder: a coluna pode chegar a 1025 cartas, e
-     `content-visibility` pula estilo, layout e pintura do que está fora da
-     janela sem exigir altura uniforme. Ver a issue #24. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
 }
 
+/**
+ * `content-visibility` **no item**, como o binder faz — e não no `<ul>`.
+ *
+ * No contêiner ele não pula nada enquanto a lista estiver na janela: os até 1025
+ * picks renderizam estilo, layout e pintura do mesmo jeito. Pior, ele liga
+ * `contain: layout style paint` na coluna inteira, e o `contain-intrinsic-size`
+ * a fazia colapsar de uma vez ao sair da janela — salto de rolagem de graça.
+ *
+ * A altura declarada é a de **um** pick (arte de 56px mais número e nome), que é
+ * o que o navegador reserva para o que ainda não pintou.
+ */
+.deck__picks > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 108px;
+}
+
+/**
+ * `--surface-cell`, e **não** `--card-surface`.
+ *
+ * O segundo é declarado sob `[data-type]`, porque ele resolve `var(--type)` no
+ * elemento que acabou de receber o tipo. Este botão não tem `data-type` nem
+ * descende de um que tenha, então ali `var(--card-surface)` é
+ * *guaranteed-invalid* e o `background` cai para o inicial: transparente. O tile
+ * ficava sem fundo, mostrando a coluna atrás.
+ *
+ * O portão de token não vê porque `--card-surface` é um semântico legítimo — ele
+ * cobra o vocabulário, não o escopo em que cada nome existe.
+ */
 .deck__pick {
   display: flex;
   flex-direction: column;
@@ -520,7 +566,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
   width: 100%;
   padding: 6px 7px 8px;
   border: 1px solid var(--border);
-  background: var(--card-surface);
+  background: var(--surface-cell);
   color: inherit;
   cursor: grab;
 }

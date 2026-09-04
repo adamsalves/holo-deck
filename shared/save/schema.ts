@@ -178,6 +178,10 @@ export type RecoveryReason = 'corrupt' | 'unknown-version' | 'failed-migration'
  * e adivinhar seis cartas da coleção seria montar time pelo jogador.
  */
 function addDeck(save: Record<string, unknown>): Record<string, unknown> {
+  // O `2` é o destino **deste** passo, e a cadeia é indexada por posição:
+  // `MIGRATIONS[0]` leva de 1 para 2. Inserir um passo antes deste sem renumerar
+  // gravaria a versão errada, e o guarda não pegaria — ele confere forma, não
+  // número. Passo novo entra sempre no fim.
   return { ...save, schemaVersion: 2, deck: emptyDeck() }
 }
 

@@ -79,10 +79,29 @@ export async function useDeck(): Promise<DeckView> {
   const collection = useCollectionStore()
   const deck = useDeckStore()
 
-  const { data } = await useAsyncData('deck-dex', async () => {
+  /**
+   * **Os dois `useAsyncData` são registrados antes de qualquer `await`, e isso
+   * não é estilo.**
+   *
+   * Isto é uma função `.ts` comum, e não um `<script setup>`: o `withAsyncContext`
+   * do compilador só restaura o instance na fronteira da página. Depois do
+   * primeiro `await`, `getCurrentInstance()` e `getCurrentScope()` são nulos — e o
+   * `useAsyncData` só registra `onScopeDispose` quando há escopo.
+   *
+   * O que vazava com o registro tardio: o `watch: [generations]` do segundo
+   * sobrevivia à saída da tela, segurando um computed que depende da store global
+   * do deck. Moer uma carta escalada estando em `/collection` acordava o
+   * observador órfão e disparava um `$fetch` de `gen-N.json` numa tela que não usa
+   * stat nenhum — e cada visita a `/deck` acrescentava mais um.
+   *
+   * Os computeds abaixo atravessam `data.value` ainda `null` sem reclamar, então
+   * registrar cedo não custa nada. O `await` de verdade fica no fim.
+   */
+  const dexAsync = useAsyncData('deck-dex', async () => {
     const [index, core] = await Promise.all([loadIndex(), loadCore()])
     return { index, effectiveness: core.effectiveness }
   })
+  const { data } = dexAsync
 
   const ready = computed(() => data.value !== null && data.value !== undefined)
   const entries = computed(() => data.value?.index ?? [])
@@ -122,8 +141,32 @@ export async function useDeck(): Promise<DeckView> {
   const generations = computed(() =>
     [...new Set(cards.value.map(entry => entry.generation))].sort((a, b) => a - b))
 
-  const { data: statsByGeneration } = await useAsyncData(
-    'deck-generations',
+  /**
+   * **A chave carrega as gerações, e sem isso a tela abre com `—` nos seis
+   * slots.**
+   *
+   * `/deck` é pré-renderizada. No servidor o deck está sempre vazio, então
+   * `generations` é `[]` e o handler devolve um mapa vazio — que vai para o
+   * payload sob a chave. No cliente, o plugin de save roda antes do mount, então
+   * quando isto executa o deck **já** está hidratado e `generations` já vale
+   * `[1]`; mas o `useAsyncData` vê dado no payload para aquela chave, marca
+   * `success` e não busca. O `watch` também não salva: ele registra `[1]` como
+   * valor inicial e nada muda depois.
+   *
+   * Com a geração dentro da chave, a do cliente (`deck-generations:1`) não casa
+   * com a do servidor (`deck-generations:`), e a busca acontece. A chave reativa
+   * também **substitui** o `watch`: trocar de carta troca a chave, e é isso que
+   * dispara a releitura.
+   *
+   * Este defeito estava escondido atrás de outro: enquanto o registro acontecia
+   * depois do `await`, ele caía fora do contexto do Nuxt e a chave nunca chegava
+   * ao payload — a tela funcionava por acidente. Consertar o vazamento revelou
+   * este, e os dois só fecham juntos.
+   */
+  const statsKey = computed(() => `deck-generations:${generations.value.join('-')}`)
+
+  const statsAsync = useAsyncData(
+    statsKey,
     async () => {
       const loaded = await Promise.all(generations.value.map(loadGeneration))
       const map = new Map<SpeciesId, BattleStats>()
@@ -132,8 +175,8 @@ export async function useDeck(): Promise<DeckView> {
       }
       return map
     },
-    { watch: [generations] },
   )
+  const { data: statsByGeneration } = statsAsync
 
   const slots = computed<readonly DeckSlotView[]>(() =>
     Array.from({ length: DECK_SIZE }, (_, index) => {
@@ -171,6 +214,10 @@ export async function useDeck(): Promise<DeckView> {
     return entry.types.some(type =>
       effectivenessAgainst(matrix, type, [leader.value.type]) > 1)
   }
+
+  // Só agora: os dois já estão registrados dentro do escopo da tela, e o que
+  // sobra é esperar o dado chegar.
+  await Promise.all([dexAsync, statsAsync])
 
   return { ready, owned, slots, leader, coverage, isStrong }
 }

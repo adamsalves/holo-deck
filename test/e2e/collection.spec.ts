@@ -144,24 +144,34 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
 
 /**
  * A porta. A Fase 3 já teve um defeito desta família — a raiz não levava à
- * Pokédex —, e a Fase 5 acrescentou duas telas: sem link, elas existem no build
- * e não existem para quem joga. A navegação global é da Fase 6; até lá, é esta
- * a checagem que impede uma fase inteira de ficar inalcançável.
+ * Pokédex —, e cada fase seguinte acrescentou tela: sem link, elas existem no
+ * build e não existem para quem joga. A navegação global é o último PR da Fase 6;
+ * até lá, é esta a checagem que impede uma fase inteira de ficar inalcançável.
+ *
+ * **Ela precisa crescer com a raiz, e a Fase 5 provou isso do jeito ruim:** o
+ * teste ficou chamado "três telas" depois de a quarta entrar, e a asserção sobre
+ * a porta nova simplesmente não existia. Um teste que não acompanha o que ele
+ * guarda é um teste que passa a guardar o passado.
  */
-test('a raiz leva às três telas que já existem', async ({ page }) => {
-  await page.goto('/')
-
-  await expect(page.getByRole('link', { name: 'Abrir pack' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Coleção' })).toBeVisible()
-
-  await page.getByRole('link', { name: 'Abrir pack' }).click()
-  await expect(page).toHaveURL(/\/packs$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Abrir pack' })).toBeVisible()
+test('a raiz leva a todas as telas que já existem', async ({ page }) => {
+  const portas = [
+    { link: 'Abrir pack', url: /\/packs$/, titulo: 'Abrir pack' },
+    { link: 'Coleção', url: /\/collection$/, titulo: 'Binder' },
+    { link: 'Deck', url: /\/deck$/, titulo: 'Seu time' },
+    { link: 'Pokédex', url: /\/pokedex$/, titulo: 'Pokédex' },
+  ]
 
   await page.goto('/')
-  await page.getByRole('link', { name: 'Coleção' }).click()
-  await expect(page).toHaveURL(/\/collection$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Binder' })).toBeVisible()
+  for (const porta of portas) {
+    await expect(page.getByRole('link', { name: porta.link, exact: true })).toBeVisible()
+  }
+
+  for (const porta of portas) {
+    await page.goto('/')
+    await page.getByRole('link', { name: porta.link, exact: true }).click()
+    await expect(page).toHaveURL(porta.url)
+    await expect(page.getByRole('heading', { level: 1, name: porta.titulo })).toBeVisible()
+  }
 })
 
 /**

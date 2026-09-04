@@ -274,7 +274,7 @@ está aqui é só o que sobrou de propósito.
 
 | divergência | por quê |
 |---|---|
-| `dragon` em `#966BFF`, e não no valor do canvas | é o único dos 18 tipos que reprova AA sobre painel (3,99 em `--surface-raised`), e a Fase 6 é quem estreia nome de tipo como texto ali. A alternativa — restringir o consumidor à superfície escura — obrigaria o portão a saber em qual superfície cada texto cai. Ver a issue #11 |
+| `dragon` em `#966BFF`, e não no valor do canvas | é o único dos 18 tipos que reprova AA sobre painel (3,99 em `--surface-raised`). A issue #11 dizia que a Fase 6 decidiria, e ela decidiu **limpar a exceção em vez de carregá-la** — não porque um consumidor tenha chegado (nenhuma tela pinta nome de tipo na cor do tipo), mas porque a alternativa obrigaria o portão a saber em qual superfície cada texto cai, sem traçar a cascata. O preço foram 3 pontos de L; o que se compra é `18 × 5 ≥ AA` sem exceção para consultar |
 | *Deck* em stats de Lv50, não em base stat | a prancha escrevia `HP 35` e a *Batalha* `110` para o mesmo Pikachu. O deck é onde se decide quem entra em campo, então ele mostra o que entra; a *Detalhe* segue em base stat, e lá a aba **se chama** *Base stats*. A prancha *Deck* foi corrigida |
 | `/deck` sem botão SALVAR | a prancha desenha um, cinza. O save é gravado a cada mutação — um botão que não salva nada é pior que nenhum, e um que salvasse exigiria um estado "não salvo" que o jogo não tem |
 | `×2` de efetividade fora da carta do deck | a prancha o põe na linha do número de cada carta; ele está na coluna de cobertura logo abaixo, por tipo, que é onde informa mais — duas cartas do mesmo tipo dão a mesma linha. Na carta ficou o que muda decisão: a faixa `LEVA ×2` |

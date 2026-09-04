@@ -176,14 +176,13 @@ describe('a leitura de cobertura', () => {
     ])
   })
 
-  it('nomeia as cartas que trazem cada tipo', () => {
+  it('abre uma linha por tipo, e não por carta', () => {
     const { outgoing } = deckCoverage(effectiveness, cards(PIKACHU, GEODUDE), FLYING)
 
-    // Geodude é pedra/terrestre: uma carta aparece nas duas linhas que ela cobre.
-    const rock = outgoing.find(linha => linha.type === 'rock')
-    const ground = outgoing.find(linha => linha.type === 'ground')
-    expect(rock?.cards).toEqual([GEODUDE])
-    expect(ground?.cards).toEqual([GEODUDE])
+    // Geodude é pedra/terrestre: uma carta abre **duas** linhas, uma por tipo que
+    // ela cobre. E dois Pokémon do mesmo tipo abririam uma só — a leitura é sobre
+    // o que o time alcança, não sobre quantas cartas o alcançam.
+    expect(outgoing.map(linha => linha.type)).toEqual(['electric', 'rock', 'ground'])
   })
 
   /**

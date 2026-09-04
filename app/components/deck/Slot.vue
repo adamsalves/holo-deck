@@ -34,7 +34,37 @@ const props = defineProps<{
 
 const emit = defineEmits<{ remove: [], drop: [id: number] }>()
 
-const rarity = computed(() => (props.entry === null ? null : rarityFrom(props.entry)))
+/**
+ * O estado preenchido, resolvido de uma vez.
+ *
+ * Carta, raridade e link nascem juntos ou não nascem: um `entry` não-nulo
+ * **implica** uma raridade e um destino, e três computeds separados fariam o
+ * tipo perder essa implicação — o `v-if="entry"` do template estreita `entry` e
+ * não estreita `rarity`, e a saída seria um `?? 'common'` que nunca roda,
+ * escondendo a relação em vez de declará-la.
+ */
+const card = computed(() => {
+  const entry = props.entry
+  if (entry === null) return null
+
+  const rarity = rarityFrom(entry)
+
+  return {
+    entry,
+    rarity,
+    link: {
+      to: `/pokemon/${entry.slug}`,
+      // O link cobre a carta e não tem texto dentro: este rótulo é o único nome
+      // que ele tem.
+      label: [
+        entry.displayName,
+        `slot ${props.index + 1}`,
+        entry.types.map(type => TYPE_LABELS[type]).join(' e '),
+        RARITY_LABELS[rarity],
+      ].join(', '),
+    },
+  }
+})
 
 /**
  * O segundo número do rodapé — o stat mais alto depois do HP.
@@ -58,16 +88,6 @@ const standout = computed(() => {
   return candidates.reduce((best, candidate) => (candidate.value > best.value ? candidate : best))
 })
 
-const label = computed(() => {
-  if (props.entry === null) return `Slot ${props.index + 1}, vazio`
-  return [
-    props.entry.displayName,
-    `slot ${props.index + 1}`,
-    props.entry.types.map(type => TYPE_LABELS[type]).join(' e '),
-    rarity.value === null ? '' : RARITY_LABELS[rarity.value],
-  ].filter(Boolean).join(', ')
-})
-
 /**
  * Soltar uma carta arrastada.
  *
@@ -88,21 +108,21 @@ function onDrop(event: DragEvent): void {
 <template>
   <article
     class="deck-slot"
-    :class="{ 'deck-slot--empty': entry === null, 'deck-slot--weak': incoming > 1 }"
+    :class="{ 'deck-slot--empty': card === null, 'deck-slot--weak': incoming > 1 }"
     @dragover.prevent
     @drop.prevent="onDrop"
   >
     <DexPokeCard
-      v-if="entry"
-      :dex-number="entry.id"
-      :name="entry.displayName"
-      :types="entry.types"
-      :rarity="rarity ?? 'common'"
-      :link="{ to: `/pokemon/${entry.slug}`, label }"
+      v-if="card"
+      :dex-number="card.entry.id"
+      :name="card.entry.displayName"
+      :types="card.entry.types"
+      :rarity="card.rarity"
+      :link="card.link"
     >
       <template #art>
         <img
-          :src="`/sprites/${entry.id}.webp`"
+          :src="`/sprites/${card.entry.id}.webp`"
           alt=""
           width="128"
           height="128"
@@ -127,6 +147,22 @@ function onDrop(event: DragEvent): void {
           aria-hidden="true"
         >
           <span>—</span>
+        </p>
+
+        <!-- O alerta de matchup, que é a razão de a leitura de cobertura
+             existir — **no fluxo**, logo abaixo dos stats.
+
+             Ele era `position: absolute; bottom: 0` e cobria 9,5px da linha de
+             stats: a faixa tem ~21px e o recuo de baixo da carta tem 11. Ou
+             seja, escondia a metade inferior de `HP 136 / ATK 104` justamente na
+             carta que mais se quer ler. No fluxo isso não tem como acontecer, e
+             a arte encolhe no lugar (ela é `flex: 1`), então a fileira de seis
+             continua com a mesma altura. -->
+        <p
+          v-if="incoming > 1"
+          class="numeric deck-slot__warning"
+        >
+          LEVA {{ multiplierLabel(incoming) }}
         </p>
       </template>
     </DexPokeCard>
@@ -159,10 +195,10 @@ function onDrop(event: DragEvent): void {
     <!-- Tirar do deck. Fora do link e acima dele, que é o degrau que a `PokeCard`
          publica. Some no slot vazio: não há o que tirar. -->
     <button
-      v-if="entry"
+      v-if="card"
       type="button"
       class="deck-slot__remove"
-      :aria-label="`Tirar ${entry.displayName} do slot ${index + 1}`"
+      :aria-label="`Tirar ${card.entry.displayName} do slot ${index + 1}`"
       @click="emit('remove')"
     >
       <svg
@@ -180,14 +216,6 @@ function onDrop(event: DragEvent): void {
         />
       </svg>
     </button>
-
-    <!-- O alerta de matchup, que é a razão de a leitura de cobertura existir. -->
-    <p
-      v-if="entry && incoming > 1"
-      class="numeric deck-slot__warning"
-    >
-      LEVA {{ multiplierLabel(incoming) }}
-    </p>
   </article>
 </template>
 
@@ -262,15 +290,23 @@ function onDrop(event: DragEvent): void {
   outline-offset: 2px;
 }
 
-/* A faixa `LEVA ×2` da prancha. Ela é aviso e não ação, então não intercepta
-   ponteiro: o resto da carta continua navegando por baixo dela. */
+/**
+ * A faixa `LEVA ×2` da prancha, sangrando até as bordas da carta.
+ *
+ * As margens negativas anulam os recuos que a `PokeCard` **publica** como
+ * `--card-gutter` e `--card-foot`. Escrever `-9px` e `-11px` aqui funcionaria
+ * igual hoje e desalinharia no dia em que a carta mudasse de recuo, sem nada
+ * acusar — é a mesma razão de a escada de `z-index` estar documentada lá e não
+ * adivinhada aqui.
+ *
+ * Ela é aviso e não ação, então não intercepta ponteiro: o resto da carta
+ * continua navegando por baixo dela.
+ */
 .deck-slot__warning {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  margin: 0;
+  margin:
+    4px
+    calc(var(--card-gutter) * -1)
+    calc(var(--card-foot) * -1);
   padding: 4px;
   pointer-events: none;
   font-size: 9px;

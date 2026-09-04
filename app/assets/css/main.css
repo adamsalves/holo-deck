@@ -97,11 +97,17 @@
    * `--surface`. O segundo pior, `dark`, para em 4.94. `#966BFF` é o mesmo matiz
    * e a mesma saturação com +3 pontos de L em HSL.
    *
-   * **O que decidiu não foi o número, foi o que o portão consegue medir.** A
-   * alternativa era restringir tipo-como-texto às superfícies escuras, onde a cor
-   * original passa — e isso obrigaria o portão a saber em qual superfície cada
-   * texto cai, sem traçar a cascata. Clareando, a invariante vira reta: 18 tipos
-   * × 5 superfícies ≥ 4.5, que é o que `theme.spec.ts` cobra.
+   * **Nenhuma tela pinta nome de tipo na cor do tipo, e isso não é o argumento.**
+   * A issue #11 dizia que a Fase 6 decidiria, e o que ela decidiu foi *limpar a
+   * exceção em vez de carregá-la*: uma lista de tipos que não sustentam texto é
+   * um registro que envelhece — alguém acrescenta uma cor, ela entra na lista, e
+   * a lista vira a regra. A alternativa que preservaria o hex do canvas era
+   * restringir tipo-como-texto às superfícies escuras, e isso obrigaria o portão
+   * a saber em qual superfície cada texto cai sem traçar a cascata: o defeito
+   * recorrente deste repositório, plantado de propósito.
+   *
+   * O preço foram 3 pontos de L, e o que se compra é uma invariante que a máquina
+   * verifica sozinha: 18 tipos × 5 superfícies ≥ 4.5, sem exceção para consultar.
    *
    * Mesmo movimento que `ink-325` na Fase 2: a matriz pediu um valor que nenhuma
    * prancha desenha. Ver a issue #11.

@@ -94,9 +94,16 @@ export const useDeckStore = defineStore('deck', () => {
     { deep: true },
   )
 
-  /** O que o plugin de save grava. */
+  /**
+   * O que o plugin de save grava — uma **cópia**, simétrica a `hydrate`.
+   *
+   * Devolver o array reativo vivo é inofensivo enquanto o driver serializa na
+   * hora, e deixa de ser no dia em que alguém guardar o retorno para comparar
+   * com o próximo: os dois seriam o mesmo objeto e a comparação diria que nada
+   * mudou.
+   */
   function snapshot(): DeckSlots {
-    return slots.value
+    return [...slots.value]
   }
 
   /**
