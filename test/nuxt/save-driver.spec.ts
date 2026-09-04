@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StorageLike } from '~~/app/utils/save-driver'
-import { BACKUP_PREFIX, LocalStorageDriver, SAVE_KEY, backupKey } from '~~/app/utils/save-driver'
+import { BACKUP_PREFIX, LocalStorageDriver, MAX_BACKUPS, SAVE_KEY, backupKey } from '~~/app/utils/save-driver'
 import { SCHEMA_VERSION, emptySave, isSaveData } from '~~/shared/save/schema'
 
 /**
@@ -39,6 +39,15 @@ function fakeStorage(initial: Record<string, string> = {}): StorageLike & {
       // Sem `delete` de chave computada, que o lint proíbe em todo o repositório
       // — inclusive num dublê, para o dublê não ensinar o contrário do código.
       this.data = Object.fromEntries(Object.entries(this.data).filter(([held]) => held !== key))
+    },
+    // As duas metades de enumerar chaves, como o `Storage` do navegador as
+    // expõe. `length` é getter porque `removeItem` **troca** o objeto, e um
+    // valor fixado na criação contaria as chaves de antes da primeira remoção.
+    get length() {
+      return Object.keys(this.data).length
+    },
+    key(index) {
+      return Object.keys(this.data)[index] ?? null
     },
   }
 }
@@ -132,6 +141,59 @@ describe('a regra de nunca apagar', () => {
     expect(backups).toHaveLength(2)
     expect(storage.data[backupKey(FROZEN)]).toBe('primeiro lixo')
     expect(storage.data[backupKey(FROZEN + 1000)]).toBe('segundo lixo')
+  })
+
+  /**
+   * Nunca apagar o save que não entendemos não é guardar **todos** os que nunca
+   * entendemos. Cada recuperação deixa uma cópia numa cota de 5 MB, e um save de
+   * 21 KB que falhe em todo boot enche o armazenamento em algumas centenas de
+   * aberturas — derrubando justamente a gravação do save novo.
+   */
+  it('guarda no máximo três cópias, e descarta sempre a mais antiga', async () => {
+    const storage = fakeStorage()
+
+    for (let recovery = 0; recovery < MAX_BACKUPS + 2; recovery += 1) {
+      storage.data[SAVE_KEY] = `lixo ${recovery}`
+      await new LocalStorageDriver(storage, () => FROZEN + recovery).load()
+    }
+
+    const backups = Object.keys(storage.data).filter(key => key.startsWith(BACKUP_PREFIX))
+
+    expect(backups).toHaveLength(MAX_BACKUPS)
+    // As três últimas sobrevivem; as duas primeiras foram podadas.
+    expect(storage.data[backupKey(FROZEN)]).toBeUndefined()
+    expect(storage.data[backupKey(FROZEN + 1)]).toBeUndefined()
+    expect(storage.data[backupKey(FROZEN + 2)]).toBe('lixo 2')
+    expect(storage.data[backupKey(FROZEN + 4)]).toBe('lixo 4')
+  })
+
+  /**
+   * A poda ordena pelo instante da chave, e não pela ordem de inserção do
+   * objeto. É o que mantém a regra correta quando o armazenamento devolve as
+   * chaves em qualquer ordem — que é o contrato do `Storage` de verdade.
+   */
+  it('poda pela idade na chave, não pela ordem em que o armazenamento lista', async () => {
+    const storage = fakeStorage({
+      [backupKey(FROZEN + 500)]: 'recente',
+      [backupKey(FROZEN)]: 'antigo',
+      [backupKey(FROZEN + 250)]: 'do meio',
+      [SAVE_KEY]: 'lixo novo',
+    })
+
+    await new LocalStorageDriver(storage, () => FROZEN + 900).load()
+
+    expect(storage.data[backupKey(FROZEN)]).toBeUndefined()
+    expect(storage.data[backupKey(FROZEN + 250)]).toBe('do meio')
+    expect(storage.data[backupKey(FROZEN + 500)]).toBe('recente')
+    expect(storage.data[backupKey(FROZEN + 900)]).toBe('lixo novo')
+  })
+
+  it('não toca na chave do save ao podar', async () => {
+    const storage = fakeStorage({ [SAVE_KEY]: 'lixo' })
+
+    await new LocalStorageDriver(storage, () => FROZEN).load()
+
+    expect(storage.data[SAVE_KEY]).toBe('lixo')
   })
 
   it('devolve save jogável mesmo quando nem o backup cabe', async () => {

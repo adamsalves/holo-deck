@@ -74,6 +74,28 @@ function isCount(value: unknown): value is number {
 }
 
 /**
+ * O teto de qualquer contagem do save.
+ *
+ * `isCount` recusa o negativo e o fracionário, e deixava passar `1e15`. O jogo
+ * não produz esse número por nenhum caminho — são cópias de uma espécie, ou pó
+ * ganho moendo-as —, mas o save é texto num navegador que o jogador controla, e
+ * um `c` absurdo vira pó absurdo na primeira moagem, o que apaga a economia
+ * inteira sem nada parecer quebrado.
+ *
+ * O valor é folgado de propósito: um milhão de cópias da mesma espécie são ~100
+ * mil packs, ordens de grandeza acima de qualquer partida real e ordens de
+ * grandeza abaixo do que quebra a conta. O teto não existe para calibrar o jogo,
+ * existe para o número ter **alguma** ordem de grandeza — e recusar aqui é
+ * preferível a truncar, porque o save cru vai para o backup em vez de ser
+ * silenciosamente reescrito menor.
+ */
+const MAX_COUNT = 1_000_000
+
+function isBoundedCount(value: unknown): value is number {
+  return isCount(value) && value <= MAX_COUNT
+}
+
+/**
  * Uma entrada de coleção válida: pelo menos uma cópia, e nunca mais shinies que
  * cópias.
  *
@@ -84,12 +106,16 @@ function isCount(value: unknown): value is number {
  */
 function isCollectionEntry(value: unknown): value is CollectionEntry {
   if (!isRecord(value)) return false
-  return isCount(value.c) && value.c >= 1 && isCount(value.s) && value.s <= value.c
+  return isBoundedCount(value.c) && value.c >= 1
+    && isBoundedCount(value.s) && value.s <= value.c
 }
 
 export function isSaveData(value: unknown): value is SaveData {
   if (!isRecord(value)) return false
-  if (!isCount(value.schemaVersion) || !isCount(value.dust)) return false
+  // `schemaVersion` fica sem teto: ele é comparado com `SCHEMA_VERSION` logo em
+  // `migrate`, e um número alto ali é o caso normal de quem voltou de uma build
+  // nova — recusa por versão desconhecida, não por corrupção.
+  if (!isCount(value.schemaVersion) || !isBoundedCount(value.dust)) return false
 
   const { collection, progress } = value
   if (!isRecord(collection) || !isRecord(progress)) return false
@@ -101,7 +127,7 @@ export function isSaveData(value: unknown): value is SaveData {
     if (!isSpeciesId(Number(id)) || !isCollectionEntry(entry)) return false
   }
 
-  return isCount(progress.pity) && isCount(progress.welcomeClaimed)
+  return isBoundedCount(progress.pity) && isBoundedCount(progress.welcomeClaimed)
 }
 
 /**
@@ -161,11 +187,17 @@ export function migrate(raw: unknown): LoadResult {
 }
 
 /**
- * As cinco somas que o binder mostra no cabeçalho, feitas uma vez.
+ * As espécies possuídas, em ordem de dex — a lista de onde saem as somas.
  *
- * Mora aqui, e não no componente, porque a mesma conta aparece em três lugares —
- * cabeçalho do binder, progresso por região e a contagem `98 / 151` da Pokédex —
- * e três implementações da mesma soma é como elas passam a discordar.
+ * Mora aqui, e não em quem soma, por causa do `.filter`: a chave do save é
+ * texto, porque é assim que o JSON a devolve, e nem toda string vira espécie. A
+ * leitura já recusa um save com chave inválida, mas o mesmo mapa chega a esta
+ * função vindo de uma store hidratada em memória, e uma varredura escrita à mão
+ * em cada consumidor descarta a chave torta só enquanto alguém lembra.
+ *
+ * Ordenado porque a lista atravessa a tela: contagem por tier e por região são
+ * invariantes à ordem, mas qualquer coisa que venha depois e mostre ids em
+ * sequência espera a ordem do dex nacional, não a de inserção no objeto.
  */
 export function ownedIds(collection: CollectionMap): SpeciesId[] {
   return Object.keys(collection)

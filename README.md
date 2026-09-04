@@ -527,6 +527,15 @@ por isso que ele hoje mede pesos puros e rede em série em blocos separados.
   tem um ciclo fechado na partida — carta para deck, deck para ginásio, ginásio
   para moeda, moeda para pack — e sem uma concessão inicial nenhuma porta abre.
   A loja e o pack diário continuam na Fase 6.
+- **O binder não virtualiza; ele usa `content-visibility`.** A Pokédex virtualiza
+  porque suas fileiras têm altura uniforme. A carta do binder não tem: a linha
+  `2 dup · 10 pó` só aparece quando há duplicata, e uma fileira com repetida é
+  ~22px mais alta que uma sem — um `estimateSize` único posicionaria as fileiras
+  erradas depois da primeira divergência. `content-visibility: auto` pula estilo,
+  layout e pintura do que está fora da janela sem exigir altura uniforme, e é o
+  que faz as 1025 caberem. **Virtualizar de verdade depende de uniformizar a
+  altura da carta, que é decisão de canvas** — fica para a Fase 6, junto com o
+  deck, que desenha a mesma carta.
 
 ## O save
 
@@ -539,16 +548,37 @@ cobrindo o save inteiro, uma cadeia de migração que enxerga todas as seções 
 mesmo tempo, e os ~21 KB que a Fase 7 sobe numa requisição só.
 
 ```
-shared/save/schema.ts   forma, guarda e migração — puro, não sabe que localStorage existe
-app/utils/save-driver   LocalStorageDriver: a única camada que toca o navegador
-app/plugins/save.client o único lugar que faz IO de save
-app/stores/*            regra e estado; não tocam disco
+shared/save/schema.ts        forma, guarda e migração — puro, não sabe que localStorage existe
+app/utils/save-driver        LocalStorageDriver: a única camada que toca o navegador
+app/plugins/save.client      o único lugar que faz IO de save
+app/components/SaveRecoveryNotice.vue  o aviso, que é a outra metade da regra
+app/stores/*                 regra e estado; não tocam disco
 ```
 
-**A regra inegociável é nunca apagar.** Toda leitura que dá errado copia o save
-cru para `holodeck:backup:<instante>` e devolve save limpo **com motivo** — nunca
-um `null`, que a tela confundiria com jogador novo. O instante entra na chave e
-não no valor: senão a segunda recuperação apagaria a cópia que a primeira salvou.
+**A regra inegociável é nunca apagar, e ela tem duas metades.** Toda leitura que
+dá errado copia o save cru para `holodeck:backup:<instante>` e devolve save limpo
+**com motivo** — nunca um `null`, que a tela confundiria com jogador novo. O
+instante entra na chave e não no valor: senão a segunda recuperação apagaria a
+cópia que a primeira salvou.
+
+A segunda metade é **avisar**. Quem abre a coleção e a encontra vazia não tem
+como distinguir "o save estava ilegível e foi guardado" de "o jogo apagou tudo",
+e as duas hipóteses levam a ações opostas porque só a primeira tem conserto —
+por isso o motivo sobe até `$saveRecovery` e o `SaveRecoveryNotice` o mostra
+acima do layout, com o endereço da cópia. Começar limpo em silêncio seria
+guardar o backup para ninguém.
+
+Guardar **tudo** que nunca entendemos não é a mesma regra: ficam as três cópias
+mais recentes (`MAX_BACKUPS`), podadas pelo instante da chave antes de cada
+gravação nova. Uma cota de 5 MB e um save de 21 KB que falhe em todo boot
+enchem o armazenamento em algumas centenas de aberturas, derrubando justamente
+a gravação do save novo.
+
+O guarda de leitura recusa contagem sem ordem de grandeza — o save é texto num
+navegador que o jogador controla, e um `c: 1e15` vira pó infinito na primeira
+moagem. Recusar manda o cru para o backup em vez de reescrevê-lo menor em
+silêncio; `schemaVersion` fica de fora do teto, porque número alto ali é o caso
+normal de quem voltou de uma build nova e tem tratamento próprio.
 
 Foi essa fronteira, escrita antes de haver backend, que faz a Fase 7 custar uma
 implementação nova (`HttpDriver`, `SyncDriver`) em vez de uma reescrita —

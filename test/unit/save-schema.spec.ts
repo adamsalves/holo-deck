@@ -90,6 +90,30 @@ describe('o guarda', () => {
     expect(isSaveData({ ...valid, collection: { 9999: { c: 1, s: 0 } } })).toBe(false)
     expect(isSaveData({ ...valid, collection: { pikachu: { c: 1, s: 0 } } })).toBe(false)
   })
+
+  /**
+   * O negativo e o fracionário já eram recusados; `1e15` passava.
+   *
+   * O jogo não chega nesse número por caminho nenhum — são cópias de uma espécie
+   * e pó ganho moendo-as —, mas o save é texto num navegador que o jogador
+   * controla, e um `c` absurdo vira pó absurdo na primeira moagem. Recusar manda
+   * o save cru para o backup em vez de reescrevê-lo menor em silêncio.
+   */
+  it('recusa contagem sem ordem de grandeza', () => {
+    expect(isSaveData({ ...valid, dust: 1e15 })).toBe(false)
+    expect(isSaveData({ ...valid, collection: { [speciesKey(25)]: { c: 1e12, s: 0 } } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { pity: 1e9, welcomeClaimed: 0 } })).toBe(false)
+  })
+
+  /**
+   * O teto não vale para `schemaVersion`: uma versão alta é o caso normal de
+   * quem voltou de uma build nova, e `migrate` a trata por *versão desconhecida*
+   * — que guarda o save e avisa — em vez de por corrupção.
+   */
+  it('não põe teto na versão, que tem tratamento próprio', () => {
+    expect(isSaveData({ ...valid, schemaVersion: 1e9 })).toBe(true)
+    expect(migrate({ ...valid, schemaVersion: 1e9 }).recovered).toBe('unknown-version')
+  })
 })
 
 describe('a migração', () => {

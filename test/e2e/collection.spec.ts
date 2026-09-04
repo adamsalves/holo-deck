@@ -45,10 +45,18 @@ test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reloa
   await expect(page.locator('.opener__slot[data-rarity="common"]')).toHaveCount(6)
   await expect(page.locator('.opener__slot[data-rarity="uncommon"]')).toHaveCount(3)
 
-  // Os dois packs restantes.
+  // A tira termina em `10 / 10`, e não em `11 / 10`: o contador do opener é por
+  // pack, e a instância do componente atravessa as três aberturas sem desmontar.
+  const counter = page.getByText(/\d+ \/ 10 reveladas/)
+  await expect(counter).toHaveText('10 / 10 reveladas')
+
+  // Os dois packs restantes. A asserção do contador se repete aqui de propósito:
+  // é no **segundo** pack que a contagem continuava de onde parou, e um laço que
+  // só conte cartas veria dez das duas vezes sem notar `20 / 10` no cabeçalho.
   for (let pack = 2; pack <= 3; pack += 1) {
     await page.getByRole('button', { name: 'ABRIR O PRÓXIMO' }).click()
     await expect(cards).toHaveCount(10)
+    await expect(counter).toHaveText('10 / 10 reveladas')
   }
 
   // Acabaram: o botão some e o baralho fica desabilitado.

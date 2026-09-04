@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isPityTier } from '~~/shared/game/packs'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
@@ -41,10 +41,42 @@ const props = defineProps<{
  * Sob `reduced-motion` e no modo pulado não há animação, logo não há evento — e
  * é por isso que os dois casos entregam o total de uma vez, em vez de deixar o
  * contador travado em zero enquanto as dez cartas estão à vista.
+ *
+ * `.self` no ouvinte porque `animationend` **borbulha**: hoje nada dentro da
+ * carta anima, mas o dia em que qualquer descendente ganhar um `@keyframes` o
+ * contador passaria a contar duas vezes por slot, e o defeito apareceria longe
+ * daqui.
  */
 const emit = defineEmits<{ reveal: [count: number] }>()
 
 let revealed = 0
+
+/**
+ * O selo do pack em exibição — e a razão de ele existir em vez de um contador
+ * solto.
+ *
+ * A tela abre três packs seguidos **sem desmontar este componente**: a seção que
+ * o contém já está montada depois da primeira abertura, então o Vue reaproveita
+ * a instância e passa cartas novas. Duas coisas quebravam nisso, e as duas são
+ * a mesma quebra vista de ângulos diferentes:
+ *
+ * - `revealed` seguia de onde parou, e o segundo pack contava `11 / 10`. Pior
+ *   que o número errado: o botão de pular some quando o pai vê `revealed`
+ *   alcançar o total, e ele sumia na **primeira** carta do segundo pack.
+ * - a chave de cada slot era `espécie-índice`, e uma espécie repetida na mesma
+ *   posição de dois packs seguidos reaproveitava o `<li>`. Elemento
+ *   reaproveitado não reinicia `animation`: aquele slot nunca mais dispararia
+ *   `animationend`, e o contador travaria abaixo do total.
+ *
+ * Um selo que anda a cada pack resolve os dois: ele zera a contagem e entra na
+ * chave, o que garante `<li>` novo — e animação nova — para as dez.
+ */
+const pack = ref(0)
+
+watch(() => props.cards, () => {
+  revealed = 0
+  pack.value += 1
+})
 
 function onRevealed(): void {
   revealed += 1
@@ -87,13 +119,13 @@ function labelOf(card: PackCard, entry: SearchEntry | null): string {
   >
     <li
       v-for="(card, index) in cards"
-      :key="`${card.speciesId}-${index}`"
+      :key="`${pack}-${index}`"
       class="opener__slot"
       :style="{ '--delay': `${delays[index] ?? 0}ms`, '--flip': `${FLIP_MS}ms` }"
       :data-rarity="card.rarity"
       :data-shiny="card.isShiny ? 'true' : undefined"
       :data-pity="isPityTier(card.rarity) ? 'true' : undefined"
-      @animationend="onRevealed()"
+      @animationend.self="onRevealed()"
     >
       <!-- Os raios de ultra+, atrás da carta. `aria-hidden` porque a raridade já
            está no texto da carta e no rótulo do slot. -->

@@ -4,9 +4,9 @@ import type { Region } from '~~/shared/dex/regions'
 import { toRegions } from '~~/shared/dex/regions'
 import { rarityFrom } from '~~/shared/game/rarity'
 import { progressRatio } from '~~/shared/game/progress'
+import { ownedIds } from '~~/shared/save/schema'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { RARITY_NAMES } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from './useDex'
 
@@ -40,7 +40,6 @@ export interface RegionProgress extends Region {
 export interface CollectionView {
   readonly ready: ComputedRef<boolean>
   readonly entries: ComputedRef<readonly SearchEntry[]>
-  readonly rarityOfId: ComputedRef<(id: number) => Rarity | null>
   readonly ownedByRarity: ComputedRef<Readonly<Record<Rarity, number>>>
   readonly byRegion: ComputedRef<readonly RegionProgress[]>
   readonly total: ComputedRef<number>
@@ -74,10 +73,16 @@ export async function useCollection(): Promise<CollectionView> {
     return map
   })
 
-  const rarityOfId = computed(() => (id: number): Rarity | null => {
-    const entry = entryById.value.get(id)
-    return entry === undefined ? null : rarityFrom(entry)
-  })
+  /**
+   * Os ids possuídos, uma vez — e é `ownedIds` quem os lê.
+   *
+   * As duas somas abaixo varriam `Object.keys(store.entries)` cada uma por
+   * conta própria. Passar pela função de `shared/save/` não é cerimônia: ela
+   * descarta a chave que não é uma espécie, o que uma varredura escrita à mão
+   * faz só enquanto alguém lembra, e é o mesmo descarte que o guarda do save já
+   * aplica na leitura.
+   */
+  const owned = computed(() => ownedIds(store.entries))
 
   /**
    * Quantas espécies **distintas** possuídas em cada tier.
@@ -91,8 +96,8 @@ export async function useCollection(): Promise<CollectionView> {
       common: 0, uncommon: 0, rare: 0, ultra: 0, legendary: 0, mythic: 0,
     }
 
-    for (const key of Object.keys(store.entries)) {
-      const entry = entryById.value.get(Number(key))
+    for (const id of owned.value) {
+      const entry = entryById.value.get(id)
       if (entry !== undefined) counts[rarityFrom(entry)] += 1
     }
 
@@ -112,8 +117,8 @@ export async function useCollection(): Promise<CollectionView> {
     if (generations === null) return []
 
     const ownedPerGeneration = new Map<number, number>()
-    for (const key of Object.keys(store.entries)) {
-      const entry = entryById.value.get(Number(key))
+    for (const id of owned.value) {
+      const entry = entryById.value.get(id)
       if (entry === undefined) continue
       ownedPerGeneration.set(entry.generation, (ownedPerGeneration.get(entry.generation) ?? 0) + 1)
     }
@@ -127,8 +132,5 @@ export async function useCollection(): Promise<CollectionView> {
   const total = computed(() => entries.value.length)
   const ratio = computed(() => progressRatio(store.ownedCount, total.value))
 
-  return { ready, entries, rarityOfId, ownedByRarity, byRegion, total, ratio }
+  return { ready, entries, ownedByRarity, byRegion, total, ratio }
 }
-
-/** As seis, na ordem da escada — para a tela não reimportar o vocabulário. */
-export const COLLECTION_TIERS = RARITY_NAMES

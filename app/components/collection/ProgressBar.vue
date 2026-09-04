@@ -24,7 +24,20 @@ const props = defineProps<{
 
 const ratio = computed(() => progressRatio(props.owned, props.total))
 const step = computed(() => progressStep(ratio.value))
-const percent = computed(() => `${Math.round(ratio.value * 100)}%`)
+
+/**
+ * A largura, com piso de 1% — porque a alternativa é uma barra que mente.
+ *
+ * O `v-if` abaixo desenha o preenchimento assim que a fração passa de zero, e
+ * arredondar levaria toda fração abaixo de 0,5% a `width: 0%`: um elemento na
+ * árvore, invisível na tela. A primeira carta de uma região de 251 é 0,4% — o
+ * caso mais comum que existe, porque todo jogador passa por ele.
+ *
+ * Um por cento de 4px de altura é um fio, e é exatamente o que a informação
+ * merece: pouco, mas não nada.
+ */
+const percent = computed(() =>
+  `${ratio.value > 0 ? Math.max(1, Math.round(ratio.value * 100)) : 0}%`)
 </script>
 
 <template>

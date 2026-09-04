@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { dustFor, forgeCost } from '~~/shared/game/dust'
+import { dustFor, dustMissing, forgeCost } from '~~/shared/game/dust'
 import { gameNumber, progressLabel } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { RARITY_LABELS } from '~~/shared/types/game'
-import { isSpeciesId } from '~~/shared/types/brand'
+import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useCollection } from '~/composables/useCollection'
 
@@ -68,7 +67,15 @@ const targetRarity = computed(() => (target.value === null ? null : rarityFrom(t
 const targetCost = computed(() =>
   (targetRarity.value === null ? 0 : forgeCost(targetRarity.value)))
 
-const missing = computed(() => Math.max(0, targetCost.value - store.dust))
+/**
+ * O déficit vem de `dustMissing`, e não de uma subtração escrita aqui.
+ *
+ * É a razão de aquela função devolver o número em vez de um booleano: o botão
+ * desabilitado escreve `FALTAM 1.260 PÓ`, e uma tela que refaz a conta é uma
+ * segunda conta esperando para divergir da primeira.
+ */
+const missing = computed(() =>
+  (targetRarity.value === null ? 0 : dustMissing(store.dust, targetRarity.value)))
 
 function choose(entry: SearchEntry): void {
   target.value = entry
@@ -80,15 +87,6 @@ function forgeTarget(): void {
   const rarity = targetRarity.value
   if (entry === null || rarity === null) return
   store.forge(entry.id, rarity)
-}
-
-/**
- * O número do dex com quatro casas. Existe aqui e não no `dexNumber` de
- * `regions.ts` porque a chamada precisa do `id` marcado, e marcar na fronteira
- * é o que dispensa um `as`.
- */
-function speciesArt(entry: SearchEntry): string {
-  return isSpeciesId(entry.id) ? `/sprites/${entry.id}.webp` : ''
 }
 
 useSeoMeta({
@@ -188,8 +186,11 @@ useSeoMeta({
 
           <span class="collection__divider" />
 
+          <!-- Os seis saem de `RARITY_NAMES`, que é onde a escada mora: uma
+               lista escrita aqui é a que fica para trás no dia em que um degrau
+               entrar. -->
           <button
-            v-for="tier in (['common', 'uncommon', 'rare', 'ultra', 'legendary', 'mythic'] as const)"
+            v-for="tier in RARITY_NAMES"
             :key="tier"
             type="button"
             class="numeric collection__chip"
@@ -309,7 +310,7 @@ useSeoMeta({
             class="collection__target"
           >
             <img
-              :src="speciesArt(target)"
+              :src="`/sprites/${target.id}.webp`"
               alt=""
               width="44"
               height="44"
@@ -507,6 +508,28 @@ useSeoMeta({
   display: grid;
   gap: 11px;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/**
+ * O binder não virtualiza, e isto é o que faz as 1025 caberem mesmo assim.
+ *
+ * `content-visibility: auto` manda o navegador pular estilo, layout e pintura de
+ * cada carta fora da janela. Não é virtualização — os nós continuam no DOM, e é
+ * de propósito: virtualizar aqui exigiria fileira de **altura uniforme**, e a
+ * carta do binder não tem uma. A linha `2 dup · 10 pó` só aparece quando há
+ * duplicata, então uma fileira com repetida é ~22px mais alta que uma sem, e um
+ * `estimateSize` único posicionaria as fileiras erradas depois da primeira
+ * divergência. Uniformizar a altura é decisão de canvas, não de implementação.
+ *
+ * `contain-intrinsic-size` é a altura que o navegador assume enquanto a carta
+ * está pulada — sem ela a barra de rolagem salta a cada pedaço que entra na
+ * janela. O valor é a carta na largura mínima (140 × 7/5) mais a linha de
+ * duplicata: errar para mais é preferível, porque a correção encolhe a página em
+ * vez de esticá-la sob o cursor.
+ */
+.collection__grid > li {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 218px;
 }
 
 .collection__empty {

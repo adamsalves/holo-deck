@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import type { Region } from '~~/shared/dex/regions'
+import { computed, onMounted, ref } from 'vue'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
 import { progressLabel } from '~~/shared/game/progress'
 import { isSpeciesId } from '~~/shared/types/brand'
@@ -35,16 +34,6 @@ onMounted(() => {
   mounted.value = true
 })
 
-function ownedIn(region: Region): number | null {
-  if (!mounted.value) return null
-
-  let owned = 0
-  for (let id = region.firstId; id <= region.lastId; id += 1) {
-    if (isSpeciesId(id) && collection.has(id)) owned += 1
-  }
-  return owned
-}
-
 /**
  * `transform` não é otimização de gosto — é o que impede os 54 KB de `core.json`
  * de viajarem no payload de SSR.
@@ -59,6 +48,33 @@ const { data: regions } = await useAsyncData(
   () => loadCore(),
   { transform: core => toRegions(core.generations) },
 )
+
+/**
+ * As nove regiões já com a contagem — uma varredura por render, não cinco por
+ * região.
+ *
+ * A versão anterior era uma função chamada direto do template, e o template a
+ * chamava cinco vezes por cartão (o `v-if`, o número, o `v-if` da barra, o
+ * `owned` e o rótulo dela). Nove regiões × cinco chamadas × até 251 ids é perto
+ * de nove mil consultas à coleção **a cada render**, para produzir nove
+ * números — o mesmo desperdício que o `Map` de `useCollection` existe para
+ * evitar, escrito de outro jeito.
+ *
+ * A contagem sai da faixa de id, e não do campo `generation` como no binder,
+ * porque esta tela lê `core.json` e nunca abre o índice: aqui a faixa é o único
+ * dado disponível. Os dois caminhos dão o mesmo número, e é o e2e que compara a
+ * Pokédex com o binder para que continuem dando.
+ */
+const rows = computed(() => (regions.value ?? []).map((region) => {
+  if (!mounted.value) return { ...region, owned: null }
+
+  let owned = 0
+  for (let id = region.firstId; id <= region.lastId; id += 1) {
+    if (isSpeciesId(id) && collection.has(id)) owned += 1
+  }
+
+  return { ...region, owned }
+}))
 
 useSeoMeta({
   title: 'Pokédex — Holo Deck',
@@ -86,7 +102,7 @@ useSeoMeta({
 
     <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <li
-        v-for="region in regions ?? []"
+        v-for="region in rows"
         :key="region.generation"
       >
         <NuxtLink
@@ -96,8 +112,8 @@ useSeoMeta({
           <span class="numeric region-card__generation">{{ region.generationLabel }}</span>
           <span class="region-card__name">{{ region.label }}</span>
           <span class="numeric region-card__range">
-            <template v-if="ownedIn(region) !== null">
-              <span class="region-card__owned">{{ ownedIn(region) }}</span>
+            <template v-if="region.owned !== null">
+              <span class="region-card__owned">{{ region.owned }}</span>
               / {{ region.speciesCount }} capturados
             </template>
             <template v-else>
@@ -111,10 +127,10 @@ useSeoMeta({
           </span>
 
           <CollectionProgressBar
-            v-if="ownedIn(region) !== null"
-            :owned="ownedIn(region) ?? 0"
+            v-if="region.owned !== null"
+            :owned="region.owned"
             :total="region.speciesCount"
-            :label="`Progresso em ${region.label}: ${progressLabel(ownedIn(region) ?? 0, region.speciesCount)}`"
+            :label="`Progresso em ${region.label}: ${progressLabel(region.owned, region.speciesCount)}`"
             class="mt-1"
           />
         </NuxtLink>

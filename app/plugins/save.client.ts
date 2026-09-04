@@ -64,6 +64,9 @@ export default defineNuxtPlugin(async (nuxtApp) => {
        * um save ilegível vira backup e o jogo começa limpo *avisando*. Começar
        * limpo em silêncio é indistinguível, para quem está do outro lado, de o
        * jogo ter apagado a coleção.
+       *
+       * Quem o lê é o `SaveRecoveryNotice`, montado em `app.vue` — acima do
+       * layout, porque isto é estado do boot e não de uma tela.
        */
       saveRecovery: recovered satisfies RecoveryReason | null,
     },

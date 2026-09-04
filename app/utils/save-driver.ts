@@ -24,6 +24,22 @@ export const SAVE_KEY = 'holodeck:save'
 export const BACKUP_PREFIX = 'holodeck:backup:'
 
 /**
+ * Quantas cópias de segurança ficam guardadas.
+ *
+ * Nunca apagar o save que não entendemos é a regra; guardar **todos** os saves
+ * que nunca entendemos não é a mesma coisa. Cada recuperação deixa uma cópia
+ * para sempre numa cota de 5 MB, e um save de 21 KB que falhe ao ser lido a
+ * cada boot enche o armazenamento em algumas centenas de aberturas — o que
+ * derruba justamente a gravação do save novo, que é a última coisa que deveria
+ * quebrar.
+ *
+ * Três porque o que se quer recuperar à mão é quase sempre a última cópia, e a
+ * segunda e a terceira existem para o caso de a última já ser o estado ruim.
+ * Podar é sempre da **mais antiga** para a mais nova, pelo instante na chave.
+ */
+export const MAX_BACKUPS = 3
+
+/**
  * A chave de backup de um save que não pôde ser lido.
  *
  * O instante entra na chave, e não no valor, porque duas recuperações no mesmo
@@ -48,6 +64,14 @@ export interface StorageLike {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
+  /**
+   * As duas metades de "quais chaves existem", que é o que a poda de backups
+   * precisa. São a API do `Storage` do navegador, e um objeto de teste as
+   * implementa em duas linhas — o que não dá para fazer é iterar `Storage` com
+   * `Object.keys`, porque ele não é um objeto comum.
+   */
+  readonly length: number
+  key(index: number): string | null
 }
 
 /**
@@ -136,11 +160,42 @@ export class LocalStorageDriver implements SaveDriver {
 
   #backup(raw: string): void {
     try {
+      // A poda vem antes da escrita, e não depois: se a cota já estiver cheia, é
+      // liberar espaço primeiro que faz esta cópia caber. Depois seria tentar
+      // gravar, falhar, e podar para ninguém.
+      this.#prune(MAX_BACKUPS - 1)
       this.#storage?.setItem(backupKey(this.#now()), raw)
     }
     catch {
       // Se nem o backup cabe, gravar o save novo por cima é a única saída
       // restante. Perder o ilegível é ruim; travar o jogo nele é pior.
+    }
+  }
+
+  /**
+   * Deixa no máximo `keep` cópias, apagando as mais antigas.
+   *
+   * A ordem sai da própria chave — o instante está nela, e é por isso que ele
+   * está nela. Ordenar por string funciona porque `Date.now()` tem o mesmo
+   * número de dígitos até o ano 33658, mas a comparação é numérica de qualquer
+   * jeito: o dia em que alguém mudar o relógio injetado para outra escala, a
+   * ordenação certa não deve depender de um acidente de largura.
+   */
+  #prune(keep: number): void {
+    const storage = this.#storage
+    if (storage === null) return
+
+    const backups: string[] = []
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key !== null && key.startsWith(BACKUP_PREFIX)) backups.push(key)
+    }
+
+    const at = (key: string): number => Number(key.slice(BACKUP_PREFIX.length))
+    backups.sort((first, second) => at(first) - at(second))
+
+    for (const key of backups.slice(0, Math.max(0, backups.length - keep))) {
+      storage.removeItem(key)
     }
   }
 }
