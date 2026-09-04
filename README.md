@@ -535,7 +535,8 @@ por isso que ele hoje mede pesos puros e rede em série em blocos separados.
   layout e pintura do que está fora da janela sem exigir altura uniforme, e é o
   que faz as 1025 caberem. **Virtualizar de verdade depende de uniformizar a
   altura da carta, que é decisão de canvas** — fica para a Fase 6, junto com o
-  deck, que desenha a mesma carta.
+  deck, que desenha a mesma carta. Registrado na
+  [issue #24](https://github.com/adamsalves/holo-deck/issues/24).
 
 ## O save
 
