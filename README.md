@@ -291,6 +291,25 @@ está aqui é só o que sobrou de propósito.
 | `Seu deck: N ajustes` conta as cartas que apanham ×2 | a prancha escreve `1 ajuste` e não define o que conta. Esta é a única leitura que o código já produz — a mesma `coverage.incoming` que o deck builder desenha como faixa `LEVA ×2` na carta, e a que a anotação da prancha *Batalha* descreve ("Machop caiu exatamente como o deck builder avisou") |
 | `N ajustes` em `--deficit`, não no amarelo de terrestre | mesmo argumento do chip de resumo do deck builder: a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa |
 
+### Estados sem prancha, escritos neste PR
+
+A regra do projeto é que tela, painel ou estado que o canvas não desenha **ganha
+prancha antes de virar código**. Estes cinco não têm, e é preciso saber disso ao
+olhá-los: eles foram escritos na linguagem de painel das pranchas vizinhas —
+mesmo chanfro, mesmo `eyebrow`, mesmos botões — e nenhum inventa vocabulário
+novo. Se o canvas discordar depois, o custo é de estilo, não de estrutura.
+
+| estado | quando aparece |
+|---|---|
+| **resultado da batalha** | fim de luta: vitória com as parcelas do prêmio, ou derrota dizendo que nada foi perdido |
+| **ginásio fechado** | `/battle/N` de um ginásio que a insígnia anterior não abriu |
+| **sem time** | menos de seis slots preenchidos |
+| **você já está lutando** | uma batalha aberta em **outro** ginásio, com a escolha entre retomar e desistir |
+| **o dex não carregou** | falha de rede montando o contexto do motor |
+
+O terceiro e o quarto não são decoração: sem eles a tela ou oferece uma batalha
+que o motor recusa, ou apaga o turno 12 de alguém em silêncio.
+
 ### Segurado até a fase que cria o dado
 
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um

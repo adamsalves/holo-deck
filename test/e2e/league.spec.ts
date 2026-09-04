@@ -200,3 +200,54 @@ test('o Hub conta a coleção, o saldo e o próximo ginásio', async ({ page }) 
   // Sem batalha aberta a faixa de retomar não existe — ela não é uma casca vazia.
   await expect(page.locator('.hub__resume')).toHaveCount(0)
 })
+
+/**
+ * Uma batalha aberta não é sobrescrita em silêncio pelo ginásio vizinho.
+ *
+ * O caminho é normal: a Liga oferece revanche em toda carta vencida e o Hub
+ * oferece retomar, então chegar a `/battle/2` com o ginásio 1 no meio acontece.
+ * A versão anterior desta tela começava por cima e apagava o turno de alguém sem
+ * uma linha na tela — o mesmo defeito que ela já evitava para o **mesmo**
+ * ginásio e deixava passar para o de ao lado.
+ *
+ * A insígnia é escrita direto no save, e isso é deliberado: vencer um ginásio
+ * pela interface leva dezenas de cliques, e o que este teste mede é a **tela**,
+ * não a economia — essa tem portão próprio em `test/unit/economy.spec.ts` e em
+ * `test/unit/battle-store.spec.ts`. O log da batalha, esse **não** é forjado:
+ * ele sai de uma luta de verdade, com seed, motor e dex reais.
+ */
+test('começar outro ginásio com uma batalha aberta pede confirmação', async ({ page }) => {
+  await openWelcomePack(page)
+  await fillDeck(page)
+
+  await page.goto('/battle/1')
+  await playTurn(page)
+  await expect(page.getByText('TURNO 02')).toBeVisible()
+
+  // A insígnia do primeiro abre o segundo. O resto do save fica como estava.
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem('holodeck:save')
+    if (raw === null) throw new Error('sem save para editar')
+    const save: unknown = JSON.parse(raw)
+    if (typeof save !== 'object' || save === null) throw new Error('save fora de forma')
+    const record: Record<string, unknown> = { ...save }
+    const progress = record.progress
+    if (typeof progress !== 'object' || progress === null) throw new Error('save sem progresso')
+    record.progress = { ...progress, badges: 1 }
+    window.localStorage.setItem('holodeck:save', JSON.stringify(record))
+  })
+
+  await page.goto('/battle/2')
+  await expect(page.getByRole('heading', { name: 'Você já está lutando' })).toBeVisible()
+  await expect(page.getByText(/Ginásio 1 · Brock, no turno 2/)).toBeVisible()
+
+  // Retomar aquela devolve o mesmo turno: nada foi perdido no caminho.
+  await page.getByRole('link', { name: 'RETOMAR AQUELA' }).click()
+  await expect(page.getByText('TURNO 02')).toBeVisible()
+
+  // E desistir explicitamente começa a nova, do turno 1.
+  await page.goto('/battle/2')
+  await page.getByRole('button', { name: 'DESISTIR E COMEÇAR ESTA' }).click()
+  await expect(page.getByText('Ginásio 2 / 9')).toBeVisible()
+  await expect(page.getByText('TURNO 01')).toBeVisible()
+})

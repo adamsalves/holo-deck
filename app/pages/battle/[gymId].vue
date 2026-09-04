@@ -58,7 +58,7 @@ useHead({
  * são quatro razões diferentes com quatro saídas diferentes, e um nulo só diria
  * "não deu".
  */
-type Standing = 'loading' | 'ready' | 'unknown-gym' | 'locked' | 'no-deck' | 'failed'
+type Standing = 'loading' | 'ready' | 'unknown-gym' | 'locked' | 'no-deck' | 'busy' | 'failed'
 
 const standing = ref<Standing>('loading')
 const context = shallowRef<BattleContext | null>(null)
@@ -87,6 +87,20 @@ onMounted(async () => {
   const saved = battle.log
   const resuming = saved !== null && saved.gymId === id
   const team = resuming ? saved.team : deck.team
+
+  /**
+   * **Uma batalha em andamento em outro ginásio não é sobrescrita em silêncio.**
+   *
+   * Chegar aqui com um log de outro ginásio é o caminho normal — a Liga oferece
+   * revanche em toda carta vencida, e o Hub oferece retomar. Começar por cima
+   * apagaria o turno 12 de alguém sem uma linha na tela, que é exatamente o que
+   * o `resuming` acima evita para o mesmo ginásio e deixava passar para o
+   * vizinho. A escolha é do jogador, e ela precisa existir.
+   */
+  if (!resuming && saved !== null) {
+    standing.value = 'busy'
+    return
+  }
 
   if (!resuming && !deck.ready) {
     standing.value = 'no-deck'
@@ -121,6 +135,38 @@ onMounted(async () => {
  */
 function newSeed(): number {
   return Math.floor(Math.random() * 2 ** 32)
+}
+
+/** A batalha aberta em outro ginásio, quando é ela que está no caminho. */
+const busyWith = computed(() => {
+  const saved = battle.log
+  if (saved === null || !isGymId(saved.gymId)) return null
+  return { gym: saved.gymId, leader: gymLeader(saved.gymId), turns: saved.actions.length + 1 }
+})
+
+/**
+ * Descarta a batalha aberta e começa esta. É o único caminho que apaga uma luta
+ * sem que ela tenha terminado, e ele passa por um clique com o nome do ginásio
+ * escrito ao lado.
+ */
+async function dropAndStart(): Promise<void> {
+  const id = gym.value
+  if (id === null || !deck.ready) return
+
+  battle.discard()
+  standing.value = 'loading'
+
+  try {
+    context.value = await loadBattleContext(id, deck.team)
+  }
+  catch {
+    standing.value = 'failed'
+    return
+  }
+
+  battle.start(id, deck.team, newSeed(), context.value)
+  history.value = []
+  standing.value = 'ready'
 }
 
 const state = computed(() => battle.state)
@@ -572,6 +618,31 @@ function fallbackSprite(event: Event, id: number): void {
             IR PARA A LIGA
           </NuxtLink>
         </template>
+        <template v-else-if="standing === 'busy' && busyWith">
+          <h1 class="battle__outcome">
+            Você já está lutando
+          </h1>
+          <p class="battle__note">
+            Ginásio {{ busyWith.gym }} · {{ busyWith.leader.name }}, no turno
+            {{ busyWith.turns }}. Começar esta luta apaga aquela.
+          </p>
+          <div class="battle__buttons">
+            <NuxtLink
+              :to="`/battle/${busyWith.gym}`"
+              class="battle__button battle__button--primary bevel-control"
+            >
+              RETOMAR AQUELA
+            </NuxtLink>
+            <button
+              type="button"
+              class="battle__button bevel-control"
+              :disabled="!deck.ready"
+              @click="dropAndStart"
+            >
+              DESISTIR E COMEÇAR ESTA
+            </button>
+          </div>
+        </template>
         <template v-else-if="standing === 'no-deck'">
           <h1 class="battle__outcome">
             Sem time
@@ -895,6 +966,11 @@ function fallbackSprite(event: Event, id: number): void {
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   cursor: pointer;
+}
+
+.battle__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .battle__button--primary {
