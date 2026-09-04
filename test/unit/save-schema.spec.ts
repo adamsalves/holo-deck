@@ -11,6 +11,7 @@ import {
 } from '~~/shared/save/schema'
 import type { SpeciesId } from '~~/shared/types/brand'
 import { isSpeciesId } from '~~/shared/types/brand'
+import { emptyDeck } from '~~/shared/game/deck'
 
 /**
  * O formato do save, e a regra que o governa: **nunca apagar**.
@@ -41,6 +42,7 @@ describe('o save vazio', () => {
       schemaVersion: SCHEMA_VERSION,
       collection: {},
       dust: 0,
+      deck: [null, null, null, null, null, null],
       progress: { pity: 0, welcomeClaimed: 0 },
     })
   })
@@ -52,14 +54,29 @@ describe('o save vazio', () => {
 
 describe('o guarda', () => {
   const valid = {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     collection: { [speciesKey(25)]: { c: 3, s: 1 } },
     dust: 340,
+    deck: [species(25), null, null, null, null, null],
     progress: { pity: 4, welcomeClaimed: 3 },
   }
 
   it('aceita um save real', () => {
     expect(isSaveData(valid)).toBe(true)
+  })
+
+  /**
+   * O deck entrou no contrato na Fase 6, e o guarda o cobra como cobra a coleção.
+   *
+   * Um save com deck torto é o caminho realista para dois exemplares da mesma
+   * espécie chegarem ao time — a regra que nenhum tipo consegue dizer.
+   */
+  it('recusa deck fora de forma', () => {
+    expect(isSaveData({ ...valid, deck: undefined })).toBe(false)
+    expect(isSaveData({ ...valid, deck: [] })).toBe(false)
+    expect(isSaveData({ ...valid, deck: [null, null, null, null, null] })).toBe(false)
+    expect(isSaveData({ ...valid, deck: [species(25), species(25), null, null, null, null] })).toBe(false)
+    expect(isSaveData({ ...valid, deck: [9999, null, null, null, null, null] })).toBe(false)
   })
 
   it('recusa o que não é objeto', () => {
@@ -122,10 +139,46 @@ describe('a migração', () => {
       schemaVersion: SCHEMA_VERSION,
       collection: { [speciesKey(6)]: { c: 2, s: 0 } },
       dust: 50,
+      deck: [species(6), null, null, null, null, null],
       progress: { pity: 2, welcomeClaimed: 3 },
     }
 
     expect(migrate(save)).toEqual({ data: save, recovered: null })
+  })
+
+  /**
+   * **O passo que impede a Fase 6 de apagar a coleção de quem já jogava.**
+   *
+   * Este é o save que a Fase 5 gravava: sem `deck`, porque o campo não existia.
+   * Com o guarda passando a exigi-lo, ele reprovaria em `isSaveData` e a leitura
+   * o trataria como corrupção — a coleção iria para o backup, que é a rede que
+   * sempre existiu, e o jogador abriria o binder vazio com um aviso. Nada se
+   * perderia de verdade, e mesmo assim seria o pior dia do jogo por um campo que
+   * ninguém tinha.
+   *
+   * O que o teste afirma não é só que a migração roda: é que **o que já estava
+   * lá atravessa intacto**. Cartas, pó e progresso do lado esquerdo são os mesmos
+   * do direito, e o único delta é o deck vazio mais a versão.
+   */
+  it('leva um save da Fase 5 para a versão 2 sem tocar no que já estava lá', () => {
+    const daFase5 = {
+      schemaVersion: 1,
+      collection: {
+        [speciesKey(25)]: { c: 3, s: 1 },
+        [speciesKey(6)]: { c: 1, s: 0 },
+      },
+      dust: 340,
+      progress: { pity: 4, welcomeClaimed: 3 },
+    }
+
+    const { data, recovered } = migrate(daFase5)
+
+    expect(recovered).toBeNull()
+    expect(data).toEqual({ ...daFase5, schemaVersion: 2, deck: emptyDeck() })
+
+    // E o resultado é um save de verdade, não um objeto que só parece um: é o
+    // guarda quem decide, depois da cadeia.
+    expect(isSaveData(data)).toBe(true)
   })
 
   it('recusa versão do futuro em vez de adivinhar', () => {
@@ -150,7 +203,7 @@ describe('a migração', () => {
    * não a boa vontade de quem escreveu o passo.
    */
   it('recusa o que sai da cadeia fora de contrato', () => {
-    const result = migrate({ schemaVersion: SCHEMA_VERSION, collection: { 25: { c: 1, s: 9 } }, dust: 0, progress: { pity: 0, welcomeClaimed: 0 } })
+    const result = migrate({ schemaVersion: SCHEMA_VERSION, collection: { 25: { c: 1, s: 9 } }, dust: 0, deck: emptyDeck(), progress: { pity: 0, welcomeClaimed: 0 } })
 
     expect(result.recovered).toBe('failed-migration')
     expect(result.data).toEqual(emptySave())

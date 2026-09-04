@@ -5,8 +5,8 @@
         Holo Deck
       </h1>
       <p class="max-w-sm text-sm text-muted">
-        Pack, coleção e Pokédex estão de pé. Deck, batalha e a Liga entram nas
-        próximas fases.
+        Pack, coleção, Pokédex e deck estão de pé. A batalha e a Liga entram no
+        próximo passo da Fase 6.
       </p>
 
       <nav class="home-doors">
@@ -23,6 +23,12 @@
           Coleção
         </NuxtLink>
         <NuxtLink
+          to="/deck"
+          class="home-link bevel-control"
+        >
+          Deck
+        </NuxtLink>
+        <NuxtLink
           to="/pokedex"
           class="home-link bevel-control"
         >
@@ -37,7 +43,7 @@
 
 <style scoped>
 /**
- * As três portas do jogo até aqui. A navegação global é da Fase 6 — a única
+ * As quatro portas do jogo até aqui. A navegação global é da Fase 6 — a única
  * barra desenhada no canvas é a do Hub, e ela lista cinco destinos que ainda não
  * existem —, mas duas telas sem caminho até elas seria a Fase 5 entregue e
  * inalcançável.

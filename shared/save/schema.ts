@@ -1,6 +1,8 @@
 import type { SpeciesId } from '../types/brand.ts'
 import { isSpeciesId } from '../types/brand.ts'
 import type { CollectionEntry } from '../types/game.ts'
+import type { DeckSlots } from '../game/deck.ts'
+import { emptyDeck, isDeckSlots } from '../game/deck.ts'
 
 /**
  * O formato do save — um documento só, versionado, e a regra de nunca apagar.
@@ -29,7 +31,7 @@ import type { CollectionEntry } from '../types/game.ts'
  * compatibilidade real do projeto é este número, e não a versão do `package.json`
  * — é isto que o `RELEASE.md` quer dizer ao separar os dois.
  */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 /** A coleção: espécie → cópias e shinies. Ver `CollectionEntry`. */
 export type CollectionMap = Readonly<Record<string, CollectionEntry>>
@@ -47,6 +49,8 @@ export interface SaveData {
   readonly schemaVersion: number
   readonly collection: CollectionMap
   readonly dust: number
+  /** Os seis slots, na ordem em que entram em campo. Ver `shared/game/deck.ts`. */
+  readonly deck: DeckSlots
   readonly progress: {
     /** Packs consecutivos sem ultra+. Ver `PITY_THRESHOLD`. */
     readonly pity: number
@@ -61,6 +65,7 @@ export function emptySave(): SaveData {
     schemaVersion: SCHEMA_VERSION,
     collection: {},
     dust: 0,
+    deck: emptyDeck(),
     progress: { pity: 0, welcomeClaimed: 0 },
   }
 }
@@ -117,8 +122,9 @@ export function isSaveData(value: unknown): value is SaveData {
   // nova — recusa por versão desconhecida, não por corrupção.
   if (!isCount(value.schemaVersion) || !isBoundedCount(value.dust)) return false
 
-  const { collection, progress } = value
+  const { collection, deck, progress } = value
   if (!isRecord(collection) || !isRecord(progress)) return false
+  if (!isDeckSlots(deck)) return false
 
   // A chave é o id em texto, porque é assim que o JSON a devolve. Conferir que
   // ela é uma espécie de verdade é o que impede um save adulterado de plantar
@@ -155,12 +161,33 @@ export type RecoveryReason = 'corrupt' | 'unknown-version' | 'failed-migration'
  * destruímos — perder uma batalha é aceitável, perder três meses de cartas não.
  *
  * A cadeia de migração é uma lista de funções puras `v1→v2→v3`, aplicadas em
- * ordem a partir da versão lida. Hoje ela está vazia porque `SCHEMA_VERSION` é 1
- * e não existe versão anterior — o que o código precisa ter pronto não é o
- * primeiro passo, é o **lugar** dele, e a recusa de versão desconhecida que
- * protege quem voltou para uma build antiga.
+ * ordem a partir da versão lida. A Fase 5 a deixou vazia e escreveu o **lugar**
+ * dela; a Fase 6 pôs o primeiro passo dentro.
  */
-const MIGRATIONS: readonly ((save: Record<string, unknown>) => Record<string, unknown>)[] = []
+
+/**
+ * v1 → v2: o deck entra no save.
+ *
+ * **Este passo não é opcional, e é a razão de `SCHEMA_VERSION` ter subido.** O
+ * guarda passou a exigir `deck`, e sem migração todo save da Fase 5 reprovaria
+ * em `isSaveData` — o que a leitura trata como corrupção. O jogador não perderia
+ * a coleção (ela iria para a chave de backup, que é a regra inegociável), mas
+ * abriria o jogo com o binder vazio e um aviso, por um campo que ninguém tinha.
+ *
+ * O deck vazio é a única saída honesta: não há deck anterior de onde derivar um,
+ * e adivinhar seis cartas da coleção seria montar time pelo jogador.
+ */
+function addDeck(save: Record<string, unknown>): Record<string, unknown> {
+  // O `2` é o destino **deste** passo, e a cadeia é indexada por posição:
+  // `MIGRATIONS[0]` leva de 1 para 2. Inserir um passo antes deste sem renumerar
+  // gravaria a versão errada, e o guarda não pegaria — ele confere forma, não
+  // número. Passo novo entra sempre no fim.
+  return { ...save, schemaVersion: 2, deck: emptyDeck() }
+}
+
+const MIGRATIONS: readonly ((save: Record<string, unknown>) => Record<string, unknown>)[] = [
+  addDeck,
+]
 
 export function migrate(raw: unknown): LoadResult {
   if (!isRecord(raw)) return { data: emptySave(), recovered: 'corrupt' }

@@ -3,6 +3,7 @@ import { watch } from 'vue'
 import { SCHEMA_VERSION } from '~~/shared/save/schema'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { useCollectionStore } from '~~/app/stores/collection'
+import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
 
@@ -24,11 +25,18 @@ import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
 export default defineNuxtPlugin(async (nuxtApp) => {
   const driver = new LocalStorageDriver(browserStorage())
   const collection = useCollectionStore(nuxtApp.$pinia)
+  const deck = useDeckStore(nuxtApp.$pinia)
   const progress = useProgressStore(nuxtApp.$pinia)
 
   const { data, recovered } = await driver.load()
 
+  // A coleção antes do deck, porque `deck.hydrate` **lê** a coleção: ele
+  // descarta na entrada a espécie que o save escalou e a coleção não tem mais.
+  // O observador da store do deck não cobre este caso — ele é `flush: 'pre'` e
+  // acorda um tick depois, o que basta para moer com o jogo aberto e não para
+  // o boot. Ver o comentário de `hydrate`.
   collection.hydrate(data.collection, data.dust)
+  deck.hydrate(data.deck)
   progress.hydrate(data.progress)
 
   function compose(): SaveData {
@@ -37,6 +45,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       schemaVersion: SCHEMA_VERSION,
       collection: entries,
       dust,
+      deck: deck.snapshot(),
       progress: progress.snapshot(),
     }
   }
@@ -50,7 +59,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
    * compõe as duas é mais curta e não tem ordem.
    */
   watch(
-    () => [collection.entries, collection.dust, progress.pity, progress.welcomeClaimed],
+    () => [collection.entries, collection.dust, deck.slots, progress.pity, progress.welcomeClaimed],
     () => { void driver.save(compose()) },
     { deep: true },
   )

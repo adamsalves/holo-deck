@@ -246,32 +246,42 @@ describe('contraste do tema', () => {
   })
 
   /**
-   * O que o sistema **não** garante, escrito em vez de descoberto na Fase 4.
+   * Toda cor de tipo sustenta texto sobre **toda** superfície — o registro de
+   * exceção virou invariante na Fase 6.
    *
-   * As 18 cores foram escolhidas contra `ink-950`, e nem todas sobrevivem a uma
-   * superfície mais clara: `dragon` cai a 3.99 sobre `--surface-raised`. Isso não
-   * é defeito hoje — a cor de tipo é preenchimento (chip, brilho, barra) e o
-   * único texto que ela carrega é sobre `--bg`. Vira defeito no dia em que o log
-   * de batalha escrever o nome do tipo colorido dentro de um painel.
+   * Até a Fase 5 este teste era uma lista: `['dragon']`, a única cor que reprovava
+   * AA sobre painel (3.99 em `--surface-raised`, 4.39 em `--surface`). Não era
+   * defeito enquanto a cor de tipo fosse só preenchimento — chip, brilho, barra —
+   * e o único texto que ela carregasse caísse sobre `--bg`.
    *
-   * A lista fica aqui e é exata: se uma cor nova entrar reprovando, ou se
-   * `dragon` for corrigida, o portão reprova e alguém decide de novo — em vez de
-   * a exceção crescer sozinha.
+   * A Fase 6 decidiu, como a issue #11 mandava — e decidiu **limpar a exceção em
+   * vez de carregá-la**. Não porque um consumidor tenha chegado: nenhuma tela
+   * deste repositório pinta nome de tipo na cor do tipo, nem depois do deck
+   * builder. Porque uma lista de tipos que não sustentam texto é um registro que
+   * envelhece, e a alternativa que preservaria o hex do canvas — restringir
+   * tipo-como-texto às superfícies escuras — obrigaria **este portão** a saber em
+   * qual superfície cada texto cai, sem traçar a cascata. É o defeito recorrente
+   * do repositório, e não vale plantá-lo de propósito.
    *
-   * A decisão em si está na #11, com as saídas que não tocam a paleta. Quem
-   * mexer nesta lista fecha a issue junto; a referência está nos dois lados para
-   * o registro não sobreviver ao portão nem o portão à issue.
+   * Com a lista vazia a regra é mecânica: **18 tipos × toda superfície ≥ AA**. Um
+   * tipo novo, uma superfície nova ou uma cor repontada reprovam sozinhos, e a
+   * mensagem nomeia o par e a razão — sem isso, "algo reprovou" custa uma sessão
+   * de bisseção. Isso cobre também o par da etiqueta que o teste acima mede, já
+   * que `--bg` é uma das superfícies descobertas.
+   *
+   * Ver a issue #11 e a nota em `--color-type-dragon`.
    */
-  it('registra quais tipos não sustentam texto sobre painel', () => {
+  it('mantém as 18 cores de tipo acima do AA em toda superfície', () => {
     const source = themeSource()
-    const paineis = surfaces(source).filter(fundo => fundo.name !== '--bg')
+    const fundos = surfaces(source)
 
-    const soSobreOFundo = TYPE_NAMES.filter((type) => {
+    const reprovam = TYPE_NAMES.flatMap(type => fundos.flatMap((fundo) => {
       const hex = resolveToken(`--color-type-${type}`, source) ?? ''
-      return paineis.some(fundo => contrastRatio(hex, fundo.value) < AA_NORMAL)
-    })
+      const ratio = contrastRatio(hex, fundo.value)
+      return ratio >= AA_NORMAL ? [] : [`${type} sobre ${fundo.name} → ${ratio.toFixed(2)}`]
+    }))
 
-    expect(soSobreOFundo, 'tipos que só sustentam texto sobre `--bg`').toEqual(['dragon'])
+    expect(reprovam, 'pares tipo × superfície abaixo do AA').toEqual([])
   })
 })
 

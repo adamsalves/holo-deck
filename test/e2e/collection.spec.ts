@@ -144,22 +144,113 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
 
 /**
  * A porta. A Fase 3 já teve um defeito desta família — a raiz não levava à
- * Pokédex —, e a Fase 5 acrescentou duas telas: sem link, elas existem no build
- * e não existem para quem joga. A navegação global é da Fase 6; até lá, é esta
- * a checagem que impede uma fase inteira de ficar inalcançável.
+ * Pokédex —, e cada fase seguinte acrescentou tela: sem link, elas existem no
+ * build e não existem para quem joga. A navegação global é o último PR da Fase 6;
+ * até lá, é esta a checagem que impede uma fase inteira de ficar inalcançável.
+ *
+ * **Ela precisa crescer com a raiz, e a Fase 5 provou isso do jeito ruim:** o
+ * teste ficou chamado "três telas" depois de a quarta entrar, e a asserção sobre
+ * a porta nova simplesmente não existia. Um teste que não acompanha o que ele
+ * guarda é um teste que passa a guardar o passado.
  */
-test('a raiz leva às três telas que já existem', async ({ page }) => {
-  await page.goto('/')
-
-  await expect(page.getByRole('link', { name: 'Abrir pack' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Coleção' })).toBeVisible()
-
-  await page.getByRole('link', { name: 'Abrir pack' }).click()
-  await expect(page).toHaveURL(/\/packs$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Abrir pack' })).toBeVisible()
+test('a raiz leva a todas as telas que já existem', async ({ page }) => {
+  const portas = [
+    { link: 'Abrir pack', url: /\/packs$/, titulo: 'Abrir pack' },
+    { link: 'Coleção', url: /\/collection$/, titulo: 'Binder' },
+    { link: 'Deck', url: /\/deck$/, titulo: 'Seu time' },
+    { link: 'Pokédex', url: /\/pokedex$/, titulo: 'Pokédex' },
+  ]
 
   await page.goto('/')
-  await page.getByRole('link', { name: 'Coleção' }).click()
+  for (const porta of portas) {
+    await expect(page.getByRole('link', { name: porta.link, exact: true })).toBeVisible()
+  }
+
+  for (const porta of portas) {
+    await page.goto('/')
+    await page.getByRole('link', { name: porta.link, exact: true }).click()
+    await expect(page).toHaveURL(porta.url)
+    await expect(page.getByRole('heading', { level: 1, name: porta.titulo })).toBeVisible()
+  }
+})
+
+/**
+ * O link da carta virou **camada**, e isso é comportamento que só o navegador vê.
+ *
+ * Até a Fase 5 o link envolvia a carta e o botão de moer vivia fora dela, embaixo
+ * — era essa a razão de a altura divergir (issue #24). Agora o link é um
+ * `position: absolute` cobrindo a carta por dentro, e o rodapé com ação sobe uma
+ * camada para receber o próprio clique.
+ *
+ * A troca move o risco para onde nenhum teste de unidade alcança: `happy-dom` não
+ * resolve empilhamento, então lá o botão e o link coexistem felizes mesmo que na
+ * tela um cubra o outro. O que o portão de unidade prova é a **estrutura** (o
+ * botão não está dentro do `<a>`); o que falta provar é que o clique vai para o
+ * elemento certo — e um `z-index` errado aqui faria o jogador **navegar** quando
+ * pediu para moer, perdendo o pó sem nenhum erro aparecer.
+ */
+test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', async ({ page }) => {
+  await page.goto('/packs')
+
+  await expect(async () => {
+    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
+    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
+
+  await page.goto('/collection')
+
+  const binderCards = page.locator('.binder-card')
+  await expect.poll(() => binderCards.count()).toBeGreaterThan(5)
+
+  // 1. Clicar a carta navega — em qualquer ponto dela, e não só sobre um texto.
+  //    Um `z-index` baixo demais deixaria a arte e o nome por cima do link, e o
+  //    clique morreria neles. O Playwright afirma isso de graça: a checagem de
+  //    acionabilidade exige que o elemento no ponto do clique seja a carta ou um
+  //    descendente dela, e é o link que está lá.
+  const first = binderCards.first()
+  const name = (await first.locator('.poke-card__name').textContent())?.trim() ?? ''
+  await first.click()
+
+  await expect(page).toHaveURL(/\/pokemon\/[a-z0-9-]+$/)
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
+
+  // 2. Agora o outro lado. Uma duplicata não é garantida em 10 cartas de 1025,
+  //    então ela é plantada **no formato real do save** — lido, alterado e
+  //    devolvido, sem um documento escrito à mão que envelheceria com o schema.
+  await page.goto('/collection')
+  await page.evaluate(() => {
+    const raw = localStorage.getItem('holodeck:save')
+    if (raw === null) throw new Error('sem save depois de abrir um pack')
+
+    // Sem `as`: cada degrau estreita de verdade, que é a mesma regra que o resto
+    // do repositório aplica na fronteira de `JSON.parse`.
+    const save: unknown = JSON.parse(raw)
+    if (typeof save !== 'object' || save === null || !('collection' in save)) {
+      throw new Error('save sem coleção')
+    }
+
+    const { collection } = save
+    if (typeof collection !== 'object' || collection === null) {
+      throw new Error('coleção ilegível')
+    }
+
+    const first = Object.keys(collection)[0]
+    if (first === undefined) throw new Error('coleção vazia depois de abrir um pack')
+
+    Object.assign(collection, { [first]: { c: 3, s: 0 } })
+    localStorage.setItem('holodeck:save', JSON.stringify(save))
+  })
+  await page.reload()
+
+  // A linha `2 dup · N pó` existe porque a espécie plantada tem três cópias.
+  const scrap = page.locator('.binder-card__scrap').first()
+  await expect(scrap).toBeVisible({ timeout: 15_000 })
+
+  await scrap.click()
+
+  // O clique moeu, e **não** navegou: continuamos no binder, e a linha sumiu
+  // porque a espécie deixou de ter duplicata. Se o link tivesse engolido o
+  // clique, a URL seria a da espécie.
   await expect(page).toHaveURL(/\/collection$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Binder' })).toBeVisible()
+  await expect(scrap).toHaveCount(0)
 })

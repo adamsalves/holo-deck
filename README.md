@@ -264,6 +264,22 @@ está aqui é só o que sobrou de propósito.
 | *Detalhe*: barras de stat coloridas uma a uma | só o mais alto acende, na cor-luz do tipo — é o que a prancha *A carta* anota e o que o código sempre fez |
 | *Pokédex*: célula de grid em 140×172 | a carta é 5:7, que é o que a prancha *A carta* especifica; a 140 de largura isso pede 196 de altura |
 
+### A prancha estava certa, e foi o código que voltou para ela
+
+| o que o código fazia | o que a prancha sempre disse |
+|---|---|
+| carta do binder com duas alturas — raridade dentro do rodapé da `PokeCard`, botão de moer fora do link e embaixo do artigo | `RARO` e `2 dup · 10 pó` no **mesmo slot**, com os mesmos estilos, numa carta de altura fixa. A issue #24 supunha uma decisão de canvas; não havia nenhuma |
+
+### Decidido na Fase 6, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| `dragon` em `#966BFF`, e não no valor do canvas | é o único dos 18 tipos que reprova AA sobre painel (3,99 em `--surface-raised`). A issue #11 dizia que a Fase 6 decidiria, e ela decidiu **limpar a exceção em vez de carregá-la** — não porque um consumidor tenha chegado (nenhuma tela pinta nome de tipo na cor do tipo), mas porque a alternativa obrigaria o portão a saber em qual superfície cada texto cai, sem traçar a cascata. O preço foram 3 pontos de L; o que se compra é `18 × 5 ≥ AA` sem exceção para consultar |
+| *Deck* em stats de Lv50, não em base stat | a prancha escrevia `HP 35` e a *Batalha* `110` para o mesmo Pikachu. O deck é onde se decide quem entra em campo, então ele mostra o que entra; a *Detalhe* segue em base stat, e lá a aba **se chama** *Base stats*. A prancha *Deck* foi corrigida |
+| `/deck` sem botão SALVAR | a prancha desenha um, cinza. O save é gravado a cada mutação — um botão que não salva nada é pior que nenhum, e um que salvasse exigiria um estado "não salvo" que o jogo não tem |
+| `×2` de efetividade fora da carta do deck | a prancha o põe na linha do número de cada carta; ele está na coluna de cobertura logo abaixo, por tipo, que é onde informa mais — duas cartas do mesmo tipo dão a mesma linha. Na carta ficou o que muda decisão: a faixa `LEVA ×2` |
+| chip de resumo em `--accent`, não no amarelo de terrestre | a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa: cor de tipo é preenchimento de tipo. A tela já tem dois níveis — `--deficit` no risco concreto, `--accent` no resumo |
+
 ### Segurado até a fase que cria o dado
 
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
@@ -275,7 +291,11 @@ progresso que ninguém pode mover.
 - **Fase 6:** a faixa de retomar batalha no Hub, a barra de navegação global
   (`Base · Pokédex · Coleção · Deck · Liga`, mais Packs, Ajustes e Regras), o
   saldo de moedas e o contador do pack diário. Até lá a raiz é a porta, com um
-  link para cada uma das três telas que existem.
+  link para cada uma das quatro telas que existem.
+- **A Liga:** contra qual ginásio o `/deck` lê a cobertura. Enquanto ela não
+  existe, todo jogador tem zero insígnias e o próximo ginásio **é** o primeiro —
+  o número não é inventado, é o único verdadeiro, e o que a Liga troca é uma
+  constante em `useDeck`.
 - **Sem dado no dex:** a lista de jogos da geração (`Red · Blue · Yellow`) que a
   prancha *Pokédex* põe no cabeçalho. `GenerationMeta` traz geração, região,
   nome e contagem — o campo teria de nascer no pipeline.
@@ -288,13 +308,6 @@ progresso que ninguém pode mover.
   pendente vence; local limpo aceita o servidor, sem comparar relógio de
   aparelho". São regras diferentes, e a Fase 8 não pode escolher no meio da
   implementação.
-- **Base stat contra Lv50.** A prancha *Deck* mostra Pikachu com `HP 35` (base) e
-  a prancha *Batalha* com `110` (Lv50). Duas telas vizinhas escrevendo "HP" com
-  significados diferentes.
-- **Tipo como texto em painel.** `dragon` dá 3,99 sobre `--surface-raised`. Hoje
-  a cor de tipo é só preenchimento e o único texto que ela carrega fica sobre
-  `--bg`, onde passa. A Fase 6 é a que põe nome de tipo em painel, e é ela que
-  precisa decidir — ver a issue #11 e o portão em `test/unit/theme.spec.ts`.
 
 Uma das perguntas desta lista **foi respondida na Fase 5**, e fica registrada
 aqui porque o canvas não a respondia sozinho: as barras de progresso por região
@@ -481,6 +494,7 @@ A regra inteira mora em [`shared/game/`](shared/game/), headless como o motor �
 | `dust.ts`    | pó por duplicata e custo de forja, na razão 4×              |
 | `progress.ts`| a fração capturada e o degrau que ela pinta                 |
 | `economy.ts` | por enquanto só os packs de boas-vindas; o resto é Fase 6   |
+| `deck.ts`    | os seis slots, o que é um deck válido, e a cobertura        |
 
 ### Os números, e de onde eles saem
 
@@ -514,8 +528,8 @@ por isso que ele hoje mede pesos puros e rede em série em blocos separados.
   e não distorce taxa nenhuma, mas a mesma carta duas vezes numa tira de dez lê
   como defeito, não como sorte.
 - **Moer consome as normais antes das shiny**, e aceita moer até a última cópia —
-  a Fase 6 diz que moer uma carta do deck ativo esvazia o slot, e um limite aqui
-  contradiria aquela regra antes de ela chegar.
+  a Fase 6 confirmou que moer uma carta do deck ativo esvazia o slot, e um limite
+  aqui contradiria aquela regra. Ver [O deck](#o-deck).
 - **Forjar credita a carta antes de debitar o pó**, pela ordem de escrita do
   plano: uma falha no meio dá carta de graça em vez de cobrar sem entregar. A
   carta forjada nunca é shiny — brilho é sorte de pack.
@@ -528,15 +542,62 @@ por isso que ele hoje mede pesos puros e rede em série em blocos separados.
   para moeda, moeda para pack — e sem uma concessão inicial nenhuma porta abre.
   A loja e o pack diário continuam na Fase 6.
 - **O binder não virtualiza; ele usa `content-visibility`.** A Pokédex virtualiza
-  porque suas fileiras têm altura uniforme. A carta do binder não tem: a linha
-  `2 dup · 10 pó` só aparece quando há duplicata, e uma fileira com repetida é
-  ~22px mais alta que uma sem — um `estimateSize` único posicionaria as fileiras
-  erradas depois da primeira divergência. `content-visibility: auto` pula estilo,
-  layout e pintura do que está fora da janela sem exigir altura uniforme, e é o
-  que faz as 1025 caberem. **Virtualizar de verdade depende de uniformizar a
-  altura da carta, que é decisão de canvas** — fica para a Fase 6, junto com o
-  deck, que desenha a mesma carta. Registrado na
-  [issue #24](https://github.com/adamsalves/holo-deck/issues/24).
+  porque suas fileiras têm altura uniforme, e a carta do binder não tinha: a linha
+  `2 dup · 10 pó` deixava uma fileira com repetida ~22px mais alta que uma sem, e
+  um `estimateSize` único posicionaria errado a partir da primeira divergência.
+  **A altura foi uniformizada na Fase 6** — raridade e linha de moer passaram ao
+  mesmo slot do rodapé, que é onde a prancha sempre as desenhou —, então
+  virtualizar passou a ser possível. Continua não sendo feito: falta a medição com
+  1025 cartas em CPU limitada que a
+  [issue #24](https://github.com/adamsalves/holo-deck/issues/24) pede, e sem esse
+  número escolher entre os dois é preferência. `content-visibility: auto` cobre o
+  custo de renderização, que é o dominante.
+
+## O deck
+
+Seis slots, a leitura de cobertura contra o próximo ginásio, e a regra que liga
+os dois à coleção.
+
+| Rota    | O que é                                                       |
+| ------- | ------------------------------------------------------------- |
+| `/deck` | os seis slots, a cobertura, e a coleção escalável ao lado      |
+
+A regra mora em [`shared/game/deck.ts`](shared/game/deck.ts), headless como o
+motor — `place`, `clear`, `remove`, o guarda de forma e `deckCoverage` rodam sem
+montar componente nenhum.
+
+### Três decisões que o código não deduz sozinho
+
+- **`null` é um slot vazio, e precisa ser representável.** O plano manda que moer
+  uma carta do deck ativo **esvazie o slot** em vez de bloquear a moagem — mais
+  gentil que um erro, e a tela já sinaliza slot vazio. Uma lista compacta de ids
+  perderia a posição, e as cartas seguintes andariam sozinhas para tapar o buraco.
+- **`place` tira a carta de onde ela estava.** Um `place` que só escrevesse no
+  destino deixaria a espécie nos dois slots, e o guarda só reprovaria na próxima
+  leitura do save — depois de a tela já ter mostrado o deck errado.
+- **A cobertura lê o tipo da carta, não os golpes dela.** Quem decide dano é o
+  moveset, e `selectBattleMoves` só o resolve na batalha. A aproximação se
+  sustenta porque aquela seleção é por cobertura e o STAB puxa para os tipos da
+  própria espécie. O que a tela **não** faz é prometer: ela diz "seu time tem
+  elétrico, e elétrico bate ×2", que é verdade sobre o time.
+
+### Moer esvazia o slot, por dois caminhos
+
+A regra vale em dois momentos, e eles precisam de mecanismos diferentes:
+
+| quando | quem resolve |
+| --- | --- |
+| com o jogo aberto | o observador da store do deck sobre a coleção |
+| no boot | `deck.hydrate`, que descarta na entrada a espécie que a coleção não tem |
+
+O segundo não é redundante. O observador é `flush: 'pre'` e acorda **no tick
+seguinte**: medido síncrono, logo depois de hidratar, o deck ainda segurava a
+carta órfã. Pendurar a invariante no agendamento do Vue seria deixá-la quebrar no
+dia em que alguém trocasse o `flush` por `'sync'` — e aí o observador rodaria
+antes de `hydrate`, que é quando ele não tem nada para ver.
+
+O portão desse caso **não** espera tick, e a ausência do `await nextTick()` nele
+é o teste.
 
 ## O save
 

@@ -66,7 +66,11 @@
    *
    * A ordem é a de `TYPE_NAMES` em `shared/types/dex.ts`, que é a ordem de id da
    * PokeAPI, e há teste cobrando que nenhum tipo do contrato fique sem cor.
-   * Todas passam o AA sobre o fundo da página; a mais fraca é `dragon`, a 4.69.
+   *
+   * **Todas passam o AA sobre as cinco superfícies, não só sobre o fundo** — a
+   * mais fraca é `dragon`, a 4.59 sobre `--surface-raised` e 5.40 sobre `--bg`.
+   * Isso é mais forte do que a paleta prometia até a Fase 5, e custou clarear
+   * uma cor: ver a nota em `dragon` abaixo.
    */
   --color-type-normal: #C6C6A7;
   --color-type-fighting: #FF5A4E;
@@ -83,7 +87,32 @@
   --color-type-electric: #FFE44D;
   --color-type-psychic: #FF6BA8;
   --color-type-ice: #7FE8E8;
-  --color-type-dragon: #8B5CFF;
+  /**
+   * `dragon` clareou de `#8B5CFF` para `#966BFF` na Fase 6 — o único tipo que a
+   * matriz de contraste obrigou a mexer, e a única cor de tipo que diverge do
+   * canvas.
+   *
+   * Medidos os 18 contra as 5 superfícies, `dragon` era o único a reprovar AA, e
+   * só nas duas mais claras: 3.99 sobre `--surface-raised` e 4.39 sobre
+   * `--surface`. O segundo pior, `dark`, para em 4.94. `#966BFF` é o mesmo matiz
+   * e a mesma saturação com +3 pontos de L em HSL.
+   *
+   * **Nenhuma tela pinta nome de tipo na cor do tipo, e isso não é o argumento.**
+   * A issue #11 dizia que a Fase 6 decidiria, e o que ela decidiu foi *limpar a
+   * exceção em vez de carregá-la*: uma lista de tipos que não sustentam texto é
+   * um registro que envelhece — alguém acrescenta uma cor, ela entra na lista, e
+   * a lista vira a regra. A alternativa que preservaria o hex do canvas era
+   * restringir tipo-como-texto às superfícies escuras, e isso obrigaria o portão
+   * a saber em qual superfície cada texto cai sem traçar a cascata: o defeito
+   * recorrente deste repositório, plantado de propósito.
+   *
+   * O preço foram 3 pontos de L, e o que se compra é uma invariante que a máquina
+   * verifica sozinha: 18 tipos × 5 superfícies ≥ 4.5, sem exceção para consultar.
+   *
+   * Mesmo movimento que `ink-325` na Fase 2: a matriz pediu um valor que nenhuma
+   * prancha desenha. Ver a issue #11.
+   */
+  --color-type-dragon: #966BFF;
   --color-type-dark: #A08878;
   --color-type-fairy: #FF9FC4;
 

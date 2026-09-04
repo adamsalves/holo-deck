@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StorageLike } from '~~/app/utils/save-driver'
 import { BACKUP_PREFIX, LocalStorageDriver, MAX_BACKUPS, SAVE_KEY, backupKey } from '~~/app/utils/save-driver'
+import { emptyDeck } from '~~/shared/game/deck'
 import { SCHEMA_VERSION, emptySave, isSaveData } from '~~/shared/save/schema'
 
 /**
@@ -66,6 +67,7 @@ describe('leitura', () => {
       schemaVersion: SCHEMA_VERSION,
       collection: { 25: { c: 2, s: 1 } },
       dust: 15,
+      deck: [25, null, null, null, null, null],
       progress: { pity: 3, welcomeClaimed: 3 },
     }
     const storage = fakeStorage({ [SAVE_KEY]: JSON.stringify(save) })
@@ -105,7 +107,7 @@ describe('a regra de nunca apagar', () => {
   })
 
   it('guarda o cru quando o save abre mas está fora de contrato', async () => {
-    const raw = JSON.stringify({ schemaVersion: SCHEMA_VERSION, collection: { 25: { c: 1, s: 5 } }, dust: 0, progress: { pity: 0, welcomeClaimed: 0 } })
+    const raw = JSON.stringify({ schemaVersion: SCHEMA_VERSION, collection: { 25: { c: 1, s: 5 } }, dust: 0, deck: emptyDeck(), progress: { pity: 0, welcomeClaimed: 0 } })
     const storage = fakeStorage({ [SAVE_KEY]: raw })
 
     const result = await new LocalStorageDriver(storage, () => FROZEN).load()

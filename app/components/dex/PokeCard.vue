@@ -16,13 +16,29 @@ import { useFoil } from '~/composables/useFoil'
  * significa nenhum listener: o foil fica no repouso, que é exatamente o gradiente
  * estático que o canvas desenha nas cartas do grid.
  */
+/**
+ * O link é **um objeto ou nada**, e não `to` mais `label` soltos.
+ *
+ * Um link sem nome acessível é um link que o leitor de tela anuncia como o
+ * destino cru, e a carta não tem texto próprio dentro dele para servir de nome —
+ * ele cobre a carta, não a envolve. Dois campos independentes tornariam esse
+ * estado representável, e ele passaria em review porque a tela continua certa.
+ */
+export interface CardLink {
+  readonly to: string
+  /** A frase que substitui o conteúdo visual. Ver `DexCard` e `CollectionCard`. */
+  readonly label: string
+}
+
 const props = withDefaults(defineProps<{
   dexNumber: number
   name: string
   types: readonly [TypeName] | readonly [TypeName, TypeName]
   rarity: Rarity
   interactive?: boolean
-}>(), { interactive: false })
+  /** Quando presente, a carta inteira navega — menos o que o rodapé levantar. */
+  link?: CardLink | null
+}>(), { interactive: false, link: null })
 
 /**
  * O foil mede a **moldura**, não a carta.
@@ -88,6 +104,16 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
         aria-hidden="true"
       />
 
+      <!-- O link **cobre** a carta em vez de envolvê-la, e é isso que permite o
+           rodapé hospedar um botão sem aninhar interativos. Quem precisa ficar
+           acima dele sobe de camada: ver `.poke-card__link` no estilo. -->
+      <NuxtLink
+        v-if="link"
+        :to="link.to"
+        :aria-label="link.label"
+        class="poke-card__link"
+      />
+
       <span class="poke-card__number numeric">{{ dexLabel }}</span>
 
       <div class="poke-card__art">
@@ -140,7 +166,20 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   overflow: hidden;
   box-sizing: border-box;
   aspect-ratio: 5 / 7;
-  padding: 9px 0 11px;
+
+  /**
+   * As duas medidas internas viram **contrato publicado**, e não números que
+   * cada consumidor redescobre.
+   *
+   * Quem monta um rodapé que precisa sangrar até a borda — a faixa `LEVA ×2` do
+   * slot de deck é o primeiro caso — precisa saber de quanto é o recuo para
+   * anulá-lo. Copiar `9px` e `11px` no componente de fora funciona até o dia em
+   * que estes mudarem aqui, e aí o desalinhamento aparece numa tela só.
+   */
+  --card-gutter: 9px;
+  --card-foot: 11px;
+
+  padding: 9px 0 var(--card-foot);
 
   /* `--card-surface` é o gradiente do tema, já tingido pela cor do tipo — o
      `data-type` deste mesmo elemento é quem o resolve. */
@@ -186,10 +225,53 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   left: 66%;
 }
 
+/**
+ * A camada do link, e o contrato que ela publica.
+ *
+ * `inset: 0` cobre a carta inteira, e o `z-index: 1` é o que a põe acima do
+ * número, da arte e do nome — os três são `position: relative`, então sem ele a
+ * ordem do DOM os deixaria por cima e o clique morreria no texto.
+ *
+ * **O rodapé é a exceção, de propósito.** Quem monta um rodapé com ação — o
+ * botão de moer do binder, o de remover do slot de deck — sobe para `z-index: 2`
+ * e passa a receber o próprio clique. É esse degrau que substitui o `<button>`
+ * dentro de `<a>` que o HTML não admite, e é por isso que o rodapé pôde voltar
+ * para dentro da carta, onde a prancha sempre o desenhou.
+ *
+ * O foil fecha a escada em `z-index: 3`, e **precisa ser explícito**. Com ele em
+ * `auto` a ordem do DOM o punha no degrau 0: o link (1) e o rodapé com ação (2)
+ * pintavam por cima dele, enquanto o rodapé sem ação (auto) pintava por baixo —
+ * os dois estados do mesmo slot com blend diferente numa carta rara+, que é o
+ * oposto do que o rodapé único se propôs a unificar. Ele não disputa clique:
+ * `pointer-events: none`.
+ *
+ * A escada inteira, de baixo para cima: conteúdo (auto) · link (1) · rodapé com
+ * ação (2) · foil (3).
+ */
+.poke-card__link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/**
+ * O anel de foco mora na moldura, que é o único retângulo não recortado.
+ *
+ * `.poke-card` carrega o chanfro por `clip-path` e `overflow: hidden`: um
+ * `outline` no próprio link seria cortado nos quatro cantos. O `:has()` traz o
+ * estado de foco de dentro para fora, que é exatamente o que a moldura já
+ * existia para permitir — ela não gira e não recorta.
+ */
+.poke-card-frame:has(.poke-card__link:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
 .poke-card__number {
   position: relative;
   align-self: flex-start;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
   font-size: 9px;
   /* `--text-muted`, e não `--text-faint`: a 9px isto é texto pequeno, e
      `--text-faint` é papel de texto grande — sobre o topo da carta ele dá
@@ -205,7 +287,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
 }
 
 .poke-card__art :deep(img) {
@@ -216,7 +298,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 
 .poke-card__id {
   position: relative;
-  padding: 0 9px;
+  padding: 0 var(--card-gutter);
 }
 
 .poke-card__name {
@@ -245,6 +327,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
 .poke-card__foil {
   position: absolute;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
   mix-blend-mode: color-dodge;
   opacity: var(--foil-strength);
