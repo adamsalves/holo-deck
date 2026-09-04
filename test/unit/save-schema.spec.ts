@@ -10,8 +10,9 @@ import {
   shiniesOf,
 } from '~~/shared/save/schema'
 import type { SpeciesId } from '~~/shared/types/brand'
-import { isSpeciesId } from '~~/shared/types/brand'
+import { GYM_COUNT, isSpeciesId } from '~~/shared/types/brand'
 import { emptyDeck } from '~~/shared/game/deck'
+import { ENGINE_VERSION } from '~~/shared/game/battle'
 
 /**
  * O formato do save, e a regra que o governa: **nunca apagar**.
@@ -43,7 +44,8 @@ describe('o save vazio', () => {
       collection: {},
       dust: 0,
       deck: [null, null, null, null, null, null],
-      progress: { pity: 0, welcomeClaimed: 0 },
+      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+      battle: null,
     })
   })
 
@@ -58,7 +60,8 @@ describe('o guarda', () => {
     collection: { [speciesKey(25)]: { c: 3, s: 1 } },
     dust: 340,
     deck: [species(25), null, null, null, null, null],
-    progress: { pity: 4, welcomeClaimed: 3 },
+    progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1 },
+    battle: null,
   }
 
   it('aceita um save real', () => {
@@ -88,7 +91,9 @@ describe('o guarda', () => {
   it('recusa contagem negativa e fracionária', () => {
     expect(isSaveData({ ...valid, dust: -1 })).toBe(false)
     expect(isSaveData({ ...valid, dust: 1.5 })).toBe(false)
-    expect(isSaveData({ ...valid, progress: { pity: -1, welcomeClaimed: 0 } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, pity: -1 } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, coins: -1 } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, badges: 1.5 } })).toBe(false)
   })
 
   /**
@@ -119,7 +124,43 @@ describe('o guarda', () => {
   it('recusa contagem sem ordem de grandeza', () => {
     expect(isSaveData({ ...valid, dust: 1e15 })).toBe(false)
     expect(isSaveData({ ...valid, collection: { [speciesKey(25)]: { c: 1e12, s: 0 } } })).toBe(false)
-    expect(isSaveData({ ...valid, progress: { pity: 1e9, welcomeClaimed: 0 } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, pity: 1e9 } })).toBe(false)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, coins: 1e9 } })).toBe(false)
+  })
+
+  /**
+   * O teto das insígnias é a Liga, e não o teto genérico de contagem.
+   *
+   * Um save com 40 insígnias passaria por `isBoundedCount` e abriria os nove
+   * ginásios de uma vez, escrevendo `40/9` no cabeçalho da Liga — número que o
+   * jogo não produz e que um save editado à mão produz de graça.
+   */
+  it('recusa mais insígnias do que a Liga tem ginásios', () => {
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, badges: GYM_COUNT } })).toBe(true)
+    expect(isSaveData({ ...valid, progress: { ...valid.progress, badges: GYM_COUNT + 1 } })).toBe(false)
+  })
+
+  /**
+   * `battle` é `null` ou um log de verdade — e nunca ausente.
+   *
+   * A ausência é o save de antes da Liga, e quem o traz para cá é a migração.
+   * Aceitá-la aqui deixaria o guarda passar um save meio-migrado, que é
+   * exatamente a classe que o `isSaveData` depois da cadeia existe para pegar.
+   */
+  it('aceita batalha nula ou bem-formada, e recusa a ausência', () => {
+    const log = {
+      gymId: 1,
+      seed: 7,
+      engineVersion: ENGINE_VERSION,
+      dexVersion: '19c9dc2a',
+      team: [species(25)],
+      actions: [{ kind: 'move', slot: 0 }],
+    }
+
+    expect(isSaveData({ ...valid, battle: log })).toBe(true)
+    expect(isSaveData({ ...valid, battle: undefined })).toBe(false)
+    expect(isSaveData({ ...valid, battle: { ...log, gymId: 99 } })).toBe(false)
+    expect(isSaveData({ ...valid, battle: {} })).toBe(false)
   })
 
   /**
@@ -140,7 +181,8 @@ describe('a migração', () => {
       collection: { [speciesKey(6)]: { c: 2, s: 0 } },
       dust: 50,
       deck: [species(6), null, null, null, null, null],
-      progress: { pity: 2, welcomeClaimed: 3 },
+      progress: { pity: 2, welcomeClaimed: 3, coins: 900, badges: 2 },
+      battle: null,
     }
 
     expect(migrate(save)).toEqual({ data: save, recovered: null })
@@ -160,7 +202,7 @@ describe('a migração', () => {
    * lá atravessa intacto**. Cartas, pó e progresso do lado esquerdo são os mesmos
    * do direito, e o único delta é o deck vazio mais a versão.
    */
-  it('leva um save da Fase 5 para a versão 2 sem tocar no que já estava lá', () => {
+  it('leva um save da Fase 5 até a versão corrente sem tocar no que já estava lá', () => {
     const daFase5 = {
       schemaVersion: 1,
       collection: {
@@ -174,10 +216,48 @@ describe('a migração', () => {
     const { data, recovered } = migrate(daFase5)
 
     expect(recovered).toBeNull()
-    expect(data).toEqual({ ...daFase5, schemaVersion: 2, deck: emptyDeck() })
+    expect(data).toEqual({
+      ...daFase5,
+      schemaVersion: 3,
+      deck: emptyDeck(),
+      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0 },
+      battle: null,
+    })
 
     // E o resultado é um save de verdade, não um objeto que só parece um: é o
     // guarda quem decide, depois da cadeia.
+    expect(isSaveData(data)).toBe(true)
+  })
+
+  /**
+   * **O passo da Liga, sozinho** — o save de quem parou no PR anterior.
+   *
+   * Ele já tem deck e já jogou; o que falta são saldo, insígnias e a batalha em
+   * andamento. Zero e `null` são as únicas respostas honestas: não havia ginásio
+   * para vencer, então não há progresso de Liga para deduzir.
+   *
+   * O teste separa este passo do anterior de propósito. A cadeia é indexada por
+   * posição, e um save da versão 2 exercita **só** `MIGRATIONS[1]` — se alguém
+   * inserir um passo no meio em vez de no fim, é este teste que reprova.
+   */
+  it('leva um save da versão 2 para a 3 preservando deck e coleção', () => {
+    const daVersao2 = {
+      schemaVersion: 2,
+      collection: { [speciesKey(25)]: { c: 3, s: 1 } },
+      dust: 340,
+      deck: [species(25), null, null, null, null, null],
+      progress: { pity: 4, welcomeClaimed: 3 },
+    }
+
+    const { data, recovered } = migrate(daVersao2)
+
+    expect(recovered).toBeNull()
+    expect(data).toEqual({
+      ...daVersao2,
+      schemaVersion: 3,
+      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0 },
+      battle: null,
+    })
     expect(isSaveData(data)).toBe(true)
   })
 
@@ -203,7 +283,14 @@ describe('a migração', () => {
    * não a boa vontade de quem escreveu o passo.
    */
   it('recusa o que sai da cadeia fora de contrato', () => {
-    const result = migrate({ schemaVersion: SCHEMA_VERSION, collection: { 25: { c: 1, s: 9 } }, dust: 0, deck: emptyDeck(), progress: { pity: 0, welcomeClaimed: 0 } })
+    const result = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      collection: { 25: { c: 1, s: 9 } },
+      dust: 0,
+      deck: emptyDeck(),
+      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+      battle: null,
+    })
 
     expect(result.recovered).toBe('failed-migration')
     expect(result.data).toEqual(emptySave())

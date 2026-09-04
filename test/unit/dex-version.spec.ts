@@ -67,7 +67,10 @@ describe('dexVersionOf', () => {
     // trazer os golpes de status tirou o oitavo golpe de 309 espécies.
     const [first, ...rest] = core.moves
     if (first === undefined) throw new Error('dex sem catálogo de golpes')
-    const outro = { ...payloadOf(core), moves: [{ ...first, power: 1 }, ...rest] }
+    // O PP, e não o poder: `MoveEntry` é união discriminada e `power` só existe
+    // no ramo de dano — espalhar um `power` sobre o golpe que calhar de ser o
+    // primeiro não compila. PP muda o mesmo tanto para o hash.
+    const outro = { ...payloadOf(core), moves: [{ ...first, pp: first.pp + 1 }, ...rest] }
 
     expect(dexVersionOf(outro, generations)).not.toBe(core.dexVersion)
   })
