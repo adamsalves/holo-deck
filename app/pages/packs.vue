@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { useIntervalFn } from '@vueuse/core'
 import { useRoute } from 'nuxt/app'
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   PACK_PRICE,
   WELCOME_PACKS,
-  msUntilNextDay,
+  countdownLabel,
 } from '~~/shared/game/economy'
 import {
   COMMON_SLOTS,
@@ -26,6 +25,7 @@ import { RARITY_LABELS } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from '~/composables/useDex'
+import { useGameClock } from '~/composables/useGameClock'
 import { useReduceMotion } from '~/composables/useMotion'
 
 /**
@@ -68,25 +68,13 @@ const entryById = computed(() => {
 })
 
 /**
- * O relógio da loja, batendo de segundo em segundo.
- *
- * Ele existe pelo contador regressivo, que a prancha escreve como
- * `próximo em 14:22:07` — e um segundo é o passo que esse formato exige. Mas ele
- * é também o que faz o cartão do diário **voltar sozinho** à meia-noite com a
- * aba aberta, que é o caso que um instante lido uma vez não cobre.
- *
- * `useIntervalFn` para o descarte vir junto: o intervalo morre com o escopo do
- * componente, sem `onUnmounted` escrito à mão. Ele bate durante a abertura
- * também — loja e abertura são dois `v-if` do mesmo componente, e o `setup` não
- * roda de novo entre elas. Um tique por segundo enquanto dez cartas viram não
- * paga a complexidade de pausar.
+ * O relógio da loja. Ele bate durante a abertura também — loja e abertura são
+ * dois `v-if` do mesmo componente, e o `setup` não roda de novo entre elas. Um
+ * tique por segundo enquanto dez cartas viram não paga a complexidade de pausar.
  *
  * **Ele não serve de seed**, e essa distinção custou um defeito: ver `open`.
  */
-const now = shallowRef(new Date())
-useIntervalFn(() => {
-  now.value = new Date()
-}, 1000)
+const now = useGameClock()
 
 const opened = ref<readonly PackCard[]>([])
 const revealed = ref(0)
@@ -110,12 +98,7 @@ const openedEntries = computed(() =>
 const dailyReady = computed(() => progress.dailyReadyAt(now.value))
 
 /** `14:22:07` — o que falta para a meia-noite local, no formato da prancha. */
-const untilDaily = computed(() => {
-  const total = Math.max(0, Math.floor(msUntilNextDay(now.value) / 1000))
-  const parts = [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
-
-  return parts.map(part => String(part).padStart(2, '0')).join(':')
-})
+const untilDaily = computed(() => countdownLabel(now.value))
 
 /**
  * Quem pode abrir agora.
@@ -163,8 +146,13 @@ function open(from: PackSource): void {
   collection.credit(result.cards)
   progress.setPity(result.pity)
 
+  // `new Date()` e não `now.value`, pelo mesmo motivo da seed: o relógio reativo
+  // pode estar até um segundo atrás do real. Na virada da meia-noite isso grava
+  // o dia de ontem e devolve o diário de hoje — um pack a mais, uma vez por dia,
+  // numa janela de um segundo. As duas leituras de relógio desta função passam a
+  // ser do mesmo instante.
   if (from === 'welcome') welcomeNumber.value = progress.claimWelcome()
-  else if (from === 'daily') progress.claimDaily(now.value)
+  else if (from === 'daily') progress.claimDaily(new Date())
   else progress.buyPack()
 
   opened.value = result.cards
