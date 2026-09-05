@@ -73,11 +73,15 @@ const entryById = computed(() => {
  * Ele existe pelo contador regressivo, que a prancha escreve como
  * `próximo em 14:22:07` — e um segundo é o passo que esse formato exige. Mas ele
  * é também o que faz o cartão do diário **voltar sozinho** à meia-noite com a
- * aba aberta, que é o caso que um `Date.now()` lido uma vez não cobre.
+ * aba aberta, que é o caso que um instante lido uma vez não cobre.
  *
  * `useIntervalFn` para o descarte vir junto: o intervalo morre com o escopo do
- * componente, sem `onUnmounted` escrito à mão. Ele só bate enquanto a loja está
- * na tela — durante a abertura a tela é outra e o cartão não está lá.
+ * componente, sem `onUnmounted` escrito à mão. Ele bate durante a abertura
+ * também — loja e abertura são dois `v-if` do mesmo componente, e o `setup` não
+ * roda de novo entre elas. Um tique por segundo enquanto dez cartas viram não
+ * paga a complexidade de pausar.
+ *
+ * **Ele não serve de seed**, e essa distinção custou um defeito: ver `open`.
  */
 const now = shallowRef(new Date())
 useIntervalFn(() => {
@@ -139,15 +143,22 @@ function canOpen(from: PackSource): boolean {
  * três cobranças são diferentes, o crédito é o mesmo, e é o crédito que precisa
  * acontecer primeiro nos três casos.
  *
- * A seed é o relógio. Ela não precisa ser imprevisível: o save guarda o
- * resultado, não a seed, e um jogador que quisesse trapacear já tem o DevTools —
- * o plano decidiu isso por escrito ao recusar checksum e ofuscação.
+ * A seed é o relógio, em milissegundos. Ela não precisa ser imprevisível: o save
+ * guarda o resultado, não a seed, e um jogador que quisesse trapacear já tem o
+ * DevTools — o plano decidiu isso por escrito ao recusar checksum e ofuscação. O
+ * que ela precisa ser é **diferente a cada abertura**, e é aí que a precisão
+ * importa.
  */
 function open(from: PackSource): void {
   const buckets = pool.value
   if (buckets === null || !canOpen(from)) return
 
-  const result = openPack({ seed: now.value.getTime(), pity: progress.pity, pool: buckets })
+  // `Date.now()` e **não** o relógio reativo: `now` anda de segundo em segundo,
+  // e dois packs abertos dentro do mesmo tique receberiam a mesma seed — o que
+  // em `openPack` significa exatamente as mesmas dez cartas. O caminho que
+  // encosta nisso é o normal, não o patológico: `ABRIR O PRÓXIMO` encadeia as
+  // três boas-vindas, e nada obriga o jogador a esperar um segundo entre elas.
+  const result = openPack({ seed: Date.now(), pity: progress.pity, pool: buckets })
 
   collection.credit(result.cards)
   progress.setPity(result.pity)

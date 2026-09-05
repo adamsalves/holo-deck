@@ -127,6 +127,47 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
 })
 
 /**
+ * **Dois packs abertos em sequência não podem ser iguais.**
+ *
+ * A seed de `openPack` é o relógio, e a precisão dela é a coisa inteira: com um
+ * relógio de segundo em segundo, dois cliques dentro do mesmo tique recebem a
+ * mesma seed — e a mesma seed, sobre o mesmo pool, é exatamente as mesmas dez
+ * cartas. Foi o defeito que a primeira versão desta tela tinha, quando a seed
+ * passou a sair do `ref` reativo que alimenta o contador do diário.
+ *
+ * O caminho que encosta nisso é o **normal**, não o patológico: `ABRIR O
+ * PRÓXIMO` encadeia os três packs de estreia, e nada obriga o jogador a esperar
+ * um segundo entre eles.
+ *
+ * Duas tiras de dez saírem iguais por acaso, sobre ~500 comuns, é
+ * astronomicamente improvável — a asserção não é frágil, é a definição do
+ * defeito.
+ */
+test('dois packs abertos em sequência não saem idênticos', async ({ page }) => {
+  await page.goto('/packs')
+
+  const sprites = async (): Promise<string[]> =>
+    page.locator('.opener__slot img').evaluateAll(images =>
+      images.map(image => image.getAttribute('src') ?? ''))
+
+  await expect(async () => {
+    await page.locator('.packs__buy--gift').click()
+    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
+
+  await expect(page.locator('.opener__slot')).toHaveCount(10)
+  const primeiro = await sprites()
+
+  // Sem pausa nenhuma: é o clique imediato que o defeito exige.
+  await page.locator('.packs__skip--primary').click()
+  await expect(page.locator('.opener__slot')).toHaveCount(10)
+  const segundo = await sprites()
+
+  expect(primeiro).toHaveLength(10)
+  expect(segundo).not.toEqual(primeiro)
+})
+
+/**
  * `/rules` renderizando o que os módulos dizem.
  *
  * A checagem do plano nomeia estes números — pity, shiny, os limiares de
