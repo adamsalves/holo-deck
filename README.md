@@ -839,6 +839,14 @@ A tela mantém um relógio de um segundo enquanto está aberta. Ele existe pelo
 contador regressivo — `próximo em 14:22:07` —, mas é também o que faz o cartão
 voltar sozinho à meia-noite com a aba aberta.
 
+O relógio é [`useGameClock`](app/composables/useGameClock.ts) e o formato é
+`countdownLabel`, em `shared/game/economy.ts`. Os dois moravam copiados caractere
+por caractere no Hub e na loja — a mesma dívida que justificou extrair o helper
+das suítes e2e, achada pelo review no mesmo PR. **O relógio reativo não serve de
+seed nem de carimbo**: quem sorteia um pack e quem grava o dia do diário leem
+`new Date()` na hora, senão dois packs do mesmo tique saem idênticos e um clique
+na virada da meia-noite grava o dia de ontem.
+
 ### `/rules` não contém número nenhum
 
 A página é derivada de `shared/game/` inteira, e isso é contrato, não estilo:
@@ -847,10 +855,21 @@ o jogador — é que as regras estão espalhadas por três fases, e "spec espalh
 foi o padrão de quase todo defeito que a revisão do plano encontrou.
 
 [`test/unit/rules-gate.spec.ts`](test/unit/rules-gate.spec.ts) monta a lista de
-números proibidos **a partir das próprias constantes**: um tier novo na escada de
-forja entra sozinho, e um limiar movido passa a ser cobrado no valor novo sem
-ninguém editar o teste. Ele afirma o outro lado também — os nove módulos
-continuam importados —, senão uma página vazia passaria.
+números proibidos **a partir do que o motor exporta**: ele importa o namespace de
+todo módulo de `shared/game/` e `shared/types/` e policia todo número que sair de
+lá. Um tier novo na escada de forja entra sozinho, um limiar movido passa a ser
+cobrado no valor novo, e uma **constante nova** entra sem ninguém editar o teste.
+
+A primeira versão dele enumerava à mão *quais* constantes policiar, e o review
+mostrou o custo: `BATTLE_IV` (31), `TYPE_COUNT` (18), `RANDOM_MIN_PERCENT` (85),
+`RANDOM_MAX_PERCENT` (100), `CRIT_CHANCE` e `BURN_DAMAGE_FRACTION` — seis
+constantes que a página renderiza — ficaram de fora pela omissão, e escrevê-las à
+mão passava no portão que existe para impedir isso. A lista de **módulos**
+continua escrita, e o que impede ela de envelhecer é um teste que a compara com a
+árvore em disco: arquivo novo em `shared/` reprova até ser incluído.
+
+Ele afirma o outro lado também — os nove módulos continuam importados pela
+página —, senão uma página vazia passaria.
 
 Duas exceções ficam escritas no portão, em vez de escondidas:
 
@@ -881,6 +900,20 @@ o lixo — aplicada ao caminho voluntário: sem conta não existe segunda cópia
 lugar nenhum, e um arquivo trocado por engano custaria a coleção. O anel continua
 com teto de três cópias, então clicar todo dia não enche a cota.
 
+**E dá para voltar por elas.** O painel *Cópias de segurança* lista o que existe,
+com o instante, e restaurar guarda o save de agora antes — a operação é reversível
+nos dois sentidos. Ele nasceu do review: as duas telas prometiam que a cópia ficava
+guardada e o único caminho de volta era o DevTools. O argumento do aviso de boot
+para não oferecer restauração — a chave crua é de uma versão que este código, por
+definição, não soube ler — não vale aqui: nestes dois caminhos o texto arquivado é
+um save que este mesmo código acabou de escrever. *Restaurar a gravação anterior*
+do painel *Ainda não* é outra coisa: aquela é a versão do servidor, Fase 7.
+
+O import recusa arquivo acima de 1 MB **antes** de o ler (o save realista tem ~3 KB
+e o pior caso documentado 21 KB), e reinicia o `<input type="file">` num `finally`.
+Sem esse reset no caminho de erro, escolher o mesmo arquivo duas vezes não dispara
+`change` — e é no erro que repetir o mesmo arquivo é mais provável.
+
 ### O interruptor de animação: dois sinais, uma regra de escrita
 
 Quem pede menos movimento diz isso de duas formas — pelo sistema
@@ -900,7 +933,16 @@ para uma animação aparece duas vezes**:
 
 A media query não sai, e é a metade que mais importa: ela é o único caminho que
 funciona antes de o JavaScript rodar. [`test/unit/motion-gate.spec.ts`](test/unit/motion-gate.spec.ts)
-conta **pares por arquivo** e reprova a metade — dos dois lados.
+compara **os conjuntos de seletores** dos dois lados, arquivo por arquivo, e
+reprova a metade — dos dois lados.
+
+Ele contava *ocorrências* das duas formas na primeira versão, o que deixava passar
+o caso mais provável: uma segunda regra **dentro** de um `@media` que já existe
+não muda a contagem, e o interruptor da tela passaria a desligar parte da animação
+e deixar o resto correndo. E ele excluía `app/assets/css/main.css` inteiro para
+não reprovar o exemplo escrito no docblock de lá — exclusão mais larga que o
+problema, que tirava do portão qualquer regra de movimento de verdade que o tema
+viesse a ter. Agora ele apaga comentário, como os outros três portões já faziam.
 
 Do lado do JavaScript, `useReduceMotion` soma os dois sinais e `useMotionSwitch`
 devolve só o interruptor. A separação não é elegância: o plugin de boot precisa
@@ -921,6 +963,28 @@ cobra os dois sentidos: toda tela está na barra ou está na lista de **saída**
 barra não aponta para tela que não existe. A lista é de saída de propósito — uma
 página nova cai do lado de dentro por omissão e reprova. Lista de entrada falha
 em silêncio, que foi o defeito do portão de tema na fase passada.
+
+Ele **importa** [`app/utils/nav-links.ts`](app/utils/nav-links.ts), que é a mesma
+lista que o componente renderiza. A primeira versão lia o `.vue` e perguntava se a
+string `'/deck'` estava lá dentro, o que é presença de texto e não link
+renderizado: `v-if="false"` em volta do link, ou a rota citada só num comentário,
+mantinham o portão verde com a tela fora da barra. O que o portão de disco ainda
+não alcança — o link que existe no dado e não chega à tela — é
+`test/e2e/collection.spec.ts`, que **itera sobre os mesmos destinos** e clica em
+cada um.
+
+### A seção atual, e um mecanismo que nunca existiu
+
+O sublinhado do destino atual saía de `router-link-active`, com um comentário
+dizendo que ela "casa por prefixo, que é o que acende *Pokédex* em `/pokedex/1`".
+Ela não faz isso: casa por **registro de rota**, e `/pokedex` e `/pokedex/:gen`
+são irmãs no roteamento por arquivos. O HTML pré-renderizado de toda rota
+aninhada saía com a barra inteira apagada — sem sublinhado e sem `aria-current`.
+
+`isCurrent` passou a decidir por prefixo de caminho, que é o que o comentário
+afirmava, e o mesmo booleano escreve a classe e o `aria-current` — os dois não têm
+como discordar. O `exact` da Base virou load-bearing pela primeira vez: `/` é
+prefixo de toda rota.
 
 ## O save
 
