@@ -28,7 +28,17 @@ const collection = useCollectionStore()
 const progress = useProgressStore()
 const motion = useMotionSwitch()
 
-const { $saveDriver } = useNuxtApp()
+/**
+ * `$pinia` explícito, e não a instância ativa por acaso.
+ *
+ * `composeSave` e `hydrateSave` chamam as stores, e as duas rodam **fora do
+ * setup** — uma dentro de um `computed`, a outra dentro de um handler. Ali o
+ * `inject` do Pinia não existe mais, e ele cai no `activePinia` do módulo, que é
+ * global. Numa SPA dá no mesmo; num render de servidor, duas requisições
+ * simultâneas dividem esse global. Passar a instância fecha a porta antes de a
+ * Fase 7 abrir qualquer coisa no servidor.
+ */
+const { $saveDriver, $pinia } = useNuxtApp()
 const { appVersion, gitSha } = useRuntimeConfig().public
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -43,7 +53,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const notice = ref<{ tone: 'done' | 'failed', text: string } | null>(null)
 
 /** O save atual como texto — a mesma coisa que é exportada e que é medida. */
-const saveText = computed(() => JSON.stringify(composeSave(), null, 2))
+const saveText = computed(() => JSON.stringify(composeSave($pinia), null, 2))
 
 /**
  * O tamanho do save em KB, medido em **bytes** e não em caracteres.
@@ -175,7 +185,7 @@ function archiveCurrent(): void {
  * é o disco já batendo com a tela quando a mensagem aparece.
  */
 function apply(data: SaveData): void {
-  hydrateSave(data)
+  hydrateSave(data, $pinia)
   void $saveDriver.save(data)
 }
 
