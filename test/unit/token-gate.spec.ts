@@ -114,10 +114,31 @@ function scannedFiles(): string[] {
     .filter(file => file !== THEME && file !== STYLEGUIDE)
 }
 
+/**
+ * Apaga comentário preservando as quebras de linha, para o número da linha na
+ * mensagem de erro continuar certo.
+ *
+ * **Sem isto o portão reprova quem explica a própria regra.** Foi o que
+ * aconteceu ao escrever `/rules`: o comentário que diz que ler
+ * `--color-type-fire` direto seria pular a camada semântica foi acusado de fazer
+ * exatamente isso. `shared-purity.spec.ts` já tinha aprendido a lição e a
+ * escreve no docblock do `stripComments` dele — uma regra que proíbe explicar o
+ * motivo da regra é pior que não ter regra.
+ *
+ * `//` só conta como comentário quando não vem logo depois de `:`, senão o `//`
+ * de uma URL apagaria o resto da linha — e com ele um token de verdade.
+ */
+function stripComments(source: string): string {
+  return source.replace(
+    /\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(?<!:)\/\/[^\n]*/g,
+    match => match.replaceAll(/[^\n]/g, ' '),
+  )
+}
+
 /** Lê uma vez só: são quatro varreduras sobre a mesma árvore. */
 const sources = scannedFiles().map(file => ({
   file,
-  lines: readFileSync(join(REPO_ROOT, file), 'utf8').split('\n'),
+  lines: stripComments(readFileSync(join(REPO_ROOT, file), 'utf8')).split('\n'),
 }))
 
 function offenders(pattern: RegExp, ignore: (hit: string) => boolean = () => false): string[] {
