@@ -185,6 +185,10 @@ const standout = computed(() => {
   }
 }
 
+:root[data-reduce-motion] .combatant__fill {
+  transition: none;
+}
+
 .combatant__foot {
   display: flex;
   align-items: baseline;

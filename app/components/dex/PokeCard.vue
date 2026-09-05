@@ -348,4 +348,8 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
     transition: none;
   }
 }
+
+:root[data-reduce-motion] .poke-card {
+  transition: none;
+}
 </style>

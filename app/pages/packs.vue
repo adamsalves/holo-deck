@@ -15,6 +15,7 @@ import type { PackCard } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from '~/composables/useDex'
+import { useReduceMotion } from '~/composables/useMotion'
 
 /**
  * Abrir pack — a prancha *Abertura de pack*.
@@ -25,6 +26,7 @@ import { useDex } from '~/composables/useDex'
  * nasceria vazio e a fase inteira ficaria sem como ser exercitada.
  */
 const { loadIndex } = useDex()
+const reduced = useReduceMotion()
 const collection = useCollectionStore()
 const progress = useProgressStore()
 
@@ -53,7 +55,8 @@ const revealed = ref(0)
 const skipped = ref(false)
 
 /**
- * `reduced-motion` e o botão de pular chegam ao mesmo lugar: as dez de uma vez.
+ * O interruptor de movimento e o botão de pular chegam ao mesmo lugar: as dez de
+ * uma vez.
  * Sem animação não há `animationend`, então o contador precisa saber disso — do
  * contrário ele ficaria em `0 / 10` com as dez cartas na tela.
  */
@@ -61,9 +64,6 @@ function revealAll(): void {
   revealed.value = opened.value.length
 }
 
-function prefersReducedMotion(): boolean {
-  return import.meta.client && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
 const welcomeNumber = ref<number | null>(null)
 const forcedByPity = ref(false)
 
@@ -97,7 +97,7 @@ function open(): void {
   forcedByPity.value = result.forcedByPity
   welcomeNumber.value = claimed
   skipped.value = false
-  revealed.value = prefersReducedMotion() ? result.cards.length : 0
+  revealed.value = reduced.value ? result.cards.length : 0
 }
 
 function skip(): void {
@@ -358,6 +358,10 @@ useSeoMeta({
   .packs__deck {
     animation: none;
   }
+}
+
+:root[data-reduce-motion] .packs__deck {
+  animation: none;
 }
 
 .packs__hint {

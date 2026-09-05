@@ -204,4 +204,8 @@ const detail = computed(() => {
     transition: none;
   }
 }
+
+:root[data-reduce-motion] .move {
+  transition: none;
+}
 </style>

@@ -76,6 +76,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       progress.welcomeClaimed,
       progress.coins,
       progress.badges,
+      progress.dailyClaimed,
       // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
       // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
       // gravação síncrona continua barata, e o debounce que o plano descreve é

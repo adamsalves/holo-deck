@@ -196,4 +196,8 @@ useSeoMeta({
     transition: none;
   }
 }
+
+:root[data-reduce-motion] .region-card {
+  transition: none;
+}
 </style>

@@ -105,4 +105,8 @@ const percent = computed(() =>
     transition: none;
   }
 }
+
+:root[data-reduce-motion] .progress__fill {
+  transition: none;
+}
 </style>
