@@ -74,13 +74,17 @@ describe('portão do interruptor de movimento', () => {
   })
 
   /**
-   * O portão só vale se houver o que contar. Sem esta linha, apagar as sete
-   * regras de movimento do repositório o deixaria verde — que é exatamente o
-   * modo de falha que a Fase 5 plantou e o review da Fase 6 pegou.
+   * O portão só vale se houver o que contar: `[] === []` passa, e um repositório
+   * sem nenhuma regra de movimento o deixaria verde para sempre.
+   *
+   * **O piso é um, e não a contagem de hoje.** Regra de movimento nasce e morre
+   * com a animação que ela para — a loja apagou a do baralho selado ao trocar o
+   * estado selado pelos três cartões, e um piso fixo teria reprovado uma remoção
+   * correta. O que precisa ser verdade é só que ainda existe par a conferir.
    */
-  it('há regras de movimento para parear', () => {
+  it('há ao menos uma regra de movimento para parear', () => {
     const paired = sources.filter(({ code }) => count(code, MEDIA) > 0)
 
-    expect(paired.length).toBeGreaterThanOrEqual(7)
+    expect(paired.length).toBeGreaterThanOrEqual(1)
   })
 })

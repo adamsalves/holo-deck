@@ -369,8 +369,8 @@
  * Quem pede menos movimento diz isso de duas formas — pelo sistema
  * (`prefers-reduced-motion`) e pelo interruptor de `/settings`, que carimba
  * `data-reduce-motion` no `<html>`. **Toda regra que para uma animação precisa
- * existir nas duas formas**, e é por isso que os sete blocos deste repositório
- * aparecem sempre em par:
+ * existir nas duas formas**, e é por isso que todo bloco deste repositório
+ * aparece em par:
  *
  * ```css
  * @media (prefers-reduced-motion: reduce) {

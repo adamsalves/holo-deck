@@ -32,12 +32,23 @@ export const RARE_PLUS_SLOTS = 1
  * Somam 1 exatamente, e o teste cobra isso: um peso alterado sem os outros
  * cederem espaço é o jeito silencioso de a distribuição deixar de fechar.
  *
+ * A **ordem** é a tupla ao lado, e ela existe para não ser redescoberta: o
+ * sorteio percorre os tiers do mais provável ao mais raro, e a loja e `/rules`
+ * desenham as quatro barras na mesma sequência. Um `Object.keys` daria a mesma
+ * lista com o tipo errado — `string[]` — e chegaria ao tipo certo por `as`, que
+ * o lint proíbe justamente porque a asserção também apagaria o tier novo que
+ * entrasse sem peso.
+ *
  * A escada é íngreme de propósito — 0,5% de mítico dá **um mítico a cada 200
  * packs**, o que é a raridade que faz Mew valer a tela que a prancha *Coleção*
  * dá a ele. Mais generoso que isso e a forja a 1.600 pó, que existe justamente
  * para a cauda longa fechar, viraria enfeite.
  */
-export const RARE_PLUS_WEIGHTS: Readonly<Record<'rare' | 'ultra' | 'legendary' | 'mythic', number>> = {
+export const RARE_PLUS_TIERS = ['rare', 'ultra', 'legendary', 'mythic'] as const satisfies readonly Rarity[]
+
+export type RarePlusTier = typeof RARE_PLUS_TIERS[number]
+
+export const RARE_PLUS_WEIGHTS: Readonly<Record<RarePlusTier, number>> = {
   rare: 0.8,
   ultra: 0.15,
   legendary: 0.045,
@@ -130,11 +141,13 @@ export function buildPool(index: IndexData): RarityPool {
  * entre si em vez de o slot virar ultra seco: um pity que sempre entregasse o
  * degrau mais baixo do ultra+ tornaria lendário e mítico impossíveis justamente
  * para o jogador mais azarado, que é o oposto do que a rede existe para fazer.
+ *
+ * "De ultra para cima" **é** `PITY_TIERS` — a mesma lista que decide se um pack
+ * quebrou a seca é a que o pack forçado sorteia, e é assim que as duas pontas da
+ * rede não podem discordar. Antes eram dois literais iguais escritos aqui.
  */
 function rollRarePlus(roll: number, forced: boolean): Rarity {
-  const tiers = forced
-    ? (['ultra', 'legendary', 'mythic'] as const)
-    : (['rare', 'ultra', 'legendary', 'mythic'] as const)
+  const tiers = forced ? PITY_TIERS : RARE_PLUS_TIERS
 
   const total = tiers.reduce((sum, tier) => sum + RARE_PLUS_WEIGHTS[tier], 0)
 
