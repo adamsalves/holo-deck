@@ -208,6 +208,13 @@ const packsPerShiny = computed(() => Math.round(100 / shinyPerPack.value))
 const decimal = (value: number, places: number): string =>
   value.toFixed(places).replace('.', ',')
 
+/**
+ * Uma taxa em porcentagem, com casa decimal só quando ela existe: `80`, `15`,
+ * `4,5`, `0,5`. Perguntar se o número é inteiro em vez de comparar com um
+ * limiar — um peso de 12,5% ganha a casa que um `< 10` lhe negaria.
+ */
+const rate = (value: number): string => decimal(value, Number.isInteger(value) ? 0 : 1)
+
 useSeoMeta({
   title: 'Packs — Holo Deck',
   description: 'Dez cartas: seis comuns, três incomuns e uma rara ou acima. Shiny a 1 em 256, e um ultra garantido a cada dez packs secos.',
@@ -415,7 +422,7 @@ useSeoMeta({
                   />
                 </div>
                 <dd class="numeric">
-                  {{ decimal(odd.percent, odd.percent < 10 ? 1 : 0) }}%
+                  {{ rate(odd.percent) }}%
                 </dd>
               </div>
             </dl>

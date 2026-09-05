@@ -92,6 +92,43 @@ export const GYM_LEADERS: readonly GymLeader[] = PROFILES.map((profile, index) =
   return { ...profile, gym, generation: gym, ...BAND_RULES[bandOf(gym)] }
 })
 
+/** Uma faixa vista de fora: onde começa, onde acaba, e o que ela cobra. */
+export interface GymBandSummary {
+  readonly band: GymBand
+  readonly first: GymId
+  readonly last: GymId
+  readonly teamSize: number
+  readonly bstCap: number
+}
+
+/**
+ * As três faixas resumidas — o que a página `/rules` desenha.
+ *
+ * **Derivadas de `GYM_LEADERS`, e não de `BAND_RULES`.** As duas dariam os
+ * mesmos seis números hoje, e a diferença aparece no dia em que um líder deixar
+ * de seguir a regra da sua faixa: a tabela de regras continuaria dizendo o que
+ * deveria acontecer, e esta lista diz o que acontece. Numa página cujo contrato
+ * é *nada aqui pode divergir do jogo*, é a segunda leitura que vale.
+ *
+ * A ordem é a dos ginásios, porque é a ordem em que se joga.
+ */
+export const GYM_BANDS: readonly GymBandSummary[] = GYM_LEADERS
+  .reduce<GymBandSummary[]>((bands, leader) => {
+    const open = bands.at(-1)
+    if (open !== undefined && open.band === bandOf(leader.gym)) {
+      // A faixa aberta continua: só o fim dela anda.
+      return [...bands.slice(0, -1), { ...open, last: leader.gym }]
+    }
+
+    return [...bands, {
+      band: bandOf(leader.gym),
+      first: leader.gym,
+      last: leader.gym,
+      teamSize: leader.teamSize,
+      bstCap: leader.bstCap,
+    }]
+  }, [])
+
 export function gymLeader(gym: GymId): GymLeader {
   const leader = GYM_LEADERS[gym - 1]
   if (leader === undefined) throw new Error(`ginásio ${gym} não existe`)
