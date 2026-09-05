@@ -85,10 +85,66 @@ const UI_ROLES = [
   { token: '--shiny', minimum: AA_NORMAL },
   { token: '--forge', minimum: AA_NORMAL },
   { token: '--deficit', minimum: AA_NORMAL },
+  /**
+   * Os dois que a Fase 6 promoveu, e os dois carregam texto.
+   *
+   * `--coin` pinta o saldo da barra superior, o `+400` do prêmio e o número da
+   * insígnia; `--hp` pinta a fração de HP das duas barras e o multiplicador
+   * favorável na carta de golpe. Os valores por trás deles já passavam AA por
+   * outro papel — `--color-rarity-legendary` e `--color-type-grass` —, mas
+   * "passar por outro papel" é exatamente o acaso que este arquivo recusa.
+   */
+  { token: '--coin', minimum: AA_NORMAL },
+  { token: '--hp', minimum: AA_NORMAL },
 ]
 
 /** Todo papel de cor que a matriz de contraste cobra, seja qual for o nome. */
 const COLOR_ROLES = [...TEXT_ROLES, ...UI_ROLES]
+
+/**
+ * O que, no bloco dos semânticos, **não** é papel de cor.
+ *
+ * A lista enumera quem sai, e essa é a diferença que importa: a primeira versão
+ * deste portão enumerava quem **entra**, por uma regex de nomes conhecidos, e
+ * uma lista de entrada falha em silêncio. Foi o que aconteceu — `--coin` e
+ * `--hp` entraram no tema carregando texto em oito lugares, não casaram com o
+ * padrão, não entraram na conta, e a igualdade contra `COLOR_ROLES` continuou
+ * valendo. Dois papéis sem piso, legíveis por acaso, num teste cujo próprio
+ * docblock diz não aceitar isso.
+ *
+ * Invertida, ela falha alto: um papel novo cai do lado de dentro por omissão, a
+ * igualdade quebra, e quem o introduziu escolhe o piso dele.
+ *
+ * Quem sai, e por quê:
+ * - `--ui-*` é a ponte para o Nuxt UI. São os nossos valores reapontados para os
+ *   slots dele, não papéis nossos — e cada um já é medido pelo papel de origem.
+ * - `--bg` e `--surface-*` são o **fundo** contra o qual tudo é medido; eles são
+ *   o outro lado da matriz, e `surfaces()` os descobre pelo mesmo caminho.
+ * - `--border`, `--border-strong` e `--progress-track` não carregam texto nem
+ *   são indicador de estado: são separador e trilho. O 1.4.11 cobra contraste de
+ *   componente e de indicador, e `--focus`, que é indicador, está na matriz.
+ */
+const NOT_A_ROLE = /^--(?:ui-|bg$|surface|border|progress-track$)/
+
+/**
+ * Os papéis de cor que o tema declara — descobertos, como as superfícies.
+ *
+ * O segundo filtro é pelo **valor** e não pelo nome: o bloco também guarda
+ * `--ease-out`, que não é cor. Um papel de cor resolve para um literal; um token
+ * de tempo, de raio ou de sombra não resolve para `#rrggbb`, e cai fora sem
+ * precisar ser nomeado aqui.
+ */
+function declaredRoles(source: string): string[] {
+  const block = blockFor(':root', source)
+  if (block === null) throw new Error('o tema perdeu o bloco :root dos semânticos')
+
+  return [...new Set(
+    declarations(block)
+      .map(({ name }) => name)
+      .filter(name => !NOT_A_ROLE.test(name))
+      .filter(name => /^#[0-9a-f]{3,8}$/i.test(resolveToken(name, source) ?? '')),
+  )]
+}
 
 describe('cobertura da paleta', () => {
   it('dá cor e escopo a cada um dos 18 tipos do contrato', () => {
@@ -140,18 +196,11 @@ describe('cobertura da paleta', () => {
 
 describe('contraste do tema', () => {
   it('cobre todo papel de texto que o tema declara', () => {
-    const declarados = new Set(
-      declarations(themeSource())
-        .map(({ name }) => name)
-        .filter(name => /^--(?:text(?:-[\w-]+)?|accent|focus|progress-(?:high|mid|low)|shiny|forge|deficit)$/.test(name)),
-    )
-
     // Um papel novo entrar no tema e não entrar na matriz seria um papel sem
-    // piso — legível por acaso, não por decisão. O padrão lista os nomes que
-    // não são `--text-*` um a um, de propósito: um papel de cor novo precisa
-    // aparecer aqui **e** em `COLOR_ROLES`, e é o segundo passo que escolhe o
-    // piso dele.
-    expect([...declarados].sort()).toEqual(COLOR_ROLES.map(r => r.token).sort())
+    // piso — legível por acaso, não por decisão. Ver `declaredRoles`: a lista de
+    // exclusão é o que faz um token novo cair **dentro** da conta por omissão, e
+    // este `toEqual` é o que cobra o piso de quem o introduziu.
+    expect(declaredRoles(themeSource()).sort()).toEqual(COLOR_ROLES.map(r => r.token).sort())
   })
 
   it('mantém os papéis legíveis sobre TODA superfície, não só sobre o fundo', () => {
