@@ -182,7 +182,6 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
   }[name],
 })))
 
-/** O ruído do primeiro ginásio e o do último — a curva de dificuldade, medida. */
 /**
  * Os seis passos do turno, na ordem em que o motor os executa.
  *
@@ -225,6 +224,7 @@ const TURN_ORDER = computed(() => [
   },
 ])
 
+/** O ruído do primeiro ginásio e o do último — a curva de dificuldade, medida. */
 const noiseRange = computed(() => ({
   first: gamePercent(noiseChance(1)),
   last: gamePercent(noiseChance(GYM_COUNT)),
