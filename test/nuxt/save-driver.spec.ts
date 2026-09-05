@@ -68,7 +68,7 @@ describe('leitura', () => {
       collection: { 25: { c: 2, s: 1 } },
       dust: 15,
       deck: [25, null, null, null, null, null],
-      progress: { pity: 3, welcomeClaimed: 3, coins: 400, badges: 1 },
+      progress: { pity: 3, welcomeClaimed: 3, coins: 400, badges: 1, dailyClaimed: null },
       battle: null,
     }
     const storage = fakeStorage({ [SAVE_KEY]: JSON.stringify(save) })

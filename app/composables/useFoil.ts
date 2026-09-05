@@ -1,6 +1,7 @@
 import type { MaybeRefOrGetter, Ref } from 'vue'
-import { createSharedComposable, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
+import { useEventListener } from '@vueuse/core'
 import { computed, shallowRef, toValue, watch } from 'vue'
+import { useReduceMotion } from '~/composables/useMotion'
 
 /**
  * O foil holográfico — a única coisa da interface que reage ao ponteiro.
@@ -23,8 +24,9 @@ import { computed, shallowRef, toValue, watch } from 'vue'
  * arquivo.** `usePreferredReducedMotion` é `useMediaQuery` por baixo, e o VueUse
  * não o memoiza: cada chamada cria um `MediaQueryList` novo e assina `change`
  * nele. Chamado direto, o grid pagaria 1025 assinaturas de mídia — listeners de
- * verdade, e de objeto de janela, exatamente o que a regra de custo proíbe.
- * `createSharedComposable` faz as 1025 cartas dividirem uma assinatura só.
+ * verdade, e de objeto de janela, exatamente o que a regra de custo proíbe. A
+ * assinatura única vive hoje em `useMotion`, que é também quem soma o
+ * interruptor de `/settings` ao sinal do sistema — o rastreio obedece aos dois.
  */
 
 /**
@@ -191,14 +193,6 @@ export function tiltNeedsPermission(): boolean {
   return isTiltGatekeeper(window.DeviceOrientationEvent)
 }
 
-/**
- * Uma assinatura de `prefers-reduced-motion` para o app inteiro.
- *
- * Ver o docblock do topo: sem isto, cada carta do grid assina a media query por
- * conta própria e a afirmação de custo do plano deixa de valer.
- */
-const useSharedReducedMotion = createSharedComposable(usePreferredReducedMotion)
-
 export interface FoilOptions {
   /**
    * Liga o rastreio. A carta do grid passa `false` e não gasta listener nenhum.
@@ -220,7 +214,7 @@ export function useFoil(
   target: MaybeRefOrGetter<HTMLElement | null | undefined>,
   options: FoilOptions = {},
 ): FoilControls {
-  const reducedMotion = useSharedReducedMotion()
+  const reduced = useReduceMotion()
 
   /**
    * `prefers-reduced-motion` desliga o rastreio na origem, não na animação.
@@ -229,7 +223,7 @@ export function useFoil(
    * letra e não o propósito: quem pede menos movimento não quer o custo nem o
    * brilho perseguindo o cursor. Sem isto, nenhum listener chega a existir.
    */
-  const allowed = computed(() => toValue(options.enabled ?? true) && reducedMotion.value !== 'reduce')
+  const allowed = computed(() => toValue(options.enabled ?? true) && !reduced.value)
 
   /** Ponteiro ou foco na carta. */
   const engaged = shallowRef(false)

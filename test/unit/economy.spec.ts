@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   FLAWLESS_RATE,
+  PACK_PRICE,
   REMATCH_RATE,
   WELCOME_PACKS,
+  coinsMissing,
+  dayKey,
   gymReward,
+  isDailyReady,
+  isDayKey,
+  msUntilNextDay,
+  packsAffordable,
   rewardFor,
 } from '~~/shared/game/economy'
 import type { GymId } from '~~/shared/types/brand'
@@ -119,14 +126,97 @@ describe('vitória imaculada', () => {
 })
 
 /**
- * A tabela do contrato da Fase 6 punha `economy.ts` "completo" neste PR, e a
- * decisão de 04/09 corrigiu: pack diário e preço da loja só ganham consumidor
- * com a loja, no PR seguinte. Constante de economia sem quem a leia é o que o
- * repositório recusa desde a Fase 0, e o que o docblock do módulo escreve desde
- * a Fase 5.
+ * O preço da loja, e a razão que ele fecha.
+ *
+ * O que importa não é o 150 isolado — é a divisão. Os 6.300 da campanha compram
+ * 42 packs, e é essa razão que decide se vencer os nove ginásios significa
+ * alguma coisa. Um preço dobrado deixaria a Liga inteira valendo 21 packs.
  */
-describe('o que continua fora deste módulo', () => {
-  it('a concessão inicial da Fase 5 segue sendo a única fonte de carta grátis', () => {
+describe('o preço do pack', () => {
+  it('é 150, e a campanha compra 42', () => {
+    expect(PACK_PRICE).toBe(150)
+    expect(Math.floor(somaDaLiga({ rematch: false, flawless: false }) / PACK_PRICE)).toBe(42)
+  })
+
+  it('divide o saldo em packs inteiros — a prancha escreve `dá para 8`', () => {
+    // 1.240 é o saldo que as prancha *Hub* e *Loja* estampam na barra superior.
+    expect(packsAffordable(1240)).toBe(8)
+    expect(packsAffordable(PACK_PRICE)).toBe(1)
+    expect(packsAffordable(PACK_PRICE - 1)).toBe(0)
+    expect(packsAffordable(0)).toBe(0)
+  })
+
+  it('devolve o déficit, que é o que o botão desabilitado escreve', () => {
+    expect(coinsMissing(0)).toBe(PACK_PRICE)
+    expect(coinsMissing(90)).toBe(60)
+    expect(coinsMissing(PACK_PRICE)).toBe(0)
+    expect(coinsMissing(9000)).toBe(0)
+  })
+})
+
+/**
+ * O pack diário, e a decisão de 05/09: **dia de calendário local**, não espera
+ * de 24 horas.
+ *
+ * A diferença aparece no segundo dia, e é ela que estes testes seguram. Uma
+ * espera contada a partir da abertura empurra o horário para frente toda vez;
+ * dia de calendário devolve o pack à meia-noite, que é o que "um por dia"
+ * significa para quem lê a frase.
+ */
+describe('o pack diário', () => {
+  it('lê o dia do relógio local, e não o de Greenwich', () => {
+    // Às 22h de um fuso a oeste, `toISOString` já marcaria o dia seguinte — e o
+    // pack aberto na terça sumiria a quarta inteira.
+    expect(dayKey(new Date(2026, 8, 5, 22, 30))).toBe('2026-09-05')
+    expect(dayKey(new Date(2026, 8, 5, 0, 0))).toBe('2026-09-05')
+    expect(dayKey(new Date(2026, 0, 9, 12, 0))).toBe('2026-01-09')
+  })
+
+  it('está de pé quando o dia guardado não é o de hoje', () => {
+    expect(isDailyReady(null, '2026-09-05')).toBe(true)
+    expect(isDailyReady('2026-09-04', '2026-09-05')).toBe(true)
+    expect(isDailyReady('2026-09-05', '2026-09-05')).toBe(false)
+  })
+
+  /**
+   * Relógio atrasado **devolve** o pack em vez de travar a loja.
+   *
+   * É a diferença que a decisão comprou: uma subtração de instantes deixaria
+   * quem viaja de fuso ou corrige a data esperando por um pack que já venceu.
+   */
+  it('não trava quando o relógio anda para trás', () => {
+    expect(isDailyReady('2026-09-05', '2026-09-04')).toBe(true)
+  })
+
+  it('conta até a meia-noite local', () => {
+    expect(msUntilNextDay(new Date(2026, 8, 5, 0, 0, 0, 0))).toBe(86_400_000)
+    expect(msUntilNextDay(new Date(2026, 8, 5, 23, 59, 59, 0))).toBe(1_000)
+    expect(msUntilNextDay(new Date(2026, 8, 5, 9, 37, 53, 0))).toBe(51_727_000)
+  })
+
+  /**
+   * O guarda do save chama esta função, então ela precisa recusar o que um save
+   * editado à mão produz — não só o que o jogo produz.
+   */
+  it('reconhece a forma que o save aceita, e recusa o resto', () => {
+    expect(isDayKey(dayKey(new Date(2026, 8, 5)))).toBe(true)
+    expect(isDayKey('2026-09-05')).toBe(true)
+
+    expect(isDayKey('2026-9-5')).toBe(false)
+    expect(isDayKey('05/09/2026')).toBe(false)
+    expect(isDayKey('')).toBe(false)
+    expect(isDayKey(null)).toBe(false)
+    expect(isDayKey(20260905)).toBe(false)
+  })
+})
+
+/**
+ * `economy.ts` fecha aqui. As duas linhas que faltavam — preço e pack diário —
+ * chegaram com a loja, que é quem as lê, e não no PR da Liga: constante de
+ * economia sem consumidor é o que este repositório recusa desde a Fase 0.
+ */
+describe('as fontes de carta e moeda', () => {
+  it('a concessão inicial segue sendo a única fonte de carta grátis fora do diário', () => {
     expect(WELCOME_PACKS).toBe(3)
   })
 })

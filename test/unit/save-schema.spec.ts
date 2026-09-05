@@ -13,6 +13,7 @@ import type { SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isSpeciesId } from '~~/shared/types/brand'
 import { emptyDeck } from '~~/shared/game/deck'
 import { ENGINE_VERSION } from '~~/shared/game/battle'
+import { dayKey, isDailyReady } from '~~/shared/game/economy'
 
 /**
  * O formato do save, e a regra que o governa: **nunca apagar**.
@@ -44,7 +45,7 @@ describe('o save vazio', () => {
       collection: {},
       dust: 0,
       deck: [null, null, null, null, null, null],
-      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0, dailyClaimed: null },
       battle: null,
     })
   })
@@ -60,7 +61,7 @@ describe('o guarda', () => {
     collection: { [speciesKey(25)]: { c: 3, s: 1 } },
     dust: 340,
     deck: [species(25), null, null, null, null, null],
-    progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1 },
+    progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1, dailyClaimed: null },
     battle: null,
   }
 
@@ -168,6 +169,27 @@ describe('o guarda', () => {
    * quem voltou de uma build nova, e `migrate` a trata por *versão desconhecida*
    * — que guarda o save e avisa — em vez de por corrupção.
    */
+  /**
+   * O dia do pack diário é `AAAA-MM-DD` ou `null`, e nada mais.
+   *
+   * Texto livre aqui vira duas coisas ao mesmo tempo: a comparação que decide se
+   * o pack está de pé — que com lixo dentro passa a dizer "disponível" para
+   * sempre — e o `próximo em` da loja. Um save editado à mão é o caminho normal
+   * para isso, e o guarda é o único lugar que o vê.
+   */
+  it('aceita o dia do diário nulo ou em `AAAA-MM-DD`, e recusa o resto', () => {
+    const comDia = (dailyClaimed: unknown): unknown =>
+      ({ ...valid, progress: { ...valid.progress, dailyClaimed } })
+
+    expect(isSaveData(comDia(null))).toBe(true)
+    expect(isSaveData(comDia('2026-09-05'))).toBe(true)
+
+    expect(isSaveData(comDia('ontem'))).toBe(false)
+    expect(isSaveData(comDia('2026-9-5'))).toBe(false)
+    expect(isSaveData(comDia(Date.parse('2026-09-05')))).toBe(false)
+    expect(isSaveData(comDia(undefined))).toBe(false)
+  })
+
   it('não põe teto na versão, que tem tratamento próprio', () => {
     expect(isSaveData({ ...valid, schemaVersion: 1e9 })).toBe(true)
     expect(migrate({ ...valid, schemaVersion: 1e9 }).recovered).toBe('unknown-version')
@@ -181,7 +203,7 @@ describe('a migração', () => {
       collection: { [speciesKey(6)]: { c: 2, s: 0 } },
       dust: 50,
       deck: [species(6), null, null, null, null, null],
-      progress: { pity: 2, welcomeClaimed: 3, coins: 900, badges: 2 },
+      progress: { pity: 2, welcomeClaimed: 3, coins: 900, badges: 2, dailyClaimed: null },
       battle: null,
     }
 
@@ -218,9 +240,9 @@ describe('a migração', () => {
     expect(recovered).toBeNull()
     expect(data).toEqual({
       ...daFase5,
-      schemaVersion: 3,
+      schemaVersion: 4,
       deck: emptyDeck(),
-      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0 },
+      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0, dailyClaimed: null },
       battle: null,
     })
 
@@ -240,7 +262,7 @@ describe('a migração', () => {
    * posição, e um save da versão 2 exercita **só** `MIGRATIONS[1]` — se alguém
    * inserir um passo no meio em vez de no fim, é este teste que reprova.
    */
-  it('leva um save da versão 2 para a 3 preservando deck e coleção', () => {
+  it('leva um save da versão 2 até a corrente preservando deck e coleção', () => {
     const daVersao2 = {
       schemaVersion: 2,
       collection: { [speciesKey(25)]: { c: 3, s: 1 } },
@@ -254,11 +276,44 @@ describe('a migração', () => {
     expect(recovered).toBeNull()
     expect(data).toEqual({
       ...daVersao2,
-      schemaVersion: 3,
-      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0 },
+      schemaVersion: 4,
+      progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0, dailyClaimed: null },
       battle: null,
     })
     expect(isSaveData(data)).toBe(true)
+  })
+
+  /**
+   * **O passo do pack diário, sozinho** — o save de quem parou no PR da Liga.
+   *
+   * Um campo só, e `null` é a resposta honesta **e** a generosa: quem migra
+   * encontra o diário de pé em vez de esperar até a meia-noite por um pack que
+   * nunca abriu.
+   *
+   * Vale pela mesma razão que o teste acima: a cadeia é indexada por posição, e
+   * um save da versão 3 exercita **só** `MIGRATIONS[2]`. Um passo inserido no
+   * meio em vez de no fim reprova aqui.
+   */
+  it('leva um save da versão 3 para a 4 abrindo o diário', () => {
+    const daVersao3 = {
+      schemaVersion: 3,
+      collection: { [speciesKey(25)]: { c: 3, s: 1 } },
+      dust: 340,
+      deck: [species(25), null, null, null, null, null],
+      progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1 },
+      battle: null,
+    }
+
+    const { data, recovered } = migrate(daVersao3)
+
+    expect(recovered).toBeNull()
+    expect(data).toEqual({
+      ...daVersao3,
+      schemaVersion: 4,
+      progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1, dailyClaimed: null },
+    })
+    expect(isSaveData(data)).toBe(true)
+    expect(isDailyReady(null, dayKey(new Date('2026-09-05T10:00:00')))).toBe(true)
   })
 
   it('recusa versão do futuro em vez de adivinhar', () => {
@@ -288,7 +343,7 @@ describe('a migração', () => {
       collection: { 25: { c: 1, s: 9 } },
       dust: 0,
       deck: emptyDeck(),
-      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+      progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0, dailyClaimed: null },
       battle: null,
     })
 

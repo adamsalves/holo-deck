@@ -215,7 +215,7 @@ describe('o progresso', () => {
   it('lembra quantos já foram, ao voltar do save', () => {
     const progress = useProgressStore()
 
-    progress.hydrate({ pity: 2, welcomeClaimed: WELCOME_PACKS, coins: 0, badges: 0 })
+    progress.hydrate({ pity: 2, welcomeClaimed: WELCOME_PACKS, coins: 0, badges: 0, dailyClaimed: null })
 
     expect(progress.hasWelcomePack).toBe(false)
     expect(progress.claimWelcome()).toBeNull()
@@ -349,7 +349,7 @@ describe('a Liga', () => {
   it('o saldo não passa do teto que o save aceita', () => {
     const progress = useProgressStore()
 
-    progress.hydrate({ pity: 0, welcomeClaimed: 3, coins: MAX_SAVE_COUNT, badges: 9 })
+    progress.hydrate({ pity: 0, welcomeClaimed: 3, coins: MAX_SAVE_COUNT, badges: 9, dailyClaimed: null })
     progress.recordVictory(gym(9), true)
 
     expect(progress.coins).toBe(MAX_SAVE_COUNT)

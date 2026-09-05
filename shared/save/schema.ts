@@ -5,6 +5,7 @@ import type { DeckSlots } from '../game/deck.ts'
 import { emptyDeck, isDeckSlots } from '../game/deck.ts'
 import type { BattleLog } from '../game/battle.ts'
 import { isBattleLog } from '../game/battle.ts'
+import { isDayKey } from '../game/economy.ts'
 
 /**
  * O formato do save — um documento só, versionado, e a regra de nunca apagar.
@@ -33,7 +34,7 @@ import { isBattleLog } from '../game/battle.ts'
  * compatibilidade real do projeto é este número, e não a versão do `package.json`
  * — é isto que o `RELEASE.md` quer dizer ao separar os dois.
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /** A coleção: espécie → cópias e shinies. Ver `CollectionEntry`. */
 export type CollectionMap = Readonly<Record<string, CollectionEntry>>
@@ -70,6 +71,16 @@ export interface SaveData {
      * de graça. O contador não tem como dizer isso.
      */
     readonly badges: number
+    /**
+     * O dia em que o pack diário foi aberto, em `AAAA-MM-DD` local, ou `null`
+     * para quem nunca abriu um.
+     *
+     * **Uma chave de dia, e não um instante.** Ver `isDailyReady`: quem decide
+     * se o pack está de pé compara datas, e guardar o timestamp obrigaria toda
+     * leitura a refazer a conversão para o fuso do aparelho — a mesma regra em
+     * dois lugares, com o segundo livre para discordar do primeiro.
+     */
+    readonly dailyClaimed: string | null
   }
   /**
    * A batalha em andamento, ou `null`.
@@ -93,7 +104,7 @@ export function emptySave(): SaveData {
     collection: {},
     dust: 0,
     deck: emptyDeck(),
-    progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+    progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0, dailyClaimed: null },
     battle: null,
   }
 }
@@ -174,6 +185,11 @@ export function isSaveData(value: unknown): value is SaveData {
   if (!isBoundedCount(progress.pity) || !isBoundedCount(progress.welcomeClaimed)) return false
   if (!isBoundedCount(progress.coins)) return false
 
+  // `null` é o valor de quem nunca abriu um diário, e uma data qualquer não
+  // serve: uma string livre aqui vira o `próximo em` da loja e a comparação que
+  // decide se o pack está de pé — as duas coisas em cima de texto não conferido.
+  if (progress.dailyClaimed !== null && !isDayKey(progress.dailyClaimed)) return false
+
   // O teto das insígnias é a Liga, e não o `MAX_SAVE_COUNT` genérico: um save com 40
   // insígnias abriria os nove ginásios e escreveria `40/9` no cabeçalho.
   return isCount(progress.badges) && progress.badges <= GYM_COUNT
@@ -253,9 +269,29 @@ function addLeague(save: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+/**
+ * v3 → v4: o pack diário entra no save.
+ *
+ * Um campo, e `null` é a única resposta honesta — quem jogou o PR da Liga nunca
+ * abriu um diário porque não havia loja. **Sobe a versão porque o guarda passou
+ * a exigi-lo**, e sem este passo todo save do PR anterior reprovaria em
+ * `isSaveData`, o que a leitura trata como corrupção.
+ *
+ * O `null` também é a resposta **generosa**: quem migra encontra o diário de pé,
+ * em vez de esperar até a meia-noite por um pack que nunca abriu.
+ */
+function addDailyPack(save: Record<string, unknown>): Record<string, unknown> {
+  const progress = isRecord(save.progress) ? save.progress : {}
+
+  // O `4` é o destino **deste** passo, e a cadeia é indexada por posição:
+  // `MIGRATIONS[2]` leva de 3 para 4. Passo novo entra sempre no fim.
+  return { ...save, schemaVersion: 4, progress: { ...progress, dailyClaimed: null } }
+}
+
 const MIGRATIONS: readonly ((save: Record<string, unknown>) => Record<string, unknown>)[] = [
   addDeck,
   addLeague,
+  addDailyPack,
 ]
 
 export function migrate(raw: unknown): LoadResult {

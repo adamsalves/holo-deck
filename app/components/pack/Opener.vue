@@ -285,4 +285,8 @@ function labelOf(card: PackCard, entry: SearchEntry | null): string {
     animation: none;
   }
 }
+
+:root[data-reduce-motion] .opener__slot {
+  animation: none;
+}
 </style>

@@ -363,6 +363,36 @@
   );
 }
 
+/**
+ * Movimento: dois sinais, e a regra de escrever os dois.
+ *
+ * Quem pede menos movimento diz isso de duas formas — pelo sistema
+ * (`prefers-reduced-motion`) e pelo interruptor de `/settings`, que carimba
+ * `data-reduce-motion` no `<html>`. **Toda regra que para uma animação precisa
+ * existir nas duas formas**, e é por isso que os sete blocos deste repositório
+ * aparecem sempre em par:
+ *
+ * ```css
+ * @media (prefers-reduced-motion: reduce) {
+ *   .x { animation: none; }
+ * }
+ *
+ * :root[data-reduce-motion] .x {
+ *   animation: none;
+ * }
+ * ```
+ *
+ * **A media query não some**, e é a metade que mais importa: ela é o único
+ * caminho que funciona antes de o JavaScript rodar, e quem já configurou o
+ * sistema não deveria precisar de um interruptor para ser obedecido. O
+ * `:root[...]` cobre o caso oposto — quem quer menos movimento **só aqui**.
+ *
+ * O par não é composição de duas regras que caberiam numa: media query e
+ * seletor não se combinam em CSS, e a duplicação de uma declaração é o preço
+ * disso. `test/unit/motion-gate.spec.ts` é quem impede a metade — ele anda por
+ * `app/` e reprova o bloco que aparecer sozinho, dos dois lados.
+ */
+
 :root {
   color-scheme: dark;
 

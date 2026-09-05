@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { WELCOME_PACKS, rewardFor } from '~~/shared/game/economy'
+import { PACK_PRICE, WELCOME_PACKS, coinsMissing, dayKey, isDailyReady, packsAffordable, rewardFor } from '~~/shared/game/economy'
 import type { BattleReward } from '~~/shared/game/economy'
 import { packsUntilPity } from '~~/shared/game/packs'
 import type { GymId } from '~~/shared/types/brand'
@@ -11,10 +11,11 @@ import { MAX_SAVE_COUNT } from '~~/shared/save/schema'
 /**
  * O progresso — o que atravessa aberturas, batalhas e sessões.
  *
- * Nasceu com dois campos e o nome que a Fase 6 encheria; a Liga é quem os
- * traz. **Saldo e insígnias moram aqui, e a batalha em andamento não**: esta
- * store guarda o que sobrevive à luta, e o log da luta em si tem store própria,
- * porque é a única parte do save que não sobe para o servidor na Fase 7.
+ * Nasceu com dois campos e o nome que a Fase 6 encheria; a Liga trouxe saldo e
+ * insígnias, e a loja trouxe o último — o dia do pack diário. **A batalha em
+ * andamento continua de fora**: esta store guarda o que sobrevive à luta, e o
+ * log da luta em si tem store própria, porque é a única parte do save que não
+ * sobe para o servidor na Fase 7.
  *
  * A regra continua fora: quanto uma vitória paga é `shared/game/economy.ts`, e
  * o que mora aqui é o estado e a aplicação dela.
@@ -24,6 +25,7 @@ export const useProgressStore = defineStore('progress', () => {
   const welcomeClaimed = ref(0)
   const coins = ref(0)
   const badges = ref(0)
+  const dailyClaimed = ref<string | null>(null)
 
   /** Quantos packs faltam para a rede disparar. A prancha estampa no cabeçalho. */
   const untilPity = computed(() => packsUntilPity(pity.value))
@@ -110,6 +112,53 @@ export const useProgressStore = defineStore('progress', () => {
     return welcomeClaimed.value
   }
 
+  /** Quantos packs o saldo compra, e quanto falta para o primeiro. */
+  const affordablePacks = computed(() => packsAffordable(coins.value))
+  const missingCoins = computed(() => coinsMissing(coins.value))
+  const canBuyPack = computed(() => missingCoins.value === 0)
+
+  /**
+   * O pack diário está de pé **naquele instante**.
+   *
+   * Recebe o relógio em vez de o ler, e não é preciosismo de pureza: um
+   * `computed` sobre `Date.now()` nunca reavalia — ele não tem dependência
+   * reativa nenhuma —, então a loja continuaria dizendo "disponível" depois de o
+   * jogador abrir o pack, ou "amanhã" depois da meia-noite virar com a aba
+   * aberta. Quem chama é quem tem o tique do relógio.
+   */
+  function dailyReadyAt(now: Date): boolean {
+    return isDailyReady(dailyClaimed.value, dayKey(now))
+  }
+
+  /**
+   * Marca o diário como aberto **hoje**, e devolve se havia um.
+   *
+   * O booleano existe pelo mesmo motivo do `claimWelcome`: a tela precisa
+   * distinguir "acabou de abrir" de "não tinha nenhum" sem reler o campo já
+   * escrito, que a essa altura diz hoje nos dois casos.
+   */
+  function claimDaily(now: Date): boolean {
+    if (!dailyReadyAt(now)) return false
+
+    dailyClaimed.value = dayKey(now)
+    return true
+  }
+
+  /**
+   * Debita o preço de um pack. Devolve `false` quando o saldo não cobre.
+   *
+   * **Quem chama credita as cartas antes de chamar isto**, e a ordem é regra
+   * escrita do plano: uma falha no meio dá um pack de graça em vez de cobrar por
+   * nada. Por isso o débito é uma função à parte, e não um efeito de `openPack`
+   * — invertê-la exigiria mover a linha, que é uma mudança que o review vê.
+   */
+  function buyPack(): boolean {
+    if (!canBuyPack.value) return false
+
+    coins.value -= PACK_PRICE
+    return true
+  }
+
   /** O contador que `openPack` devolveu. A store não recalcula a regra. */
   function setPity(value: number): void {
     pity.value = Math.max(0, value)
@@ -121,6 +170,7 @@ export const useProgressStore = defineStore('progress', () => {
       welcomeClaimed: welcomeClaimed.value,
       coins: coins.value,
       badges: badges.value,
+      dailyClaimed: dailyClaimed.value,
     }
   }
 
@@ -129,6 +179,7 @@ export const useProgressStore = defineStore('progress', () => {
     welcomeClaimed.value = saved.welcomeClaimed
     coins.value = saved.coins
     badges.value = saved.badges
+    dailyClaimed.value = saved.dailyClaimed
   }
 
   return {
@@ -136,7 +187,14 @@ export const useProgressStore = defineStore('progress', () => {
     welcomeClaimed,
     coins,
     badges,
+    dailyClaimed,
     untilPity,
+    affordablePacks,
+    missingCoins,
+    canBuyPack,
+    dailyReadyAt,
+    claimDaily,
+    buyPack,
     welcomeRemaining,
     hasWelcomePack,
     leagueComplete,
