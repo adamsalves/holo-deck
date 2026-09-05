@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { openWelcomePack } from './support'
 
 /**
  * O deck builder num navegador de verdade.
@@ -14,16 +15,6 @@ import { expect, test } from '@playwright/test'
  * Roda contra `yarn preview`, o build pré-renderizado, que é onde o deck mora só
  * no cliente e o HTML servido não sabe nada dele.
  */
-
-/** Abre um pack de boas-vindas, que é como qualquer jogador chega ao deck. */
-async function openWelcomePack(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/packs')
-
-  await expect(async () => {
-    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
-  }).toPass({ timeout: 15_000 })
-}
 
 test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ page }) => {
   await openWelcomePack(page)

@@ -114,20 +114,11 @@ const untilDaily = computed(() => {
 })
 
 /**
- * Quem pode abrir agora, na ordem em que os cartões aparecem.
+ * Quem pode abrir agora.
  *
  * O dex ainda carregando desabilita os três de uma vez, e não some com eles: um
  * cartão que desaparece por meio segundo e volta é pior que um botão parado.
  */
-const available = computed<readonly PackSource[]>(() => {
-  const sources: PackSource[] = []
-  if (progress.hasWelcomePack) sources.push('welcome')
-  if (dailyReady.value) sources.push('daily')
-  sources.push('store')
-
-  return sources
-})
-
 function canOpen(from: PackSource): boolean {
   if (pool.value === null) return false
   if (from === 'welcome') return progress.hasWelcomePack
@@ -200,6 +191,29 @@ function backToShop(): void {
   source.value = null
   welcomeNumber.value = null
 }
+
+/**
+ * O botão primário da tela de abertura — repetir a mesma fonte, ou voltar.
+ *
+ * **Os três packs de boas-vindas são uma sequência**, e é isso que o cabeçalho
+ * da prancha *Abertura* escreve: `BOAS-VINDAS · 1 DE 3`. Mandar o jogador de
+ * volta à loja entre um e outro quebraria a única sequência que o jogo tem, e
+ * foi o que a primeira versão desta tela fez — o E2E da coleção pegou, esperando
+ * por um `ABRIR O PRÓXIMO` que tinha deixado de existir.
+ *
+ * O mesmo vale para o pack da loja com saldo de sobra: quem está gastando 600
+ * moedas não quer quatro voltas à fileira de cartões. O diário nunca repete, e
+ * por isso cai no `VOLTAR À LOJA` sozinho, sem caso especial.
+ */
+const again = computed(() => {
+  const from = source.value
+  if (from === null || !canOpen(from)) return null
+
+  if (from === 'welcome') return { from, label: 'ABRIR O PRÓXIMO' }
+  if (from === 'store') return { from, label: `COMPRAR OUTRO · ${gameNumber(PACK_PRICE)}` }
+
+  return null
+})
 
 /**
  * O que o slot raro+ paga, em porcentagem — derivado dos pesos, nunca escrito.
@@ -539,11 +553,20 @@ useSeoMeta({
                 VER COLEÇÃO
               </NuxtLink>
               <button
+                v-if="again"
                 type="button"
                 class="numeric packs__skip packs__skip--primary"
+                @click="open(again.from)"
+              >
+                {{ again.label }}
+              </button>
+              <button
+                type="button"
+                class="numeric packs__skip"
+                :class="{ 'packs__skip--primary': again === null }"
                 @click="backToShop()"
               >
-                {{ available.length > 1 || canOpen('store') ? 'ABRIR OUTRO' : 'VOLTAR À LOJA' }}
+                VOLTAR À LOJA
               </button>
             </div>
           </div>
