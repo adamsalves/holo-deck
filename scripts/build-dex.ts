@@ -26,6 +26,7 @@ import {
   toTypes,
 } from './lib/transform.ts'
 import { chainsSchema, coreSchema, flavorSchema, generationSchema, indexSchema } from './lib/schema.ts'
+import { dexVersionOf } from './lib/dex-version.ts'
 import { THUMBNAIL_SIZE, artworkUrl, toThumbnail } from './lib/sprites.ts'
 import type {
   ChainsData,
@@ -38,7 +39,7 @@ import type {
   MoveEntry,
   SpeciesEntry, AilmentName,
 } from '../shared/types/dex.ts'
-import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES } from '../shared/types/dex.ts'
+import { AILMENT_NAMES, GENERATION_COUNT, MOVES_IN_BATTLE, TYPE_COUNT, TYPE_NAMES, isDexVersion } from '../shared/types/dex.ts'
 import { MOVE_COUNT, SPECIES_COUNT, isSpeciesId } from '../shared/types/brand.ts'
 import { baseStatTotal } from '../shared/game/rarity.ts'
 
@@ -461,12 +462,19 @@ async function main(): Promise<void> {
     .filter(move => usedMoveIds.has(move.id))
     .sort((a, b) => a.id - b.id)
 
-  const core: CoreData = {
+  /**
+   * O conteúdo primeiro, o hash depois — nesta ordem porque `dexVersion` é o
+   * hash do que está aqui **mais** as nove gerações, e um campo não pode entrar
+   * na conta que o produz. Ver `scripts/lib/dex-version.ts`.
+   */
+  const payload = {
     types: TYPE_NAMES,
     effectiveness,
     moves: usedMoves,
     generations: generationMetas,
-  }
+  } satisfies Omit<CoreData, 'dexVersion'>
+
+  const core: CoreData = { dexVersion: dexVersionOf(payload, generationData), ...payload }
   coreSchema.parse(core)
 
   // O `sort` é redundante hoje — chave de objeto que parece inteiro itera em
@@ -487,7 +495,8 @@ async function main(): Promise<void> {
   written.push({
     name: 'core.json',
     bytes: await writeOutput(options.outDir, 'core.json', serializeRows(
-      `{"types":${JSON.stringify(core.types)},"effectiveness":${JSON.stringify(core.effectiveness)},`
+      `{"dexVersion":${JSON.stringify(core.dexVersion)},`
+      + `"types":${JSON.stringify(core.types)},"effectiveness":${JSON.stringify(core.effectiveness)},`
       + `"generations":${JSON.stringify(core.generations)},"moves":[`,
       core.moves.map(move => JSON.stringify(move)),
       ']}',
@@ -690,6 +699,9 @@ function printReport(input: ReportInput): number {
   const charizard = describeChain(chains, 'charmander')
 
   const checks: readonly [string, boolean, string][] = [
+    // Impresso além de checado: o número é o que o jogador vê descartar uma
+    // batalha em andamento, e quem roda o build precisa saber se ele mudou.
+    ['core.json carrega dexVersion', isDexVersion(core.dexVersion), core.dexVersion],
     [`core.json tem ${TYPE_COUNT} tipos`, core.types.length === TYPE_COUNT, `${core.types.length}`],
     [
       `matriz completa ${TYPE_COUNT}×${TYPE_COUNT}`,

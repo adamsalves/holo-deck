@@ -4,8 +4,9 @@ import { isGymId } from '~~/shared/types/brand'
 import type { MoveEntry, SpeciesEntry } from '~~/shared/types/dex'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
 import type { BattleAction, BattleContext, BattleLog, BattleState } from '~~/shared/game/battle'
-import { activeOf, ENGINE_VERSION, isBattleLog, POTION_HEAL_FRACTION } from '~~/shared/game/battle'
-import { applyAction, replay, startBattle, switchOptions } from '~~/shared/game/engine'
+import { activeOf, ENGINE_VERSION, isBattleLog, POTION_HEAL_FRACTION, toBattleLog } from '~~/shared/game/battle'
+import { applyAction, replay, replayable, startBattle, switchOptions } from '~~/shared/game/engine'
+import { DECK_SIZE } from '~~/shared/game/deck'
 import { readAllSpecies, readCore, readGeneration } from '../support/generated-dex'
 
 /**
@@ -21,6 +22,7 @@ const core = readCore()
 const species = new Map<number, SpeciesEntry>(readAllSpecies().map(entry => [entry.id, entry]))
 
 const context: BattleContext = {
+  dexVersion: core.dexVersion,
   matrix: core.effectiveness,
   moves: new Map<number, MoveEntry>(core.moves.map(move => [move.id, move])),
   speciesById: id => species.get(id),
@@ -188,14 +190,11 @@ describe('determinismo', () => {
 describe('replay', () => {
   it('reconstrói o estado final a partir do log', () => {
     const { state, actions } = playThrough(2024, 6)
-    const log: BattleLog = {
-      gymId: state.gymId,
-      seed: state.seed,
-      engineVersion: ENGINE_VERSION,
-      team: DECK,
-      actions,
-    }
+    // Pelo `toBattleLog`, e não por um literal: é ele que a store usa, e um log
+    // montado à mão no teste provaria o replay sobre um formato que ninguém grava.
+    const log = toBattleLog(state, actions)
 
+    expect(log.team).toEqual(DECK)
     expect(JSON.stringify(replay(log, context))).toBe(JSON.stringify(state))
   })
 
@@ -204,7 +203,14 @@ describe('replay', () => {
     // a IA troca e a batalha é mais longa.
     const { actions } = playThrough(77, 9)
     const parcial = actions.slice(0, 4)
-    const log: BattleLog = { gymId: 9, seed: 77, engineVersion: ENGINE_VERSION, team: DECK, actions: parcial }
+    const log: BattleLog = {
+      gymId: 9,
+      seed: 77,
+      engineVersion: ENGINE_VERSION,
+      dexVersion: core.dexVersion,
+      team: DECK,
+      actions: parcial,
+    }
 
     let esperado = startBattle({ gymId: gym(9), seed: 77, team: DECK }, context)
     for (const action of parcial) esperado = applyAction(esperado, action, context).state
@@ -220,13 +226,7 @@ describe('replay', () => {
     const formas = new Set(actions.map(action => action.kind))
 
     expect(formas).toEqual(new Set(['move', 'switch', 'item']))
-    expect(JSON.stringify(replay({
-      gymId: state.gymId,
-      seed: state.seed,
-      engineVersion: ENGINE_VERSION,
-      team: DECK,
-      actions,
-    }, context))).toBe(JSON.stringify(state))
+    expect(JSON.stringify(replay(toBattleLog(state, actions), context))).toBe(JSON.stringify(state))
   })
 
   it('recusa log de outra versão do motor em vez de reproduzir torto', () => {
@@ -234,11 +234,34 @@ describe('replay', () => {
       gymId: 1,
       seed: 1,
       engineVersion: ENGINE_VERSION - 1,
+      dexVersion: core.dexVersion,
       team: DECK,
       actions: [],
     }
 
+    expect(replayable(log, context)).toBe(false)
     expect(() => replay(log, context)).toThrow(/não reproduz/)
+  })
+
+  /**
+   * A trava da issue #18, e ela precisa de um teste próprio: o motor podia estar
+   * intacto e o dex ter mudado embaixo dele. `buildGymTeam` lê `gen-N.json` e
+   * `selectBattleMoves` lê o catálogo — as duas entradas que `engineVersion`
+   * nunca cobriu.
+   */
+  it('recusa log gravado sobre outro dex', () => {
+    const { state, actions } = playThrough(2024, 6)
+    const log: BattleLog = { ...toBattleLog(state, actions), dexVersion: 'deadbeef' }
+
+    expect(replayable(log, context)).toBe(false)
+    expect(() => replay(log, context)).toThrow(/não reproduz sobre o dex/)
+  })
+
+  it('aceita o log que carimbou o dex em campo', () => {
+    const { state, actions } = playThrough(2024, 6)
+
+    expect(toBattleLog(state, actions).dexVersion).toBe(core.dexVersion)
+    expect(replayable(toBattleLog(state, actions), context)).toBe(true)
   })
 })
 
@@ -340,7 +363,14 @@ describe('isBattleLog — a fronteira do save', () => {
   // válido e trocam um campo, e `unknown` não é espalhável — a fixture precisa
   // ser um objeto de verdade, mesmo que o guarda receba `unknown`.
   function logValido(): Record<string, unknown> {
-    return { gymId: 1, seed: 7, engineVersion: ENGINE_VERSION, team: [...DECK], actions: [{ kind: 'move', slot: 0 }] }
+    return {
+      gymId: 1,
+      seed: 7,
+      engineVersion: ENGINE_VERSION,
+      dexVersion: core.dexVersion,
+      team: [...DECK],
+      actions: [{ kind: 'move', slot: 0 }],
+    }
   }
 
   it('aceita o log que o motor produz', () => {
@@ -364,6 +394,17 @@ describe('isBattleLog — a fronteira do save', () => {
     expect(isBattleLog({ ...logValido(), team: [0] })).toBe(false)
   })
 
+  it('recusa time acima do deck, pelo mesmo argumento do teto das contagens', () => {
+    // A lista vazia já era recusada e a de 300 passava — e `buildSide` montava
+    // os 300, cada um com moveset resolvido no catálogo. Save é texto que o
+    // jogador controla: o que atravessa o guarda sem ordem de grandeza vira
+    // trabalho absurdo do outro lado, como o `c: 1e15` virava pó infinito.
+    const umAMais = [...DECK, DECK[0]].filter(id => id !== undefined)
+    expect(umAMais).toHaveLength(DECK_SIZE + 1)
+    expect(isBattleLog({ ...logValido(), team: umAMais })).toBe(false)
+    expect(isBattleLog({ ...logValido(), team: [...DECK] })).toBe(true)
+  })
+
   it('recusa ação de kind desconhecido', () => {
     // Sem isto, ela atravessava até o `assertNever` do motor — que agora existe,
     // mas o certo é a forma ser recusada na porta.
@@ -371,6 +412,20 @@ describe('isBattleLog — a fronteira do save', () => {
     expect(isBattleLog({ ...logValido(), actions: [{ kind: 'move' }] })).toBe(false)
     expect(isBattleLog({ ...logValido(), actions: [{ kind: 'switch', index: -1 }] })).toBe(false)
     expect(isBattleLog({ ...logValido(), actions: [{ kind: 'item' }] })).toBe(true)
+  })
+
+  it('recusa dexVersion fora do formato, e não julga o valor', () => {
+    // Forma na porta, valor no `replay`: um hash de outro build é bem-formado, e
+    // o que fazer com a batalha que ele descreve depende do contexto.
+    expect(isBattleLog({ ...logValido(), dexVersion: 'deadbeef' })).toBe(true)
+    expect(isBattleLog({ ...logValido(), dexVersion: '19C9DC2A' })).toBe(false)
+    expect(isBattleLog({ ...logValido(), dexVersion: '19c9dc' })).toBe(false)
+    expect(isBattleLog({ ...logValido(), dexVersion: '' })).toBe(false)
+    // O log da Fase 4, gravado antes de a trava existir. Ele não pode passar: sem
+    // o campo não há como saber sobre qual dex ele foi escrito.
+    const semDex: Record<string, unknown> = { ...logValido() }
+    delete semDex.dexVersion
+    expect(isBattleLog(semDex)).toBe(false)
   })
 
   it('não julga a versão do motor — quem decide isso é o replay', () => {

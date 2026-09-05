@@ -2,6 +2,7 @@ import { defineNuxtPlugin } from 'nuxt/app'
 import { watch } from 'vue'
 import { SCHEMA_VERSION } from '~~/shared/save/schema'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
+import { useBattleStore } from '~~/app/stores/battle'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
@@ -27,6 +28,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   const collection = useCollectionStore(nuxtApp.$pinia)
   const deck = useDeckStore(nuxtApp.$pinia)
   const progress = useProgressStore(nuxtApp.$pinia)
+  const battle = useBattleStore(nuxtApp.$pinia)
 
   const { data, recovered } = await driver.load()
 
@@ -38,6 +40,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   collection.hydrate(data.collection, data.dust)
   deck.hydrate(data.deck)
   progress.hydrate(data.progress)
+  // A batalha por último, e **esta** ordem é a única das quatro que não é
+  // exigência: `battle.hydrate` guarda o log cru e não liquida nada — quem paga
+  // moedas e insígnia é `resume`, na primeira tela que trouxer o dex, muito
+  // depois de as quatro hidratações terem terminado. Ela fica por último porque
+  // é a que depende do resto, não porque inverter quebraria algo.
+  battle.hydrate(data.battle)
 
   function compose(): SaveData {
     const { collection: entries, dust } = collection.snapshot()
@@ -47,6 +55,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       dust,
       deck: deck.snapshot(),
       progress: progress.snapshot(),
+      battle: battle.snapshot(),
     }
   }
 
@@ -59,7 +68,20 @@ export default defineNuxtPlugin(async (nuxtApp) => {
    * compõe as duas é mais curta e não tem ordem.
    */
   watch(
-    () => [collection.entries, collection.dust, deck.slots, progress.pity, progress.welcomeClaimed],
+    () => [
+      collection.entries,
+      collection.dust,
+      deck.slots,
+      progress.pity,
+      progress.welcomeClaimed,
+      progress.coins,
+      progress.badges,
+      // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
+      // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
+      // gravação síncrona continua barata, e o debounce que o plano descreve é
+      // o da rede, que chega com o `HttpDriver` na Fase 7.
+      battle.log,
+    ],
     () => { void driver.save(compose()) },
     { deep: true },
   )

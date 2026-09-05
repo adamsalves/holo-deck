@@ -1,8 +1,10 @@
 import type { SpeciesId } from '../types/brand.ts'
-import { isSpeciesId } from '../types/brand.ts'
+import { GYM_COUNT, isSpeciesId } from '../types/brand.ts'
 import type { CollectionEntry } from '../types/game.ts'
 import type { DeckSlots } from '../game/deck.ts'
 import { emptyDeck, isDeckSlots } from '../game/deck.ts'
+import type { BattleLog } from '../game/battle.ts'
+import { isBattleLog } from '../game/battle.ts'
 
 /**
  * O formato do save — um documento só, versionado, e a regra de nunca apagar.
@@ -31,7 +33,7 @@ import { emptyDeck, isDeckSlots } from '../game/deck.ts'
  * compatibilidade real do projeto é este número, e não a versão do `package.json`
  * — é isto que o `RELEASE.md` quer dizer ao separar os dois.
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /** A coleção: espécie → cópias e shinies. Ver `CollectionEntry`. */
 export type CollectionMap = Readonly<Record<string, CollectionEntry>>
@@ -56,7 +58,32 @@ export interface SaveData {
     readonly pity: number
     /** Quantos dos packs de boas-vindas já foram entregues. */
     readonly welcomeClaimed: number
+    /** O saldo. A prancha *Hub* o estampa na barra superior. */
+    readonly coins: number
+    /**
+     * Quantas insígnias — **um contador, não a lista dos ginásios vencidos.**
+     *
+     * O desbloqueio é sequencial: o ginásio N só abre com a insígnia N−1. Isso
+     * faz de qualquer conjunto de vencidos um prefixo de 1..9, e uma lista
+     * conseguiria representar `[9]` — insígnia do nono sem ter passado pelo
+     * primeiro —, que é estado que o jogo não produz e o save adulterado produz
+     * de graça. O contador não tem como dizer isso.
+     */
+    readonly badges: number
   }
+  /**
+   * A batalha em andamento, ou `null`.
+   *
+   * Seed mais lista de ações, e não um retrato do estado: 0,2 KB contra 1,1 KB,
+   * e o log se valida sozinho — ou ele reproduz, ou não reproduz. Ver `BattleLog`.
+   *
+   * Mora no mesmo documento porque o save **é** um documento; o que o plano
+   * separa é outra coisa: `battle` não sobe para o servidor. Ela mudaria a cada
+   * turno e geraria um `PUT` a cada 5 s durante a luta — sobe só o resultado,
+   * dentro de `progress`. **A Fase 7 precisa excluí-la do corpo que sincroniza e
+   * do que marca o save como sujo**, e este é o comentário que registra isso.
+   */
+  readonly battle: BattleLog | null
 }
 
 /** O save de quem nunca jogou. Coleção vazia, pó zero, nenhum pack recebido. */
@@ -66,7 +93,8 @@ export function emptySave(): SaveData {
     collection: {},
     dust: 0,
     deck: emptyDeck(),
-    progress: { pity: 0, welcomeClaimed: 0 },
+    progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 0 },
+    battle: null,
   }
 }
 
@@ -81,6 +109,11 @@ function isCount(value: unknown): value is number {
 /**
  * O teto de qualquer contagem do save.
  *
+ * **Exportado desde a Fase 6 porque quem escreve precisa conhecê-lo.** O guarda
+ * recusa acima dele, e recusar na leitura é o certo — mas uma store que passe do
+ * teto grava um save que não volta, e a coleção vai para o backup por um saldo
+ * de moedas. Quem produz número sem limite natural (o saldo) trunca aqui.
+ *
  * `isCount` recusa o negativo e o fracionário, e deixava passar `1e15`. O jogo
  * não produz esse número por nenhum caminho — são cópias de uma espécie, ou pó
  * ganho moendo-as —, mas o save é texto num navegador que o jogador controla, e
@@ -94,10 +127,10 @@ function isCount(value: unknown): value is number {
  * preferível a truncar, porque o save cru vai para o backup em vez de ser
  * silenciosamente reescrito menor.
  */
-const MAX_COUNT = 1_000_000
+export const MAX_SAVE_COUNT = 1_000_000
 
 function isBoundedCount(value: unknown): value is number {
-  return isCount(value) && value <= MAX_COUNT
+  return isCount(value) && value <= MAX_SAVE_COUNT
 }
 
 /**
@@ -133,7 +166,17 @@ export function isSaveData(value: unknown): value is SaveData {
     if (!isSpeciesId(Number(id)) || !isCollectionEntry(entry)) return false
   }
 
-  return isBoundedCount(progress.pity) && isBoundedCount(progress.welcomeClaimed)
+  // `battle` é opcional na forma, nunca na presença: `null` é o valor de quem
+  // não está lutando, e ausente é save de antes da Liga — que a migração já
+  // preencheu antes de chegar aqui.
+  if (value.battle !== null && !isBattleLog(value.battle)) return false
+
+  if (!isBoundedCount(progress.pity) || !isBoundedCount(progress.welcomeClaimed)) return false
+  if (!isBoundedCount(progress.coins)) return false
+
+  // O teto das insígnias é a Liga, e não o `MAX_SAVE_COUNT` genérico: um save com 40
+  // insígnias abriria os nove ginásios e escreveria `40/9` no cabeçalho.
+  return isCount(progress.badges) && progress.badges <= GYM_COUNT
 }
 
 /**
@@ -185,8 +228,34 @@ function addDeck(save: Record<string, unknown>): Record<string, unknown> {
   return { ...save, schemaVersion: 2, deck: emptyDeck() }
 }
 
+/**
+ * v2 → v3: a Liga entra no save.
+ *
+ * Três campos, e nenhum deles derivável: saldo, insígnias e a batalha em
+ * andamento. Zero e `null` são as únicas respostas honestas — quem jogou a Fase
+ * 5 não venceu ginásio nenhum, porque não havia ginásio.
+ *
+ * **Sobe a versão porque o guarda passou a exigi-los.** Sem este passo, todo
+ * save da Fase 5 reprovaria em `isSaveData`, o que a leitura trata como
+ * corrupção: a coleção iria para o backup — a regra inegociável continua valendo
+ * — mas o jogador abriria o binder vazio por causa de campos que ninguém tinha.
+ */
+function addLeague(save: Record<string, unknown>): Record<string, unknown> {
+  const progress = isRecord(save.progress) ? save.progress : {}
+
+  // O `3` é o destino **deste** passo, e a cadeia é indexada por posição:
+  // `MIGRATIONS[1]` leva de 2 para 3. Passo novo entra sempre no fim.
+  return {
+    ...save,
+    schemaVersion: 3,
+    progress: { ...progress, coins: 0, badges: 0 },
+    battle: null,
+  }
+}
+
 const MIGRATIONS: readonly ((save: Record<string, unknown>) => Record<string, unknown>)[] = [
   addDeck,
+  addLeague,
 ]
 
 export function migrate(raw: unknown): LoadResult {

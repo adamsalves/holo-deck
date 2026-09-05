@@ -6,6 +6,7 @@ import { SPECIES_COUNT } from '~~/shared/types/brand'
 import { useDex } from '~/composables/useDex'
 
 const core = {
+  dexVersion: '19c9dc2a',
   types: [...TYPE_NAMES],
   effectiveness: TYPE_NAMES.map(() => TYPE_NAMES.map(() => 1)),
   moves: [{

@@ -3,11 +3,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
-import { WELCOME_PACKS } from '~~/shared/game/economy'
+import { WELCOME_PACKS, gymReward } from '~~/shared/game/economy'
 import { PITY_THRESHOLD } from '~~/shared/game/packs'
 import { DUST_PER_DUPLICATE, FORGE_COST } from '~~/shared/game/dust'
-import type { SpeciesId } from '~~/shared/types/brand'
-import { isSpeciesId } from '~~/shared/types/brand'
+import type { GymId, SpeciesId } from '~~/shared/types/brand'
+import { GYM_COUNT, isGymId, isSpeciesId } from '~~/shared/types/brand'
+import { MAX_SAVE_COUNT } from '~~/shared/save/schema'
 import type { PackCard } from '~~/shared/types/game'
 
 /**
@@ -22,6 +23,11 @@ import type { PackCard } from '~~/shared/types/game'
 function species(id: number): SpeciesId {
   if (!isSpeciesId(id)) throw new Error(`${id} não é uma espécie`)
   return id
+}
+
+function gym(number: number): GymId {
+  if (!isGymId(number)) throw new Error(`${number} não é ginásio`)
+  return number
 }
 
 function card(id: number, rarity: PackCard['rarity'], isShiny = false): PackCard {
@@ -209,7 +215,7 @@ describe('o progresso', () => {
   it('lembra quantos já foram, ao voltar do save', () => {
     const progress = useProgressStore()
 
-    progress.hydrate({ pity: 2, welcomeClaimed: WELCOME_PACKS })
+    progress.hydrate({ pity: 2, welcomeClaimed: WELCOME_PACKS, coins: 0, badges: 0 })
 
     expect(progress.hasWelcomePack).toBe(false)
     expect(progress.claimWelcome()).toBeNull()
@@ -255,5 +261,112 @@ describe('ida e volta pelo save', () => {
     expect(collection.ownedCount).toBe(1)
     expect(collection.has(species(1))).toBe(false)
     expect(collection.dust).toBe(10)
+  })
+})
+
+/**
+ * A Liga dentro do progresso — insígnias, saldo e o desbloqueio sequencial.
+ *
+ * A regra de quanto uma vitória paga é de `economy.ts` e é testada lá; o que
+ * estes testes cobram é a **aplicação** dela: quem já tem insígnia paga
+ * revanche, e a insígnia só avança na estreia.
+ */
+describe('a Liga', () => {
+  it('começa sem insígnia, com o primeiro ginásio aberto e nenhum outro', () => {
+    const progress = useProgressStore()
+
+    expect(progress.badges).toBe(0)
+    expect(progress.coins).toBe(0)
+    expect(progress.nextGym).toBe(1)
+    expect(progress.leagueComplete).toBe(false)
+    expect(progress.isUnlocked(gym(1))).toBe(true)
+    expect(progress.isUnlocked(gym(2))).toBe(false)
+    expect(progress.hasBadge(gym(1))).toBe(false)
+  })
+
+  /**
+   * "Cada líder só abre com a insígnia anterior", diz o rodapé da prancha. A
+   * regra mora na store e não no botão porque `/battle/[gymId]` é uma URL: o
+   * jogador pode digitar `/battle/9` no primeiro minuto de jogo.
+   */
+  it('abre o próximo ginásio a cada estreia, e só ele', () => {
+    const progress = useProgressStore()
+
+    progress.recordVictory(gym(1), false)
+
+    expect(progress.badges).toBe(1)
+    expect(progress.nextGym).toBe(2)
+    expect(progress.isUnlocked(gym(2))).toBe(true)
+    expect(progress.isUnlocked(gym(3))).toBe(false)
+    expect(progress.hasBadge(gym(1))).toBe(true)
+  })
+
+  it('vencer um ginásio já vencido paga revanche e não move a insígnia', () => {
+    const progress = useProgressStore()
+
+    const estreia = progress.recordVictory(gym(1), false)
+    const revanche = progress.recordVictory(gym(1), false)
+
+    expect(estreia.total).toBe(gymReward(gym(1)))
+    expect(revanche.total).toBe(Math.floor(gymReward(gym(1)) * 0.25))
+    expect(progress.badges).toBe(1)
+    expect(progress.coins).toBe(estreia.total + revanche.total)
+  })
+
+  it('o preview é o que o botão estampa, sem o bônus que só se sabe no fim', () => {
+    const progress = useProgressStore()
+
+    expect(progress.rewardPreview(gym(2)).total).toBe(400)
+
+    progress.recordVictory(gym(1), false)
+    progress.recordVictory(gym(2), false)
+
+    expect(progress.rewardPreview(gym(2)).total).toBe(100)
+  })
+
+  /**
+   * Com a Liga completa não há "próximo", e devolver nulo obrigaria toda tela a
+   * tratar um caso que só significa "você terminou" — inclusive o deck builder,
+   * que ficaria sem contra quem ler cobertura. Fica no nono; quem precisa da
+   * diferença lê `leagueComplete`.
+   */
+  it('depois da nona insígnia o próximo continua sendo o nono', () => {
+    const progress = useProgressStore()
+
+    for (let id = 1; id <= GYM_COUNT; id += 1) progress.recordVictory(gym(id), false)
+
+    expect(progress.badges).toBe(GYM_COUNT)
+    expect(progress.leagueComplete).toBe(true)
+    expect(progress.nextGym).toBe(GYM_COUNT)
+    expect(progress.isUnlocked(gym(GYM_COUNT))).toBe(true)
+  })
+
+  /**
+   * O saldo trunca no teto que o guarda do save cobra. Passar dele grava um save
+   * que não volta — e a coleção iria para o backup por causa de um número de
+   * moedas, que é a pior troca possível.
+   */
+  it('o saldo não passa do teto que o save aceita', () => {
+    const progress = useProgressStore()
+
+    progress.hydrate({ pity: 0, welcomeClaimed: 3, coins: MAX_SAVE_COUNT, badges: 9 })
+    progress.recordVictory(gym(9), true)
+
+    expect(progress.coins).toBe(MAX_SAVE_COUNT)
+  })
+
+  it('ida e volta pelo save preserva saldo e insígnias', () => {
+    const progress = useProgressStore()
+
+    progress.recordVictory(gym(1), true)
+    const gravado = progress.snapshot()
+
+    setActivePinia(createPinia())
+    const depois = useProgressStore()
+    depois.hydrate(gravado)
+
+    expect(depois.coins).toBe(375)
+    expect(depois.badges).toBe(1)
+    expect(depois.nextGym).toBe(2)
   })
 })
