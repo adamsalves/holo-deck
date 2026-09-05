@@ -104,19 +104,41 @@ export interface GymBandSummary {
 /**
  * As três faixas resumidas — o que a página `/rules` desenha.
  *
- * **Derivadas de `GYM_LEADERS`, e não de `BAND_RULES`.** As duas dariam os
- * mesmos seis números hoje, e a diferença aparece no dia em que um líder deixar
- * de seguir a regra da sua faixa: a tabela de regras continuaria dizendo o que
- * deveria acontecer, e esta lista diz o que acontece. Numa página cujo contrato
- * é *nada aqui pode divergir do jogo*, é a segunda leitura que vale.
+ * **Derivadas de `GYM_LEADERS`, e não de `BAND_RULES`.** Numa página cujo
+ * contrato é *nada aqui pode divergir do jogo*, o que vale é ler o que
+ * acontece, e não o que deveria acontecer.
+ *
+ * **Hoje divergir é impossível, e vale dizer isso em vez de insinuar o
+ * contrário.** `GYM_LEADERS` monta cada líder com `...BAND_RULES[bandOf(gym)]`
+ * por último, então `teamSize` e `bstCap` vêm sempre da faixa e um valor
+ * próprio no `LeaderProfile` seria descartado em silêncio. A versão anterior
+ * deste comentário prometia surfacear o líder que fugisse da regra — e o
+ * `reduce` abaixo, que fundia por banda e herdava os números do **primeiro**
+ * líder, faria justamente o contrário se a divergência existisse.
+ *
+ * O `reduce` foi corrigido para abrir faixa nova quando os números divergem, de
+ * modo que o resumo seja honesto no dia em que o `LeaderProfile` puder
+ * sobrescrevê-los. **Esse dia depende de inverter a ordem do espalhamento em
+ * `GYM_LEADERS`**, que é decisão de como o líder é escrito e não deste módulo.
  *
  * A ordem é a dos ginásios, porque é a ordem em que se joga.
  */
 export const GYM_BANDS: readonly GymBandSummary[] = GYM_LEADERS
   .reduce<GymBandSummary[]>((bands, leader) => {
     const open = bands.at(-1)
-    if (open !== undefined && open.band === bandOf(leader.gym)) {
-      // A faixa aberta continua: só o fim dela anda.
+
+    // A faixa aberta só continua se o líder **também** cobrar o mesmo — e não só
+    // se ele pertencer à mesma faixa. Fundir por banda e herdar `teamSize` e
+    // `bstCap` do primeiro era o que fazia o docblock acima mentir: um líder que
+    // fugisse da regra da sua faixa ficava escondido atrás dos números do
+    // vizinho, e `/rules` seguiria exibindo o valor antigo. Divergiu, abre faixa
+    // nova, e a página mostra as duas linhas.
+    if (
+      open !== undefined
+      && open.band === bandOf(leader.gym)
+      && open.teamSize === leader.teamSize
+      && open.bstCap === leader.bstCap
+    ) {
       return [...bands.slice(0, -1), { ...open, last: leader.gym }]
     }
 

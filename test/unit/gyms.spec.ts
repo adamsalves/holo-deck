@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
-import { aceOf, buildGymTeam, GYM_LEADERS, gymLeader } from '~~/shared/game/gyms'
+import { aceOf, buildGymTeam, GYM_BANDS, GYM_LEADERS, gymLeader } from '~~/shared/game/gyms'
 import { baseStatTotal } from '~~/shared/game/rarity'
 import { readGeneration } from '../support/generated-dex'
 
@@ -43,6 +43,47 @@ describe('os nove líderes', () => {
   it('`gymLeader` devolve o líder pelo número do ginásio', () => {
     expect(gymLeader(gym(3)).name).toBe('Wattson')
     expect(gymLeader(gym(9)).type).toBe('ghost')
+  })
+})
+
+/**
+ * As faixas resumidas — o que `/rules` desenha, e o que o docblock delas promete.
+ *
+ * **A promessa é dizer o que acontece, não o que deveria acontecer.** Elas saem
+ * de `GYM_LEADERS` e não de `BAND_RULES` justamente para o dia em que um líder
+ * deixar de seguir a regra da sua faixa. A primeira versão do `reduce` fundia
+ * por banda e herdava `teamSize`/`bstCap` do **primeiro** líder da faixa, o que
+ * fazia esse líder divergente ficar escondido atrás dos números do vizinho —
+ * exatamente a divergência que o comentário diz surfacear.
+ */
+describe('GYM_BANDS', () => {
+  it('resume as faixas na ordem em que se joga, sem buraco nem sobreposição', () => {
+    expect(GYM_BANDS.length).toBeGreaterThan(0)
+    expect(GYM_BANDS[0]?.first).toBe(1)
+    expect(GYM_BANDS.at(-1)?.last).toBe(GYM_COUNT)
+
+    for (const [index, band] of GYM_BANDS.entries()) {
+      const previous = GYM_BANDS[index - 1]
+      if (previous !== undefined) expect(band.first).toBe(previous.last + 1)
+      expect(band.last).toBeGreaterThanOrEqual(band.first)
+    }
+  })
+
+  /**
+   * **Este não pode falhar hoje**, e a razão está escrita: `GYM_LEADERS`
+   * espalha `BAND_RULES` por último, então nenhum líder consegue divergir. Ele
+   * existe pelo dia em que o `LeaderProfile` puder trazer os próprios números —
+   * é aí que a asserção passa a valer, e é o `reduce` corrigido que a sustenta.
+   * Sem ele, o resumo esconderia o divergente atrás dos números do vizinho.
+   */
+  it('e todo ginásio de uma faixa cobra o que a faixa diz cobrar', () => {
+    const divergentes = GYM_BANDS.flatMap(band =>
+      GYM_LEADERS
+        .filter(leader => leader.gym >= band.first && leader.gym <= band.last)
+        .filter(leader => leader.teamSize !== band.teamSize || leader.bstCap !== band.bstCap)
+        .map(leader => `ginásio ${leader.gym}`))
+
+    expect(divergentes).toEqual([])
   })
 })
 
