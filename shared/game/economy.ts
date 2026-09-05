@@ -224,3 +224,21 @@ export function msUntilNextDay(at: Date): number {
 
   return 86_400_000 - elapsed
 }
+
+/**
+ * `14:22:07` — o que falta para a meia-noite local, no formato da prancha.
+ *
+ * **Mora aqui e não na tela porque duas telas o escreviam.** O Hub e a loja
+ * tinham a mesma conta copiada caractere por caractere, e é a dívida que o
+ * próprio PR usou para justificar extrair o helper das suítes e2e: duas cópias
+ * do mesmo contador é como uma delas fica para trás.
+ *
+ * Recebe o instante em vez de o ler, como todo o resto deste módulo — `shared/`
+ * é a camada pura, e `shared-purity.spec.ts` recusa `new Date(` aqui dentro.
+ */
+export function countdownLabel(at: Date): string {
+  const total = Math.max(0, Math.floor(msUntilNextDay(at) / 1000))
+  const parts = [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
+
+  return parts.map(part => String(part).padStart(2, '0')).join(':')
+}

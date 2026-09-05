@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useIntervalFn } from '@vueuse/core'
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useGameClock } from '~/composables/useGameClock'
 import { useLeague } from '~/composables/useLeague'
 import { useCollection } from '~/composables/useCollection'
 import { loadBattleContext } from '~/composables/useBattleContext'
@@ -10,7 +10,7 @@ import { useProgressStore } from '~~/app/stores/progress'
 import { activeOf, isFainted } from '~~/shared/game/battle'
 import { gymLeader } from '~~/shared/game/gyms'
 import { PACK_SIZE, RARE_PLUS_SLOTS } from '~~/shared/game/packs'
-import { msUntilNextDay } from '~~/shared/game/economy'
+import { countdownLabel } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
@@ -80,25 +80,13 @@ const resumable = computed(() => {
   }
 })
 
-/**
- * O relógio, pelo contador do pack diário — e pela virada da meia-noite com a
- * aba aberta, que é o caso que um instante lido uma vez não cobre. Mesmo
- * raciocínio da loja, que também bate de segundo em segundo.
- */
-const now = shallowRef(new Date())
-useIntervalFn(() => {
-  now.value = new Date()
-}, 1000)
+/** O mesmo relógio da loja, e agora literalmente o mesmo — ver `useGameClock`. */
+const now = useGameClock()
 
 const dailyReady = computed(() => progress.dailyReadyAt(now.value))
 
 /** `14:22:07` — o que falta para a meia-noite local, no formato da prancha. */
-const untilDaily = computed(() => {
-  const total = Math.max(0, Math.floor(msUntilNextDay(now.value) / 1000))
-  const parts = [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
-
-  return parts.map(part => String(part).padStart(2, '0')).join(':')
-})
+const untilDaily = computed(() => countdownLabel(now.value))
 
 /** O chip verde do painel do próximo — um exemplo de cobertura, não um placar. */
 const advantage = computed(() => {

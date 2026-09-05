@@ -9,6 +9,7 @@ import {
   gymReward,
   isDailyReady,
   isDayKey,
+  countdownLabel,
   msUntilNextDay,
   packsAffordable,
   rewardFor,
@@ -207,6 +208,29 @@ describe('o pack diário', () => {
     expect(isDayKey('')).toBe(false)
     expect(isDayKey(null)).toBe(false)
     expect(isDayKey(20260905)).toBe(false)
+  })
+})
+
+/**
+ * O contador que as duas telas mostram.
+ *
+ * Ele morava copiado caractere por caractere no Hub e na loja, e virou função do
+ * motor pela mesma razão que o helper das suítes e2e virou módulo: duas cópias
+ * do mesmo cálculo é como uma delas fica para trás.
+ */
+describe('o contador até a meia-noite', () => {
+  it('escreve `HH:MM:SS` com zero à esquerda nos três campos', () => {
+    expect(countdownLabel(new Date(2026, 8, 5, 23, 59, 59, 0))).toBe('00:00:01')
+    expect(countdownLabel(new Date(2026, 8, 5, 9, 37, 53, 0))).toBe('14:22:07')
+    expect(countdownLabel(new Date(2026, 8, 5, 0, 0, 0, 0))).toBe('24:00:00')
+  })
+
+  /**
+   * Um relógio adiantado não pode escrever tempo negativo: o cartão do diário
+   * some pelo `isDailyReady`, que compara datas — o contador só desenha.
+   */
+  it('não desce abaixo de zero', () => {
+    expect(countdownLabel(new Date(2026, 8, 5, 23, 59, 59, 999))).toBe('00:00:00')
   })
 })
 
