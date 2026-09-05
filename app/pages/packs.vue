@@ -302,9 +302,13 @@ useSeoMeta({
               </p>
 
               <div class="packs__offer-foot">
+                <!-- Os três cartões escrevem `ABRIR` ou um preço, e o rótulo
+                     visível não distingue um do outro para quem não vê a
+                     fileira. O nome acessível diz qual pack é. -->
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--gift bevel-control"
+                  aria-label="Abrir pack de estreia"
                   :disabled="!canOpen('welcome')"
                   @click="open('welcome')"
                 >
@@ -338,6 +342,7 @@ useSeoMeta({
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--daily bevel-control"
+                  aria-label="Abrir pack diário"
                   :disabled="!canOpen('daily')"
                   @click="open('daily')"
                 >
@@ -368,6 +373,7 @@ useSeoMeta({
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--coin bevel-control"
+                  :aria-label="`Comprar Pack Holo por ${gameNumber(PACK_PRICE)} moedas`"
                   :disabled="!canOpen('store')"
                   @click="open('store')"
                 >
