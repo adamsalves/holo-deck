@@ -1,21 +1,28 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { REPO_ROOT } from '../support/source-tree'
-import { POTIONS_PER_SIDE, POTION_HEAL_FRACTION } from '~~/shared/game/battle'
-import { DUST_PER_DUPLICATE, FORGE_COST, FORGE_RATIO } from '~~/shared/game/dust'
-import {
-  FLAWLESS_RATE,
-  GYM_REWARD_BASE,
-  GYM_REWARD_STEP,
-  PACK_PRICE,
-  REMATCH_RATE,
-  WELCOME_PACKS,
-} from '~~/shared/game/economy'
-import { GYM_BANDS } from '~~/shared/game/gyms'
-import { PACK_SIZE, PITY_THRESHOLD, RARE_PLUS_WEIGHTS, SHINY_ODDS } from '~~/shared/game/packs'
-import { RARITY_THRESHOLDS } from '~~/shared/game/rarity'
-import { BATTLE_LEVEL } from '~~/shared/game/stats'
+import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
+import * as aiGame from '~~/shared/game/ai'
+import * as battleGame from '~~/shared/game/battle'
+import * as damageGame from '~~/shared/game/damage'
+import * as deckGame from '~~/shared/game/deck'
+import * as dustGame from '~~/shared/game/dust'
+import * as economyGame from '~~/shared/game/economy'
+import * as engineGame from '~~/shared/game/engine'
+import * as evolutionGame from '~~/shared/game/evolution'
+import * as gymsGame from '~~/shared/game/gyms'
+import * as movesetGame from '~~/shared/game/moveset'
+import * as packsGame from '~~/shared/game/packs'
+import * as progressGame from '~~/shared/game/progress'
+import * as rarityGame from '~~/shared/game/rarity'
+import * as rngGame from '~~/shared/game/rng'
+import * as statsGame from '~~/shared/game/stats'
+import * as statusGame from '~~/shared/game/status'
+import * as typechartGame from '~~/shared/game/typechart'
+import * as brandTypes from '~~/shared/types/brand'
+import * as dexTypes from '~~/shared/types/dex'
+import * as exhaustiveTypes from '~~/shared/types/exhaustive'
+import * as gameTypes from '~~/shared/types/game'
 
 /**
  * O contrato de `/rules`: **nenhum número calibrado escrito à mão**.
@@ -35,63 +42,124 @@ import { BATTLE_LEVEL } from '~~/shared/game/stats'
 const PAGE = 'app/pages/rules.vue'
 
 /**
- * O que sai da varredura antes de qualquer coisa: estilo e comentário.
+ * O `<style>` sai da varredura: um `padding: 10px` não é o limiar de pity.
  *
- * **O `<style>`**, porque um `padding: 10px` não é o limiar de pity. A regra do
- * plano fala do que a página *afirma* — o que o jogador lê e o que o script
- * calcula —, e geometria de painel é outro assunto. Incluí-la faria o portão
- * reprovar por um valor de espaçamento, que é o falso positivo que ensina a
- * desligar portão.
- *
- * **O comentário**, pelo mesmo motivo que o portão de pureza apaga os dele: o
- * docblock desta página explica que trocar o pity de 10 para 8 muda a tela no
- * mesmo commit, e uma regra que proíbe explicar a razão da regra é pior que não
- * ter regra.
+ * A regra do plano fala do que a página *afirma* — o que o jogador lê e o que o
+ * script calcula —, e geometria de painel é outro assunto. Incluí-la faria o
+ * portão reprovar por um valor de espaçamento, que é o falso positivo que ensina
+ * a desligar portão.
  */
 function withoutStyle(source: string): string {
   return source.replace(/<style[\s\S]*?<\/style>/g, '')
 }
 
-function withoutComments(source: string): string {
-  return source
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/[^\n]*$/gm, '')
+const page = readFileSync(join(REPO_ROOT, PAGE), 'utf8')
+const prose = stripComments(withoutStyle(page))
+
+/**
+ * Todo módulo do motor, importado inteiro — e é daqui que a lista de proibidos
+ * sai.
+ *
+ * **A versão anterior deste portão enumerava à mão quais constantes policiar.**
+ * Os *valores* vinham das constantes (um tier novo de forja entrava sozinho),
+ * mas *quais* constantes era escrito, e o docblock de então afirmava o
+ * contrário. Seis constantes calibradas que a página renderiza ficaram de fora
+ * pela omissão: `BATTLE_IV` (31), `TYPE_COUNT` (18), `RANDOM_MIN_PERCENT` (85),
+ * `RANDOM_MAX_PERCENT` (100), `CRIT_CHANCE` (1/24) e `BURN_DAMAGE_FRACTION`
+ * (1/16) — escrevê-las à mão passava no portão que existe para impedir isso.
+ *
+ * Importando o **namespace** de cada módulo a pergunta vira a certa: *o que o
+ * motor exporta como número*. Uma constante nova entra sozinha, e é a lista de
+ * saída abaixo que precisa de justificativa — lista de entrada falha em
+ * silêncio.
+ *
+ * O que continua escrito à mão é a lista de **módulos**, e é o teste
+ * `cobre todo módulo do motor que existe em disco` que impede ela de envelhecer:
+ * um arquivo novo em `shared/game/` ou `shared/types/` reprova até ser incluído.
+ * Namespace importado estaticamente em vez de `import.meta.glob` porque o
+ * projeto de ferramentas não carrega os tipos do Vite, e dar-lhe esses tipos
+ * para um teste seria alargar o `tsconfig` por conveniência de portão.
+ */
+const MODULES: Record<string, Record<string, unknown>> = {
+  'game/ai': aiGame,
+  'game/battle': battleGame,
+  'game/damage': damageGame,
+  'game/deck': deckGame,
+  'game/dust': dustGame,
+  'game/economy': economyGame,
+  'game/engine': engineGame,
+  'game/evolution': evolutionGame,
+  'game/gyms': gymsGame,
+  'game/moveset': movesetGame,
+  'game/packs': packsGame,
+  'game/progress': progressGame,
+  'game/rarity': rarityGame,
+  'game/rng': rngGame,
+  'game/stats': statsGame,
+  'game/status': statusGame,
+  'game/typechart': typechartGame,
+  'types/brand': brandTypes,
+  'types/dex': dexTypes,
+  'types/exhaustive': exhaustiveTypes,
+  'types/game': gameTypes,
 }
 
-const page = readFileSync(join(REPO_ROOT, PAGE), 'utf8')
-const prose = withoutComments(withoutStyle(page))
+/**
+ * As formas em que um número calibrado chega à tela.
+ *
+ * Uma fração não aparece como `0,25`: ela aparece como **25%** ou como o
+ * denominador de `1 em 24`. Policiar só o valor cru deixaria passar exatamente a
+ * escrita que a página usa — que é o defeito, não uma variação dele.
+ */
+function writtenForms(value: number): number[] {
+  if (value > 0 && value < 1) return [value, value * 100, 1 / value]
+  return [value]
+}
+
+/** Os números que um módulo exporta, direto ou dentro de lista e de tabela. */
+function numbersIn(value: unknown): number[] {
+  if (typeof value === 'number') return [value]
+  if (Array.isArray(value)) return value.flatMap(numbersIn)
+
+  if (typeof value === 'object' && value !== null) {
+    return Object.values(value).flatMap(numbersIn)
+  }
+
+  return []
+}
+
+/**
+ * Quem **sai** da lista, e por quê. Cada linha precisa de uma razão.
+ *
+ * Ela é de saída de propósito: uma constante nova do motor cai do lado de dentro
+ * por omissão e reprova alto se a página a escrever à mão. Uma lista de entrada
+ * faria o contrário — o defeito da versão anterior.
+ */
+const NOT_CALIBRATION: Record<string, string> = {
+  // O tamanho do dex é dado da PokeAPI, não calibração — e a página o escreve
+  // formatado (`1.025`), então o literal nem casaria.
+  DEX_SIZE: 'tamanho do dex, dado e não calibração',
+  // Cem é a base da porcentagem antes de ser qualquer constante. `gamePercent`
+  // já tirou o literal da página; policiá-lo aqui só produziria mensagem com o
+  // módulo errado — foi o que a versão anterior fez ao acusar `GYM_REWARD_STEP`.
+  PERCENT_BASE: 'base da porcentagem, não calibração',
+}
 
 /**
  * Os números que **não** podem aparecer, e de onde cada um vem.
  *
- * A lista é montada a partir das próprias constantes, e não escrita: um tier
- * novo na escada de forja entra aqui sozinho, e um limiar movido passa a ser
- * cobrado no valor novo sem ninguém editar este arquivo. Enumerar à mão seria o
- * defeito que este repositório vem repetindo desde a Fase 0 — a lista que
- * envelhece ao lado da regra que ela deveria vigiar.
+ * Montada varrendo os módulos: um tier novo na escada de forja entra sozinho, um
+ * limiar movido passa a ser cobrado no valor novo, e uma constante nova entra
+ * sem ninguém editar este arquivo.
  */
-const FORBIDDEN: readonly { readonly value: number, readonly source: string }[] = [
-  ...RARITY_THRESHOLDS.map(value => ({ value, source: 'RARITY_THRESHOLDS' })),
-  ...Object.values(DUST_PER_DUPLICATE).map(value => ({ value, source: 'DUST_PER_DUPLICATE' })),
-  ...Object.values(FORGE_COST).map(value => ({ value, source: 'FORGE_COST' })),
-  { value: PITY_THRESHOLD, source: 'PITY_THRESHOLD' },
-  { value: 1 / SHINY_ODDS, source: 'SHINY_ODDS' },
-  { value: PACK_SIZE, source: 'PACK_SIZE' },
-  { value: PACK_PRICE, source: 'PACK_PRICE' },
-  { value: GYM_REWARD_BASE, source: 'GYM_REWARD_BASE' },
-  { value: GYM_REWARD_STEP, source: 'GYM_REWARD_STEP' },
-  { value: WELCOME_PACKS, source: 'WELCOME_PACKS' },
-  { value: FORGE_RATIO, source: 'FORGE_RATIO' },
-  { value: BATTLE_LEVEL, source: 'BATTLE_LEVEL' },
-  ...GYM_BANDS.map(band => ({ value: band.bstCap, source: 'GYM_BANDS.bstCap' })),
-  ...GYM_BANDS.map(band => ({ value: band.teamSize, source: 'GYM_BANDS.teamSize' })),
-  ...Object.values(RARE_PLUS_WEIGHTS).map(w => ({ value: w * 100, source: 'RARE_PLUS_WEIGHTS' })),
-  { value: REMATCH_RATE * 100, source: 'REMATCH_RATE' },
-  { value: FLAWLESS_RATE * 100, source: 'FLAWLESS_RATE' },
-  { value: POTION_HEAL_FRACTION * 100, source: 'POTION_HEAL_FRACTION' },
-  { value: POTIONS_PER_SIDE, source: 'POTIONS_PER_SIDE' },
-]
+const FORBIDDEN: readonly { readonly value: number, readonly source: string }[]
+  = Object.entries(MODULES).flatMap(([name, module]) =>
+    Object.entries(module)
+      .filter(([exported]) => !(exported in NOT_CALIBRATION))
+      .flatMap(([exported, value]) =>
+        numbersIn(value)
+          .flatMap(writtenForms)
+          .map(form => ({ value: form, source: `${exported} (${name}.ts)` }))))
 
 /**
  * A **exceção declarada**, e ela precisa estar aqui e não escondida no arquivo.
@@ -144,17 +212,44 @@ describe('portão de `/rules`', () => {
   })
 
   /**
+   * O outro lado da varredura de módulos: `[] === []` passa, e um glob que
+   * parasse de casar (pasta renomeada, extensão mudada) deixaria o portão verde
+   * para sempre sem nada a policiar.
+   */
+  it('e a lista de proibidos saiu mesmo dos módulos', () => {
+    expect(Object.keys(MODULES).length).toBeGreaterThan(10)
+    expect(FORBIDDEN.filter(({ value }) => value >= SMALLEST_SCANNED).length)
+      .toBeGreaterThan(20)
+  })
+
+  /**
+   * A lista de módulos é a única parte escrita à mão, e é esta asserção que
+   * impede ela de envelhecer ao lado do motor que deveria vigiar.
+   *
+   * Um arquivo novo em `shared/game/` ou `shared/types/` cai **de fora** por
+   * omissão, e reprova aqui — que é a inversão que este repositório vem
+   * aplicando desde o portão de tema: lista de saída falha alto.
+   */
+  it('cobre todo módulo do motor que existe em disco', () => {
+    const onDisk = ['shared/game', 'shared/types'].flatMap(dir =>
+      walkFiles(join(REPO_ROOT, dir), new Set(), hasExtension(['.ts']))
+        .map(file => file.replace(/^shared\//, '').replace(/\.ts$/, '')))
+
+    expect(onDisk.filter(module => !(module in MODULES))).toEqual([])
+  })
+
+  /**
    * Uma asserção só, com a lista inteira no relatório: duas asserções separadas
    * dariam dois relatórios parciais do mesmo defeito, e o que quem lê precisa
    * saber é **qual número** e **de qual módulo ele deveria ter vindo**.
    */
   it('não escreve nenhum número calibrado à mão', () => {
     const written = FORBIDDEN
-      .filter(({ value }) => value >= SMALLEST_SCANNED)
+      .filter(({ value }) => Number.isInteger(value) && value >= SMALLEST_SCANNED)
       .filter(({ value }) => writtenLiteral(value).test(scanned))
       .map(({ value, source }) => `${value} (${source})`)
 
-    expect(written).toEqual([])
+    expect([...new Set(written)].sort()).toEqual([])
   })
 
   /**
