@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
 
 /**
  * O ciclo da Fase 5, num navegador de verdade.
@@ -159,39 +160,109 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
  * lê o disco; este anda pelo produto.
  */
 test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }) => {
-  const portas = [
-    { link: 'Base', url: /\/$/, titulo: null },
-    { link: 'Packs', url: /\/packs$/, titulo: 'Packs' },
-    { link: 'Pokédex', url: /\/pokedex$/, titulo: 'Pokédex' },
-    { link: 'Coleção', url: /\/collection$/, titulo: 'Binder' },
-    { link: 'Deck', url: /\/deck$/, titulo: 'Seu time' },
-    { link: 'Liga', url: /\/league$/, titulo: 'A Liga' },
-    { link: 'Regras', url: /\/rules$/, titulo: 'Regras' },
-  ]
+  /**
+   * Onde cada destino chega. **A lista de destinos vem do módulo**, e este mapa
+   * só diz o que esperar em cada um.
+   *
+   * A inversão importa: um destino novo na barra sem linha aqui reprova na
+   * primeira asserção, em vez de silenciosamente deixar de ser visitado — que é
+   * o que uma lista de portas escrita à mão fazia. Era a mesma lista de entrada
+   * que o `nav-gate` tinha, e pela mesma razão ela falhava em silêncio.
+   */
+  const chegada: Record<string, { url: RegExp, titulo: string | null, raiz: string }> = {
+    '/': { url: /\/$/, titulo: null, raiz: '.hub' },
+    '/packs': { url: /\/packs$/, titulo: 'Packs', raiz: '.packs' },
+    '/pokedex': { url: /\/pokedex$/, titulo: 'Pokédex', raiz: 'main' },
+    '/collection': { url: /\/collection$/, titulo: 'Binder', raiz: '.collection' },
+    '/deck': { url: /\/deck$/, titulo: 'Seu time', raiz: '.deck' },
+    '/league': { url: /\/league$/, titulo: 'A Liga', raiz: '.league' },
+    '/rules': { url: /\/rules$/, titulo: 'Regras', raiz: '.rules' },
+    '/settings': { url: /\/settings$/, titulo: 'Seu save e este aparelho', raiz: '.settings' },
+  }
+
+  const destinos = [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]
+
+  // O par da lista de saída: todo destino que a barra declara é visitado abaixo.
+  expect(destinos.filter(destino => !(destino.to in chegada)).map(d => d.to)).toEqual([])
+  expect(destinos.length).toBeGreaterThan(5)
 
   // De uma tela **interna**, não da raiz: é a barra que precisa estar em toda
   // parte, e sair sempre do Hub esconderia um layout aplicado só a ele.
   await page.goto('/collection')
 
-  for (const porta of portas) {
-    await expect(page.getByRole('link', { name: porta.link, exact: true })).toBeVisible()
+  /**
+   * Visível, e não presente no arquivo — é esta asserção que o portão de disco
+   * não consegue fazer.
+   *
+   * `nav-gate.spec.ts` importa a mesma lista e prova que a rota existe; o que
+   * ele não alcança é o link **renderizado**. Um `v-if="false"` em volta do
+   * `<NuxtLink>`, ou um `v-if` de feature flag esquecido, deixa a lista intacta
+   * e a barra sem o link — e só um clique de verdade percebe.
+   */
+  for (const destino of destinos) {
+    await expect(page.getByRole('link', { name: destino.label, exact: true })).toBeVisible()
   }
 
-  for (const porta of portas) {
+  for (const destino of destinos) {
+    const esperado = chegada[destino.to]
+    if (esperado === undefined) continue
+
     await page.goto('/collection')
-    await page.getByRole('link', { name: porta.link, exact: true }).click()
-    await expect(page).toHaveURL(porta.url)
-    if (porta.titulo !== null) {
-      await expect(page.getByRole('heading', { level: 1, name: porta.titulo })).toBeVisible()
-    }
-  }
+    await page.getByRole('link', { name: destino.label, exact: true }).click()
+    await expect(page).toHaveURL(esperado.url)
 
-  // Ajustes é ícone, não rótulo — e é a única entrada da barra que depende de
-  // `aria-label` para ser alcançável por quem navega por leitor de tela.
+    /**
+     * A Base é a única sem `<h1>` — o Hub não tem um, e a prancha *Hub* não
+     * desenha nenhum. Ela é a única porta cuja chegada não pode ser afirmada
+     * pelo título, então o que se afirma é a raiz da tela: sem isto ela seria
+     * a única das oito a provar só a URL, que é o que a versão anterior deste
+     * teste fazia sem escrever por quê.
+     */
+    if (esperado.titulo !== null) {
+      await expect(page.getByRole('heading', { level: 1, name: esperado.titulo })).toBeVisible()
+    }
+    await expect(page.locator(esperado.raiz).first()).toBeVisible()
+  }
+})
+
+/**
+ * O `aria-current` acompanha o sublinhado, inclusive em rota aninhada.
+ *
+ * O `NuxtLink` pronto só emite `aria-current` em casamento **exato**, então em
+ * `/pokedex/kanto` o sublinhado de *Pokédex* aparecia e quem navega por leitor
+ * de tela não recebia indicação nenhuma de seção atual. As duas coisas saem do
+ * mesmo booleano agora, e este teste é o que impede elas de divergirem de novo.
+ */
+test('a barra marca a seção atual, e só uma', async ({ page }) => {
+  await page.goto('/pokedex/1')
+
+  const atual = page.locator('.nav__link[aria-current="page"]')
+  await expect(atual).toHaveCount(1)
+  await expect(atual).toHaveText('Pokédex')
+
+  // A raiz é o caso em que a marca e *Base* apontam para o mesmo lugar: só o
+  // link da seção carrega `aria-current`, e a marca não.
+  await page.goto('/')
+  await expect(page.locator('[aria-current="page"]')).toHaveCount(1)
+  await expect(page.locator('[aria-current="page"]')).toHaveText('Base')
+})
+
+/**
+ * O link de pular navegação, que é a primeira parada de tabulação de toda tela.
+ *
+ * A barra põe nove elementos focáveis antes do conteúdo; sem ele, quem navega
+ * por teclado atravessa os nove em cada página (WCAG 2.4.1).
+ */
+test('a primeira tabulação de qualquer tela é pular para o conteúdo', async ({ page }) => {
   await page.goto('/collection')
-  await page.getByRole('link', { name: 'Ajustes' }).click()
-  await expect(page).toHaveURL(/\/settings$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Seu save e este aparelho' })).toBeVisible()
+
+  await page.keyboard.press('Tab')
+
+  const pular = page.getByRole('link', { name: 'Pular para o conteúdo' })
+  await expect(pular).toBeFocused()
+
+  await pular.click()
+  await expect(page.locator('#conteudo')).toBeFocused()
 })
 
 /**

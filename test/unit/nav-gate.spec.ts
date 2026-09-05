@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
+import { NAV_DESTINATIONS, NAV_LINKS } from '~~/app/utils/nav-links'
 
 /**
  * Toda tela do jogo é alcançável pela barra global — ou está escrita aqui como
@@ -18,13 +18,19 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
  * Com a barra, a pergunta certa é outra — **quais rotas existem em disco**, e
  * qual delas a barra não cita.
  *
+ * **Ele importa a lista, e não lê o arquivo.** A primeira versão perguntava
+ * `AppNav.vue.includes("'/deck'")`, que é presença de string e não link
+ * renderizado: `v-if="false"` em volta do link, um `v-if` de feature flag
+ * esquecido, ou a rota citada só num comentário mantinham o portão verde com a
+ * tela fora da barra. `NAV_DESTINATIONS` é o mesmo dado que o componente
+ * renderiza, e a busca por substring deixou de existir.
+ *
  * Ele anda por `app/pages/`, e a lista abaixo é de **saída**: uma página nova
  * cai do lado de dentro por omissão e reprova. É a mesma inversão que a Fase 6
  * fez no portão de tema, pelo mesmo motivo — lista de entrada falha em silêncio.
  */
 
 const PAGES = 'app/pages'
-const NAV = 'app/components/AppNav.vue'
 const SKIP = new Set(['node_modules'])
 
 /**
@@ -48,23 +54,26 @@ function routes(): string[] {
     .map(name => (name === 'index' ? '/' : `/${name.replace(/\/index$/, '')}`))
 }
 
-const nav = readFileSync(join(REPO_ROOT, NAV), 'utf8')
-
-/** `to="/deck"` e `:to="link.to"` não são a mesma coisa — só o literal conta. */
-function linked(route: string): boolean {
-  return nav.includes(`'${route}'`) || nav.includes(`to="${route}"`)
-}
-
 describe('portão da barra global', () => {
   it('encontra as páginas em disco', () => {
     expect(routes().length).toBeGreaterThan(8)
     expect(routes()).toContain('/')
   })
 
+  /**
+   * O outro lado da importação: `[] === []` passa, e uma lista que ficasse vazia
+   * — refactor que a monta por `map`, arquivo renomeado — deixaria os dois
+   * testes abaixo verdes para sempre sem nada a conferir.
+   */
+  it('e a barra declara destinos', () => {
+    expect(NAV_DESTINATIONS.length).toBeGreaterThan(5)
+    expect(NAV_LINKS.filter(link => link.exact)).toHaveLength(1)
+  })
+
   it('toda tela do jogo está na barra, ou está escrita como exceção', () => {
     const orphans = routes()
       .filter(route => !NOT_A_DESTINATION(route))
-      .filter(route => !linked(route))
+      .filter(route => !NAV_DESTINATIONS.includes(route))
 
     expect(orphans).toEqual([])
   })
@@ -77,12 +86,8 @@ describe('portão da barra global', () => {
    * navegação principal do jogo.
    */
   it('e a barra não aponta para tela que não existe', () => {
-    const declared = [...nav.matchAll(/to: '([^']+)'|to="([^"]+)"/g)]
-      .map(([, quoted, attribute]) => quoted ?? attribute ?? '')
-      .map(route => route.split('?')[0] ?? route)
-      .filter(route => route.startsWith('/'))
-
     const known = new Set(routes())
-    expect([...new Set(declared)].filter(route => !known.has(route))).toEqual([])
+
+    expect(NAV_DESTINATIONS.filter(route => !known.has(route))).toEqual([])
   })
 })

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { gameNumber } from '~~/shared/game/progress'
 import { useProgressStore } from '~~/app/stores/progress'
+import { useRoute } from 'nuxt/app'
+import type { NavLink } from '~~/app/utils/nav-links'
+import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 
 /**
  * A barra de navegação global — a que as pranchas *Hub*, *Loja* e *Regras*
@@ -17,61 +20,81 @@ import { useProgressStore } from '~~/app/stores/progress'
  * é `--accent` em toda página, contra o azul do *Hub* e o roxo da *Loja* — o
  * mesmo papel em duas cores é variação de mockup desenhado à mão, como o
  * `2px`/`3px` do raio que a Fase 2 normalizou.
+ *
+ * **A seção atual sai do caminho da rota, e não de `router-link-active`.** O
+ * comentário anterior afirmava que aquela classe "casa por prefixo, que é o que
+ * acende *Pokédex* em `/pokedex/1`" — e ela não faz isso. Ela casa por
+ * **registro de rota**: `/pokedex` e `/pokedex/:gen` são irmãs no roteamento por
+ * arquivos, não aninhadas, então nenhuma das duas está no `matched` da outra. O
+ * HTML pré-renderizado de `/pokedex/1` e de `/pokemon/pikachu` saía sem nenhum
+ * link marcado — nem sublinhado, nem `aria-current`. Toda rota aninhada do jogo
+ * mostrava a barra inteira apagada, e o mecanismo que o comentário descrevia
+ * nunca existiu.
+ *
+ * Com `isCurrent` a regra é a que estava escrita: prefixo de caminho. E o
+ * `exact` da Base passa a ser **necessário de verdade** pela primeira vez —
+ * `/` é prefixo de toda rota, que era o problema que ele dizia resolver.
+ *
+ * Uma consequência boa: o mesmo booleano decide a classe e o `aria-current`, e
+ * eles não têm como discordar. Antes eram dois mecanismos, e quem navega por
+ * leitor de tela ficava sem a informação que quem enxerga tinha.
+ *
+ * A marca usa `custom` por outro motivo: ela aponta para `/`, e o `NuxtLink`
+ * pronto a marcaria como página atual **junto com** *Base* — dois
+ * `aria-current="page"` na mesma tela, anunciados um atrás do outro.
  */
 const progress = useProgressStore()
+const route = useRoute()
 
-/**
- * Os seis destinos da esquerda, na ordem da prancha.
- *
- * `exact` só na Base: `NuxtLink` marca `router-link-active` por prefixo de rota,
- * o que é o que se quer em `/pokedex/1` acendendo *Pokédex* — e o que não se
- * quer na raiz, que é prefixo de tudo.
- */
-const LINKS = [
-  { to: '/', label: 'Base', exact: true },
-  { to: '/packs', label: 'Packs', exact: false },
-  { to: '/pokedex', label: 'Pokédex', exact: false },
-  { to: '/collection', label: 'Coleção', exact: false },
-  { to: '/deck', label: 'Deck', exact: false },
-  { to: '/league', label: 'Liga', exact: false },
-]
+/** A seção atual, por prefixo de caminho — exato só onde `exact` pede. */
+function isCurrent(link: NavLink): boolean {
+  if (link.exact) return route.path === link.to
+  return route.path === link.to || route.path.startsWith(`${link.to}/`)
+}
 </script>
 
 <template>
   <header class="nav">
     <div class="nav__side">
       <NuxtLink
+        v-slot="{ href, navigate }"
         to="/"
-        class="nav__brand"
+        custom
       >
-        <svg
-          class="nav__mark"
-          viewBox="0 0 100 100"
-          fill="none"
-          aria-hidden="true"
+        <a
+          :href="href ?? undefined"
+          class="nav__brand"
+          @click="navigate"
         >
-          <circle
-            cx="50"
-            cy="50"
-            r="38"
-            stroke="currentColor"
-            stroke-width="6"
-          />
-          <path
-            d="M12 50h26M62 50h26"
-            stroke="currentColor"
-            stroke-width="6"
-            stroke-linecap="round"
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="12"
-            stroke="var(--brand)"
-            stroke-width="6"
-          />
-        </svg>
-        HOLO<span>/</span>DECK
+          <svg
+            class="nav__mark"
+            viewBox="0 0 100 100"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="50"
+              cy="50"
+              r="38"
+              stroke="currentColor"
+              stroke-width="6"
+            />
+            <path
+              d="M12 50h26M62 50h26"
+              stroke="currentColor"
+              stroke-width="6"
+              stroke-linecap="round"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r="12"
+              stroke="var(--brand)"
+              stroke-width="6"
+            />
+          </svg>
+          HOLO<span>/</span>DECK
+        </a>
       </NuxtLink>
 
       <nav
@@ -79,13 +102,21 @@ const LINKS = [
         aria-label="Seções do jogo"
       >
         <NuxtLink
-          v-for="link in LINKS"
+          v-for="link in NAV_LINKS"
           :key="link.to"
+          v-slot="{ href, navigate }"
           :to="link.to"
-          class="nav__link"
-          :class="{ 'nav__link--exact': link.exact }"
+          custom
         >
-          {{ link.label }}
+          <a
+            :href="href ?? undefined"
+            class="nav__link"
+            :class="{ 'nav__link--current': isCurrent(link) }"
+            :aria-current="isCurrent(link) ? 'page' : undefined"
+            @click="navigate"
+          >
+            {{ link.label }}
+          </a>
         </NuxtLink>
       </nav>
     </div>
@@ -122,36 +153,54 @@ const LINKS = [
       </ClientOnly>
 
       <NuxtLink
-        to="/rules"
-        class="nav__link"
+        v-slot="{ href, navigate }"
+        :to="NAV_RULES.to"
+        custom
       >
-        Regras
+        <a
+          :href="href ?? undefined"
+          class="nav__link"
+          :class="{ 'nav__link--current': isCurrent(NAV_RULES) }"
+          :aria-current="isCurrent(NAV_RULES) ? 'page' : undefined"
+          @click="navigate"
+        >
+          {{ NAV_RULES.label }}
+        </a>
       </NuxtLink>
 
       <NuxtLink
-        to="/settings"
-        class="nav__gear"
-        aria-label="Ajustes"
+        v-slot="{ href, navigate }"
+        :to="NAV_SETTINGS.to"
+        custom
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
+        <a
+          :href="href ?? undefined"
+          class="nav__gear"
+          :class="{ 'nav__gear--current': isCurrent(NAV_SETTINGS) }"
+          :aria-label="NAV_SETTINGS.label"
+          :aria-current="isCurrent(NAV_SETTINGS) ? 'page' : undefined"
+          @click="navigate"
         >
-          <circle
-            cx="12"
-            cy="12"
-            r="3.1"
-            stroke="currentColor"
-            stroke-width="1.7"
-          />
-          <path
-            d="M12 3.4v2.3M12 18.3v2.3M20.6 12h-2.3M5.7 12H3.4M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6M18.1 18.1l-1.6-1.6M7.5 7.5L5.9 5.9"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-          />
-        </svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="3.1"
+              stroke="currentColor"
+              stroke-width="1.7"
+            />
+            <path
+              d="M12 3.4v2.3M12 18.3v2.3M20.6 12h-2.3M5.7 12H3.4M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6M18.1 18.1l-1.6-1.6M7.5 7.5L5.9 5.9"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+            />
+          </svg>
+        </a>
       </NuxtLink>
     </div>
   </header>
@@ -236,12 +285,13 @@ const LINKS = [
 /**
  * O sublinhado do destino atual.
  *
- * `router-link-active` casa por prefixo, que é o que acende *Pokédex* em
- * `/pokedex/1`. A Base pede `exact` porque `/` é prefixo de toda rota — sem
- * isso, ela ficaria acesa junto com a página em que se está.
+ * A classe vem do mesmo booleano que o `aria-current` do template — ativo por
+ * prefixo, que é o que acende *Pokédex* em `/pokedex/1`, e exato só na Base,
+ * porque `/` é prefixo de toda rota. Antes eram dois mecanismos: a classe saía
+ * de `router-link-active` e o `aria-current` do `NuxtLink`, que só o emite no
+ * casamento exato — e eles discordavam em toda rota aninhada.
  */
-.nav__link.router-link-active:not(.nav__link--exact),
-.nav__link.router-link-exact-active {
+.nav__link--current {
   border-bottom-color: var(--accent);
   color: var(--text);
 }
@@ -298,7 +348,7 @@ const LINKS = [
 }
 
 .nav__gear:hover,
-.nav__gear.router-link-active {
+.nav__gear--current {
   color: var(--text-body);
 }
 </style>
