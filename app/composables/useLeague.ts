@@ -60,7 +60,7 @@ export interface LeagueView {
    */
   readonly risky: ComputedRef<number>
   /**
-   * A primeira carta do deck que bate mais que o normal no próximo líder, com o
+   * Uma carta do deck que bate mais que o normal no próximo líder, com o
    * multiplicador dela.
    *
    * É o chip verde do Hub — `PIKACHU CONTRA VOADOR ×2`. Uma carta e não a
@@ -68,6 +68,11 @@ export interface LeagueView {
    * inteiro abre o deck builder, que desenha a cobertura tipo a tipo. O
    * multiplicador vem junto porque quem tem a matriz é este composable — a tela
    * pedi-la de novo seria um segundo `core.json` na mesma página.
+   *
+   * **Qual das que servem é a de menor número no dex, e não a do primeiro
+   * slot**: `cards` sai de um filtro sobre o índice, que está em ordem de dex
+   * nacional. Para um exemplo tanto faz, e depender da ordem dos slots faria o
+   * chip trocar de carta quando o jogador reordena o deck sem mudá-lo.
    */
   readonly strongest: ComputedRef<{ entry: SearchEntry, multiplier: number } | null>
   /** Slots preenchidos do deck. Abaixo de seis, a Liga não deixa desafiar. */

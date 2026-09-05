@@ -40,9 +40,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   collection.hydrate(data.collection, data.dust)
   deck.hydrate(data.deck)
   progress.hydrate(data.progress)
-  // O progresso antes da batalha: liquidar uma luta paga moedas e insígnia, e
-  // `battle.resume` pode liquidar na primeira tela que trouxer o dex. Hidratar
-  // na ordem inversa creditaria sobre um saldo que ainda seria substituído.
+  // A batalha por último, e **esta** ordem é a única das quatro que não é
+  // exigência: `battle.hydrate` guarda o log cru e não liquida nada — quem paga
+  // moedas e insígnia é `resume`, na primeira tela que trouxer o dex, muito
+  // depois de as quatro hidratações terem terminado. Ela fica por último porque
+  // é a que depende do resto, não porque inverter quebraria algo.
   battle.hydrate(data.battle)
 
   function compose(): SaveData {

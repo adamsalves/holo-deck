@@ -33,8 +33,11 @@ const badgeWidth = computed(() => `${(progress.badges / GYM_COUNT) * 100}%`)
 /**
  * Até onde a trilha está acesa.
  *
- * A prancha desenha o degradê parando na carta atual; aqui ele para na mesma
- * fração que a barra do cabeçalho, sobre uma fileira de cinco.
+ * A prancha desenha o degradê parando na carta atual, e é isso que esta conta
+ * faz: `nextGym` sobre os cinco da primeira fileira. **Não é a fração da barra
+ * do cabeçalho** — aquela é `badges / 9`, e com uma insígnia as duas dariam 40%
+ * contra 11%. São duas leituras diferentes de propósito: a barra mede a campanha
+ * inteira, a trilha aponta onde você está nela.
  */
 const trackWidth = computed(() => `${Math.min(1, progress.nextGym / 5) * 100}%`)
 
