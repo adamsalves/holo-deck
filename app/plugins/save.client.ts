@@ -1,11 +1,11 @@
 import { defineNuxtPlugin } from 'nuxt/app'
 import { watch } from 'vue'
-import { SCHEMA_VERSION } from '~~/shared/save/schema'
-import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
+import type { RecoveryReason } from '~~/shared/save/schema'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
+import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
 
 /**
@@ -32,32 +32,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   const { data, recovered } = await driver.load()
 
-  // A coleção antes do deck, porque `deck.hydrate` **lê** a coleção: ele
-  // descarta na entrada a espécie que o save escalou e a coleção não tem mais.
-  // O observador da store do deck não cobre este caso — ele é `flush: 'pre'` e
-  // acorda um tick depois, o que basta para moer com o jogo aberto e não para
-  // o boot. Ver o comentário de `hydrate`.
-  collection.hydrate(data.collection, data.dust)
-  deck.hydrate(data.deck)
-  progress.hydrate(data.progress)
-  // A batalha por último, e **esta** ordem é a única das quatro que não é
-  // exigência: `battle.hydrate` guarda o log cru e não liquida nada — quem paga
-  // moedas e insígnia é `resume`, na primeira tela que trouxer o dex, muito
-  // depois de as quatro hidratações terem terminado. Ela fica por último porque
-  // é a que depende do resto, não porque inverter quebraria algo.
-  battle.hydrate(data.battle)
-
-  function compose(): SaveData {
-    const { collection: entries, dust } = collection.snapshot()
-    return {
-      schemaVersion: SCHEMA_VERSION,
-      collection: entries,
-      dust,
-      deck: deck.snapshot(),
-      progress: progress.snapshot(),
-      battle: battle.snapshot(),
-    }
-  }
+  // A ordem — coleção antes do deck, batalha por último — e a razão dela moram
+  // em `save-document.ts`, que é o mesmo módulo que `/settings` usa para
+  // importar um save. Duas cópias da ordem é como uma delas fica para trás.
+  hydrateSave(data, nuxtApp.$pinia)
 
   /**
    * Grava as duas stores num documento só.
@@ -76,13 +54,14 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       progress.welcomeClaimed,
       progress.coins,
       progress.badges,
+      progress.dailyClaimed,
       // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
       // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
       // gravação síncrona continua barata, e o debounce que o plano descreve é
       // o da rede, que chega com o `HttpDriver` na Fase 7.
       battle.log,
     ],
-    () => { void driver.save(compose()) },
+    () => { void driver.save(composeSave(nuxtApp.$pinia)) },
     { deep: true },
   )
 
@@ -100,6 +79,16 @@ export default defineNuxtPlugin(async (nuxtApp) => {
        * layout, porque isto é estado do boot e não de uma tela.
        */
       saveRecovery: recovered satisfies RecoveryReason | null,
+
+      /**
+       * O driver, para a tela de ajustes exportar, importar e apagar.
+       *
+       * Uma instância só, e não uma por consumidor: o driver é sem estado sobre
+       * o `localStorage`, mas a **poda de backups** não é — duas instâncias
+       * podariam o anel em ordens diferentes, e o que se quer guardar é sempre
+       * a cópia mais recente.
+       */
+      saveDriver: driver,
     },
   }
 })

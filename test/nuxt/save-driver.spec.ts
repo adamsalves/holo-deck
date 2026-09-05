@@ -68,7 +68,7 @@ describe('leitura', () => {
       collection: { 25: { c: 2, s: 1 } },
       dust: 15,
       deck: [25, null, null, null, null, null],
-      progress: { pity: 3, welcomeClaimed: 3, coins: 400, badges: 1 },
+      progress: { pity: 3, welcomeClaimed: 3, coins: 400, badges: 1, dailyClaimed: null },
       battle: null,
     }
     const storage = fakeStorage({ [SAVE_KEY]: JSON.stringify(save) })
@@ -242,5 +242,60 @@ describe('escrita', () => {
 
     expect(storage.data[SAVE_KEY]).toBeUndefined()
     expect(storage.data[backupKey(FROZEN)]).toBe('lixo antigo')
+  })
+})
+
+/**
+ * As duas portas que `/settings` usa, e por que elas não estão na interface.
+ *
+ * Exportar, importar e apagar precisam do **texto original** no disco — não do
+ * resultado migrado que `load()` devolve —, e precisam poder guardá-lo antes de
+ * escrever por cima. O `HttpDriver` da Fase 7 não tem "o texto no disco", então
+ * as duas ficam de fora de `SaveDriver`: uma interface que as exigisse obrigaria
+ * a rede a fingir um conceito local.
+ */
+describe('o caminho voluntário de /settings', () => {
+  it('lê o texto cru sem migrar nem validar', () => {
+    const armazenamento = fakeStorage({ [SAVE_KEY]: '{"schemaVersion":1,"lixo":true}' })
+    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+
+    // O ponto: um save que `load()` recusaria volta inteiro aqui. É ele que
+    // precisa ser guardado antes de a importação escrever por cima.
+    expect(driver.readRaw()).toBe('{"schemaVersion":1,"lixo":true}')
+  })
+
+  it('devolve nulo, e não explode, quando não há save ou o armazenamento recusa', () => {
+    expect(new LocalStorageDriver(fakeStorage(), () => FROZEN).readRaw()).toBeNull()
+
+    const bloqueado = fakeStorage({ [SAVE_KEY]: '{}' })
+    bloqueado.failReads = true
+
+    expect(new LocalStorageDriver(bloqueado, () => FROZEN).readRaw()).toBeNull()
+  })
+
+  it('arquiva a cópia sob a mesma chave que a recuperação usa', () => {
+    const armazenamento = fakeStorage({ [SAVE_KEY]: '{"meu":"save"}' })
+    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+
+    driver.archive('{"meu":"save"}')
+
+    expect(armazenamento.data[backupKey(FROZEN)]).toBe('{"meu":"save"}')
+  })
+
+  it('poda o anel ao arquivar, como a recuperação já podava', () => {
+    // O que este teste segura é a regra de que apagar de propósito **não** pode
+    // encher a cota: quem clica em apagar duas vezes por dia não deixa uma cópia
+    // por clique guardada para sempre.
+    const antigos = Object.fromEntries(
+      Array.from({ length: MAX_BACKUPS + 2 }, (_, index) => [backupKey(index + 1), `velho ${index}`]),
+    )
+    const armazenamento = fakeStorage({ ...antigos, [SAVE_KEY]: '{"novo":true}' })
+    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+
+    driver.archive('{"novo":true}')
+
+    const guardados = Object.keys(armazenamento.data).filter(key => key.startsWith(BACKUP_PREFIX))
+    expect(guardados).toHaveLength(MAX_BACKUPS)
+    expect(guardados).toContain(backupKey(FROZEN))
   })
 })

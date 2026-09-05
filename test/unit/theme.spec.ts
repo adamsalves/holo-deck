@@ -96,6 +96,20 @@ const UI_ROLES = [
    */
   { token: '--coin', minimum: AA_NORMAL },
   { token: '--hp', minimum: AA_NORMAL },
+  /**
+   * O que a loja e a nav global trouxeram.
+   *
+   * `--brand` é o traço do centro da Pokébola na barra global — objeto gráfico,
+   * não texto, então o piso é o 3:1 do critério 1.4.11, o mesmo de `--focus`. Um
+   * piso de texto aqui seria cobrar de um símbolo a razão de um parágrafo; um
+   * piso nenhum deixaria a marca poder sumir na barra.
+   *
+   * Ele entrou por este portão, e é o argumento de a lista ser de saída: o token
+   * nasceu no mesmo commit da barra, não casaria com padrão de nome nenhum, e
+   * caiu do lado de dentro por omissão — que é o comportamento que a Fase 6
+   * comprou ao inverter a lista.
+   */
+  { token: '--brand', minimum: NON_TEXT },
 ]
 
 /** Todo papel de cor que a matriz de contraste cobra, seja qual for o nome. */

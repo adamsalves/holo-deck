@@ -45,6 +45,14 @@ const gym = computed(() => {
 
 const leader = computed(() => (gym.value === null ? null : gymLeader(gym.value)))
 
+/**
+ * Sem a barra global, e é a prancha *Batalha* quem decide isso: ela desenha uma
+ * barra **própria** no topo — ginásio, líder, região e tipo —, no lugar dos seis
+ * destinos. Uma tela que oferece sair no meio do turno 12 não é a que o canvas
+ * desenhou, e a faixa de retomar do Hub existe justamente para essa saída.
+ */
+definePageMeta({ layout: false })
+
 useHead({
   title: () => (leader.value === null ? 'Batalha' : `Ginásio ${gym.value} · ${leader.value.name}`),
   // O sprite animado vem do repositório de sprites da PokeAPI, e só esta rota o

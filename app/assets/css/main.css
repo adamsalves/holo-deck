@@ -363,6 +363,36 @@
   );
 }
 
+/**
+ * Movimento: dois sinais, e a regra de escrever os dois.
+ *
+ * Quem pede menos movimento diz isso de duas formas — pelo sistema
+ * (`prefers-reduced-motion`) e pelo interruptor de `/settings`, que carimba
+ * `data-reduce-motion` no `<html>`. **Toda regra que para uma animação precisa
+ * existir nas duas formas**, e é por isso que todo bloco deste repositório
+ * aparece em par:
+ *
+ * ```css
+ * @media (prefers-reduced-motion: reduce) {
+ *   .x { animation: none; }
+ * }
+ *
+ * :root[data-reduce-motion] .x {
+ *   animation: none;
+ * }
+ * ```
+ *
+ * **A media query não some**, e é a metade que mais importa: ela é o único
+ * caminho que funciona antes de o JavaScript rodar, e quem já configurou o
+ * sistema não deveria precisar de um interruptor para ser obedecido. O
+ * `:root[...]` cobre o caso oposto — quem quer menos movimento **só aqui**.
+ *
+ * O par não é composição de duas regras que caberiam numa: media query e
+ * seletor não se combinam em CSS, e a duplicação de uma declaração é o preço
+ * disso. `test/unit/motion-gate.spec.ts` é quem impede a metade — ele anda por
+ * `app/` e reprova o bloco que aparecer sozinho, dos dois lados.
+ */
+
 :root {
   color-scheme: dark;
 
@@ -487,6 +517,20 @@
    * `--color-type-ice` diria que shiny é gelo, que é a leitura errada.
    */
   --shiny: var(--color-type-ice);
+
+  /**
+   * A marca — o vermelho do centro da Pokébola, na barra de navegação.
+   *
+   * Reusa `--color-type-fighting`, que é o mesmo `#FF5A4E` que o canvas desenha
+   * no símbolo, e o que faltava era o **nome**: o único semântico que já
+   * apontava para esse valor é `--deficit`, e um componente escrevendo
+   * `var(--deficit)` no logotipo diria que a marca é um aviso de risco.
+   *
+   * Mesmo argumento de `--shiny`, que reusa o ciano de gelo pela mesma razão. É
+   * o papel que justifica o terceiro nome, e no dia em que a identidade andar,
+   * ela anda sozinha.
+   */
+  --brand: var(--color-type-fighting);
 
   /**
    * O acento da forja.

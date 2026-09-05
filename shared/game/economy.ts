@@ -8,10 +8,10 @@ import type { GymId } from '../types/brand.ts'
  * três das cinco linhas que faltavam entram agora — recompensa por ginásio,
  * revanche e vitória imaculada.
  *
- * **As outras duas continuam de fora**, e isso corrige a tabela do contrato da
- * Fase 6, que punha o módulo "completo" neste PR. Pack diário e o preço de 150
- * só ganham consumidor com a loja, no PR seguinte, e uma constante de economia
- * sem quem a leia é exatamente o que este docblock recusa desde a Fase 5.
+ * **As outras duas chegaram com a loja**, no PR seguinte, e não antes: pack
+ * diário e o preço de 150 só ganharam consumidor lá, e uma constante de economia
+ * sem quem a leia é exatamente o que este docblock recusa desde a Fase 5. Com
+ * elas o módulo fecha, e é ele inteiro que `/rules` lê na seção *Economia*.
  *
  * Ele mora neste arquivo, e não em `packs.ts` ou em `gyms.ts`, porque `/rules`
  * vai procurá-lo onde o plano diz que ele está — e porque economia espalhada
@@ -45,9 +45,17 @@ export const WELCOME_PACKS = 3
  * Cresce com o ginásio porque o time do líder cresce junto: a faixa A leva 3
  * Pokémon sob teto de 480 de BST e a C leva 6 sob 600. Uma recompensa fixa
  * pagaria o nono ginásio pelo preço do primeiro.
+ *
+ * As duas parcelas têm nome porque `/rules` **escreve a fórmula**, e não a
+ * faixa: a prancha estampa `200 + 100×n`, e a página só pode reproduzir isso sem
+ * digitar número se os dois vierem daqui. Com eles nomeados, mexer na curva
+ * reescreve a página no mesmo commit — que é o contrato dela.
  */
+export const GYM_REWARD_BASE = 200
+export const GYM_REWARD_STEP = 100
+
 export function gymReward(gym: GymId): number {
-  return 200 + 100 * gym
+  return GYM_REWARD_BASE + GYM_REWARD_STEP * gym
 }
 
 /**
@@ -111,4 +119,108 @@ export function rewardFor({ gym, rematch, flawless }: VictoryTerms): BattleRewar
   const bonus = flawless ? Math.floor(earned * FLAWLESS_RATE) : 0
 
   return { base, earned, flawless: bonus, total: earned + bonus }
+}
+
+/**
+ * O preço do pack na loja, e o número que fecha a economia.
+ *
+ * 150 é o que o plano fixa e o que a prancha *Loja* estampa no botão. Ele existe
+ * para ser dividido pelos outros: os 6.300 da campanha compram **42 packs**, e é
+ * essa razão — não o preço isolado — que faz a Liga inteira valer alguma coisa.
+ *
+ * Ele chega **agora**, e não no PR da Liga, pela regra que o docblock do módulo
+ * escreve: constante de economia sem quem a leia é constante que ninguém pode
+ * calibrar. A loja é quem paga.
+ */
+export const PACK_PRICE = 150
+
+/**
+ * Quantos packs o saldo compra. A prancha escreve `dá para 8` ao lado do preço.
+ *
+ * Existe como função para a tela não repetir a divisão: o cartão da loja mostra
+ * o que sobra **e** quantos cabem, e duas contas escritas em dois lugares é como
+ * elas passam a discordar quando o preço mudar.
+ */
+export function packsAffordable(coins: number): number {
+  return Math.floor(coins / PACK_PRICE)
+}
+
+/**
+ * Quanto falta para comprar um pack — zero quando dá.
+ *
+ * Déficit e não booleano, pela mesma razão que `dustMissing`: o botão
+ * desabilitado escreve `FALTAM 60 MOEDAS`, e um `canBuy` obrigaria a tela a
+ * refazer a subtração para dizer isso.
+ */
+export function coinsMissing(coins: number): number {
+  return Math.max(0, PACK_PRICE - coins)
+}
+
+/**
+ * O pack diário — grátis, um por dia, e o "dia" é o de calendário do aparelho.
+ *
+ * **Decidido em 05/09 contra a espera de 24 horas.** As duas leituras cabem no
+ * `próximo em 14:22:07` que a prancha desenha, e a diferença aparece no segundo
+ * dia: uma espera de 24h a partir da abertura empurra o horário para frente toda
+ * vez — quem abre às 20h só pode às 20h do dia seguinte, e às 20h10 no outro, e
+ * a janela vai driftando até cair na madrugada. Dia de calendário devolve o pack
+ * à meia-noite, que é o que "um por dia" quer dizer.
+ *
+ * O relógio é o do aparelho, e isso é deliberado: o save é do jogador e o
+ * servidor confia nele por decisão escrita do plano — quem adiantar o relógio
+ * ganha um pack, que é o mesmo que já se ganha editando o save no DevTools.
+ */
+
+/**
+ * O dia de um instante, em `AAAA-MM-DD` **local**.
+ *
+ * `toISOString` não serve: ele converte para UTC antes de formatar, e para
+ * qualquer fuso a oeste de Greenwich — o do jogador — as horas finais do dia
+ * pertenceriam ao dia seguinte. Um pack aberto às 22h de terça marcaria
+ * quarta-feira e sumiria o dia inteiro.
+ *
+ * Recebe o instante em vez de o ler: `shared/` é a camada pura, e o portão de
+ * `shared-purity.spec.ts` recusa `new Date(` e `Date.now(` aqui dentro.
+ */
+export function dayKey(at: Date): string {
+  const month = String(at.getMonth() + 1).padStart(2, '0')
+  const day = String(at.getDate()).padStart(2, '0')
+  return `${at.getFullYear()}-${month}-${day}`
+}
+
+/** A forma que o save aceita — o guarda de `progress.dailyClaimed` chama esta. */
+export function isDayKey(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+/**
+ * O pack diário está de pé.
+ *
+ * Compara chaves de dia em vez de instantes, então um relógio que ande para trás
+ * **devolve** o pack em vez de travar a loja para sempre — que é o que uma
+ * subtração de timestamps faria com quem viaja de fuso ou corrige a data.
+ */
+export function isDailyReady(claimed: string | null, today: string): boolean {
+  return claimed !== today
+}
+
+/**
+ * Quanto falta para a meia-noite local, em milissegundos — o `próximo em
+ * 14:22:07` da prancha.
+ *
+ * Sai das componentes do relógio local, e não de uma subtração entre duas datas,
+ * pelo mesmo motivo de `dayKey`: construir a meia-noite seguinte exigiria `new
+ * Date`, que este módulo não pode chamar.
+ *
+ * Nos dois dias do ano em que um fuso muda de horário de verão o dia local tem
+ * 23 ou 25 horas e esta conta erra por uma. É contador de tela, e quem decide se
+ * o pack está de pé é `isDailyReady`, que compara datas e não sabe de horas.
+ */
+export function msUntilNextDay(at: Date): number {
+  const elapsed = at.getHours() * 3_600_000
+    + at.getMinutes() * 60_000
+    + at.getSeconds() * 1_000
+    + at.getMilliseconds()
+
+  return 86_400_000 - elapsed
 }
