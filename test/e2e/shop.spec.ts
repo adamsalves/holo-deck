@@ -70,6 +70,12 @@ test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
 
   await expect(page.getByRole('heading', { level: 1, name: 'Packs' })).toBeVisible()
 
+  // Os três cartões escrevem `ABRIR` ou um preço, e o rótulo visível não
+  // distingue um do outro para quem não vê a fileira. Aqui só há dois — as
+  // boas-vindas já foram no save plantado.
+  await expect(page.getByRole('button', { name: 'Abrir pack diário' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Comprar Pack Holo por 150 moedas' })).toBeVisible()
+
   // O cartão da loja diz o que sobra e quantos cabem, e os dois saem da mesma
   // divisão — a prancha escreve `restam 1.090 · dá para 8` com outro saldo.
   await expect(page.locator('.packs__offer-meta').last()).toContainText('restam 250')
@@ -198,9 +204,11 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
 test('o interruptor de animação atravessa o reload', async ({ page }) => {
   await page.goto('/settings')
 
-  const toggle = page.getByRole('switch', { name: /Reduzir animações|ligado|desligado/i })
-    .or(page.locator('.settings__switch'))
-    .first()
+  // Por papel e por nome, e não pela classe: o que este teste também guarda é
+  // que o controle **tem** nome acessível. O texto de dentro dele é o estado
+  // (`ligado`/`desligado`), e sem `aria-label` o leitor de tela anunciaria o
+  // estado no lugar do rótulo.
+  const toggle = page.getByRole('switch', { name: 'Reduzir animações' })
 
   await expect(toggle).toHaveAttribute('aria-checked', 'false')
   await toggle.click()

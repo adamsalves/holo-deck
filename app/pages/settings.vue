@@ -293,9 +293,14 @@ useSeoMeta({
               sistema já pede menos movimento, o jogo obedece sem isto.
             </p>
           </div>
+          <!-- `aria-label` porque o texto de dentro é o **estado**, não o nome:
+               sem ele o leitor de tela anuncia "ligado, switch, marcado", que
+               diz duas vezes a mesma coisa e nunca diz do que se trata. O estado
+               já viaja em `aria-checked`. -->
           <button
             type="button"
             role="switch"
+            aria-label="Reduzir animações"
             :aria-checked="motion.forced.value"
             class="settings__switch"
             :class="{ 'settings__switch--on': motion.forced.value }"
