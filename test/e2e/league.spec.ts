@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { openWelcomePack } from './support'
 
 /**
  * A Liga e a batalha num navegador de verdade.
@@ -16,16 +17,6 @@ import type { Page } from '@playwright/test'
  * Roda contra `yarn preview`, que é onde a batalha mora só no cliente e o HTML
  * servido não sabe nada dela.
  */
-
-/** Abre um pack de boas-vindas, que é como qualquer jogador chega ao deck. */
-async function openWelcomePack(page: Page): Promise<void> {
-  await page.goto('/packs')
-
-  await expect(async () => {
-    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
-  }).toPass({ timeout: 15_000 })
-}
 
 /** Escala as seis primeiras cartas que o pack deu. */
 async function fillDeck(page: Page): Promise<void> {

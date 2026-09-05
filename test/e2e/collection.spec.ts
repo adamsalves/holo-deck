@@ -29,13 +29,15 @@ import { expect, test } from '@playwright/test'
 test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reload', async ({ page }) => {
   await page.goto('/packs')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Abrir pack' })).toBeVisible()
-  await expect(page.getByText('BOAS-VINDAS · 1 DE 3')).toBeVisible()
+  // A loja abre em `Packs`, e o cartão de estreia é o primeiro da fileira. O
+  // título vira `Abrir pack` só depois do clique, que é a outra metade da tela.
+  await expect(page.getByRole('heading', { level: 1, name: 'Packs' })).toBeVisible()
+  await expect(page.getByText('Boas-vindas · 1 de 3')).toBeVisible()
 
   // O clique só vale depois da hidratação — antes dela o botão é marcação. Mesmo
   // `toPass` que a suíte da Pokédex usa pelas abas.
   await expect(async () => {
-    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
+    await page.locator('.packs__buy--gift').click()
     await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
@@ -95,7 +97,7 @@ test('a Pokédex conta o que o binder tem, e o filtro de posse separa os dois la
   await page.goto('/packs')
 
   await expect(async () => {
-    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
+    await page.locator('.packs__buy--gift').click()
     await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
@@ -143,35 +145,68 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
 })
 
 /**
- * A porta. A Fase 3 já teve um defeito desta família — a raiz não levava à
- * Pokédex —, e cada fase seguinte acrescentou tela: sem link, elas existem no
- * build e não existem para quem joga. A navegação global é o último PR da Fase 6;
- * até lá, é esta a checagem que impede uma fase inteira de ficar inalcançável.
+ * A porta, que agora é a barra global.
  *
- * **Ela precisa crescer com a raiz, e a Fase 5 provou isso do jeito ruim:** o
- * teste ficou chamado "três telas" depois de a quarta entrar, e a asserção sobre
- * a porta nova simplesmente não existia. Um teste que não acompanha o que ele
- * guarda é um teste que passa a guardar o passado.
+ * A Fase 3 já teve um defeito desta família — a raiz não levava à Pokédex —, e
+ * cada fase seguinte acrescentou tela: sem link, elas existem no build e não
+ * existem para quem joga. Até o PR anterior quem guardava isso era a fileira
+ * provisória de portas do Hub; agora é a barra, e a checagem passou a valer **de
+ * qualquer tela**, não só da raiz.
+ *
+ * O que este teste prova e o portão de `nav-gate.spec.ts` não alcança é o
+ * caminho inteiro: o link existe no `AppNav`, o layout o coloca na tela, o
+ * clique navega, e a rota de destino renderiza o `<h1>` que se espera. O portão
+ * lê o disco; este anda pelo produto.
  */
-test('a raiz leva a todas as telas que já existem', async ({ page }) => {
+test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }) => {
   const portas = [
-    { link: 'Abrir pack', url: /\/packs$/, titulo: 'Abrir pack' },
+    { link: 'Base', url: /\/$/, titulo: null },
+    { link: 'Packs', url: /\/packs$/, titulo: 'Packs' },
+    { link: 'Pokédex', url: /\/pokedex$/, titulo: 'Pokédex' },
     { link: 'Coleção', url: /\/collection$/, titulo: 'Binder' },
     { link: 'Deck', url: /\/deck$/, titulo: 'Seu time' },
-    { link: 'Pokédex', url: /\/pokedex$/, titulo: 'Pokédex' },
+    { link: 'Liga', url: /\/league$/, titulo: 'A Liga' },
+    { link: 'Regras', url: /\/rules$/, titulo: 'Regras' },
   ]
 
-  await page.goto('/')
+  // De uma tela **interna**, não da raiz: é a barra que precisa estar em toda
+  // parte, e sair sempre do Hub esconderia um layout aplicado só a ele.
+  await page.goto('/collection')
+
   for (const porta of portas) {
     await expect(page.getByRole('link', { name: porta.link, exact: true })).toBeVisible()
   }
 
   for (const porta of portas) {
-    await page.goto('/')
+    await page.goto('/collection')
     await page.getByRole('link', { name: porta.link, exact: true }).click()
     await expect(page).toHaveURL(porta.url)
-    await expect(page.getByRole('heading', { level: 1, name: porta.titulo })).toBeVisible()
+    if (porta.titulo !== null) {
+      await expect(page.getByRole('heading', { level: 1, name: porta.titulo })).toBeVisible()
+    }
   }
+
+  // Ajustes é ícone, não rótulo — e é a única entrada da barra que depende de
+  // `aria-label` para ser alcançável por quem navega por leitor de tela.
+  await page.goto('/collection')
+  await page.getByRole('link', { name: 'Ajustes' }).click()
+  await expect(page).toHaveURL(/\/settings$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Seu save e este aparelho' })).toBeVisible()
+})
+
+/**
+ * A batalha **não** recebe a barra, e a prancha *Batalha* é quem decide isso:
+ * ela desenha uma barra própria no lugar dos seis destinos.
+ *
+ * Vale um teste porque o mecanismo é uma linha fácil de perder — um
+ * `definePageMeta({ layout: false })` some num refactor sem nada reclamar, e o
+ * sintoma é uma tela de batalha oferecendo sair no meio do turno 12.
+ */
+test('a tela de batalha não recebe a barra global', async ({ page }) => {
+  await page.goto('/battle/1')
+
+  await expect(page.locator('.battle')).toBeVisible()
+  await expect(page.locator('.nav')).toHaveCount(0)
 })
 
 /**
@@ -193,7 +228,7 @@ test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', asy
   await page.goto('/packs')
 
   await expect(async () => {
-    await page.getByRole('button', { name: 'HOLO/DECK' }).click()
+    await page.locator('.packs__buy--gift').click()
     await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 

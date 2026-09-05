@@ -249,7 +249,7 @@ const tiers = computed(() => [
                 IR À LOJA
               </NuxtLink>
 
-              <p class="numeric hub__reward">
+              <p class="numeric hub__daily-meta">
                 <template v-if="dailyReady">
                   grátis, um por dia
                 </template>
@@ -613,6 +613,23 @@ const tiers = computed(() => [
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+/**
+ * A linha do diário tem classe própria, e não a do prêmio do ginásio.
+ *
+ * As duas dizem coisas diferentes — uma é recompensa de batalha, a outra é
+ * quando o pack volta — e compartilhar a classe fez um `.hub__reward` casar dois
+ * elementos, que é como o E2E da Liga passou a reprovar por ambiguidade.
+ */
+.hub__daily-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hub__daily-meta b {
+  font-weight: 700;
+  color: var(--text-body);
 }
 
 .hub__reward {

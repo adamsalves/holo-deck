@@ -79,9 +79,25 @@ test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre ele
   const contador = page.getByRole('button', { name: /^Todos/ })
   await expect(contador).toHaveText(/151$/)
 
-  // Kanto tem 12 espécies de fogo.
-  await page.getByRole('button', { name: 'Fogo', exact: true }).click()
-  await expect(contador).toHaveText(/12 de 151/)
+  /**
+   * O primeiro clique espera a hidratação; os seguintes não precisam.
+   *
+   * Antes dela o chip é marcação servida, e o clique cai no vazio: a chip fica
+   * `Todos · 151` e a asserção seguinte estoura. É o mesmo `toPass` que as
+   * suítes de pack e de aba usam, e ele está **só aqui** de propósito — depois
+   * do primeiro clique a página já respondeu, e repetir o laço esconderia uma
+   * regressão de verdade atrás de uma re-tentativa.
+   *
+   * Ele passou a ser necessário quando a barra global entrou em toda rota: o
+   * atraso sempre existiu, e este teste reprovava de vez em quando com os seis
+   * workers. Com mais um componente para hidratar, "de vez em quando" virou
+   * "sempre" — o defeito não é novo, o que mudou foi a margem.
+   */
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Fogo', exact: true }).click()
+    // Kanto tem 12 espécies de fogo.
+    await expect(contador).toHaveText(/12 de 151/, { timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
 
   // Ligar um segundo tipo amplia — é OU dentro do grupo.
   await page.getByRole('button', { name: 'Água', exact: true }).click()
