@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import type { BattleAction, BattleContext, BattlePokemon } from '~~/shared/game/battle'
-import { activeOf, benchIndexes, isFainted } from '~~/shared/game/battle'
+import { activeOf, isFainted } from '~~/shared/game/battle'
 import { switchOptions } from '~~/shared/game/engine'
 import { gymLeader } from '~~/shared/game/gyms'
 import { effectiveSpeed } from '~~/shared/game/status'
 import { effectivenessAgainst, multiplierLabel } from '~~/shared/game/typechart'
 import { gameNumber } from '~~/shared/game/progress'
 import { battleSpriteUrl } from '~~/shared/dex/artwork'
+import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
+import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
 import { AILMENT_LABELS, REGION_LABELS, TYPE_LABELS } from '~~/shared/types/game'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { useBattleStore } from '~~/app/stores/battle'
@@ -55,7 +57,7 @@ useHead({
  * Por que a tela não está lutando, quando não está.
  *
  * Estado explícito em vez de um encadeado de `v-if` sobre `context === null`:
- * são quatro razões diferentes com quatro saídas diferentes, e um nulo só diria
+ * são cinco razões diferentes com cinco saídas diferentes, e um nulo só diria
  * "não deu".
  */
 type Standing = 'loading' | 'ready' | 'unknown-gym' | 'locked' | 'no-deck' | 'busy' | 'failed'
@@ -85,8 +87,6 @@ onMounted(async () => {
   }
 
   const saved = battle.log
-  const resuming = saved !== null && saved.gymId === id
-  const team = resuming ? saved.team : deck.team
 
   /**
    * **Uma batalha em andamento em outro ginásio não é sobrescrita em silêncio.**
@@ -94,37 +94,98 @@ onMounted(async () => {
    * Chegar aqui com um log de outro ginásio é o caminho normal — a Liga oferece
    * revanche em toda carta vencida, e o Hub oferece retomar. Começar por cima
    * apagaria o turno 12 de alguém sem uma linha na tela, que é exatamente o que
-   * o `resuming` acima evita para o mesmo ginásio e deixava passar para o
-   * vizinho. A escolha é do jogador, e ela precisa existir.
+   * o ramo de retomada abaixo evita para o mesmo ginásio e deixava passar para
+   * o vizinho. A escolha é do jogador, e ela precisa existir.
    */
-  if (!resuming && saved !== null) {
+  if (saved !== null && saved.gymId !== id) {
     standing.value = 'busy'
     return
   }
 
-  if (!resuming && !deck.ready) {
+  // Retomar primeiro: um log daquele ginásio é uma luta que o jogador deixou no
+  // meio, e começar outra por cima apagaria o turno 4 dele sem avisar.
+  if (saved !== null) {
+    const outcome = await tryResume(id, saved.team)
+    if (outcome !== 'discarded') {
+      standing.value = outcome === 'resumed' ? 'ready' : 'failed'
+      return
+    }
+  }
+
+  // `discarded` cai aqui, e daqui para baixo o caminho é o de quem chega sem
+  // batalha nenhuma — inclusive a conferência do deck. Ver `startFresh`.
+  await startFresh(id)
+})
+
+/**
+ * O que sobrou de uma tentativa de retomar: a luta, nada, ou a rede.
+ *
+ * Três saídas e não um booleano porque elas levam a três lugares diferentes.
+ * `discarded` **continua** para uma batalha nova, e `failed` não: o log sobrevive
+ * a uma falha de carga, e começar do zero por causa de um `fetch` que não voltou
+ * apagaria a luta do jogador por um problema que passa sozinho.
+ */
+type ResumeOutcome = 'resumed' | 'discarded' | 'failed'
+
+/**
+ * Reconstrói a luta salva, ou a descarta.
+ *
+ * O contexto é montado para o time do **log** e não para o do deck, porque é o
+ * do log que está em campo — trocar carta no deck builder no meio de um ginásio
+ * não muda a luta que já começou.
+ *
+ * Aqui só há o `catch` da carga. O do replay mora na store, que é dona do log e
+ * é chamada das duas telas — ver o docblock de `resume`.
+ */
+async function tryResume(id: GymId, team: readonly SpeciesId[]): Promise<ResumeOutcome> {
+  let saved: BattleContext
+  try {
+    saved = await loadBattleContext(id, team)
+  }
+  catch {
+    return 'failed'
+  }
+
+  if (battle.resume(saved) === null) return 'discarded'
+
+  context.value = saved
+  return 'resumed'
+}
+
+/**
+ * Começa uma luta nova neste ginásio, e é ela quem cobra o deck.
+ *
+ * **A cobrança mora aqui, e não no `onMounted`.** Um log descartado chega a este
+ * ponto pelo mesmo caminho de quem nunca lutou, e as duas coisas que o ramo de
+ * retomada garantia deixam de valer junto com ele: o deck pode ter esvaziado
+ * desde que o log foi gravado — nada trava o deck builder durante uma batalha, e
+ * o log carrega o próprio time justamente por isso —, e o contexto que
+ * `tryResume` montou é o do time salvo. Começar com ele pediria ao motor uma
+ * espécie de uma geração que ninguém carregou, e `buildSide` derruba.
+ */
+async function startFresh(id: GymId): Promise<void> {
+  if (!deck.ready) {
     standing.value = 'no-deck'
     return
   }
 
+  standing.value = 'loading'
+
   try {
-    context.value = await loadBattleContext(id, team)
+    context.value = await loadBattleContext(id, deck.team)
+    // Dentro do mesmo `try` que a carga: `startBattle` derruba quando o time não
+    // cabe no dex — e cair aqui é a diferença entre a tela de erro, que tem
+    // porta, e o `loading` eterno, que não tem.
+    battle.start(id, deck.team, newSeed(), context.value)
   }
   catch {
     standing.value = 'failed'
     return
   }
 
-  // Retomar primeiro: um log daquele ginásio é uma luta que o jogador deixou no
-  // meio, e começar outra por cima apagaria o turno 4 dele sem avisar.
-  if (resuming && battle.resume(context.value) !== null) {
-    standing.value = 'ready'
-    return
-  }
-
-  battle.start(id, deck.team, newSeed(), context.value)
+  history.value = []
   standing.value = 'ready'
-})
+}
 
 /**
  * A semente da batalha — a única coisa que este jogo sorteia fora do gerador.
@@ -137,11 +198,20 @@ function newSeed(): number {
   return Math.floor(Math.random() * 2 ** 32)
 }
 
-/** A batalha aberta em outro ginásio, quando é ela que está no caminho. */
+/**
+ * A batalha aberta em outro ginásio, quando é ela que está no caminho.
+ *
+ * **Ações, e não turnos.** O log não guarda o número do turno, e derivá-lo do
+ * tamanho da lista supõe uma ação por turno — o que a troca forçada quebra: o
+ * ramo `playerSwitch` de `applyAction` devolve o estado sem incrementar `turn`,
+ * então depois de dois desmaios a conta erra por dois. Aqui o número serve para
+ * dizer "há luta de verdade parada aí", e a quantidade de ações diz isso sem
+ * afirmar um turno que ninguém contou.
+ */
 const busyWith = computed(() => {
   const saved = battle.log
   if (saved === null || !isGymId(saved.gymId)) return null
-  return { gym: saved.gymId, leader: gymLeader(saved.gymId), turns: saved.actions.length + 1 }
+  return { gym: saved.gymId, leader: gymLeader(saved.gymId), actions: saved.actions.length }
 })
 
 /**
@@ -151,22 +221,19 @@ const busyWith = computed(() => {
  */
 async function dropAndStart(): Promise<void> {
   const id = gym.value
-  if (id === null || !deck.ready) return
+  if (id === null) return
 
-  battle.discard()
-  standing.value = 'loading'
-
-  try {
-    context.value = await loadBattleContext(id, deck.team)
-  }
-  catch {
-    standing.value = 'failed'
+  // O deck é conferido **antes** do descarte, e não dentro de `startFresh`:
+  // apagar a luta salva para só então parar em "Sem time" trocaria uma batalha
+  // em andamento por uma tela de erro. Antes daqui não havia nem uma coisa nem
+  // outra — o clique voltava em silêncio.
+  if (!deck.ready) {
+    standing.value = 'no-deck'
     return
   }
 
-  battle.start(id, deck.team, newSeed(), context.value)
-  history.value = []
-  standing.value = 'ready'
+  battle.discard()
+  await startFresh(id)
 }
 
 const state = computed(() => battle.state)
@@ -190,15 +257,21 @@ const moves = computed(() => {
 /**
  * O aviso que substitui o multiplicador, quando há um.
  *
- * Os dois casos são os que a prancha desenha: o golpe que não afeta (`×0`) e o
- * de status contra alvo que já carrega condição — o `JÁ PARALISADO`, que sai do
- * rótulo da condição em vez de uma frase escrita por golpe.
+ * Dois vêm da prancha: o golpe que não afeta (`×0`) e o de status contra alvo que
+ * já carrega condição — o `JÁ PARALISADO`, que sai do rótulo da condição em vez
+ * de uma frase escrita por golpe.
+ *
+ * O terceiro é o slot gasto, e ele vem **primeiro** de propósito: `moveFromSlot`
+ * o troca por Struggle, então o multiplicador ao lado do nome descreveria um
+ * golpe que não vai sair. É a mesma mentira que o `×2` sobre Thunder Wave era, e
+ * a correção é a mesma — o número sai e o aviso entra.
  */
 function noteFor(
   slot: { readonly move: { readonly damageClass: string }, readonly pp: number },
   foe: BattlePokemon,
   multiplier: number,
 ): string | null {
+  if (slot.pp <= 0) return 'SEM PP · STRUGGLE'
   if (multiplier === 0) return '×0 NÃO AFETA'
   if (slot.move.damageClass === 'status' && foe.condition !== null) {
     return `JÁ ${AFFECTED[foe.condition.kind]}`
@@ -225,19 +298,31 @@ const AFFECTED = {
  */
 const reading = computed(() => {
   const foe = opponent.value
-  const matrix = context.value?.matrix
+  const ctx = context.value
   const chosen = moves.value[focused.value] ?? moves.value[0]
-  if (foe === undefined || foe === null || matrix === undefined || chosen === undefined) return null
+  if (foe === null || ctx === null || chosen === undefined) return null
+
+  /**
+   * O golpe que a jogada produz, e não o que está escrito no slot.
+   *
+   * `moveFromSlot` troca o slot gasto por Struggle, então a leitura de um slot
+   * sem PP precisa abrir a conta **de Struggle** — sem tipo, contra os tipos de
+   * quem está do outro lado. Abrir a do golpe escrito ali seria explicar uma
+   * conta que não acontece, no mesmo lugar em que a tela ensina a escolher.
+   */
+  const move = chosen.pp > 0 ? chosen.move : ctx.moves.get(STRUGGLE_MOVE_ID)
+  if (move === undefined) return null
+
+  const multiplier = effectivenessAgainst(ctx.matrix, move.type, foe.types)
 
   // A conta aberta, tipo a tipo — é a linha de baixo da prancha, e é ela que
   // ensina de onde o número saiu, inclusive quando ele é zero.
   const detail = foe.types
-    .map(type => `${TYPE_LABELS[chosen.move.type]} → ${TYPE_LABELS[type]} `
-      + multiplierLabel(effectivenessAgainst(matrix, chosen.move.type, [type])))
+    .map(type => `${TYPE_LABELS[move.type]} → ${TYPE_LABELS[type]} `
+      + multiplierLabel(effectivenessAgainst(ctx.matrix, move.type, [type])))
     .join(' · ')
 
-  const move = chosen.move
-  if (move.damageClass === 'status' && chosen.multiplier !== 0) {
+  if (move.damageClass === 'status' && multiplier !== 0) {
     return {
       kind: 'status' as const,
       multiplier: 1,
@@ -249,9 +334,9 @@ const reading = computed(() => {
 
   return {
     kind: 'damage' as const,
-    multiplier: chosen.multiplier,
-    title: multiplierLabel(chosen.multiplier),
-    label: EFFECTIVENESS_LABELS[chosen.multiplier] ?? 'NEUTRO',
+    multiplier,
+    title: multiplierLabel(multiplier),
+    label: EFFECTIVENESS_LABELS[multiplier] ?? 'NEUTRO',
     detail,
   }
 })
@@ -280,7 +365,16 @@ const initiative = computed(() => {
 })
 
 const bench = computed(() => (state.value === null ? [] : state.value.player.team))
-const standingBench = computed(() => (state.value === null ? [] : benchIndexes(state.value.player)))
+/**
+ * Quantos dos seis ainda estão de pé — sobre o time inteiro, e não banco + 1.
+ *
+ * O `+ 1` supunha que o ativo está vivo, e ele não está justamente quando o
+ * número importa: em `expecting === 'playerSwitch'` o ativo acabou de desmaiar e
+ * o painel escrevia "3 de pé" com dois vivos. É a mesma leitura que a faixa do
+ * Hub faz, e agora pela mesma conta.
+ */
+const teamStanding = computed(() =>
+  (state.value === null ? 0 : state.value.player.team.filter(card => !isFainted(card)).length))
 const canSwitch = computed(() => state.value !== null && switchOptions(state.value).length > 0)
 const potions = computed(() => state.value?.player.potionsLeft ?? 0)
 
@@ -303,9 +397,17 @@ function play(action: BattleAction): void {
   focused.value = 0
 }
 
+/**
+ * O clique num dos quatro golpes — **inclusive no que está sem PP**.
+ *
+ * O `pp <= 0` que voltava aqui em silêncio era o único lugar que impedia
+ * `moveFromSlot` de cair em Struggle, e ele fechava a saída que o motor mantém
+ * para o caso extremo: com os quatro slots zerados, sem banco vivo e sem poção,
+ * não sobrava nenhuma ação e a batalha parava. Struggle é a jogada, e a carta já
+ * a anuncia com `SEM PP · STRUGGLE`.
+ */
 function choose(index: number): void {
-  const chosen = moves.value[index]
-  if (chosen === undefined || chosen.pp <= 0) return
+  if (moves.value[index] === undefined) return
   play({ kind: 'move', slot: index })
 }
 
@@ -556,7 +658,7 @@ function fallbackSprite(event: Event, id: number): void {
             <div class="battle__bench-wrap">
               <p class="battle__eyebrow">
                 Seu banco
-                <span class="battle__initiative">— {{ standingBench.length + 1 }} de pé</span>
+                <span class="battle__initiative">— {{ teamStanding }} de pé</span>
               </p>
               <div class="battle__bench">
                 <button
@@ -623,8 +725,9 @@ function fallbackSprite(event: Event, id: number): void {
             Você já está lutando
           </h1>
           <p class="battle__note">
-            Ginásio {{ busyWith.gym }} · {{ busyWith.leader.name }}, no turno
-            {{ busyWith.turns }}. Começar esta luta apaga aquela.
+            Ginásio {{ busyWith.gym }} · {{ busyWith.leader.name }}, com
+            {{ busyWith.actions }} {{ busyWith.actions === 1 ? 'jogada feita' : 'jogadas feitas' }}.
+            Começar esta luta apaga aquela.
           </p>
           <div class="battle__buttons">
             <NuxtLink

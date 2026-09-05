@@ -16,8 +16,18 @@ import { AILMENT_LABELS } from '~~/shared/types/game'
  * O botão continua clicável quando o golpe não afeta — o motor executa, gasta o
  * turno e narra `não afetou`. Isso é decisão do plano, e não descuido: a
  * interface **ensina no ponto de decisão**, e um botão desabilitado esconderia o
- * `×0` em vez de mostrá-lo. Sem PP é diferente: aí não há golpe, e o motor cai em
- * Struggle.
+ * `×0` em vez de mostrá-lo.
+ *
+ * **Sem PP ele também continua clicável, e pelo mesmo argumento.** `moveFromSlot`
+ * cai em Struggle por *slot*, não só quando os quatro acabam: clicar um golpe
+ * zerado é uma jogada válida, e o motor a resolve. A carta dizia o contrário de
+ * três formas — `cursor: not-allowed`, um comentário afirmando que o golpe "some
+ * da escolha" e um `choose()` que voltava em silêncio —, sem nunca desabilitar o
+ * botão. Fechá-lo de verdade era a saída errada: com os quatro zerados, sem banco
+ * vivo e sem poção, não sobraria nenhuma ação e a batalha travaria — e o Struggle
+ * que o motor mantém para exatamente esse caso deixaria de existir para o
+ * jogador. Aqui o slot vazio vira o aviso `SEM PP · STRUGGLE`, que é o que a
+ * jogada produz.
  */
 const props = defineProps<{
   move: MoveEntry
@@ -129,11 +139,12 @@ const detail = computed(() => {
   outline-offset: 2px;
 }
 
-/* Sem PP o golpe some da escolha: o motor cai em Struggle e a tela não deve
-   oferecer o que ela sabe que não vai sair. */
+/* O slot gasto continua uma jogada — o motor o resolve em Struggle. O que a cor
+   diz é que o golpe escrito ali não é o que vai sair; quem diz o que sai é o
+   aviso `SEM PP · STRUGGLE`, na linha do multiplicador. Sem `not-allowed`: o
+   cursor prometia um botão desabilitado que nunca existiu. */
 .move--empty {
   opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .move__top {

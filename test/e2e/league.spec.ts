@@ -239,7 +239,7 @@ test('começar outro ginásio com uma batalha aberta pede confirmação', async 
 
   await page.goto('/battle/2')
   await expect(page.getByRole('heading', { name: 'Você já está lutando' })).toBeVisible()
-  await expect(page.getByText(/Ginásio 1 · Brock, no turno 2/)).toBeVisible()
+  await expect(page.getByText(/Ginásio 1 · Brock, com 1 jogada feita/)).toBeVisible()
 
   // Retomar aquela devolve o mesmo turno: nada foi perdido no caminho.
   await page.getByRole('link', { name: 'RETOMAR AQUELA' }).click()
@@ -250,4 +250,77 @@ test('começar outro ginásio com uma batalha aberta pede confirmação', async 
   await page.getByRole('button', { name: 'DESISTIR E COMEÇAR ESTA' }).click()
   await expect(page.getByText('Ginásio 2 / 9')).toBeVisible()
   await expect(page.getByText('TURNO 01')).toBeVisible()
+})
+
+/**
+ * **A batalha descartada tem de virar alguma tela — e nunca o campo montando.**
+ *
+ * O descarte é o caminho normal do plano, e este PR é o que o torna comum: antes
+ * só `ENGINE_VERSION` o disparava, à mão e quase nunca; agora todo rebuild do dex
+ * muda o `dexVersion` e descarta a luta de quem estava no meio de um ginásio.
+ *
+ * A página tratava o descarte caindo direto num `battle.start` de fora do `try`,
+ * com o contexto que tinha sido montado para o time do **log** e sem reconferir o
+ * deck. As duas coisas derrubam `buildSide` — espécie de uma geração que ninguém
+ * carregou, ou time vazio —, a exceção saía de um `onMounted` async, e a tela
+ * ficava em "Montando o campo…" para sempre: um beco, na única rota do jogo que
+ * não tem barra de navegação.
+ *
+ * Nada disso é alcançável por unitário. O que ele prova é que a store descarta;
+ * o que só o navegador percorre é o `onMounted`, a rota pré-renderizada, o dex
+ * carregado por geração e a tela que sobra no fim.
+ */
+test('a batalha de outro dex é descartada sem deixar a tela montando o campo', async ({ page }) => {
+  await openWelcomePack(page)
+  await fillDeck(page)
+
+  await page.goto('/battle/1')
+  await playTurn(page)
+  await expect(page.getByText('TURNO 02')).toBeVisible()
+
+  /** Um deploy que mexeu no dex, encenado no save: a forma continua válida —
+   * `isDexVersion` cobra oito hex — e só o valor diverge, que é exatamente o que
+   * `replayable` recusa. */
+  const forjarDexVersion = async (): Promise<void> => {
+    await page.evaluate(() => {
+      const raw = window.localStorage.getItem('holodeck:save')
+      if (raw === null) throw new Error('sem save para editar')
+      const save: unknown = JSON.parse(raw)
+      if (typeof save !== 'object' || save === null) throw new Error('save fora de forma')
+      const record: Record<string, unknown> = { ...save }
+      const battle = record.battle
+      if (typeof battle !== 'object' || battle === null) throw new Error('save sem batalha')
+      record.battle = { ...battle, dexVersion: 'deadbeef' }
+      window.localStorage.setItem('holodeck:save', JSON.stringify(record))
+    })
+  }
+
+  await forjarDexVersion()
+
+  // Com deck montado, o descarte cai no caminho de quem chega sem batalha: luta
+  // nova, do turno 1. O que ele **não** pode ser é o campo montando para sempre.
+  await page.goto('/battle/1')
+  await expect(page.getByText('TURNO 01')).toBeVisible()
+  await expect(page.locator('.move')).toHaveCount(4)
+  await expect(page.getByText('Montando o campo…')).toHaveCount(0)
+
+  // A outra metade: o deck pode ter esvaziado desde que o log foi gravado — nada
+  // trava o deck builder durante uma batalha. Aqui o descarte tem de encontrar a
+  // conferência do deck, que o ramo de retomada não fazia.
+  await playTurn(page)
+  await forjarDexVersion()
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem('holodeck:save')
+    if (raw === null) throw new Error('sem save para editar')
+    const save: unknown = JSON.parse(raw)
+    if (typeof save !== 'object' || save === null) throw new Error('save fora de forma')
+    window.localStorage.setItem(
+      'holodeck:save',
+      JSON.stringify({ ...save, deck: [null, null, null, null, null, null] }),
+    )
+  })
+
+  await page.goto('/battle/1')
+  await expect(page.getByRole('heading', { name: 'Sem time' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'MONTAR O DECK' })).toBeVisible()
 })

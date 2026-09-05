@@ -710,15 +710,33 @@ duas linhas deixa o jogador com a recompensa e uma batalha para refazer pelo
 valor de revanche, e a ordem inversa apagaria a luta sem pagar por ela. Derrota
 não cobra nada — revanche imediata, nada é perdido.
 
-### Quatro decisões de tela que o código não deduz sozinho
+### Seis decisões de tela que o código não deduz sozinho
 
 - **A leitura grande do centro segue o golpe em foco**, e a linha de baixo abre a
   conta tipo a tipo. É o que transforma `×2.0` numa explicação em vez de um
   número.
 - **O golpe que não afeta continua clicável.** O motor executa, gasta o turno e
   narra `não afetou`; a interface ensina no ponto de decisão, e desabilitar o
-  botão esconderia o `×0` em vez de mostrá-lo. Sem PP é outro caso — aí não há
-  golpe, e o motor cai em Struggle.
+  botão esconderia o `×0` em vez de mostrá-lo.
+- **O golpe sem PP também continua clicável**, e pelo mesmo argumento.
+  `moveFromSlot` cai em Struggle **por slot**, e não só quando os quatro acabam:
+  clicar um slot gasto é jogada válida e o motor a resolve. A carta troca o
+  multiplicador pelo aviso `SEM PP · STRUGGLE` e a leitura do centro abre a conta
+  de Struggle, porque estampar a do golpe escrito ali seria explicar uma conta
+  que não acontece — a mesma mentira que o `×2` sobre Thunder Wave era. Fechar o
+  botão seria a saída errada: com os quatro zerados, sem banco vivo e sem poção
+  não sobraria ação nenhuma, e o Struggle que o motor mantém para exatamente esse
+  caso deixaria de existir para o jogador.
+- **Uma batalha descartada cai no caminho de quem chega sem batalha, e ele
+  começa pelo deck.** `replayable` recusar o log é o caminho normal — e virou o
+  comum, porque `dexVersion` muda a cada rebuild do dex. Descartar não pode
+  continuar de onde a retomada parou: o contexto foi montado para o time do
+  **log**, e o deck pode ter esvaziado no meio da luta, já que nada trava o deck
+  builder durante uma batalha. As duas coisas derrubam `buildSide`, e uma exceção
+  num `onMounted` async não é pega por ninguém — a tela ficaria montando o campo
+  para sempre, na única rota sem barra de navegação. Por isso `resume` **nunca
+  derruba**: as versões ele pergunta, e o que só executando se descobre ele
+  captura, com o mesmo destino.
 - **A narração caminha pelos eventos mantendo o cursor de cada lado.** Ler o
   ativo depois do turno nomearia o Pokémon errado duas vezes: o motor resolve
   troca antes dos golpes e troca de novo no fim, quando alguém cai. O time nunca

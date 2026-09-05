@@ -182,6 +182,57 @@ describe('retomar', () => {
     expect(depois.resume(context)).toBeNull()
     expect(depois.hasSaved).toBe(false)
   })
+
+  /**
+   * **`resume` devolve `null`; ele não derruba.** É o contrato que as duas telas
+   * que o chamam dependem, e por isso ele é cobrado aqui.
+   *
+   * `replayable` compara motor e dex e nada mais — a lista de ações passa pelo
+   * guarda do save com qualquer inteiro não negativo, de propósito, porque quem
+   * conhece o time e o moveset é o motor. Só que o motor recusa **derrubando**, e
+   * `resume` é chamado do `onMounted` async do Hub e de `/battle/[gymId]`: uma
+   * exceção ali não é pega por ninguém e deixa a tela montando o campo para
+   * sempre.
+   */
+  it('descarta o log cujas ações o motor recusa, em vez de derrubar', () => {
+    const battle = useBattleStore()
+    battle.start(gym(1), DECK, 2024, context)
+
+    const gravado = battle.snapshot()
+    if (gravado === null) throw new Error('a batalha não foi gravada')
+
+    // Duas poções numa luta que tem uma. Motor e dex conferem, `isBattleLog`
+    // aceita — é `usePotion` quem recusa, e só executando.
+    const adulterado = { ...gravado, actions: [{ kind: 'item' }, { kind: 'item' }] } as const
+
+    setActivePinia(createPinia())
+    const depois = useBattleStore()
+    depois.hydrate(adulterado)
+
+    expect(() => depois.resume(context)).not.toThrow()
+    expect(depois.resume(context)).toBeNull()
+    expect(depois.hasSaved).toBe(false)
+    expect(depois.state).toBeNull()
+  })
+
+  /** Descartado é descartado: a store fica pronta para uma luta nova, e é isso
+   * que deixa `/battle/[gymId]` cair no caminho de quem chega sem batalha. */
+  it('depois de descartar, uma batalha nova começa por cima sem resíduo', () => {
+    const battle = useBattleStore()
+    battle.start(gym(1), DECK, 2024, context)
+
+    const gravado = battle.snapshot()
+    if (gravado === null) throw new Error('a batalha não foi gravada')
+
+    setActivePinia(createPinia())
+    const depois = useBattleStore()
+    depois.hydrate({ ...gravado, dexVersion: 'deadbeef' })
+    expect(depois.resume(context)).toBeNull()
+
+    depois.start(gym(1), DECK, 99, context)
+    expect(depois.ongoing).toBe(true)
+    expect(depois.snapshot()?.seed).toBe(99)
+  })
 })
 
 describe('o fim da luta', () => {

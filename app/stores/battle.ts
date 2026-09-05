@@ -80,13 +80,26 @@ export const useBattleStore = defineStore('battle', () => {
   }
 
   /**
-   * Reconstrói a batalha salva, ou a descarta.
+   * Reconstrói a batalha salva, ou a descarta. **Nunca derruba.**
    *
    * **Descartar é o caminho normal, não o excepcional**: um deploy que mexa no
    * motor ou no dex torna o log irreproduzível, e a regra do plano é perder a
    * luta em vez de reproduzi-la torto — perder uma batalha é aceitável, perder
-   * coleção não. Por isso `replayable` é perguntado antes, em vez de um
-   * `try/catch` em volta do `replay`.
+   * coleção não. Por isso `replayable` é perguntado antes: ele responde a
+   * pergunta de versão sem executar nada, e responder é melhor que capturar.
+   *
+   * **O `try` abaixo é a parte que nenhuma pergunta cobre.** `replayable` compara
+   * dois números; o que ele não pode olhar é a lista de ações, que `isBattleAction`
+   * aceita como qualquer inteiro não negativo de propósito — "quem conhece o time
+   * e o moveset é o motor". Só que o motor recusa **derrubando**: uma poção além
+   * das da luta sai por `usePotion`, um índice de troca inválido por `switchTo`.
+   * Não existe predicado barato para "estas 30 ações executam" — o predicado é
+   * executá-las. Então a pergunta cobre o que dá para perguntar, e o `catch` cobre
+   * o resto, com o mesmo destino: o log já está perdido de qualquer jeito.
+   *
+   * Ele mora aqui e não nas telas porque o log é desta store: o Hub e
+   * `/battle/[gymId]` chamam `resume` no boot, e uma exceção escapando para o
+   * `onMounted` async de qualquer um dos dois não é pega por ninguém.
    *
    * Devolve o estado para quem chamou não precisar reler a store no mesmo tick.
    */
@@ -99,7 +112,16 @@ export const useBattleStore = defineStore('battle', () => {
       return null
     }
 
-    state.value = replay(saved, context)
+    let reproduced: BattleState
+    try {
+      reproduced = replay(saved, context)
+    }
+    catch {
+      discard()
+      return null
+    }
+
+    state.value = reproduced
     events.value = []
     reward.value = null
 
