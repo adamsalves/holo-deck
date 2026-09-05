@@ -298,4 +298,63 @@ describe('o caminho voluntário de /settings', () => {
     expect(guardados).toHaveLength(MAX_BACKUPS)
     expect(guardados).toContain(backupKey(FROZEN))
   })
+  /**
+   * Listar e ler as cópias — o caminho de volta que a interface prometia e o
+   * produto não tinha.
+   *
+   * Apagar e importar dizem que a cópia fica guardada; até este PR o único jeito
+   * de alcançá-la era pelo DevTools. O argumento do aviso de boot para não
+   * oferecer restauração — a chave crua é de uma versão que este código não
+   * soube ler — não vale aqui: nestes dois caminhos o texto arquivado é um save
+   * que este mesmo código acabou de escrever.
+   */
+  it('lista as cópias da mais nova para a mais velha', () => {
+    const armazenamento = fakeStorage({
+      [backupKey(300)]: 'terceira',
+      [backupKey(100)]: 'primeira',
+      [backupKey(200)]: 'segunda',
+      [SAVE_KEY]: '{"atual":true}',
+      'outra:chave': 'nada a ver',
+    })
+    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+
+    // A ordem é por instante e **numérica**: ordenar as chaves como texto
+    // funcionaria por acidente de largura, e é o mesmo cuidado que a poda toma.
+    expect(driver.listBackups().map(backup => backup.at)).toEqual([300, 200, 100])
+
+    // E o save e as chaves alheias não entram na lista.
+    expect(driver.listBackups()).toHaveLength(3)
+  })
+
+  it('lê o texto de uma cópia, e devolve nulo se ela sumiu no meio', () => {
+    const armazenamento = fakeStorage({ [backupKey(100)]: '{"guardado":true}' })
+    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+
+    expect(driver.readBackup(backupKey(100))).toBe('{"guardado":true}')
+    expect(driver.readBackup(backupKey(999))).toBeNull()
+  })
+
+  /**
+   * As duas metades falham separado, e é isso que o teste fixa.
+   *
+   * Enumerar chaves não lê valor nenhum: com as leituras bloqueadas a lista
+   * **continua** saindo, e é só o texto que volta nulo. A tela precisa disso —
+   * ela mostra as cópias que existem e só falha no clique, com a mensagem certa,
+   * em vez de fingir que não há cópia alguma.
+   */
+  it('e a listagem sobrevive à leitura bloqueada, que é o que falha sozinho', () => {
+    const bloqueado = fakeStorage({ [backupKey(100)]: 'x' })
+    bloqueado.failReads = true
+    const driver = new LocalStorageDriver(bloqueado, () => FROZEN)
+
+    expect(driver.listBackups().map(backup => backup.at)).toEqual([100])
+    expect(driver.readBackup(backupKey(100))).toBeNull()
+  })
+
+  it('e sem armazenamento nenhum não há cópia nem explosão', () => {
+    const driver = new LocalStorageDriver(null, () => FROZEN)
+
+    expect(driver.listBackups()).toEqual([])
+    expect(driver.readBackup(backupKey(100))).toBeNull()
+  })
 })

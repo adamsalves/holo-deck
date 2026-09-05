@@ -190,6 +190,51 @@ export class LocalStorageDriver implements SaveDriver {
     this.#backup(raw)
   }
 
+  /**
+   * As cópias de segurança que existem, da mais nova para a mais velha.
+   *
+   * **Ela existe porque a interface prometia uma coisa que o produto não
+   * devolvia.** Apagar e importar dizem "uma cópia de segurança fica guardada",
+   * e até aqui o único jeito de voltar era abrir o DevTools e copiar a chave à
+   * mão. O argumento do aviso de boot para não oferecer restauração — a chave
+   * crua é de uma versão que este código, por definição, não soube ler — **não
+   * vale** nestes dois caminhos: ali o texto arquivado é um save que este mesmo
+   * código acabou de ler e escrever.
+   *
+   * Fica fora da interface `SaveDriver` pelo mesmo motivo de `readRaw`: o
+   * `HttpDriver` da Fase 7 não tem "as chaves no disco", e o *restaurar versão
+   * anterior do servidor* que a prancha desenha é outra coisa, com outra fonte.
+   */
+  listBackups(): { readonly key: string, readonly at: number }[] {
+    const storage = this.#storage
+    if (storage === null) return []
+
+    try {
+      const found: { key: string, at: number }[] = []
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index)
+        if (key !== null && key.startsWith(BACKUP_PREFIX)) {
+          found.push({ key, at: Number(key.slice(BACKUP_PREFIX.length)) })
+        }
+      }
+
+      return found.sort((first, second) => second.at - first.at)
+    }
+    catch {
+      return []
+    }
+  }
+
+  /** O texto cru de uma cópia, ou `null` se ela sumiu entre listar e ler. */
+  readBackup(key: string): string | null {
+    try {
+      return this.#storage?.getItem(key) ?? null
+    }
+    catch {
+      return null
+    }
+  }
+
   #backup(raw: string): void {
     try {
       // A poda vem antes da escrita, e não depois: se a cota já estiver cheia, é

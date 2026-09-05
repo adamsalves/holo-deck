@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useNuxtApp, useRuntimeConfig } from 'nuxt/app'
+import { dayKey } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { SCHEMA_VERSION, emptySave, migrate } from '~~/shared/save/schema'
@@ -44,6 +45,19 @@ const { appVersion, gitSha } = useRuntimeConfig().public
 const fileInput = ref<HTMLInputElement | null>(null)
 
 /**
+ * O teto do arquivo importado — e ele existe antes do `await file.text()`.
+ *
+ * Sem teto, um JSON de centenas de MB escolhido no seletor trava a aba lendo o
+ * arquivo inteiro para a memória antes de o `JSON.parse` ter chance de recusá-lo.
+ * Nada é destruído (o save só é tocado depois da validação), mas a tela morre
+ * sem dizer por quê, e o jogador não tem como saber que a culpa é do arquivo.
+ *
+ * Um megabyte é duas ordens de grandeza acima do pior caso real: o save de um
+ * dex completo mede ~21 KB, e o desta tela mostra o número medido ao lado.
+ */
+const MAX_IMPORT_BYTES = 1_048_576
+
+/**
  * O que aconteceu na última ação, para a tela responder.
  *
  * Um estado só, com tom: importar, apagar e falhar são exclusivos entre si, e
@@ -80,18 +94,28 @@ const stats = computed(() => [
  * O nome carrega a data para dois arquivos exportados em dias diferentes não se
  * sobreporem na pasta de downloads — que é onde eles vão parar, e onde o
  * jogador vai procurar o "de antes de eu ter moído tudo".
+ *
+ * **É `dayKey` e não `toISOString`**, pelo mesmo motivo que o pack diário: o
+ * segundo converte para UTC antes de formatar, e às 22h de terça em São Paulo o
+ * arquivo sairia carimbado de quarta. O jogador procuraria pela data de ontem e
+ * não acharia, que é exatamente o contrário do que o nome existe para fazer.
+ *
+ * O `revoke` espera um tique: alguns navegadores ainda não começaram a gravar
+ * quando o `click()` retorna, e revogar a URL no mesmo quadro cancela o
+ * download antes de ele sair.
  */
 function exportSave(): void {
   const blob = new Blob([saveText.value], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
-  const day = new Date().toISOString().slice(0, 10)
 
   const link = document.createElement('a')
   link.href = url
-  link.download = `holodeck-${day}.json`
+  link.download = `holodeck-${dayKey(new Date())}.json`
   link.click()
 
-  URL.revokeObjectURL(url)
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 0)
   notice.value = { tone: 'done', text: 'Save exportado.' }
 }
 
@@ -125,30 +149,48 @@ async function importSave(event: Event): Promise<void> {
   const file = input instanceof HTMLInputElement ? input.files?.[0] : undefined
   if (file === undefined) return
 
-  let parsed: unknown
+  /**
+   * O reset vai no `finally`, e não no fim do caminho feliz.
+   *
+   * Sem ele, escolher o mesmo arquivo duas vezes seguidas não dispara `change` —
+   * e é **no erro** que repetir o mesmo arquivo é mais provável: o jogador
+   * escolhe um save truncado, lê "não é um JSON válido", re-exporta por cima do
+   * mesmo caminho e escolhe de novo. Com o reset só no sucesso, esse segundo
+   * clique não fazia nada e a mensagem de erro antiga continuava na tela,
+   * indistinguível de uma nova.
+   */
   try {
-    parsed = JSON.parse(await file.text())
-  }
-  catch {
-    notice.value = { tone: 'failed', text: 'O arquivo não é um JSON válido.' }
-    return
-  }
+    if (file.size > MAX_IMPORT_BYTES) {
+      notice.value = { tone: 'failed', text: 'Esse arquivo é grande demais para ser um save deste jogo.' }
+      return
+    }
 
-  const { data, recovered } = migrate(parsed)
-  if (recovered !== null) {
-    notice.value = { tone: 'failed', text: `Esse arquivo não pôde ser lido: ${REASONS[recovered]}.` }
-    return
-  }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await file.text())
+    }
+    catch {
+      notice.value = { tone: 'failed', text: 'O arquivo não é um JSON válido.' }
+      return
+    }
 
-  archiveCurrent()
-  apply(data)
-  notice.value = {
-    tone: 'done',
-    text: `Save importado — ${gameNumber(collection.ownedCount)} cartas. O anterior foi para a cópia de segurança.`,
-  }
+    const { data, recovered } = migrate(parsed)
+    if (recovered !== null) {
+      notice.value = { tone: 'failed', text: `Esse arquivo não pôde ser lido: ${REASONS[recovered]}.` }
+      return
+    }
 
-  // Sem isto, escolher o mesmo arquivo duas vezes seguidas não dispara `change`.
-  if (fileInput.value !== null) fileInput.value.value = ''
+    archiveCurrent()
+    apply(data)
+    refreshBackups()
+    notice.value = {
+      tone: 'done',
+      text: `Save importado — ${gameNumber(collection.ownedCount)} cartas. O anterior foi para a cópia de segurança.`,
+    }
+  }
+  finally {
+    if (fileInput.value !== null) fileInput.value.value = ''
+  }
 }
 
 /**
@@ -169,13 +211,87 @@ function clearSave(): void {
   archiveCurrent()
   void $saveDriver.clear()
   apply(emptySave())
-  notice.value = { tone: 'done', text: 'Save apagado. A cópia de segurança continua no navegador.' }
+  refreshBackups()
+  notice.value = { tone: 'done', text: 'Save apagado. A cópia de segurança continua no navegador — dá para voltar por ela aqui embaixo.' }
 }
 
 function archiveCurrent(): void {
   const raw = $saveDriver.readRaw()
   if (raw !== null) $saveDriver.archive(raw)
 }
+
+/**
+ * As cópias de segurança que dá para voltar — e por que elas ganharam tela.
+ *
+ * **A interface prometia e o produto não devolvia.** Apagar diz "uma cópia de
+ * segurança fica guardada" e importar diz "o anterior foi para a cópia de
+ * segurança", e até aqui o único caminho de volta era abrir o DevTools e copiar
+ * a chave à mão. Um jogador que clica `APAGAR LOCAL` por engano lê que a cópia
+ * existe e não tem como alcançá-la.
+ *
+ * O painel *Ainda não* ajudava a esconder isso ao enquadrar *restaurar a
+ * gravação anterior* como coisa de servidor. É outra coisa: aquela é a versão
+ * remota da Fase 7, esta é o texto que este mesmo código escreveu neste
+ * aparelho há um minuto.
+ */
+const backups = ref<{ key: string, at: number }[]>([])
+
+function refreshBackups(): void {
+  backups.value = $saveDriver.listBackups()
+}
+
+/** `05/09, 14:22` — o instante da cópia, no fuso de quem está olhando. */
+function backupLabel(at: number): string {
+  return new Date(at).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/**
+ * Volta para uma cópia — **guardando a atual antes**, como todo caminho que
+ * escreve por cima.
+ *
+ * O texto passa pela mesma `migrate` do boot e do import: uma cópia gravada por
+ * uma versão anterior sobe sozinha, e uma que não seja legível é recusada em vez
+ * de adivinhada. Sem isso, restaurar seria o único caminho do jogo que confia
+ * num texto sem validá-lo.
+ */
+function restoreBackup(key: string): void {
+  const raw = $saveDriver.readBackup(key)
+  if (raw === null) {
+    notice.value = { tone: 'failed', text: 'Essa cópia não está mais no navegador.' }
+    refreshBackups()
+    return
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  }
+  catch {
+    notice.value = { tone: 'failed', text: 'Essa cópia não tem a forma de um save.' }
+    return
+  }
+
+  const { data, recovered } = migrate(parsed)
+  if (recovered !== null) {
+    notice.value = { tone: 'failed', text: `Essa cópia não pôde ser lida: ${REASONS[recovered]}.` }
+    return
+  }
+
+  archiveCurrent()
+  apply(data)
+  refreshBackups()
+  notice.value = {
+    tone: 'done',
+    text: `Cópia restaurada — ${gameNumber(collection.ownedCount)} cartas. O save de antes virou a cópia mais recente.`,
+  }
+}
+
+onMounted(refreshBackups)
 
 /**
  * Devolve o save às stores e grava.
@@ -279,6 +395,45 @@ useSeoMeta({
               @change="importSave"
             >
           </label>
+        </div>
+      </section>
+
+      <!-- CÓPIAS DE SEGURANÇA -->
+      <section
+        v-if="backups.length > 0"
+        class="settings__panel"
+      >
+        <div class="settings__panel-head">
+          <p class="settings__eyebrow">
+            Cópias de segurança
+          </p>
+          <span class="numeric settings__scope">
+            SÓ NESTE APARELHO
+          </span>
+        </div>
+
+        <div
+          v-for="backup in backups"
+          :key="backup.key"
+          class="settings__row"
+        >
+          <div>
+            <p class="settings__row-title">
+              {{ backupLabel(backup.at) }}
+            </p>
+            <p class="settings__row-note">
+              Guardada antes de apagar, importar ou recuperar. Restaurar manda o
+              save de agora para a cópia mais recente — nada é perdido.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="settings__action bevel-control"
+            :aria-label="`Restaurar a cópia de ${backupLabel(backup.at)}`"
+            @click="restoreBackup(backup.key)"
+          >
+            RESTAURAR
+          </button>
         </div>
       </section>
 
