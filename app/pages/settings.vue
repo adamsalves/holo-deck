@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useNuxtApp, useRuntimeConfig } from 'nuxt/app'
 import { gameNumber } from '~~/shared/game/progress'
-import type { SaveData } from '~~/shared/save/schema'
+import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { SCHEMA_VERSION, emptySave, migrate } from '~~/shared/save/schema'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
@@ -43,7 +43,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const notice = ref<{ tone: 'done' | 'failed', text: string } | null>(null)
 
 /** O save atual como texto — a mesma coisa que é exportada e que é medida. */
-const document_ = computed(() => JSON.stringify(composeSave(), null, 2))
+const saveText = computed(() => JSON.stringify(composeSave(), null, 2))
 
 /**
  * O tamanho do save em KB, medido em **bytes** e não em caracteres.
@@ -53,7 +53,7 @@ const document_ = computed(() => JSON.stringify(composeSave(), null, 2))
  * contagem de cartas, e o número que importa é o que atravessa a rede na Fase 7.
  */
 const sizeKb = computed(() => {
-  const bytes = new TextEncoder().encode(document_.value).length
+  const bytes = new TextEncoder().encode(saveText.value).length
   return (bytes / 1024).toFixed(1).replace('.', ',')
 })
 
@@ -72,7 +72,7 @@ const stats = computed(() => [
  * jogador vai procurar o "de antes de eu ter moído tudo".
  */
 function exportSave(): void {
-  const blob = new Blob([document_.value], { type: 'application/json' })
+  const blob = new Blob([saveText.value], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const day = new Date().toISOString().slice(0, 10)
 
@@ -83,6 +83,19 @@ function exportSave(): void {
 
   URL.revokeObjectURL(url)
   notice.value = { tone: 'done', text: 'Save exportado.' }
+}
+
+/**
+ * Por que um arquivo foi recusado, em português.
+ *
+ * `RecoveryReason` é o mesmo enum que o aviso de boot usa, e ele existe porque
+ * "não deu" e "é de uma build mais nova" levam a ações opostas: a segunda tem
+ * conserto, é só atualizar o jogo.
+ */
+const REASONS: Record<RecoveryReason, string> = {
+  'corrupt': 'não tem a forma de um save',
+  'unknown-version': 'é de uma versão mais nova do jogo',
+  'failed-migration': 'não sobreviveu à migração',
 }
 
 /**
@@ -126,12 +139,6 @@ async function importSave(event: Event): Promise<void> {
 
   // Sem isto, escolher o mesmo arquivo duas vezes seguidas não dispara `change`.
   if (fileInput.value !== null) fileInput.value.value = ''
-}
-
-const REASONS: Record<'corrupt' | 'unknown-version' | 'failed-migration', string> = {
-  'corrupt': 'não tem a forma de um save',
-  'unknown-version': 'é de uma versão mais nova do jogo',
-  'failed-migration': 'não sobreviveu à migração',
 }
 
 /**
