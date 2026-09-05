@@ -146,6 +146,36 @@ qualquer tag existir.
 6. Varra as branches órfãs e apague — a release não fecha antes disso. Veja a
    seção abaixo.
 
+## Uma fase partida em vários PRs: o release PR fica segurado
+
+O plano fecha **uma minor por fase**, e é isso que faz a versão significar alguma
+coisa — a escada vai até o `1.0.0` da Fase 8. Uma fase grande, porém, pode ser
+partida em PRs separados para o review caber, e aí a conta não fecha sozinha:
+cada PR carrega um `feat:`, e o release-please cortaria uma minor por PR. A Fase
+6 saiu em três, e sem esta regra teria comido `0.7.0`, `0.8.0` e `0.9.0`.
+
+**A regra: quando uma fase sai em mais de um PR, o release PR fica segurado até o
+último deles entrar em `main`.**
+
+Isso não exige fazer nada — exige *não* fazer. O release-please acumula sozinho:
+ele reescreve o changelog e o número a cada merge, e o PR que estava propondo
+`0.7.0` continua propondo `0.7.0` com mais entradas dentro. O erro é mergeá-lo no
+meio do caminho, e é um erro que não avisa: sai uma release com meia fase, e a
+seguinte pega a outra metade com outro número.
+
+Como não esquecer, e foi assim que a Fase 6 fez: **um comentário 🔒 no próprio
+release PR**, com a lista dos PRs da fase e uma caixa por PR, marcada a cada
+merge. O comentário é o único lugar que quem abre o PR de release vai olhar.
+
+```
+🔒 SEGURADO — Fase 6, três PRs
+- [x] 1/3 deck builder  #26
+- [x] 2/3 Liga e batalha  #28
+- [ ] 3/3 loja e regras
+```
+
+Quando a última caixa fechar, o passo a passo acima volta a valer do ponto 4.
+
 ## Fechar a release apagando as branches órfãs
 
 Uma release deixa branch para trás por conta própria: além da branch da fase,

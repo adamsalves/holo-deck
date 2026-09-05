@@ -4,9 +4,11 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da Fase 5 — a Pokédex, o motor de batalha
-> (ainda sem tela) e o ciclo de pack e coleção. Deck, Liga, loja e a tela da
-> batalha entram na Fase 6. O README completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da **Fase 6 completa** — a Pokédex, o ciclo
+> de pack e coleção, o deck builder, a Liga com os nove ginásios e a tela de
+> batalha, a loja, `/rules` e `/settings`. O jogo é jogável de ponta a ponta, e
+> roda inteiro em `localStorage`. Conta e sincronização são a Fase 7; o README
+> completo é reescrito na Fase 8.
 
 ## Rodando
 
@@ -192,8 +194,13 @@ realimenta a leitura com a saída dela.
 Em aparelho sem ponteiro, o giroscópio faz o papel do cursor. No iOS 13+ ele
 exige `DeviceOrientationEvent.requestPermission()` dentro de um gesto do usuário
 — sem isso nenhum evento chega e nenhum erro é lançado. `requestTiltPermission()`
-existe para isso; a tela de Ajustes da Fase 6 é quem vai chamá-la em produção, e
-até lá o botão está na `/styleguide`.
+existe para isso, e **o único lugar que a chama continua sendo a `/styleguide`**.
+
+`/settings` chegou na Fase 6 e **não** ganhou essa linha: a prancha *Ajustes* não
+desenha nenhum controle de giroscópio, e a regra do projeto é que estado sem
+prancha ganha desenho antes de virar código. A consequência é concreta e vale
+saber: **num iPhone, a inclinação do foil não funciona fora da `/styleguide`**.
+Está em aberto — ver *Em aberto, para quem escrever a fase*.
 
 **Texto em português.** Os identificadores são em inglês e o documento é
 `lang="pt-BR"` — um `{{ rarity }}` cru põe COMMON na carta e faz o leitor de tela
@@ -264,6 +271,14 @@ está aqui é só o que sobrou de propósito.
 | *Detalhe*: barras de stat coloridas uma a uma | só o mais alto acende, na cor-luz do tipo — é o que a prancha *A carta* anota e o que o código sempre fez |
 | *Pokédex*: célula de grid em 140×172 | a carta é 5:7, que é o que a prancha *A carta* especifica; a 140 de largura isso pede 196 de altura |
 
+### A prancha *Regras* estava errada em três pontos, achados ao escrever a página
+
+| o que dizia | o que vale |
+|---|---|
+| painel *Pó e forja*: `economy.ts` | a tabela mora em [`dust.ts`](shared/game/dust.ts). `economy.ts` é moeda; pó e forja são o outro eixo |
+| ordem do turno, passo 5: "no zero o golpe fica inselecionável" | o motor cai em **Struggle por slot** — `moveFromSlot` devolve Struggle quando o PP acaba, e o golpe continua clicável. É a mesma regra que o review do PR da Liga corrigiu na carta de golpe, e a prancha ficou para trás |
+| *Vitória imaculada*: "bônus" | **+25%**, decidido em 04/09. Quando a prancha foi desenhada o número não existia |
+
 ### A prancha estava certa, e foi o código que voltou para ela
 
 | o que o código fazia | o que a prancha sempre disse |
@@ -291,6 +306,16 @@ está aqui é só o que sobrou de propósito.
 | `Seu deck: N ajustes` conta as cartas que apanham ×2 | a prancha escreve `1 ajuste` e não define o que conta. Esta é a única leitura que o código já produz — a mesma `coverage.incoming` que o deck builder desenha como faixa `LEVA ×2` na carta, e a que a anotação da prancha *Batalha* descreve ("Machop caiu exatamente como o deck builder avisou") |
 | `N ajustes` em `--deficit`, não no amarelo de terrestre | mesmo argumento do chip de resumo do deck builder: a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa |
 
+### Decidido no PR da loja, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| a loja tem **três** cartões, e não dois | os packs de boas-vindas existem desde a Fase 5 e precisam de onde ser abertos. Virá-los o primeiro da fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário; a alternativa — a loja só aparecer depois deles — esconderia saldo e preço de quem está começando |
+| sublinhado ativo em `--accent` em toda página | a prancha *Hub* o desenha azul e a *Loja* roxo, para o mesmo papel. É variação de mockup desenhado à mão, como o `2px`/`3px` que a Fase 2 normalizou num `--radius` só |
+| sem o avatar de 32px no canto da barra | é a conta, que é Fase 7. Ver *Segurado até a fase que cria o dado* |
+| `/settings` sem os painéis de conta, idioma, som e offline | mesma razão, e eles aparecem **nomeados** num painel *Ainda não* em vez de virarem controles cinzas: um botão desligado promete uma coisa que o jogo não faz |
+| apagar o save guarda uma cópia | a prancha põe *apagar local* na zona de perigo e não diz o que sobra. Sem conta não existe segunda cópia em lugar nenhum, e a regra inegociável do plano existe para a coleção de meses não depender de um clique não ter sido acidental. A tela avisa que a cópia fica |
+
 ### Estados sem prancha, escritos neste PR
 
 A regra do projeto é que tela, painel ou estado que o canvas não desenha **ganha
@@ -310,6 +335,22 @@ novo. Se o canvas discordar depois, o custo é de estilo, não de estrutura.
 O terceiro e o quarto não são decoração: sem eles a tela ou oferece uma batalha
 que o motor recusa, ou apaga o turno 12 de alguém em silêncio.
 
+**A lista tem sete, não cinco**, e a diferença virou a
+[issue #29](https://github.com/adamsalves/holo-deck/issues/29): faltavam `loading`
+("Montando o campo…", sem nenhuma saída) e `unknown-gym`. O primeiro é o que mais
+importa — foi nele que o defeito crítico do review estacionava o jogador para
+sempre.
+
+O PR da loja acrescentou **mais um**, pelo mesmo mecanismo:
+
+| estado | quando aparece |
+| --- | --- |
+| **pack diário indisponível** | o cartão do Hub e o da loja depois de o diário sair no dia |
+
+O canvas só desenha o cartão em `Disponível agora`. Sumir com ele deixaria um
+buraco na grade de duas colunas do Hub, então ele fica com o contador regressivo
+e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situação.
+
 ### Segurado até a fase que cria o dado
 
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
@@ -319,11 +360,18 @@ progresso que ninguém pode mover.
   marcador de shiny, os filtros *Possuídos* e *Faltando*, e o verde de
   progresso.~~ **Entregue na Fase 5.**
 - ~~**Fase 6:** a faixa de retomar batalha no Hub, o saldo de moedas e o painel
-  do próximo ginásio.~~ **Entregues no PR da Liga.** Continuam segurados a **barra
-  de navegação global** e o **contador do pack diário**: a primeira liga destinos
-  que só existem no PR da loja (`/rules`, `/settings`, `/packs` como loja) e o
-  segundo depende da economia que chega junto com ela. Até lá a fileira de portas
-  do Hub continua, agora com a Liga.
+  do próximo ginásio.~~ **Entregues no PR da Liga.**
+- ~~**A barra de navegação global e o cartão do pack diário.**~~ **Entregues no PR
+  da loja**, que é o que criou os destinos da primeira (`/rules`, `/settings`,
+  `/packs` como loja) e a economia do segundo. Com eles saíram a barra própria do
+  Hub e a fileira provisória de portas.
+- **Fase 7, e o que `/settings` deixa de fora por causa dela:** o painel de conta,
+  o estado de sincronização e *restaurar a gravação anterior do servidor*. Os três
+  aparecem nomeados na tela, num painel *Ainda não* — a ausência é dado que não
+  existe, e o jogador precisa saber disso.
+- **Sem a peça que os sustenta:** o seletor de **idioma** (não há i18n), o
+  interruptor de **som** (não há áudio) e *baixar tudo para offline* (não há PWA).
+  Os três estão na prancha *Ajustes*, e nenhum dos três tem o que ligar.
 - ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
   constante de `useDeck` virou `progress.nextGym`, que foi exatamente a troca de
   uma linha que o comentário dela prometia.
@@ -333,6 +381,10 @@ progresso que ninguém pode mover.
 
 ### Em aberto, para quem escrever a fase
 
+- **A permissão de giroscópio no iOS.** `requestTiltPermission()` existe desde a
+  Fase 2 e só a `/styleguide` a chama; sem ela, a inclinação do foil não funciona
+  em iPhone nenhum. A prancha *Ajustes* não desenha o controle, e `/settings`
+  respeitou isso — decidir onde ele mora é decisão de canvas, não de código.
 - **Sincronização.** O plano fechou *last-write-wins* por `updatedAt`, sem merge.
   A prancha *Sync* diz o contrário, por escrito: o `updatedAt` "nunca é usado
   para resolver conflito", e a regra dos quatro estados é "local com mutação
@@ -513,7 +565,7 @@ a carta que faltou.
 
 | Rota          | O que é                                                  |
 | ------------- | -------------------------------------------------------- |
-| `/packs`      | a abertura carta a carta, com as taxas no cabeçalho      |
+| `/packs`      | a loja e, depois do clique, a abertura carta a carta     |
 | `/collection` | o binder: progresso por região, filtros, pó e forja      |
 
 A regra inteira mora em [`shared/game/`](shared/game/), headless como o motor —
@@ -524,7 +576,7 @@ A regra inteira mora em [`shared/game/`](shared/game/), headless como o motor �
 | `packs.ts`   | 10 cartas (6/3/1), o slot raro+, o pity e o shiny           |
 | `dust.ts`    | pó por duplicata e custo de forja, na razão 4×              |
 | `progress.ts`| a fração capturada e o degrau que ela pinta                 |
-| `economy.ts` | por enquanto só os packs de boas-vindas; o resto é Fase 6   |
+| `economy.ts` | boas-vindas, recompensa de ginásio, preço da loja e o diário |
 | `deck.ts`    | os seis slots, o que é um deck válido, e a cobertura        |
 
 ### Os números, e de onde eles saem
@@ -571,7 +623,8 @@ por isso que ele hoje mede pesos puros e rede em série em blocos separados.
 - **Três packs de boas-vindas**, e eles chegaram uma fase antes do plano. O jogo
   tem um ciclo fechado na partida — carta para deck, deck para ginásio, ginásio
   para moeda, moeda para pack — e sem uma concessão inicial nenhuma porta abre.
-  A loja e o pack diário continuam na Fase 6.
+  Com a loja eles viraram o **primeiro cartão da fileira**, que some quando os
+  três acabam — ver [A loja, as regras e os ajustes](#a-loja-as-regras-e-os-ajustes).
 - **O binder não virtualiza; ele usa `content-visibility`.** A Pokédex virtualiza
   porque suas fileiras têm altura uniforme, e a carta do binder não tinha: a linha
   `2 dup · 10 pó` deixava uma fileira com repetida ~22px mais alta que uma sem, e
@@ -664,10 +717,11 @@ igualdade é deliberada: `/rules` explica uma fração só. Ele incide sobre o q
 está sendo pago e não sobre o valor cheio, senão uma revanche imaculada valeria
 mais que uma estreia normal. Campanha imaculada: 7.875.
 
-**Pack diário e o preço de 150 na loja continuam fora do módulo.** A tabela do
+**Pack diário e o preço de 150 na loja ficaram para o PR seguinte.** A tabela do
 contrato da fase punha `economy.ts` "completo" aqui, e a decisão de 04/09
 corrigiu: eles só ganham consumidor com a loja, e constante de economia sem quem
-a leia é o que o repositório recusa desde a Fase 0.
+a leia é o que o repositório recusa desde a Fase 0. Com a loja o módulo fechou —
+ver [A loja, as regras e os ajustes](#a-loja-as-regras-e-os-ajustes).
 
 ### Insígnia é contador, não lista
 
@@ -746,6 +800,128 @@ não cobra nada — revanche imediata, nada é perdido.
   commitados para uma tela que mostra dois Pokémon por vez. Nem todas existem no
   conjunto, e o recuo é a miniatura local de 128 px.
 
+## A loja, as regras e os ajustes
+
+O que fecha a Fase 6: um lugar para gastar as moedas, a referência que se gera
+sozinha, e a barra que liga as duas ao resto.
+
+| Rota        | O que é                                                             |
+| ----------- | ------------------------------------------------------------------- |
+| `/packs`    | a loja — boas-vindas, diário e Pack Holo — e a abertura logo depois  |
+| `/rules`    | raridade, packs, forja, dano, condições, Liga e economia, derivados  |
+| `/settings` | exportar, importar e apagar o save; o interruptor de animação        |
+
+### A loja: três fontes, três regras de cobrança
+
+| Cartão | Custo | Some quando |
+| --- | --- | --- |
+| Pack de estreia | grátis, 3 vezes | os três acabam |
+| Pack diário | grátis, 1 por dia | é aberto; volta à meia-noite local |
+| Pack Holo | 150 moedas | nunca |
+
+**A prancha desenha dois cartões e a tela mostra três.** Os packs de boas-vindas
+existem desde a Fase 5 e precisam de onde ser abertos; virá-los o primeiro da
+fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário.
+A alternativa — a loja só aparecer depois deles — esconderia saldo e preço
+justamente de quem está começando.
+
+**As três creditam as cartas antes de cobrar por elas**, e a ordem é regra escrita
+do plano: uma falha no meio dá um pack de graça em vez de cobrar por nada. É por
+isso que o débito é uma função à parte da store, e não um efeito de `openPack` —
+inverter a ordem exigiria mover uma linha, que é uma mudança que o review vê.
+
+**O dia do diário é o de calendário do aparelho**, gravado como `AAAA-MM-DD`.
+Decidido em 05/09 contra a espera de 24 horas, que empurra o horário para frente
+toda vez até cair na madrugada. Comparar datas em vez de instantes tem um efeito
+lateral bom: um relógio atrasado **devolve** o pack em vez de travar a loja.
+
+A tela mantém um relógio de um segundo enquanto está aberta. Ele existe pelo
+contador regressivo — `próximo em 14:22:07` —, mas é também o que faz o cartão
+voltar sozinho à meia-noite com a aba aberta.
+
+### `/rules` não contém número nenhum
+
+A página é derivada de `shared/game/` inteira, e isso é contrato, não estilo:
+trocar o pity de 10 para 8 muda a tela no mesmo commit. O motivo mais forte não é
+o jogador — é que as regras estão espalhadas por três fases, e "spec espalhada"
+foi o padrão de quase todo defeito que a revisão do plano encontrou.
+
+[`test/unit/rules-gate.spec.ts`](test/unit/rules-gate.spec.ts) monta a lista de
+números proibidos **a partir das próprias constantes**: um tier novo na escada de
+forja entra sozinho, e um limiar movido passa a ser cobrado no valor novo sem
+ninguém editar o teste. Ele afirma o outro lado também — os nove módulos
+continuam importados —, senão uma página vazia passaria.
+
+Duas exceções ficam escritas no portão, em vez de escondidas:
+
+- **A linha da fórmula de dano.** O `5`, os dois `2` e o `/50` são a forma da
+  conta da série, não a calibração dela. O nível, que **é** decisão do jogo, entra
+  interpolado — e `BATTLE_LEVEL` está na lista de proibidos justamente por isso.
+- **Constantes de um dígito.** A página pode e deve escrever `×0 a ×4` sobre
+  efetividade, e um `4` na prosa é indistinguível de um `FORGE_RATIO` digitado.
+  Cobrar os dois produziria falso positivo em cima de texto correto, que é como
+  um portão deixa de ser levado a sério.
+
+O par disso é `test/e2e/shop.spec.ts`, que lê os mesmos números **na tela**. O
+portão sozinho passaria numa página que não renderiza nada.
+
+### `/settings` entrega só o que tem dado
+
+Entram o painel *Save* — exportar JSON, importar, apagar deste aparelho —, a
+fileira de números, o interruptor de animação e a versão com o sha. Ficam
+segurados a conta e a sincronização (Fase 7), *restaurar a gravação anterior do
+servidor* (idem), idioma (não há i18n), som (não há áudio) e *baixar tudo para
+offline* (não há PWA). **Eles aparecem nomeados na própria tela**, num painel
+*Ainda não*, em vez de virarem controles cinzas: um botão desligado promete uma
+coisa que o jogo não faz.
+
+**Importar e apagar guardam o texto original antes de escrever por cima.** É a
+regra inegociável do plano — save que não se entende vai para backup, nunca para
+o lixo — aplicada ao caminho voluntário: sem conta não existe segunda cópia em
+lugar nenhum, e um arquivo trocado por engano custaria a coleção. O anel continua
+com teto de três cópias, então clicar todo dia não enche a cota.
+
+### O interruptor de animação: dois sinais, uma regra de escrita
+
+Quem pede menos movimento diz isso de duas formas — pelo sistema
+(`prefers-reduced-motion`) e pelo interruptor, que carimba `data-reduce-motion` no
+`<html>`. Media query e seletor não se combinam em CSS, então **toda regra que
+para uma animação aparece duas vezes**:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .x { animation: none; }
+}
+
+:root[data-reduce-motion] .x {
+  animation: none;
+}
+```
+
+A media query não sai, e é a metade que mais importa: ela é o único caminho que
+funciona antes de o JavaScript rodar. [`test/unit/motion-gate.spec.ts`](test/unit/motion-gate.spec.ts)
+conta **pares por arquivo** e reprova a metade — dos dois lados.
+
+Do lado do JavaScript, `useReduceMotion` soma os dois sinais e `useMotionSwitch`
+devolve só o interruptor. A separação não é elegância: o plugin de boot precisa
+carimbar sem assinar a media query, porque uma assinatura criada ali fica viva
+para sempre e congela o `matchMedia` do app inteiro — foi o que fez
+`use-foil.spec.ts` deixar de medir o que afirma, na primeira versão do módulo.
+
+### A barra global
+
+`Base · Packs · Pokédex · Coleção · Deck · Liga` à esquerda; saldo, *Regras* e o
+ícone de ajustes à direita. Ela é um layout, e **duas telas ficam de fora por
+decisão do canvas**: `/battle/[gymId]`, que a prancha *Batalha* desenha com uma
+barra própria — ginásio, líder, região e tipo —, e `/styleguide`, que é o espelho
+do sistema e não uma tela do jogo.
+
+[`test/unit/nav-gate.spec.ts`](test/unit/nav-gate.spec.ts) anda por `app/pages/` e
+cobra os dois sentidos: toda tela está na barra ou está na lista de **saída**, e a
+barra não aponta para tela que não existe. A lista é de saída de propósito — uma
+página nova cai do lado de dentro por omissão e reprova. Lista de entrada falha
+em silêncio, que foi o defeito do portão de tema na fase passada.
+
 ## O save
 
 Um documento só, versionado, em `holodeck:save`.
@@ -759,10 +935,30 @@ mesmo tempo, e os ~21 KB que a Fase 7 sobe numa requisição só.
 ```
 shared/save/schema.ts        forma, guarda e migração — puro, não sabe que localStorage existe
 app/utils/save-driver        LocalStorageDriver: a única camada que toca o navegador
-app/plugins/save.client      o único lugar que faz IO de save
+app/utils/save-document      compor e hidratar o documento a partir das stores
+app/plugins/save.client      o boot e a gravação a cada mutação
+app/pages/settings.vue       exportar, importar e apagar — o caminho voluntário
 app/components/SaveRecoveryNotice.vue  o aviso, que é a outra metade da regra
 app/stores/*                 regra e estado; não tocam disco
 ```
+
+A **ordem de hidratação carrega uma dependência real** — a coleção antes do
+deck, porque `deck.hydrate` lê a coleção para descartar a espécie que o save
+escalou e a coleção não tem mais — e por isso ela mora em `save-document.ts`, num
+lugar só. O boot e a importação de `/settings` fazem a mesma coisa; duas cópias
+da ordem é como uma delas fica para trás quando uma store nova entrar.
+
+| versão | o que entrou |
+| --- | --- |
+| 1 | coleção, pó e progresso de pack |
+| 2 | o deck |
+| 3 | saldo, insígnias e a batalha em andamento |
+| 4 | o dia do pack diário |
+
+Cada passo é uma função pura indexada por posição na cadeia, e **passo novo entra
+sempre no fim**: `MIGRATIONS[2]` leva de 3 para 4, e inserir no meio sem
+renumerar gravaria a versão errada sem o guarda perceber — ele confere forma, não
+número.
 
 **A regra inegociável é nunca apagar, e ela tem duas metades.** Toda leitura que
 dá errado copia o save cru para `holodeck:backup:<instante>` e devolve save limpo
@@ -791,6 +987,14 @@ normal de quem voltou de uma build nova e tem tratamento próprio. O time do
 `BattleLog` segue a mesma regra e o teto dele é natural: uma batalha entra com o
 deck, e o deck tem `DECK_SIZE` slots — sem isso a lista vazia era recusada e a de
 300 ids passava, com `buildSide` montando os 300 do outro lado.
+
+**Apagar e importar por `/settings` passam pelo mesmo backup**, e é a mesma regra
+lida ao contrário: ela fala de save que não se entende, e o argumento vale igual
+para o clique voluntário — sem conta não existe segunda cópia em lugar nenhum. As
+duas portas que isso exigiu (`readRaw` e `archive`) ficaram no
+`LocalStorageDriver` e **não** na interface `SaveDriver`: o `HttpDriver` da Fase 7
+não tem "o texto no disco", e exigi-lo obrigaria a rede a fingir um conceito
+local.
 
 Foi essa fronteira, escrita antes de haver backend, que faz a Fase 7 custar uma
 implementação nova (`HttpDriver`, `SyncDriver`) em vez de uma reescrita —
@@ -917,6 +1121,11 @@ existem** — os dois vivem dentro do diretório de versão do nvm. Ele resolve 
 Versionamento e changelog são automáticos, a partir das mensagens de commit. O
 passo a passo — e a regra de merge commit que o processo exige — está no
 [`RELEASE.md`](RELEASE.md).
+
+O plano fecha **uma minor por fase**, e uma fase partida em vários PRs cortaria
+uma minor por PR. A regra que resolve isso — **segurar o release PR até o último
+PR da fase entrar** — também está lá, com o comentário 🔒 que a Fase 6 usou para
+não esquecer.
 
 ## Créditos
 
