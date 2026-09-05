@@ -6,6 +6,7 @@ import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
 import type { BattleAction, BattleContext, BattleLog, BattleState } from '~~/shared/game/battle'
 import { activeOf, ENGINE_VERSION, isBattleLog, POTION_HEAL_FRACTION, toBattleLog } from '~~/shared/game/battle'
 import { applyAction, replay, replayable, startBattle, switchOptions } from '~~/shared/game/engine'
+import { DECK_SIZE } from '~~/shared/game/deck'
 import { readAllSpecies, readCore, readGeneration } from '../support/generated-dex'
 
 /**
@@ -391,6 +392,17 @@ describe('isBattleLog — a fronteira do save', () => {
     expect(isBattleLog({ ...logValido(), gymId: 10 })).toBe(false)
     expect(isBattleLog({ ...logValido(), team: [] })).toBe(false)
     expect(isBattleLog({ ...logValido(), team: [0] })).toBe(false)
+  })
+
+  it('recusa time acima do deck, pelo mesmo argumento do teto das contagens', () => {
+    // A lista vazia já era recusada e a de 300 passava — e `buildSide` montava
+    // os 300, cada um com moveset resolvido no catálogo. Save é texto que o
+    // jogador controla: o que atravessa o guarda sem ordem de grandeza vira
+    // trabalho absurdo do outro lado, como o `c: 1e15` virava pó infinito.
+    const umAMais = [...DECK, DECK[0]].filter(id => id !== undefined)
+    expect(umAMais).toHaveLength(DECK_SIZE + 1)
+    expect(isBattleLog({ ...logValido(), team: umAMais })).toBe(false)
+    expect(isBattleLog({ ...logValido(), team: [...DECK] })).toBe(true)
   })
 
   it('recusa ação de kind desconhecido', () => {

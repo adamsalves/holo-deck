@@ -3,6 +3,7 @@ import { isGymId, isSpeciesId } from '../types/brand.ts'
 import type { CoreData, MoveEntry, SpeciesEntry, TypeName } from '../types/dex.ts'
 import { isDexVersion } from '../types/dex.ts'
 import type { Combatant } from './damage.ts'
+import { DECK_SIZE } from './deck.ts'
 import type { RngState } from './rng.ts'
 import { toBattleStats } from './stats.ts'
 import type { BattleStats } from './stats.ts'
@@ -210,7 +211,17 @@ export function isBattleLog(value: unknown): value is BattleLog {
   // `engineVersion`, agora que são duas travas.
   if (!isDexVersion(log.dexVersion)) return false
 
-  if (!Array.isArray(log.team) || log.team.length === 0) return false
+  /**
+   * O time tem teto, e é o do deck.
+   *
+   * A lista vazia já era recusada; a de 300 ids passava, e `buildSide` montava
+   * 300 combatentes a partir dela. É o mesmo argumento de ordem de grandeza do
+   * `MAX_SAVE_COUNT` — save é texto num navegador que o jogador controla, e um
+   * número sem limite natural que atravessa o guarda vira trabalho absurdo do
+   * outro lado. Aqui o limite é natural: uma batalha entra com o deck, e o deck
+   * tem seis slots.
+   */
+  if (!Array.isArray(log.team) || log.team.length === 0 || log.team.length > DECK_SIZE) return false
   if (!log.team.every(id => typeof id === 'number' && isSpeciesId(id))) return false
 
   if (!Array.isArray(log.actions)) return false

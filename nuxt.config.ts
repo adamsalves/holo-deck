@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
+import { GYM_COUNT } from './shared/types/brand.ts'
 
 /**
  * Sha curto do commit em produção. Num jogo com save local, "que versão você está
@@ -119,11 +120,15 @@ export default defineNuxtConfig({
        * `useDex()` do servidor cairia junto: hoje a única classe de URL que
        * chega à função é a inválida, que é quando ela precisa ler o índice para
        * responder 404.
+       *
+       * `GYM_COUNT` e não um `9` literal: o número é o mesmo contrato que a
+       * store, o guarda do save e a Liga leem, e uma cópia dele aqui só seria
+       * descoberta por um ginásio novo que ninguém consegue abrir em produção.
        */
       routes: [
         '/pokedex',
         '/league',
-        ...Array.from({ length: 9 }, (_, index) => `/battle/${index + 1}`),
+        ...Array.from({ length: GYM_COUNT }, (_, index) => `/battle/${index + 1}`),
       ],
     },
 

@@ -787,7 +787,10 @@ O guarda de leitura recusa contagem sem ordem de grandeza — o save é texto nu
 navegador que o jogador controla, e um `c: 1e15` vira pó infinito na primeira
 moagem. Recusar manda o cru para o backup em vez de reescrevê-lo menor em
 silêncio; `schemaVersion` fica de fora do teto, porque número alto ali é o caso
-normal de quem voltou de uma build nova e tem tratamento próprio.
+normal de quem voltou de uma build nova e tem tratamento próprio. O time do
+`BattleLog` segue a mesma regra e o teto dele é natural: uma batalha entra com o
+deck, e o deck tem `DECK_SIZE` slots — sem isso a lista vazia era recusada e a de
+300 ids passava, com `buildSide` montando os 300 do outro lado.
 
 Foi essa fronteira, escrita antes de haver backend, que faz a Fase 7 custar uma
 implementação nova (`HttpDriver`, `SyncDriver`) em vez de uma reescrita —
