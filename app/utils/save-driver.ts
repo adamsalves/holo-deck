@@ -158,6 +158,38 @@ export class LocalStorageDriver implements SaveDriver {
     catch { /* mesmo raciocínio de `save` */ }
   }
 
+  /**
+   * O save como ele está no disco, sem migrar nem validar.
+   *
+   * Existe para `/settings`: apagar e importar precisam guardar **o texto
+   * original** antes de escrever por cima, e `load()` já devolveu o resultado
+   * migrado — que não é o que se quer preservar.
+   *
+   * Não entra na interface `SaveDriver`, e isso é deliberado: o `HttpDriver` da
+   * Fase 7 não tem "o texto no disco", e uma interface que exigisse isso
+   * obrigaria a rede a fingir um conceito local.
+   */
+  readRaw(): string | null {
+    try {
+      return this.#storage?.getItem(SAVE_KEY) ?? null
+    }
+    catch {
+      return null
+    }
+  }
+
+  /**
+   * Guarda uma cópia do texto sob `holodeck:backup:<instante>`, podando o anel.
+   *
+   * É o mesmo caminho que a leitura usa quando o save não volta, exposto para
+   * quem apaga ou substitui **de propósito**. A regra do plano fala de save
+   * ilegível, mas o argumento dela vale igual aqui: a coleção de meses não pode
+   * depender de um clique não ter sido acidental.
+   */
+  archive(raw: string): void {
+    this.#backup(raw)
+  }
+
   #backup(raw: string): void {
     try {
       // A poda vem antes da escrita, e não depois: se a cota já estiver cheia, é
