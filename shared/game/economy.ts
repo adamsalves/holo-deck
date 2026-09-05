@@ -45,9 +45,17 @@ export const WELCOME_PACKS = 3
  * Cresce com o ginásio porque o time do líder cresce junto: a faixa A leva 3
  * Pokémon sob teto de 480 de BST e a C leva 6 sob 600. Uma recompensa fixa
  * pagaria o nono ginásio pelo preço do primeiro.
+ *
+ * As duas parcelas têm nome porque `/rules` **escreve a fórmula**, e não a
+ * faixa: a prancha estampa `200 + 100×n`, e a página só pode reproduzir isso sem
+ * digitar número se os dois vierem daqui. Com eles nomeados, mexer na curva
+ * reescreve a página no mesmo commit — que é o contrato dela.
  */
+export const GYM_REWARD_BASE = 200
+export const GYM_REWARD_STEP = 100
+
 export function gymReward(gym: GymId): number {
-  return 200 + 100 * gym
+  return GYM_REWARD_BASE + GYM_REWARD_STEP * gym
 }
 
 /**

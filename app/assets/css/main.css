@@ -519,6 +519,20 @@
   --shiny: var(--color-type-ice);
 
   /**
+   * A marca — o vermelho do centro da Pokébola, na barra de navegação.
+   *
+   * Reusa `--color-type-fighting`, que é o mesmo `#FF5A4E` que o canvas desenha
+   * no símbolo, e o que faltava era o **nome**: o único semântico que já
+   * apontava para esse valor é `--deficit`, e um componente escrevendo
+   * `var(--deficit)` no logotipo diria que a marca é um aviso de risco.
+   *
+   * Mesmo argumento de `--shiny`, que reusa o ciano de gelo pela mesma razão. É
+   * o papel que justifica o terceiro nome, e no dia em que a identidade andar,
+   * ela anda sozinha.
+   */
+  --brand: var(--color-type-fighting);
+
+  /**
    * O acento da forja.
    *
    * A prancha marca o painel *Forjar* no roxo de ultra, e a razão é legível na

@@ -4,7 +4,14 @@ import { describe, expect, it } from 'vitest'
 import { REPO_ROOT } from '../support/source-tree'
 import { POTIONS_PER_SIDE, POTION_HEAL_FRACTION } from '~~/shared/game/battle'
 import { DUST_PER_DUPLICATE, FORGE_COST, FORGE_RATIO } from '~~/shared/game/dust'
-import { FLAWLESS_RATE, PACK_PRICE, REMATCH_RATE, WELCOME_PACKS } from '~~/shared/game/economy'
+import {
+  FLAWLESS_RATE,
+  GYM_REWARD_BASE,
+  GYM_REWARD_STEP,
+  PACK_PRICE,
+  REMATCH_RATE,
+  WELCOME_PACKS,
+} from '~~/shared/game/economy'
 import { GYM_BANDS } from '~~/shared/game/gyms'
 import { PACK_SIZE, PITY_THRESHOLD, RARE_PLUS_WEIGHTS, SHINY_ODDS } from '~~/shared/game/packs'
 import { RARITY_THRESHOLDS } from '~~/shared/game/rarity'
@@ -72,6 +79,8 @@ const FORBIDDEN: readonly { readonly value: number, readonly source: string }[] 
   { value: 1 / SHINY_ODDS, source: 'SHINY_ODDS' },
   { value: PACK_SIZE, source: 'PACK_SIZE' },
   { value: PACK_PRICE, source: 'PACK_PRICE' },
+  { value: GYM_REWARD_BASE, source: 'GYM_REWARD_BASE' },
+  { value: GYM_REWARD_STEP, source: 'GYM_REWARD_STEP' },
   { value: WELCOME_PACKS, source: 'WELCOME_PACKS' },
   { value: FORGE_RATIO, source: 'FORGE_RATIO' },
   { value: BATTLE_LEVEL, source: 'BATTLE_LEVEL' },

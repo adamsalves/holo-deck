@@ -72,3 +72,26 @@ export function progressLabel(owned: number, total: number): string {
 export function gameNumber(value: number): string {
   return value.toLocaleString('pt-BR')
 }
+
+/**
+ * Uma taxa do jogo em porcentagem, a partir da **fração** — `0,25` vira `25%`,
+ * `0,045` vira `4,5%`.
+ *
+ * `Intl` com `style: 'percent'`, e não uma multiplicação por 100 seguida de
+ * `toFixed`, por três razões que se somam:
+ *
+ * - **A casa decimal aparece só quando existe.** `25%` e `4,5%`, sem o `25,0%`
+ *   que um `toFixed(1)` fixo produziria nem o `4%` que um `toFixed(0)` cortaria.
+ * - **A vírgula é a do pt-BR**, pelo mesmo argumento de `gameNumber`: locale
+ *   fixo, porque o número está no meio de uma frase em português.
+ * - **Ninguém escreve `100`.** A página `/rules` tem por contrato não conter
+ *   número calibrado, e `GYM_REWARD_STEP` vale exatamente 100 — a base da
+ *   porcentagem escrita à mão colidia com ele, e o portão não tem como
+ *   distinguir as duas. Com o formatador, a colisão deixa de existir.
+ */
+export function gamePercent(fraction: number): string {
+  return fraction.toLocaleString('pt-BR', {
+    style: 'percent',
+    maximumFractionDigits: 1,
+  })
+}
