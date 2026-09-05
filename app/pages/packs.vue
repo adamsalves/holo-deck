@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core'
-import { computed, ref, shallowRef } from 'vue'
+import { useRoute } from 'nuxt/app'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import {
   PACK_PRICE,
   WELCOME_PACKS,
@@ -18,7 +19,7 @@ import {
   buildPool,
   openPack,
 } from '~~/shared/game/packs'
-import { gameNumber } from '~~/shared/game/progress'
+import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
 import { RARITY_LABELS } from '~~/shared/types/game'
@@ -176,6 +177,21 @@ function skip(): void {
   revealAll()
 }
 
+/**
+ * `?open=daily`, que é como o botão *ABRIR* do Hub chega aqui.
+ *
+ * A prancha *Hub* desenha o diário com um botão que abre, e a abertura mora
+ * nesta rota — sem o parâmetro, o botão de lá viraria um link que pede um
+ * segundo clique no cartão idêntico daqui.
+ *
+ * Não precisa de guarda contra reentrada: abrir o diário marca o dia, e
+ * `canOpen` recusa a segunda tentativa. Voltar para esta URL depois de abrir
+ * simplesmente cai na loja com o cartão fora.
+ */
+onMounted(() => {
+  if (useRoute().query.open === 'daily') open('daily')
+})
+
 /** Volta da abertura para a loja. A prancha *Abertura* não desenha esta saída —
  * ela desenha `VER COLEÇÃO` —, mas sem ela abrir o segundo pack exigiria
  * recarregar a rota. */
@@ -196,24 +212,19 @@ const rarePlusOdds = computed(() =>
   RARE_PLUS_TIERS.map(tier => ({
     tier,
     label: RARITY_LABELS[tier],
-    percent: RARE_PLUS_WEIGHTS[tier] * 100,
+    share: RARE_PLUS_WEIGHTS[tier],
   })))
 
-/** A chance de um pack trazer ao menos um shiny — `1 − (1 − p)^10`. */
-const shinyPerPack = computed(() => (1 - (1 - SHINY_ODDS) ** PACK_SIZE) * 100)
+// A largura da barra é CSS e o rótulo é texto, e por isso são duas contas: o
+// `gamePercent` escreve `4,5%` com a vírgula do pt-BR, que uma declaração de
+// `width` não aceita. O que a tela lê e o que o navegador desenha divergem na
+// pontuação, não no valor.
+
+/** A chance de um pack trazer ao menos um shiny — `1 − (1 − p)^10`, em fração. */
+const shinyPerPack = computed(() => 1 - (1 - SHINY_ODDS) ** PACK_SIZE)
 
 /** `1 a cada 26`. O inverso da linha acima, que é como o jogador a lê. */
-const packsPerShiny = computed(() => Math.round(100 / shinyPerPack.value))
-
-const decimal = (value: number, places: number): string =>
-  value.toFixed(places).replace('.', ',')
-
-/**
- * Uma taxa em porcentagem, com casa decimal só quando ela existe: `80`, `15`,
- * `4,5`, `0,5`. Perguntar se o número é inteiro em vez de comparar com um
- * limiar — um peso de 12,5% ganha a casa que um `< 10` lhe negaria.
- */
-const rate = (value: number): string => decimal(value, Number.isInteger(value) ? 0 : 1)
+const packsPerShiny = computed(() => Math.round(1 / shinyPerPack.value))
 
 useSeoMeta({
   title: 'Packs — Holo Deck',
@@ -418,11 +429,11 @@ useSeoMeta({
                 <div class="packs__odd-track">
                   <div
                     class="packs__odd-fill"
-                    :style="{ width: `${odd.percent}%` }"
+                    :style="{ width: `${odd.share * 100}%` }"
                   />
                 </div>
                 <dd class="numeric">
-                  {{ rate(odd.percent) }}%
+                  {{ gamePercent(odd.share) }}
                 </dd>
               </div>
             </dl>
@@ -432,7 +443,7 @@ useSeoMeta({
                 SHINY 1/{{ 1 / SHINY_ODDS }}
               </span>
               <span class="numeric packs__shiny-note">
-                Rola sobre qualquer carta, de qualquer tier — {{ decimal(shinyPerPack, 1) }}%
+                Rola sobre qualquer carta, de qualquer tier — {{ gamePercent(shinyPerPack) }}
                 por pack, ou um a cada {{ packsPerShiny }}.
               </span>
             </p>
@@ -636,14 +647,26 @@ useSeoMeta({
 /**
  * Os cartões da loja, um por fonte de pack.
  *
- * `auto-fit` com um mínimo, e não `repeat(3, 1fr)`: a fileira tem dois ou três
- * cartões conforme boas-vindas e diário existirem, e uma grade de três deixaria
- * um buraco no dia em que o diário sai.
+ * `auto-fit` com um mínimo, e não `repeat(3, 1fr)`: a fileira tem um, dois ou
+ * três cartões conforme boas-vindas e diário existirem, e uma grade fixa
+ * deixaria buraco nos dois dias em que um deles sai.
  */
 .packs__offers {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 22px;
+}
+
+/**
+ * O caso de um cartão só — as boas-vindas acabaram e o diário já saiu, que é o
+ * estado normal do jogo depois da primeira semana.
+ *
+ * `auto-fit` colapsa as trilhas vazias e entrega **toda** a fileira ao que
+ * sobra: o Pack Holo esticava para 1128px, com a arte de 104px perdida num
+ * painel largo. O teto o mantém do tamanho que ele tinha ao lado dos vizinhos.
+ */
+.packs__offers:has(> :only-child) {
+  grid-template-columns: minmax(320px, 540px);
 }
 
 .packs__offer {

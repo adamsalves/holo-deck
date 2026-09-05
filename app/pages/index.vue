@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { useIntervalFn } from '@vueuse/core'
+import { computed, onMounted, shallowRef } from 'vue'
 import { useLeague } from '~/composables/useLeague'
 import { useCollection } from '~/composables/useCollection'
 import { loadBattleContext } from '~/composables/useBattleContext'
@@ -8,23 +9,24 @@ import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { activeOf, isFainted } from '~~/shared/game/battle'
 import { gymLeader } from '~~/shared/game/gyms'
+import { PACK_SIZE, RARE_PLUS_SLOTS } from '~~/shared/game/packs'
+import { msUntilNextDay } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
 /**
- * A base do jogador — a prancha *Hub*.
+ * A base do jogador — a prancha *Hub*, agora inteira.
  *
- * Ela entra inteira neste PR **menos duas peças**, e as duas por falta de dado e
- * não por escopo: a barra de navegação global liga destinos que só existem no PR
- * seguinte (`/packs` como loja, `/rules`, `/settings`), e o cartão do pack
- * diário depende da economia que chega junto com a loja. Até lá a fileira de
- * portas provisória continua — agora com a Liga —, porque um Hub sem caminho
- * para as outras telas seria a Fase 5 entregue e inalcançável.
+ * O PR da Liga entregou a faixa de retomar, o painel do próximo ginásio e o de
+ * coleção, e segurou as duas peças que dependiam da loja: a barra de navegação
+ * global, que liga destinos que só passaram a existir com ela, e o cartão do
+ * pack diário, que depende da economia que ela trouxe. As duas chegam aqui, e
+ * com elas saem a barra própria desta tela — virou a global — e a fileira
+ * provisória de portas, que existia só para cobrir esse intervalo.
  *
- * O que entra: a faixa de retomar batalha, o painel do próximo ginásio e o de
- * coleção. Os três são estado do jogador, então todos são `<ClientOnly>` — no
+ * Tudo o que a tela mostra é estado do jogador, então tudo é `<ClientOnly>`: no
  * servidor a coleção é vazia, o progresso é zero e não há batalha nenhuma.
  */
 const battle = useBattleStore()
@@ -78,6 +80,26 @@ const resumable = computed(() => {
   }
 })
 
+/**
+ * O relógio, pelo contador do pack diário — e pela virada da meia-noite com a
+ * aba aberta, que é o caso que um instante lido uma vez não cobre. Mesmo
+ * raciocínio da loja, que também bate de segundo em segundo.
+ */
+const now = shallowRef(new Date())
+useIntervalFn(() => {
+  now.value = new Date()
+}, 1000)
+
+const dailyReady = computed(() => progress.dailyReadyAt(now.value))
+
+/** `14:22:07` — o que falta para a meia-noite local, no formato da prancha. */
+const untilDaily = computed(() => {
+  const total = Math.max(0, Math.floor(msUntilNextDay(now.value) / 1000))
+  const parts = [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
+
+  return parts.map(part => String(part).padStart(2, '0')).join(':')
+})
+
 /** O chip verde do painel do próximo — um exemplo de cobertura, não um placar. */
 const advantage = computed(() => {
   const strong = league.strongest.value
@@ -111,22 +133,6 @@ const tiers = computed(() => [
 
 <template>
   <main class="hub">
-    <header class="hub__bar">
-      <NuxtLink
-        to="/"
-        class="hub__brand"
-      >
-        HOLO<span>/</span>DECK
-      </NuxtLink>
-
-      <ClientOnly>
-        <p class="numeric hub__coins">
-          {{ gameNumber(progress.coins) }}
-          <span>moedas</span>
-        </p>
-      </ClientOnly>
-    </header>
-
     <div class="hub__body">
       <ClientOnly>
         <!-- A faixa de retomar, acima de tudo: é a única coisa da tela que o
@@ -196,8 +202,65 @@ const tiers = computed(() => [
 
       <div class="hub__grid">
         <ClientOnly>
-          <!-- Próximo desafio. O pack diário, que a prancha põe ao lado, chega
-               com a loja: sem ela não há como gastar o que ele rende. -->
+          <!--
+            O pack diário, à esquerda do próximo desafio como a prancha o põe.
+
+            O botão leva a `/packs?open=daily`, e não abre aqui: a abertura é a
+            outra metade da tela da loja, com o `PackOpener` e o índice do dex
+            que ela já carrega. Duplicar os dois no Hub seria a mesma sequência
+            de virada mantida em dois lugares.
+
+            **O estado de indisponível não tem prancha** — o canvas só desenha o
+            cartão com `Disponível agora`. Sumir com ele deixaria um buraco na
+            grade de duas colunas, então ele fica com o contador e um caminho
+            para a loja, que é o que a prancha *Loja* faz na mesma situação.
+          -->
+          <section class="hub__panel hub__panel--daily">
+            <div class="hub__panel-head">
+              <div>
+                <p
+                  class="hub__eyebrow"
+                  :class="dailyReady ? 'hub__eyebrow--daily' : ''"
+                >
+                  {{ dailyReady ? 'Disponível agora' : 'Já saiu hoje' }}
+                </p>
+                <h2 class="hub__panel-title">
+                  Pack diário
+                </h2>
+                <p class="numeric hub__panel-meta">
+                  {{ PACK_SIZE }} cartas · {{ RARE_PLUS_SLOTS }} raro ou acima garantido
+                </p>
+              </div>
+            </div>
+
+            <div class="hub__panel-foot hub__panel-foot--daily">
+              <NuxtLink
+                v-if="dailyReady"
+                to="/packs?open=daily"
+                class="hub__button hub__button--daily bevel-control"
+              >
+                ABRIR
+              </NuxtLink>
+              <NuxtLink
+                v-else
+                to="/packs"
+                class="hub__button bevel-control"
+              >
+                IR À LOJA
+              </NuxtLink>
+
+              <p class="numeric hub__reward">
+                <template v-if="dailyReady">
+                  grátis, um por dia
+                </template>
+                <template v-else>
+                  próximo em <b>{{ untilDaily }}</b>
+                </template>
+              </p>
+            </div>
+          </section>
+
+          <!-- Próximo desafio. -->
           <section
             class="hub__panel"
             :data-type="league.next.value.leader.type"
@@ -265,8 +328,9 @@ const tiers = computed(() => [
             </div>
           </section>
 
-          <!-- Coleção: os mesmos números do binder, resumidos. -->
-          <section class="hub__panel">
+          <!-- Coleção: os mesmos números do binder, resumidos, ocupando a
+               linha inteira embaixo dos dois cartões — como a prancha a põe. -->
+          <section class="hub__panel hub__panel--wide">
             <div class="hub__panel-head">
               <div>
                 <p class="hub__eyebrow">
@@ -303,97 +367,12 @@ const tiers = computed(() => [
         </ClientOnly>
       </div>
 
-      <!--
-        A fileira provisória de portas. Ela sai no PR seguinte, quando a barra de
-        navegação global do canvas passa a existir com todos os destinos de pé.
-      -->
-      <nav class="hub__doors">
-        <NuxtLink
-          to="/packs"
-          class="hub__door hub__door--primary bevel-control"
-        >
-          Abrir pack
-        </NuxtLink>
-        <NuxtLink
-          to="/league"
-          class="hub__door bevel-control"
-        >
-          Liga
-        </NuxtLink>
-        <NuxtLink
-          to="/deck"
-          class="hub__door bevel-control"
-        >
-          Deck
-        </NuxtLink>
-        <NuxtLink
-          to="/collection"
-          class="hub__door bevel-control"
-        >
-          Coleção
-        </NuxtLink>
-        <NuxtLink
-          to="/pokedex"
-          class="hub__door bevel-control"
-        >
-          Pokédex
-        </NuxtLink>
-      </nav>
-
       <AppVersion />
     </div>
   </main>
 </template>
 
 <style scoped>
-.hub {
-  min-height: 100dvh;
-  background: var(--bg);
-}
-
-.hub__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 66px;
-  padding: 0 40px;
-  border-bottom: 1px solid var(--border);
-}
-
-.hub__brand {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-decoration: none;
-  color: var(--text);
-}
-
-.hub__brand span {
-  color: var(--text-muted);
-}
-
-.hub__coins {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 6px 12px;
-  border-radius: var(--radius);
-  border: 1px solid color-mix(in oklab, var(--coin) 45%, var(--bg));
-  background: color-mix(in oklab, var(--coin) 8%, var(--surface));
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--coin);
-}
-
-.hub__coins span {
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
 .hub__body {
   padding: 36px 40px 40px;
 }
@@ -404,6 +383,10 @@ const tiers = computed(() => [
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.hub__eyebrow--daily {
+  color: var(--forge);
 }
 
 .hub__eyebrow--warm {
@@ -521,10 +504,31 @@ const tiers = computed(() => [
   color: var(--deficit);
 }
 
+/**
+ * A grade de painéis: o diário e o próximo desafio lado a lado, e a coleção
+ * ocupando a linha inteira embaixo — que é como a prancha *Hub* os dispõe.
+ *
+ * `auto-fit` continua colapsando para uma coluna abaixo de 420px por painel, e
+ * o `1 / -1` da coleção vale igual lá: ele já é a linha inteira.
+ */
 .hub__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
   gap: 22px;
+}
+
+.hub__panel--wide {
+  grid-column: 1 / -1;
+}
+
+/** O cartão do diário é o mais curto da fileira; o rodapé desce para o pé. */
+.hub__panel--daily {
+  display: flex;
+  flex-direction: column;
+}
+
+.hub__panel-foot--daily {
+  margin-top: auto;
 }
 
 .hub__panel {
@@ -702,6 +706,18 @@ const tiers = computed(() => [
   background: color-mix(in oklab, var(--type) 82%, var(--text));
 }
 
+.hub__button--daily {
+  color: var(--bg);
+  background: var(--forge);
+  border-color: var(--forge);
+}
+
+.hub__button--daily:hover,
+.hub__button--daily:focus-visible {
+  color: var(--bg);
+  background: color-mix(in oklab, var(--forge) 82%, var(--text));
+}
+
 .hub__button--warm {
   color: var(--bg);
   background: var(--coin);
@@ -714,47 +730,7 @@ const tiers = computed(() => [
   background: color-mix(in oklab, var(--coin) 82%, var(--text));
 }
 
-.hub__doors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 24px;
-}
-
-.hub__door {
-  padding: 10px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-  color: var(--text-body);
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.hub__door:hover,
-.hub__door:focus-visible {
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-
-.hub__door--primary {
-  color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 14%, var(--surface));
-  border-color: var(--accent);
-}
-
-.hub__door--primary:hover,
-.hub__door--primary:focus-visible {
-  color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 22%, var(--surface));
-}
-
-@media (max-width: 720px) {
-  .hub__bar {
-    padding: 0 20px;
-  }
-
+@media (width < 720px) {
   .hub__body {
     padding: 24px 20px 32px;
   }

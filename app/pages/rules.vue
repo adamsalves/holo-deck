@@ -12,6 +12,8 @@ import {
 import { DUST_PER_DUPLICATE, FORGE_COST, FORGE_RATIO } from '~~/shared/game/dust'
 import {
   FLAWLESS_RATE,
+  GYM_REWARD_BASE,
+  GYM_REWARD_STEP,
   PACK_PRICE,
   REMATCH_RATE,
   WELCOME_PACKS,
@@ -29,7 +31,7 @@ import {
   SHINY_ODDS,
   UNCOMMON_SLOTS,
 } from '~~/shared/game/packs'
-import { gameNumber } from '~~/shared/game/progress'
+import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import { RARITY_THRESHOLDS } from '~~/shared/game/rarity'
 import { BATTLE_IV, BATTLE_LEVEL } from '~~/shared/game/stats'
 import {
@@ -69,25 +71,6 @@ import { AILMENT_LABELS, RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/gam
 /** `1,5` e `0,5` no lugar de `1.5` — o documento é `lang="pt-BR"`. */
 function decimal(value: number, places = 1): string {
   return value.toFixed(places).replace('.', ',')
-}
-
-/**
- * Uma taxa em porcentagem, com casa decimal **só quando ela existe**: `80`,
- * `15`, `4,5`, `0,5`.
- *
- * A primeira versão escolhia as casas por um limiar (`< 10 ? 1 : 0`), o que
- * escrevia um `10` no arquivo — e o portão desta página, com razão, não sabe
- * distinguir um limiar de formatação do limiar de pity. Perguntar se o número é
- * inteiro responde a mesma coisa sem nenhum número no meio, e é mais correto:
- * um peso de 12,5% ganharia a casa decimal que o limiar lhe negava.
- */
-function rate(value: number): string {
-  return decimal(value, Number.isInteger(value) ? 0 : 1)
-}
-
-/** `40%` de uma fração. Arredonda porque nenhuma taxa do jogo tem casa decimal. */
-function percent(fraction: number): string {
-  return `${Math.round(fraction * 100)}%`
 }
 
 /** `1/24`, `1/16`, `1/8` — a fração como o jogador a lê, e não como float. */
@@ -158,7 +141,7 @@ const forgeRows = computed(() => {
 })
 
 const rarePlusOdds = computed(() =>
-  RARE_PLUS_TIERS.map(tier => rate(RARE_PLUS_WEIGHTS[tier] * 100)).join(' / '))
+  RARE_PLUS_TIERS.map(tier => gamePercent(RARE_PLUS_WEIGHTS[tier])).join(' / '))
 
 /**
  * A fórmula, com o nível à vista.
@@ -192,7 +175,7 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
   type: CONDITION_TYPES[name],
   label: AILMENT_LABELS[name].toUpperCase(),
   effect: {
-    paralysis: `Speed ×${decimal(PARALYSIS_SPEED_FACTOR)} e ${percent(PARALYSIS_SKIP_CHANCE)} de chance de perder o turno.`,
+    paralysis: `Speed ×${decimal(PARALYSIS_SPEED_FACTOR)} e ${gamePercent(PARALYSIS_SKIP_CHANCE)} de chance de perder o turno.`,
     burn: `Ataque físico ×${decimal(BURN_ATTACK_FACTOR)} e ${ratio(BURN_DAMAGE_FRACTION)} do HP máximo por turno.`,
     poison: `${ratio(POISON_DAMAGE_FRACTION)} do HP máximo por turno.`,
     sleep: `Não age por ${SLEEP_MIN_TURNS} a ${SLEEP_MAX_TURNS} turnos, sorteados.`,
@@ -222,7 +205,7 @@ const TURN_ORDER = computed(() => [
   },
   {
     key: 'blocked',
-    before: `Impedimento — dormindo não age, paralisado perde o turno em ${percent(PARALYSIS_SKIP_CHANCE)}.`,
+    before: `Impedimento — dormindo não age, paralisado perde o turno em ${gamePercent(PARALYSIS_SKIP_CHANCE)}.`,
     strong: '',
     after: '',
   },
@@ -243,8 +226,8 @@ const TURN_ORDER = computed(() => [
 ])
 
 const noiseRange = computed(() => ({
-  first: percent(noiseChance(1)),
-  last: percent(noiseChance(GYM_COUNT)),
+  first: gamePercent(noiseChance(1)),
+  last: gamePercent(noiseChance(GYM_COUNT)),
 }))
 
 /** Em que faixa cada comportamento do líder entra. */
@@ -273,11 +256,15 @@ const campaign = computed(() => {
   return { total, packs: Math.floor(total / PACK_PRICE) }
 })
 
-/** A recompensa do primeiro ginásio e a do último — a curva em dois pontos. */
-const rewardRange = computed(() => ({
-  first: rewards.value.at(0) ?? 0,
-  last: rewards.value.at(-1) ?? 0,
-}))
+/**
+ * A curva da recompensa como a prancha a escreve: `200 + 100×n`.
+ *
+ * A fórmula e não a faixa, porque é a fórmula que explica **por que** o nono
+ * ginásio paga mais — e as duas parcelas vêm nomeadas de `economy.ts` para a
+ * página poder escrevê-la sem digitar nenhuma delas.
+ */
+const rewardCurve = computed(() =>
+  `${gameNumber(GYM_REWARD_BASE)} + ${gameNumber(GYM_REWARD_STEP)}×n`)
 
 useSeoMeta({
   title: 'Regras — Holo Deck',
@@ -496,7 +483,7 @@ useSeoMeta({
             crítico ×{{ decimal(CRIT_MULTIPLIER) }} · {{ ratio(CRIT_CHANCE) }}
           </li>
           <li class="numeric rules__chip">
-            aleatório {{ RANDOM_MIN_PERCENT }} – {{ RANDOM_MAX_PERCENT }} sobre 100
+            aleatório {{ RANDOM_MIN_PERCENT }} – {{ RANDOM_MAX_PERCENT }} por cento
           </li>
         </ul>
 
@@ -529,7 +516,7 @@ useSeoMeta({
           cobertura de tipo e não por poder bruto. Item:
           {{ POTIONS_PER_SIDE === 1 ? 'uma' : POTIONS_PER_SIDE }}
           <em class="rules__potion">poção</em> por lado por batalha, restaurando
-          {{ percent(POTION_HEAL_FRACTION) }} do HP máximo. Perder não custa nada
+          {{ gamePercent(POTION_HEAL_FRACTION) }} do HP máximo. Perder não custa nada
           — a revanche é imediata.
         </p>
       </section>
@@ -629,7 +616,7 @@ useSeoMeta({
               Ginásio, 1ª vitória
             </dt>
             <dd class="numeric rules__value rules__value--coin">
-              {{ gameNumber(rewardRange.first) }} a {{ gameNumber(rewardRange.last) }}
+              {{ rewardCurve }}
             </dd>
           </div>
           <div class="rules__line">
@@ -637,7 +624,7 @@ useSeoMeta({
               Ginásio, revanche
             </dt>
             <dd class="numeric rules__value rules__value--coin">
-              {{ percent(REMATCH_RATE) }}
+              {{ gamePercent(REMATCH_RATE) }}
             </dd>
           </div>
           <div class="rules__line">
@@ -645,7 +632,7 @@ useSeoMeta({
               Vitória imaculada
             </dt>
             <dd class="numeric rules__value rules__value--progress">
-              +{{ percent(FLAWLESS_RATE) }}
+              +{{ gamePercent(FLAWLESS_RATE) }}
             </dd>
           </div>
           <div class="rules__line">
