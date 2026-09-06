@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.7.0](https://github.com/adamsalves/holo-deck/compare/v0.6.0...v0.7.0) (2026-09-06)
+
+
+### Features
+
+* **deck:** a tela dos seis slots, e a leitura de cobertura ([880bcc1](https://github.com/adamsalves/holo-deck/commit/880bcc1bd25768ce1997e66b41bf4d53b3f8185a))
+* **deck:** o deck builder, o contraste do dragon e o rodapé único da carta ([964be5a](https://github.com/adamsalves/holo-deck/commit/964be5aaa705e5947f5aeb5bf404dcc730e18542))
+* **deck:** os seis slots, a cobertura, e o save que sobe para a versão 2 ([9502fea](https://github.com/adamsalves/holo-deck/commit/9502feadff85b711247b4fd474e1489be539e15a))
+* **dex:** o carimbo do dex no build, e a segunda trava do log de batalha ([5ba5ad1](https://github.com/adamsalves/holo-deck/commit/5ba5ad1a063e86cbb358103d99dc2c34a8c4b95a))
+* **economy:** o preço da loja, o pack diário e o interruptor de movimento ([fc1d62c](https://github.com/adamsalves/holo-deck/commit/fc1d62c5c198e0ec14d82b162b2f4479cc9184a6))
+* Fase 6 (2/3) — a Liga, a batalha e o carimbo do dex ([8f48eb7](https://github.com/adamsalves/holo-deck/commit/8f48eb738c96f631169abfee24a482e71182327c))
+* **game:** a economia do ginásio, as insígnias e a batalha dentro do save ([a67e68b](https://github.com/adamsalves/holo-deck/commit/a67e68b380961d706c8112accc3b59a2dd69e77a))
+* **league:** a trilha dos nove, a batalha e o Hub que os liga ([e285b58](https://github.com/adamsalves/holo-deck/commit/e285b5802efa0760b41d1e10bce3c7480c80065d))
+* **nav:** a barra global, e o Hub que ela completa ([c611fae](https://github.com/adamsalves/holo-deck/commit/c611faedb0e5e4f54bc9b7b829f05d6b4649d483))
+* **rules:** a página que não pode mentir, porque não é redigida ([354b487](https://github.com/adamsalves/holo-deck/commit/354b4872e7744b895b0bbfc40cedd8541233dea2))
+* **settings:** a tela de ajustes, do que tem dado ([0383aa2](https://github.com/adamsalves/holo-deck/commit/0383aa2727c442bf3863d2dbb19ae2f9cc6d14a9))
+* **shop:** a loja em /packs — três fontes de pack, e o que cada uma cobra ([53fdf36](https://github.com/adamsalves/holo-deck/commit/53fdf363f8db18ca0e356f71bd173304dcbb6330))
+
+
+### Bug Fixes
+
+* **a11y:** os controles da loja e do interruptor ganham nome de verdade ([e78cd06](https://github.com/adamsalves/holo-deck/commit/e78cd0649a9d8611e8d7ba4f9618c6663d0b17a0))
+* **battle:** a batalha aberta em outro ginásio deixa de ser apagada em silêncio ([27f6e16](https://github.com/adamsalves/holo-deck/commit/27f6e1610f307ab78f31a5df94c2f3a7a310bfa4))
+* **battle:** a batalha descartada deixa de travar a tela, e o golpe sem PP volta a ser jogada ([6261304](https://github.com/adamsalves/holo-deck/commit/6261304aae7dceb7d3e41d63399beaa95e5c5fe5))
+* **collection:** o rodapé único da carta, e o link que virou camada ([d1f75ad](https://github.com/adamsalves/holo-deck/commit/d1f75ad81ca50bccdfae7871080dcb89f7d1ab5b)), closes [#24](https://github.com/adamsalves/holo-deck/issues/24)
+* **deck:** o que o review achou, e o defeito que ele previu e eu descartei cedo demais ([81e6a91](https://github.com/adamsalves/holo-deck/commit/81e6a915cbd32f8fb2143ce7c7323293d09b2e6b))
+* **gyms:** as faixas escondiam o líder que o docblock dizia surfacear ([c9ab92b](https://github.com/adamsalves/holo-deck/commit/c9ab92b4391f7bfa09ab4b84146bee5d96b08136))
+* **nav:** a barra não marcava seção nenhuma em rota aninhada ([b4a13c8](https://github.com/adamsalves/holo-deck/commit/b4a13c8515460a2e321f2d50162ccdc7c589fb1c))
+* **save:** o time do BattleLog ganha teto, e o prerender lê GYM_COUNT ([ec97204](https://github.com/adamsalves/holo-deck/commit/ec97204b6cc5c94cede15c4d265cb85b07eca9f2))
+* **settings:** a cópia de segurança que a tela prometia não tinha volta ([9ac9f18](https://github.com/adamsalves/holo-deck/commit/9ac9f182bc466b0e3781e144665b97ac7207b5ae))
+* **settings:** a instância do Pinia deixa de ser a ativa por acaso ([137432c](https://github.com/adamsalves/holo-deck/commit/137432cb88bd7ad03f3d61b10830df1ea96090cb))
+* **shop:** dois packs abertos no mesmo segundo saíam idênticos ([ed47bbe](https://github.com/adamsalves/holo-deck/commit/ed47bbefa0895d6260500957146fd14a664bae71))
+* **theme:** o dragon que não sustentava texto em painel, e o registro que virou invariante ([36c4312](https://github.com/adamsalves/holo-deck/commit/36c4312e87087632e36f2decab353a388917da30)), closes [#11](https://github.com/adamsalves/holo-deck/issues/11)
+
 ## [0.6.0](https://github.com/adamsalves/holo-deck/compare/v0.5.1...v0.6.0) (2026-09-04)
 
 
