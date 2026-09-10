@@ -1,18 +1,8 @@
 import type { H3Event } from 'h3'
-import { isSyncBody } from '~~/shared/save/sync'
 import { writeSave } from '~~/server/db/save-store'
-import { countWrite } from '~~/server/utils/save-rate-limit'
+import { countWrite, refundWrite } from '~~/server/db/save-rate-limit'
+import { readPutBody } from '~~/server/utils/save-body'
 import { requireUserId } from '~~/server/utils/session'
-
-/**
- * O teto do corpo, em bytes, conferido **antes** de `JSON.parse`.
- *
- * O pior caso documentado do save é 21 KB; isto dá mais de dez vezes de folga e
- * ainda limita o que um cliente autenticado consegue fazer o servidor analisar.
- * Conferir depois do parse seria conferir tarde: o custo que se quer evitar é o
- * do próprio parse.
- */
-const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * Grava o save, com concorrência otimista em `baseVersion`.
@@ -20,8 +10,9 @@ const MAX_BODY_BYTES = 256 * 1024
  * **`baseVersion` é a versão em que o cliente baseou a edição**, não a que ele
  * quer gravar — mandar "o próximo número" é onde este tipo de protocolo costuma
  * quebrar, porque dois clientes calculam o mesmo próximo. A regra em si mora em
- * `server/db/save-store.ts`, que é exercitável contra um Postgres de verdade;
- * aqui fica só o que é HTTP.
+ * `server/db/save-store.ts`, que é exercitável contra um Postgres de verdade; a
+ * leitura do corpo mora em `server/utils/save-body.ts`, que é pura e tem teste.
+ * Aqui fica só o que é HTTP: sessão, status, e o teto de escritas.
  *
  * **O 409 devolve o save do servidor**, e não só o aviso: o cliente reaplica a
  * mutação pendente por cima do que recebeu e tenta uma vez mais. Sem o corpo,
@@ -31,14 +22,9 @@ const MAX_BODY_BYTES = 256 * 1024
 export default defineEventHandler(async (event: H3Event) => {
   const userId = await requireUserId(event)
 
-  const raw = await readRawBody(event)
-  if (raw === undefined || raw.length > MAX_BODY_BYTES) {
-    throw createError({ statusCode: 413, statusMessage: 'Corpo grande demais' })
-  }
-
-  const body: unknown = JSON.parse(raw.toString())
-  if (!isRecord(body) || !isSyncBody(body.data) || !isBaseVersion(body.baseVersion)) {
-    throw createError({ statusCode: 400, statusMessage: 'Corpo inválido' })
+  const body = readPutBody(await readRawBody(event))
+  if (!body.ok) {
+    throw createError({ statusCode: body.status, statusMessage: body.message })
   }
 
   const now = new Date()
@@ -51,6 +37,9 @@ export default defineEventHandler(async (event: H3Event) => {
   const result = await writeSave(userId, body.data, body.baseVersion, now)
 
   if (!result.ok) {
+    // A escrita não aconteceu, então ela não conta para o teto — ver `refundWrite`.
+    await refundWrite(userId, limit.windowStart)
+
     throw createError({
       statusCode: 409,
       statusMessage: 'Outro aparelho gravou antes',
@@ -60,12 +49,3 @@ export default defineEventHandler(async (event: H3Event) => {
 
   return { version: result.version, updatedAt: result.updatedAt.toISOString() }
 })
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-/** A versão base é uma contagem: inteiro, não negativa e com ordem de grandeza. */
-function isBaseVersion(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 1_000_000
-}
