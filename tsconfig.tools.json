@@ -27,6 +27,7 @@
     "test/**/*",
     "scripts/**/*",
     "vitest.config.ts",
+    "drizzle.config.ts",
     "eslint.config.mjs",
     "commitlint.config.mjs",
     "lint-staged.config.mjs"
