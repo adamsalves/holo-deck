@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDex } from '~/composables/useDex'
 import { useFirstSync } from '~/composables/useFirstSync'
 import type { ChoiceSide } from '~/composables/useFirstSync'
+import { composeSave } from '~/utils/save-document'
 import { summarize } from '~/utils/save-summary'
 import type { SearchEntry } from '~~/shared/types/dex'
 
@@ -17,6 +18,11 @@ import type { SearchEntry } from '~~/shared/types/dex'
  * Fica acima do layout, como o aviso de save recuperado, porque é estado do boot
  * e não de uma tela — e porque não pode ser fechada por navegação: enquanto ela
  * estiver de pé, o jogo não sabe qual coleção é a sua.
+ *
+ * **O lado local sai das stores, não de um retrato.** A página por baixo continua
+ * montada e viva — esta tela é `position: fixed` —, então um `resume` de batalha
+ * pagando moedas com o modal de pé mudaria as stores e não o retrato. O que a
+ * tela mostra e o que o clique sobe passaram a ser a mesma coisa.
  */
 
 const { pending, choose } = useFirstSync()
@@ -26,17 +32,56 @@ const index = ref<readonly SearchEntry[]>([])
 const applying = ref<ChoiceSide | null>(null)
 const failed = ref(false)
 
+/**
+ * O índice do dex — e os dois estados que faltavam em volta dele.
+ *
+ * **Sem eles a tela pedia decisão irreversível exibindo números errados.** O
+ * `summarize` ignora espécie ausente do índice, então com ele vazio os dois lados
+ * mostravam `0 shiny` e *nenhuma carta*, e os botões nasciam habilitados: o
+ * `v-if` abre no mesmo tick em que a decisão chega, antes de esta leitura
+ * resolver. Quem comparasse as duas colunas naquele instante compararia dois
+ * retratos em branco — e o review da Fase 1 já registrou o deploy parcial do dex
+ * como caso real neste repositório.
+ *
+ * A rejeição também não se perde mais: ela morria como `unhandledrejection` no
+ * callback assíncrono do `watch`, e a tela ficava mentindo para sempre.
+ */
+const indexFailed = ref(false)
+const ready = computed(() => index.value.length > 0)
+
 // O índice só é carregado quando a tela precisa dele: a esmagadora maioria dos
 // boots não passa por aqui, e 1025 linhas de dex é peso que não se paga à toa.
-watch(pending, async (value) => {
-  if (value !== null && index.value.length === 0) index.value = await loadIndex()
+watch(pending, (value) => {
+  if (value === null || index.value.length > 0) return
+
+  indexFailed.value = false
+  loadIndex()
+    .then((entries) => {
+      index.value = entries
+    })
+    .catch(() => {
+      indexFailed.value = true
+    })
 }, { immediate: true })
 
-const local = computed(() => (pending.value ? summarize(pending.value.local, index.value) : null))
-const remote = computed(() => (pending.value ? summarize(pending.value.remote, index.value) : null))
+/**
+ * O lado deste aparelho, recomposto das stores a cada mudança delas.
+ *
+ * `composeSave` sem `pinia`: aqui estamos dentro de componente, onde a instância
+ * ativa existe — ao contrário do plugin, que precisa passá-la.
+ */
+const localSave = computed(() => (pending.value === null ? null : composeSave()))
+
+const local = computed(() => {
+  const save = localSave.value
+  return save === null || !ready.value ? null : summarize(save, index.value)
+})
+
+const remote = computed(() =>
+  pending.value === null || !ready.value ? null : summarize(pending.value.remote, index.value))
 
 /** A batalha em andamento é deste aparelho: a do servidor nunca sobe. */
-const hasBattle = computed(() => pending.value?.local.battle != null)
+const hasBattle = computed(() => localSave.value?.battle != null)
 
 const remoteWhen = computed(() => {
   const iso = pending.value?.remoteUpdatedAt
@@ -51,6 +96,49 @@ const localWhen = computed(() => {
 
   return new Date(at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 })
+
+/**
+ * O foco, preso dentro da folha enquanto ela está de pé.
+ *
+ * `aria-modal="true"` **promete** que o resto da página não existe para quem
+ * navega por leitor de tela, e sem isto a promessa era falsa: o Tab saía do
+ * diálogo e entrava na barra e no binder por baixo — numa tela que não pode ser
+ * fechada por navegação. `Escape` continua sem fazer nada de propósito: não há
+ * "cancelar" aqui, porque o jogo não sabe qual coleção é a do jogador até a
+ * escolha.
+ */
+const sheet = ref<HTMLElement | null>(null)
+
+watch(pending, async (value) => {
+  if (value === null) return
+
+  await nextTick()
+  sheet.value?.focus()
+})
+
+function focusables(): HTMLElement[] {
+  const root = sheet.value
+  if (root === null) return []
+
+  return [...root.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex="0"]')]
+}
+
+function trapTab(event: KeyboardEvent): void {
+  const items = focusables()
+  const first = items[0]
+  const last = items[items.length - 1]
+  if (first === undefined || last === undefined) return
+
+  const target = event.target
+  if (event.shiftKey && target === first) {
+    event.preventDefault()
+    last.focus()
+  }
+  else if (!event.shiftKey && target === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 async function pick(side: ChoiceSide): Promise<void> {
   applying.value = side
@@ -77,17 +165,25 @@ async function pick(side: ChoiceSide): Promise<void> {
     aria-modal="true"
     aria-labelledby="choice-title"
   >
-    <div class="choice__sheet">
+    <div
+      ref="sheet"
+      class="choice__sheet"
+      tabindex="-1"
+      @keydown.tab="trapTab"
+    >
       <header class="choice__head">
         <p class="choice__eyebrow">
           Duas coleções encontradas
         </p>
-        <h1
+        <!-- `h2` e não `h1`: a página por baixo continua montada com o dela, e
+             dois `h1` na mesma árvore é sumário quebrado para quem navega por
+             cabeçalho. -->
+        <h2
           id="choice-title"
           class="choice__title"
         >
           Qual delas você quer continuar?
-        </h1>
+        </h2>
         <p class="choice__lede">
           Você já jogava neste navegador, e a conta que acabou de entrar também
           tem progresso. Escolha uma — <strong>a outra não é apagada</strong>,
@@ -104,44 +200,66 @@ async function pick(side: ChoiceSide): Promise<void> {
         batalha nunca sobe para o servidor.
       </p>
 
+      <!-- Enquanto o índice não volta, nenhum número é confiável: a escolha fica
+           esperando em vez de oferecer dois retratos em branco. -->
+      <p
+        v-if="indexFailed"
+        class="choice__failed"
+        role="status"
+      >
+        Não deu para ler os dados das cartas agora, e sem eles as duas colunas não
+        podem ser comparadas. Recarregue a página — <strong>nada foi
+          alterado</strong>, e a pergunta volta.
+      </p>
+      <p
+        v-else-if="!ready"
+        class="choice__loading"
+        role="status"
+      >
+        Lendo as cartas das duas coleções…
+      </p>
+
       <div class="choice__sides">
         <section
           v-for="side in ([
-            { key: 'local' as const, label: 'Neste aparelho', sum: local, when: localWhen, dust: pending.local.dust },
+            { key: 'local' as const, label: 'Neste aparelho', sum: local, when: localWhen, dust: localSave?.dust ?? 0 },
             { key: 'remote' as const, label: 'Na sua conta', sum: remote, when: remoteWhen, dust: pending.remote.dust },
           ])"
           :key="side.key"
           class="choice__side"
           :class="{ 'choice__side--account': side.key === 'remote' }"
+          :aria-label="`Coleção ${side.label}`"
         >
           <p class="choice__eyebrow">
             {{ side.label }}
           </p>
 
+          <!-- `dt` antes de `dd` em cada par: a ordem inversa não é HTML válido,
+               e a inversão visual é do CSS, não da marcação. -->
           <dl class="choice__numbers">
             <div>
-              <dd class="numeric choice__number">
-                {{ side.sum?.cards ?? 0 }}
-              </dd>
               <dt class="choice__unit">
                 cartas
               </dt>
+              <dd class="numeric choice__number">
+                {{ side.sum?.cards ?? '—' }}
+              </dd>
             </div>
             <div>
-              <dd class="numeric choice__number">
-                {{ side.sum?.badges ?? 0 }}
-              </dd>
               <dt class="choice__unit">
                 insígnias
               </dt>
+              <dd class="numeric choice__number">
+                {{ side.sum?.badges ?? '—' }}
+              </dd>
             </div>
             <div>
-              <dd class="numeric choice__number choice__number--shiny">
-                {{ side.sum?.shiny ?? 0 }}
-              </dd>
               <dt class="choice__unit">
                 shiny
               </dt>
+              <dd class="numeric choice__number choice__number--shiny">
+                {{ side.sum?.shiny ?? '—' }}
+              </dd>
             </div>
           </dl>
 
@@ -164,7 +282,7 @@ async function pick(side: ChoiceSide): Promise<void> {
               >
             </li>
             <li
-              v-if="(side.sum?.best.length ?? 0) === 0"
+              v-if="ready && (side.sum?.best.length ?? 0) === 0"
               class="choice__unit"
             >
               nenhuma carta
@@ -173,7 +291,7 @@ async function pick(side: ChoiceSide): Promise<void> {
 
           <dl class="choice__facts">
             <div>
-              <dt>Última partida</dt>
+              <dt>{{ side.key === 'local' ? 'Última gravação' : 'Última sincronização' }}</dt>
               <dd class="numeric">
                 {{ side.when }}
               </dd>
@@ -190,7 +308,8 @@ async function pick(side: ChoiceSide): Promise<void> {
             type="button"
             class="choice__use bevel-control"
             :class="{ 'choice__use--account': side.key === 'remote' }"
-            :disabled="applying !== null"
+            :disabled="applying !== null || !ready"
+            :aria-label="`USAR ESTA — ${side.label}`"
             @click="pick(side.key)"
           >
             {{ applying === side.key ? 'APLICANDO…' : 'USAR ESTA' }}
@@ -312,6 +431,13 @@ async function pick(side: ChoiceSide): Promise<void> {
   margin-top: 16px;
 }
 
+/* O rótulo vem antes do número na marcação, porque é o que o HTML permite, e
+   depois dele na tela, porque é o que a prancha desenha. */
+.choice__numbers > div {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
 .choice__number {
   font-size: 30px;
   font-weight: 800;
@@ -405,6 +531,18 @@ async function pick(side: ChoiceSide): Promise<void> {
 .choice__use:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+.choice__loading {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.choice__sheet:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
 }
 
 .choice__failed {

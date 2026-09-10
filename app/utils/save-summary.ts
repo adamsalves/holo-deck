@@ -15,8 +15,10 @@ export interface SummaryCard {
 }
 
 export interface SaveSummary {
+  /** Espécies possuídas — **não** cópias. Ver o docblock de `summarize`. */
   readonly cards: number
   readonly badges: number
+  /** Espécies com ao menos uma shiny, na mesma unidade de `cards`. */
   readonly shiny: number
   readonly dust: number
   readonly best: readonly SummaryCard[]
@@ -37,6 +39,12 @@ export const BEST_CARDS = 5
  * Recebe o índice do dex em vez de o buscar: a tela mostra **dois** saves lado a
  * lado, e um composable que carregasse dados por chamada faria a mesma leitura
  * duas vezes.
+ *
+ * **`cards` e `shiny` contam a mesma coisa: espécie.** Uma versão anterior somava
+ * cópias em `shiny` e espécies em `cards`, e os dois números ficam lado a lado na
+ * tela: "3 cartas / 5 shiny" é possível em cópias e se lê como contradição —
+ * exatamente na tela em que o jogador compara duas colunas para decidir qual
+ * coleção perder.
  */
 export function summarize(save: SaveData, index: readonly SearchEntry[]): SaveSummary {
   const owned = ownedIds(save.collection)
@@ -49,9 +57,8 @@ export function summarize(save: SaveData, index: readonly SearchEntry[]): SaveSu
     const entry = byId.get(id)
     if (entry === undefined) continue
 
-    const copies = save.collection[String(id)]
-    const isShiny = (copies?.s ?? 0) > 0
-    if (isShiny) shiny += copies?.s ?? 0
+    const isShiny = (save.collection[String(id)]?.s ?? 0) > 0
+    if (isShiny) shiny += 1
 
     cards.push({
       id,
