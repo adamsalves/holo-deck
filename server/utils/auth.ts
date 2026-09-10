@@ -24,6 +24,15 @@ import { requireEnv } from './env'
  * `PUT /api/save` **precisam do Postgres no mesmo request** que lê a sessão, então
  * um Redis não evitaria acordar o compute suspenso do Neon — só somaria um
  * segundo lugar capaz de estar fora do ar.
+ *
+ * **`trustedOrigins` escrito, e não herdado.** O valor é o mesmo que o default da
+ * biblioteca produz — `[baseURL]` —, e escrevê-lo serve para a consequência ficar
+ * visível no código e não só no comportamento: origem que não seja esta não
+ * inicia fluxo de OAuth nem recebe callback. É o que faz **preview da Vercel não
+ * validar login**, porque cada deploy tem URL própria e nenhuma delas casa com o
+ * `BETTER_AUTH_URL` nem com a redirect URI registrada no OAuth App. Não é defeito
+ * a consertar: um preview aceito aqui seria um endereço efêmero autorizado a
+ * trocar código por sessão. Valida-se em `localhost` e em produção.
  */
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: 'pg', schema }),
@@ -37,6 +46,8 @@ export const auth = betterAuth({
       clientSecret: requireEnv('GITHUB_CLIENT_SECRET'),
     },
   },
+
+  trustedOrigins: [requireEnv('BETTER_AUTH_URL')],
 
   rateLimit: { storage: 'database' },
 })

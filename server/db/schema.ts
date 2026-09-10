@@ -39,8 +39,18 @@ export * from './auth-schema'
  * decide é o flag de sujo do cliente; este campo existe para a tela escrever
  * "sincronizado há X".
  *
- * O `onDelete: 'cascade'` é o que faz `DELETE /api/account` levar o save junto
- * sem uma segunda instrução que alguém possa esquecer de escrever.
+ * O `onDelete: 'cascade'` é o que **vai** fazer a exclusão de conta levar o save
+ * junto sem uma segunda instrução que alguém possa esquecer de escrever. A rota
+ * que apaga conta ainda não existe — não há `DELETE /api/account`, e a única
+ * coisa que apaga linha de `saves` hoje é apagar o `user` à mão. O cascade entra
+ * agora porque ele é coluna, não rota: acrescentá-lo depois seria migração.
+ *
+ * **`withTimezone` aqui e não nas tabelas do `better-auth`.** As quatro geradas
+ * usam `timestamp` sem fuso, e a divergência é conhecida: `auth-schema.ts` é
+ * reescrito inteiro por `yarn db:generate:auth` e editá-lo à mão seria uma
+ * correção que o próximo `generate` apaga. As nossas duas guardam instante que
+ * viaja para o cliente em ISO, e instante sem fuso atravessando deploy em outra
+ * região é o defeito clássico de "sincronizado há -3 horas".
  */
 export const saves = pgTable('saves', {
   userId: text('user_id')
