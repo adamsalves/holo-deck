@@ -77,3 +77,25 @@ export function markSyncedWith(userId: string): void {
     // save local, então a tela de escolha nunca chega a aparecer.
   }
 }
+
+/**
+ * Esquece o acerto, no logout.
+ *
+ * **Sem isto, sair e entrar de novo na mesma conta pularia a pergunta** — e o
+ * caso em que isso custa é o que importa: quem saiu, jogou sem conta e voltou
+ * tem duas coleções outra vez, e a marca diria que este aparelho e esta conta já
+ * se entenderam. A chave descreve um acerto entre um aparelho e uma conta; o
+ * logout desfaz o lado da conta.
+ *
+ * **Não apaga o save local**, e a distinção é de produto: sair da conta não é
+ * *Apagar save deste aparelho*, que mora em `/settings` e pede confirmação. A
+ * coleção deste navegador continua jogável, sem conta, como era antes de entrar.
+ */
+export function clearSyncedWith(): void {
+  try {
+    browserStorage()?.removeItem(SYNCED_WITH_KEY)
+  }
+  catch {
+    // Mesmo raciocínio de `markSyncedWith`: sem armazenamento não há marca.
+  }
+}

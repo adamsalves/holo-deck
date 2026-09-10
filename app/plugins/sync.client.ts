@@ -1,10 +1,10 @@
 import type { useNuxtApp } from 'nuxt/app'
 import { defineNuxtPlugin } from 'nuxt/app'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
-import { authClient } from '~~/app/utils/auth-client'
 import { HttpDriver } from '~~/app/utils/save-http'
 import { lastWrite, markSyncedWith, markWrite, syncedWith } from '~~/app/utils/last-write'
 import { decideFirstSync } from '~~/shared/save/sync'
+import { useAccount } from '~~/app/composables/useAccount'
 import { useFirstSync } from '~~/app/composables/useFirstSync'
 
 /**
@@ -38,8 +38,22 @@ export default defineNuxtPlugin({
      * O plano descreve exatamente esta forma: *"com sessão — `GET` em segundo
      * plano"*. A tela de escolha entra por estado reativo quando a resposta
      * chega, e até lá o jogo já está jogável.
+     *
+     * **O `catch` não é decoração.** Disparar sem `await` é disparar sem ninguém
+     * para pegar a rejeição: um 409, um 5xx ou um cabo arrancado entre o `GET` e
+     * o `PUT` viravam `unhandledrejection` no console, e o docblock de `reconcile`
+     * prometia que nada ali derrubava o boot sem que o código cumprisse a
+     * promessa nos dois ramos que escrevem.
+     *
+     * **E `runWithContext` porque `reconcile` continua depois de dois `await`.**
+     * O `useState` da tela de escolha precisa da instância do Nuxt, e fora do
+     * contexto ele cai na instância global — que no cliente é a mesma, hoje, por
+     * acidente. O `runWithContext` é a forma que o Nuxt documenta para exatamente
+     * esta continuação.
      */
-    void reconcile(nuxtApp, http)
+    void nuxtApp.runWithContext(() => reconcile(nuxtApp, http)).catch((error: unknown) => {
+      console.warn('[holo-deck] a sincronização de entrada não concluiu', error)
+    })
 
     return { provide: { httpDriver: http } }
   },
@@ -53,17 +67,15 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
    * inteiro. Um plugin que lançasse aqui levaria junto a coleção que já estava
    * na tela — trocando "a sincronização não subiu" por "o jogo não abre".
    * Conferido rodando a suíte E2E inteira sem `.env`, que é a condição do CI.
+   *
+   * A leitura é do `useAccount`, que a faz **uma vez** e a compartilha com o
+   * canto da barra: duas chamadas a `getSession()` seriam duas idas à rede em
+   * todo boot, inclusive no de quem nunca vai criar conta.
    */
-  let userId: string
-  try {
-    const session = await authClient.getSession()
-    if (!session.data) return
+  const account = await useAccount().load()
+  if (account === null) return
 
-    userId = session.data.user.id
-  }
-  catch {
-    return
-  }
+  const userId = account.id
 
   // Aparelho já acertado com esta conta não repete a pergunta do primeiro
   // login: sem esta linha, escolher "neste aparelho" sobe o local, e no boot
@@ -79,6 +91,25 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
     // Rede fora não é "não há save no servidor": seguir em frente e subir o
     // local por cima seria apagar a coleção da conta por causa de um cabo. Sem
     // resposta, o jogo segue local — que é exatamente o que ele já era.
+    return
+  }
+
+  /**
+   * Save que existe e não pôde ser migrado: **não se faz nada**.
+   *
+   * `recovered` vem de `migrate`, e o caso que ele nomeia aqui é o de uma build
+   * mais nova ter gravado nesta conta — um aparelho atualizado, este com o bundle
+   * antigo em cache. Nenhuma das três saídas serve: adotar seria hidratar store
+   * com dado que este código não entende, subir o local seria sobrescrever a
+   * coleção boa com a deste navegador, e perguntar seria pedir uma decisão
+   * mostrando um dos lados como "nenhuma carta". Ficar quieto deixa o jogo local
+   * funcionando e o servidor intacto, que é o par certo de ações.
+   *
+   * **E não marca acerto nenhum**: no boot seguinte — já com o bundle novo — a
+   * leitura migra e a decisão acontece de verdade.
+   */
+  if (remote !== null && remote.recovered !== null) {
+    console.warn('[holo-deck] o save da conta é de outra versão deste jogo; nada foi alterado')
     return
   }
 
@@ -107,7 +138,6 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
     case 'ask':
       if (remote) {
         useFirstSync().pending.value = {
-          local,
           remote: remote.data,
           remoteUpdatedAt: remote.updatedAt,
           localAt: lastWrite(),

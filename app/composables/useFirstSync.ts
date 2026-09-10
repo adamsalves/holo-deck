@@ -2,13 +2,20 @@ import { useNuxtApp, useState } from 'nuxt/app'
 import type { Ref } from 'vue'
 import type { SaveData } from '~~/shared/save/schema'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
-import type { LocalStorageDriver } from '~~/app/utils/save-driver'
-import type { HttpDriver } from '~~/app/utils/save-http'
 import { markSyncedWith, markWrite } from '~~/app/utils/last-write'
 
 /** Os dois lados da tela *Duas coleções*, com o que ela precisa mostrar. */
 export interface PendingChoice {
-  readonly local: SaveData
+  /**
+   * O save da conta, já migrado — ver `HttpDriver.fetchRemote`.
+   *
+   * **O lado local não está aqui, e a ausência é a correção de um defeito.** Ele
+   * era um retrato tirado no boot, e a tela é `position: fixed` por cima de uma
+   * página que continua montada e viva: um `resume` de batalha pagando moedas
+   * enquanto o modal está de pé mudava as stores e não o retrato, e escolher
+   * *Neste aparelho* subia o estado velho. A tela lê as stores, e quem aplica
+   * recompõe o documento na hora do clique.
+   */
   readonly remote: SaveData
   /** ISO do servidor, para a coluna da conta. */
   readonly remoteUpdatedAt: string
@@ -32,6 +39,17 @@ export function useFirstSync(): { pending: Ref<PendingChoice | null>, choose: (s
   const pending = useState<PendingChoice | null>('first-sync', () => null)
 
   /**
+   * A perdedora já foi guardada nesta tela.
+   *
+   * **Arquivar uma vez por tela, e não uma por clique.** `choose` pode falhar — a
+   * rede cai no `PUT` — e a tela fica de pé para tentar de novo; sem esta marca,
+   * três tentativas gravavam três cópias da mesma coleção perdedora e o anel de
+   * `MAX_BACKUPS = 3` esvaziava junto, levando cópias anteriores de recuperação
+   * de save que ninguém pediu para apagar.
+   */
+  const archived = useState<boolean>('first-sync-archived', () => false)
+
+  /**
    * Aplica a escolha, e **guarda a perdedora antes**.
    *
    * A prancha promete que "a outra não é apagada, fica guardada no backup deste
@@ -49,20 +67,28 @@ export function useFirstSync(): { pending: Ref<PendingChoice | null>, choose: (s
     if (choice === null) return
 
     const app = useNuxtApp()
-    const local = app.$saveDriver satisfies LocalStorageDriver
-    const remote = app.$httpDriver satisfies HttpDriver
+    const local = app.$saveDriver
+    const remote = app.$httpDriver
 
     if (side === 'local') {
       // A perdedora é a do servidor, e ela não tem "texto no disco": arquiva-se
       // o documento serializado, que é o que o painel de cópias sabe restaurar.
-      local.archive(JSON.stringify(choice.remote))
-      await remote.save(choice.local)
+      if (!archived.value) {
+        local.archive(JSON.stringify(choice.remote))
+        archived.value = true
+      }
+
+      // Recomposto agora, e não o retrato do boot: ver `PendingChoice.remote`.
+      await remote.save(composeSave(app.$pinia))
     }
     else {
       // A perdedora é a deste aparelho, e dela existe o texto original — que é o
       // que se quer preservar, não o resultado migrado.
-      const raw = local.readRaw()
-      if (raw !== null) local.archive(raw)
+      if (!archived.value) {
+        const raw = local.readRaw()
+        if (raw !== null) local.archive(raw)
+        archived.value = true
+      }
 
       hydrateSave(choice.remote, app.$pinia)
       await local.save(composeSave(app.$pinia))
