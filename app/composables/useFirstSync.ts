@@ -4,7 +4,7 @@ import type { SaveData } from '~~/shared/save/schema'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import type { LocalStorageDriver } from '~~/app/utils/save-driver'
 import type { HttpDriver } from '~~/app/utils/save-http'
-import { markWrite } from '~~/app/utils/last-write'
+import { markSyncedWith, markWrite } from '~~/app/utils/last-write'
 
 /** Os dois lados da tela *Duas coleções*, com o que ela precisa mostrar. */
 export interface PendingChoice {
@@ -14,6 +14,8 @@ export interface PendingChoice {
   readonly remoteUpdatedAt: string
   /** Instante da última gravação **deste aparelho**, ou nulo se não se sabe. */
   readonly localAt: number | null
+  /** De quem é a conta — o que fica marcado quando a escolha se resolve. */
+  readonly userId: string
 }
 
 export type ChoiceSide = 'local' | 'remote'
@@ -67,6 +69,10 @@ export function useFirstSync(): { pending: Ref<PendingChoice | null>, choose: (s
       markWrite()
     }
 
+    // Só aqui, e não antes: um acerto marcado antes de a escrita dar certo
+    // faria o boot seguinte pular a pergunta com os dois lados ainda em
+    // desacordo — perdendo a única tela que sabe resolvê-lo.
+    markSyncedWith(choice.userId)
     pending.value = null
   }
 

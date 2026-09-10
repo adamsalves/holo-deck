@@ -2,7 +2,7 @@ import { defineNuxtPlugin } from 'nuxt/app'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import { authClient } from '~~/app/utils/auth-client'
 import { HttpDriver } from '~~/app/utils/save-http'
-import { lastWrite, markWrite } from '~~/app/utils/last-write'
+import { lastWrite, markSyncedWith, markWrite, syncedWith } from '~~/app/utils/last-write'
 import { decideFirstSync } from '~~/shared/save/sync'
 import { useFirstSync } from '~~/app/composables/useFirstSync'
 
@@ -28,6 +28,14 @@ export default defineNuxtPlugin({
     const session = await authClient.getSession()
     if (!session.data) return { provide }
 
+    const userId = session.data.user.id
+
+    // Aparelho já acertado com esta conta não repete a pergunta do primeiro
+    // login: sem esta linha, escolher "neste aparelho" sobe o local, e no boot
+    // seguinte os dois lados cheios devolvem `ask` outra vez — para sempre. O
+    // que roda daqui em diante é o sync contínuo, que é o PR 2.
+    if (syncedWith() === userId) return { provide }
+
     let remote
     try {
       remote = await http.fetchRemote()
@@ -41,12 +49,16 @@ export default defineNuxtPlugin({
 
     const local = composeSave(nuxtApp.$pinia)
 
-    switch (decideFirstSync(local, remote?.data ?? null)) {
-      case 'idle':
-        break
+    const decision = decideFirstSync(local, remote?.data ?? null)
 
+    switch (decision) {
+      // `idle` e `push` terminam iguais: os dois deixam este aparelho acertado
+      // com a conta. A diferença é só se havia algo a subir — e um `PUT` de save
+      // vazio queimaria uma versão sem dizer nada a ninguém.
+      case 'idle':
       case 'push':
-        await http.save(local)
+        if (decision === 'push') await http.save(local)
+        markSyncedWith(userId)
         break
 
       case 'adopt':
@@ -54,6 +66,7 @@ export default defineNuxtPlugin({
           hydrateSave(remote.data, nuxtApp.$pinia)
           markWrite()
         }
+        markSyncedWith(userId)
         break
 
       case 'ask':
@@ -63,6 +76,7 @@ export default defineNuxtPlugin({
             remote: remote.data,
             remoteUpdatedAt: remote.updatedAt,
             localAt: lastWrite(),
+            userId,
           }
         }
         break

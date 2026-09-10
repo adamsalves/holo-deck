@@ -37,3 +37,43 @@ export function lastWrite(): number | null {
     return null
   }
 }
+
+/**
+ * Com qual conta este aparelho já se acertou.
+ *
+ * **Sem isto a tela *Duas coleções* reaparece em todo boot**, e o defeito é
+ * bonito de entender: escolher "neste aparelho" sobe o local para o servidor,
+ * então na abertura seguinte os dois lados estão cheios outra vez e a regra
+ * devolve `ask` de novo. A pergunta é do **primeiro** login; depois dela, este
+ * aparelho e esta conta são a mesma história.
+ *
+ * Guarda o id do usuário e não um booleano: entrar com outra conta no mesmo
+ * navegador é um primeiro login legítimo, e um `true` faria o save da segunda
+ * conta ser tratado como continuação da primeira.
+ *
+ * Chave local pela mesma razão das outras duas: ela descreve **este aparelho**,
+ * não a conta, e não teria sentido sincronizada.
+ *
+ * O que acontece depois dela é o sync contínuo — flag de sujo, fila, 409 com
+ * reaplicação —, que é o PR 2. Até lá, boot já acertado não mexe em nada.
+ */
+export const SYNCED_WITH_KEY = 'holodeck:syncedWith'
+
+export function syncedWith(): string | null {
+  try {
+    return browserStorage()?.getItem(SYNCED_WITH_KEY) ?? null
+  }
+  catch {
+    return null
+  }
+}
+
+export function markSyncedWith(userId: string): void {
+  try {
+    browserStorage()?.setItem(SYNCED_WITH_KEY, userId)
+  }
+  catch {
+    // Sem armazenamento não há o que lembrar — e sem armazenamento também não há
+    // save local, então a tela de escolha nunca chega a aparecer.
+  }
+}
