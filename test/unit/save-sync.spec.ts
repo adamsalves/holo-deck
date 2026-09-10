@@ -3,7 +3,8 @@ import type { BattleLog } from '~~/shared/game/battle'
 import type { SpeciesId } from '~~/shared/types/brand'
 import { isSpeciesId } from '~~/shared/types/brand'
 import { emptySave, isSaveData } from '~~/shared/save/schema'
-import { forSync, isSyncBody } from '~~/shared/save/sync'
+import type { SaveData } from '~~/shared/save/schema'
+import { decideFirstSync, forSync, isSyncBody, isUntouched } from '~~/shared/save/sync'
 
 /**
  * Uma batalha em andamento **válida**, e a validade é o ponto.
@@ -59,5 +60,48 @@ describe('o corpo que sobe para o servidor', () => {
     expect(isSyncBody(null)).toBe(false)
     expect(isSyncBody({})).toBe(false)
     expect(isSyncBody({ ...emptySave(), dust: -1, battle: null })).toBe(false)
+  })
+})
+
+describe('a decisão do primeiro login', () => {
+  const touched = (): SaveData => ({ ...emptySave(), dust: 10 })
+
+  it('sem save no servidor, sobe o local — a menos que não haja nada a subir', () => {
+    expect(decideFirstSync(touched(), null)).toBe('push')
+    expect(decideFirstSync(emptySave(), null)).toBe('idle')
+  })
+
+  it('com o local intocado, adota o do servidor', () => {
+    expect(decideFirstSync(emptySave(), touched())).toBe('adopt')
+  })
+
+  it('com o do servidor intocado, sobe o local', () => {
+    expect(decideFirstSync(touched(), emptySave())).toBe('push')
+  })
+
+  it('com os dois cheios, pergunta — e é a única saída que pergunta', () => {
+    expect(decideFirstSync(touched(), touched())).toBe('ask')
+  })
+
+  it('qualquer campo fora do inicial já conta como tocado', () => {
+    const base = emptySave()
+
+    // A lista é conservadora de propósito: chamar de intocado um save que não é
+    // significa apagá-lo em silêncio, e perguntar de mais custa um clique.
+    expect(isUntouched(base)).toBe(true)
+    expect(isUntouched({ ...base, dust: 1 })).toBe(false)
+    expect(isUntouched({ ...base, collection: { 25: { c: 1, s: 0 } } })).toBe(false)
+    expect(isUntouched({ ...base, progress: { ...base.progress, coins: 1 } })).toBe(false)
+    expect(isUntouched({ ...base, progress: { ...base.progress, badges: 1 } })).toBe(false)
+    expect(isUntouched({ ...base, progress: { ...base.progress, pity: 1 } })).toBe(false)
+    expect(isUntouched({ ...base, progress: { ...base.progress, welcomeClaimed: 1 } })).toBe(false)
+    expect(isUntouched({ ...base, progress: { ...base.progress, dailyClaimed: '2026-09-10' } })).toBe(false)
+  })
+
+  it('migração e batalha não contam como jogo', () => {
+    const base = emptySave()
+
+    expect(isUntouched({ ...base, schemaVersion: 99 })).toBe(true)
+    expect(isUntouched({ ...base, battle: someBattle() })).toBe(true)
   })
 })
