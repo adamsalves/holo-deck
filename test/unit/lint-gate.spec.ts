@@ -25,10 +25,13 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
  * de carregar TypeScript fora do alcance do bloco, ele falha — sem precisar
  * saber de antemão qual pasta ou extensão alguém inventou.
  *
- * Os outros três portões da mesma checagem não são verificáveis daqui e
- * continuam sendo trabalho de review ao criar pasta nova de TS:
- * `tsconfig.tools.json`, os aliases do Vitest, e a escolha entre `test/nuxt/`
- * e `test/unit/`.
+ * **Dois dos outros três deixaram de ser trabalho de review.** A cobertura dos
+ * projetos de `tsconfig` tem portão próprio desde a Fase 3 — `tsconfig-gate.spec.ts`,
+ * que pergunta ao compilador quais arquivos cada projeto cobre — e na Fase 7 ele
+ * passou a medir também os arquivos da **raiz**, que era metade do defeito daquela
+ * fase: `drizzle.config.ts` caiu fora deste bloco *e* dos seis projetos, e só este
+ * arquivo acusou. Restam os aliases do Vitest e a escolha entre `test/nuxt/` e
+ * `test/unit/`.
  */
 
 const BLOCK = 'holo-deck/typing-honesty-type-aware'
@@ -149,7 +152,10 @@ describe('portão de tipagem type-aware', () => {
      * e nenhum precisou mudar: o glob do ESLint já listava `server/**\/*.ts`, o
      * `tsconfig.server.json` que o `nuxt prepare` gera já cobre a pasta — o que
      * `tsconfig-gate.spec.ts` verifica sozinho —, e os aliases do Vitest não
-     * entram porque nenhum teste importa de `server/`.
+     * entravam porque nenhum teste importava de `server/`. **Na Fase 7 passou a
+     * importar**: `test/unit/save-body.spec.ts` lê a regra da borda do `PUT` por
+     * `~~/server/utils/save-body`, e o alias resolveu sem mudança — `~~` é a raiz,
+     * e a pasta está debaixo dela como qualquer outra.
      *
      * A asserção fica invertida em vez de apagada: a pasta ter sumido enquanto o
      * glob continua armado é o mesmo defeito de cabeça para baixo.

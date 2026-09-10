@@ -67,8 +67,9 @@ export default withNuxt(
    *
    * **`drizzle.config.ts` entrou na Fase 7 — quarta vez.** Ele caiu fora dos dois
    * portões ao mesmo tempo: fora deste bloco e fora dos seis projetos de
-   * `tsconfig.json` (o `tsconfig.node.json` do Nuxt cobre `nuxt.config.*` e mais
-   * nada). Provado plantando `out: 42` e vendo o typecheck passar limpo.
+   * `tsconfig.json`. Provado plantando `out: 42` e vendo o typecheck passar limpo.
+   * O segundo buraco ficou sem portão no PR de origem, e agora tem: o
+   * `tsconfig-gate.spec.ts` passou a medir também os arquivos da raiz.
    *
    * Ele é fronteira de dados de verdade — lê `process.env` e monta credencial de
    * banco —, ao contrário dos outros arquivos de configuração da raiz, que o

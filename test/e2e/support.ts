@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
 
 /**
  * O que toda suíte E2E precisa fazer antes de poder afirmar qualquer coisa:
@@ -49,6 +50,18 @@ export interface FakeSync {
   /** Os corpos que o cliente tentou gravar, na ordem. */
   readonly puts: { data: unknown, baseVersion: number }[]
   /**
+   * Quantas vezes o cliente perguntou quem está logado.
+   *
+   * **É a âncora positiva do boot**, e existe porque a outra não servia para o
+   * teste que mais precisa dela: provar que um boot já acertado **não** lê o save
+   * é provar uma ausência, e `gets()` não cresce para ancorá-la. Este cresce — a
+   * sessão é lida em todo boot, antes da decisão —, então esperar por ele é
+   * esperar o plugin ter chegado ao ponto em que leria. Era um
+   * `waitForTimeout(1500)`, que é a mesma forma de falso verde que esta suíte
+   * corrigiu nos outros testes: numa máquina lenta ele dá verde com o defeito.
+   */
+  sessions: () => number
+  /**
    * Quantas leituras o cliente fez.
    *
    * **É o sinal que ancora as asserções de ausência.** `toHaveCount(0)` passa no
@@ -87,13 +100,22 @@ export async function fakeSync(page: Page, remote: unknown | null = null): Promi
 
   const puts: { data: unknown, baseVersion: number }[] = []
   let gets = 0
+  let sessions = 0
+  let signedOut = false
 
-  await page.route('**/api/auth/get-session', route => route.fulfill({
-    json: {
-      user: { id: 'e2e', name: 'Treinadora', email: 'e2e@exemplo.invalido', emailVerified: true },
-      session: { id: 'e2e-session', userId: 'e2e', expiresAt: '2099-01-01T00:00:00.000Z' },
-    },
-  }))
+  await page.route('**/api/auth/get-session', async (route) => {
+    sessions += 1
+
+    // Depois do logout a sessão acabou, e o fake precisa disso para o canto da
+    // barra poder ser testado: sem estado, `SAIR` recarregaria a página e o
+    // servidor falso diria que a conta continua logada.
+    await route.fulfill({ json: signedOut ? null : session() })
+  })
+
+  await page.route('**/api/auth/sign-out', async (route) => {
+    signedOut = true
+    await route.fulfill({ json: { success: true } })
+  })
 
   await page.route('**/api/save', async (route) => {
     const request = route.request()
@@ -130,7 +152,15 @@ export async function fakeSync(page: Page, remote: unknown | null = null): Promi
     await route.fulfill({ json: { version: stored.version, updatedAt: stored.updatedAt } })
   })
 
-  return { puts, gets: () => gets, current: () => stored }
+  return { puts, gets: () => gets, sessions: () => sessions, current: () => stored }
+}
+
+/** A sessão falsa. O consentimento do GitHub exige um humano — ver o docblock. */
+function session(): unknown {
+  return {
+    user: { id: 'e2e', name: 'Treinadora Ash', email: 'e2e@exemplo.invalido', emailVerified: true, image: null },
+    session: { id: 'e2e-session', userId: 'e2e', expiresAt: '2099-01-01T00:00:00.000Z' },
+  }
 }
 
 /**
@@ -158,10 +188,17 @@ function isPutBody(value: unknown): value is { data: unknown, baseVersion: numbe
     && 'baseVersion' in value && typeof value.baseVersion === 'number'
 }
 
-/** Um save válido, com o que cada teste precisar por cima. */
+/**
+ * Um save válido, com o que cada teste precisar por cima.
+ *
+ * A versão vem de `SCHEMA_VERSION` e não de um `4` literal, pela mesma razão que
+ * o repositório escreve `GYM_COUNT` em vez de `9`: no dia em que ela subir, cinco
+ * suítes passariam a semear um save de migração sem ninguém ter decidido isso — e
+ * o teste que falhasse acusaria a tela, não o número.
+ */
 export function saveWith(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    schemaVersion: 4,
+    schemaVersion: SCHEMA_VERSION,
     collection: {},
     dust: 0,
     deck: [null, null, null, null, null, null],

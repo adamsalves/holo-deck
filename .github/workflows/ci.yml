@@ -78,6 +78,35 @@ jobs:
 
       - run: yarn test
 
+      # **O SQL é a metade da Fase 7 que nenhum teste alcança.** A decisão 4 da
+      # fase fechou e2e contra servidor falso, sem banco, e `yarn db:verify` —
+      # que exercita o CAS de verdade — é manual, contra o Neon. O que dá para
+      # fechar aqui sem banco nem segredo é a **deriva**: editar
+      # `server/db/schema.ts` e esquecer de gerar a migration deixa o código
+      # pedindo uma coluna que não existe em produção, e o sintoma aparece no
+      # primeiro `PUT` de um jogador.
+      #
+      # O `drizzle-kit generate` lê o schema e compara com `drizzle/` sem abrir
+      # conexão. A verificação é `git status --porcelain` e não `git diff`: a
+      # migration nova nasce como arquivo **não rastreado**, e `git diff` sozinho
+      # só pegaria o `_journal.json` — o que funciona hoje por acidente e pararia
+      # de funcionar no dia em que o journal deixar de ser tocado.
+      #
+      # A credencial falsa existe porque `drizzle.config.ts` exige a variável ao
+      # ser importado — e exigir alto é o certo para os comandos que realmente
+      # falam com o banco. Provado plantando uma coluna em `server/db/schema.ts`:
+      # o passo gera `0002_*.sql` e reprova.
+      - name: migrations acompanham o schema
+        env:
+          DATABASE_URL_UNPOOLED: postgres://portao:sem-banco@localhost:5432/nao-usada
+        run: |
+          yarn db:check
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo '::error::server/db/schema.ts mudou sem migration gerada - rode yarn db:generate'
+            git status --porcelain drizzle/
+            exit 1
+          fi
+
   # Sem banco — os fluxos E2E rodam deslogados, que é um modo legítimo, já que
   # jogar não exige conta.
   e2e:
