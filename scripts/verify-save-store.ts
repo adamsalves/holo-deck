@@ -19,7 +19,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '~~/server/db'
 import { saves, user } from '~~/server/db/schema'
 import { readSave, writeSave } from '~~/server/db/save-store'
-import { countWrite } from '~~/server/utils/save-rate-limit'
+import { WINDOW_MS, countWrite, refundWrite } from '~~/server/db/save-rate-limit'
 import { emptySave } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
 
@@ -55,9 +55,24 @@ ok('readSave devolve o dado gravado', read?.data.dust === 42)
 
 const now = new Date()
 let last = 0
-for (let i = 0; i < 61; i++) last = (await countWrite(UID, now)).count
-ok('rate limit conta 61 escritas na janela', last === 61)
-ok('a 61ª não passa do teto de 60', !(await countWrite(UID, now)).allowed)
+for (let i = 0; i < 60; i++) last = (await countWrite(UID, now)).count
+ok('rate limit conta as 60 escritas da janela', last === 60)
+
+// A 61ª é a primeira que não cabe. O rótulo anterior dizia isso e media a 62ª:
+// o laço já tinha deixado o contador em 61, que também não era permitido.
+const over = await countWrite(UID, now)
+ok('a 61ª não passa do teto de 60', !over.allowed && over.count === 61)
+
+// O 409 não gravou nada, então ele devolve a escrita ao teto — senão dois
+// aparelhos em disputa se trancariam fora por estarem sincronizando.
+await refundWrite(UID, over.windowStart)
+const afterRefund = await countWrite(UID, now)
+ok('a devolução do 409 libera a escrita que não gravou', afterRefund.allowed && afterRefund.count === 61)
+
+// E ela não desce abaixo de zero nem desconta de outra janela.
+await refundWrite(UID, new Date(now.getTime() - WINDOW_MS * 2))
+const untouched = await countWrite(UID, now)
+ok('devolver citando outra janela não mexe no contador', untouched.count === 62)
 
 await db.delete(user).where(eq(user.id, UID))
 const gone = await db.select().from(saves).where(eq(saves.userId, UID))
