@@ -7,6 +7,7 @@ import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
+import { markWrite } from '~~/app/utils/last-write'
 
 /**
  * O plugin que liga as stores ao disco — o **único** lugar do jogo que faz IO
@@ -23,72 +24,89 @@ import { LocalStorageDriver, browserStorage } from '~~/app/utils/save-driver'
  * celular mata a aba. O debounce que o plano descreve é o da **rede**, e chega
  * com o `HttpDriver` na Fase 7.
  */
-export default defineNuxtPlugin(async (nuxtApp) => {
-  const driver = new LocalStorageDriver(browserStorage())
-  const collection = useCollectionStore(nuxtApp.$pinia)
-  const deck = useDeckStore(nuxtApp.$pinia)
-  const progress = useProgressStore(nuxtApp.$pinia)
-  const battle = useBattleStore(nuxtApp.$pinia)
-
-  const { data, recovered } = await driver.load()
-
-  // A ordem — coleção antes do deck, batalha por último — e a razão dela moram
-  // em `save-document.ts`, que é o mesmo módulo que `/settings` usa para
-  // importar um save. Duas cópias da ordem é como uma delas fica para trás.
-  hydrateSave(data, nuxtApp.$pinia)
-
+export default defineNuxtPlugin({
   /**
-   * Grava as duas stores num documento só.
-   *
-   * Um `watch` profundo sobre o estado das duas, e não `$subscribe` por store:
-   * o save é um documento, então gravar por store faria a segunda escrita do
-   * mesmo tick reler o estado da primeira de qualquer jeito. Uma função que
-   * compõe as duas é mais curta e não tem ordem.
+   * Nomeado para o plugin de sincronização poder declarar `dependsOn`.
+   * A ordem entre os dois é real — o boot local lê e renderiza antes de a rede
+   * entrar — e depender do nome do arquivo em ordem alfabética seria mantê-la
+   * por acidente.
    */
-  watch(
-    () => [
-      collection.entries,
-      collection.dust,
-      deck.slots,
-      progress.pity,
-      progress.welcomeClaimed,
-      progress.coins,
-      progress.badges,
-      progress.dailyClaimed,
-      // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
-      // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
-      // gravação síncrona continua barata, e o debounce que o plano descreve é
-      // o da rede, que chega com o `HttpDriver` na Fase 7.
-      battle.log,
-    ],
-    () => { void driver.save(composeSave(nuxtApp.$pinia)) },
-    { deep: true },
-  )
+  name: 'holo-deck:save',
 
-  return {
-    provide: {
-      /**
-       * Por que o save anterior não pôde ser lido, ou `null`.
-       *
-       * Fica exposto porque **o jogador precisa saber**: a regra do plano é que
-       * um save ilegível vira backup e o jogo começa limpo *avisando*. Começar
-       * limpo em silêncio é indistinguível, para quem está do outro lado, de o
-       * jogo ter apagado a coleção.
-       *
-       * Quem o lê é o `SaveRecoveryNotice`, montado em `app.vue` — acima do
-       * layout, porque isto é estado do boot e não de uma tela.
-       */
-      saveRecovery: recovered satisfies RecoveryReason | null,
+  async setup(nuxtApp) {
+    const driver = new LocalStorageDriver(browserStorage())
+    const collection = useCollectionStore(nuxtApp.$pinia)
+    const deck = useDeckStore(nuxtApp.$pinia)
+    const progress = useProgressStore(nuxtApp.$pinia)
+    const battle = useBattleStore(nuxtApp.$pinia)
 
-      /**
-       * O driver, para a tela de ajustes exportar, importar e apagar.
-       *
-       * Uma instância só, e não uma por consumidor: o driver é sem estado sobre
-       * o `localStorage`, mas a **poda de backups** não é — duas instâncias
-       * podariam o anel em ordens diferentes, e o que se quer guardar é sempre
-       * a cópia mais recente.
-       */
-      saveDriver: driver,
-    },
-  }
+    const { data, recovered } = await driver.load()
+
+    // A ordem — coleção antes do deck, batalha por último — e a razão dela moram
+    // em `save-document.ts`, que é o mesmo módulo que `/settings` usa para
+    // importar um save. Duas cópias da ordem é como uma delas fica para trás.
+    hydrateSave(data, nuxtApp.$pinia)
+
+    /**
+     * Grava as duas stores num documento só.
+     *
+     * Um `watch` profundo sobre o estado das duas, e não `$subscribe` por store:
+     * o save é um documento, então gravar por store faria a segunda escrita do
+     * mesmo tick reler o estado da primeira de qualquer jeito. Uma função que
+     * compõe as duas é mais curta e não tem ordem.
+     */
+    watch(
+      () => [
+        collection.entries,
+        collection.dust,
+        deck.slots,
+        progress.pity,
+        progress.welcomeClaimed,
+        progress.coins,
+        progress.badges,
+        progress.dailyClaimed,
+        // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
+        // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
+        // gravação síncrona continua barata, e o debounce que o plano descreve é
+        // o da rede, que chega com o `HttpDriver` na Fase 7.
+        battle.log,
+      ],
+      () => {
+        void driver.save(composeSave(nuxtApp.$pinia))
+        // O carimbo de "última partida", que a tela *Duas coleções* compara com
+        // o `updatedAt` do servidor. Mora em chave própria, fora do save: dentro
+        // dele subiria junto com a coleção e passaria a mostrar, na coluna da
+        // conta, o instante gravado pelo outro aparelho.
+        markWrite()
+      },
+      { deep: true },
+    )
+
+    return {
+      provide: {
+        /**
+         * Por que o save anterior não pôde ser lido, ou `null`.
+         *
+         * Fica exposto porque **o jogador precisa saber**: a regra do plano é que
+         * um save ilegível vira backup e o jogo começa limpo *avisando*. Começar
+         * limpo em silêncio é indistinguível, para quem está do outro lado, de o
+         * jogo ter apagado a coleção.
+         *
+         * Quem o lê é o `SaveRecoveryNotice`, montado em `app.vue` — acima do
+         * layout, porque isto é estado do boot e não de uma tela.
+         */
+        saveRecovery: recovered satisfies RecoveryReason | null,
+
+        /**
+         * O driver, para a tela de ajustes exportar, importar e apagar.
+         *
+         * Uma instância só, e não uma por consumidor: o driver é sem estado sobre
+         * o `localStorage`, mas a **poda de backups** não é — duas instâncias
+         * podariam o anel em ordens diferentes, e o que se quer guardar é sempre
+         * a cópia mais recente.
+         */
+        saveDriver: driver,
+      },
+    }
+  },
 })
