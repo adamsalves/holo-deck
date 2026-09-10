@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { BattleLog } from '~~/shared/game/battle'
 import type { SpeciesId } from '~~/shared/types/brand'
 import { isSpeciesId } from '~~/shared/types/brand'
-import { emptySave, isSaveData } from '~~/shared/save/schema'
+import { SCHEMA_VERSION, emptySave, isSaveData } from '~~/shared/save/schema'
 import type { SaveData } from '~~/shared/save/schema'
-import { decideFirstSync, forSync, isSyncBody, isUntouched } from '~~/shared/save/sync'
+import { decideFirstSync, forSync, isSyncBody, isSyncShape, isUntouched } from '~~/shared/save/sync'
 
 /**
  * Uma batalha em andamento **válida**, e a validade é o ponto.
@@ -61,6 +61,67 @@ describe('o corpo que sobe para o servidor', () => {
     expect(isSyncBody({})).toBe(false)
     expect(isSyncBody({ ...emptySave(), dust: -1, battle: null })).toBe(false)
   })
+
+  /**
+   * Chave desconhecida é recusada — e `isSaveData` sozinho a aceita.
+   *
+   * As duas asserções juntas é que provam a regra: se a primeira cair, a segunda
+   * passa a medir a forma em vez do campo extra, e a recusa vira acidente.
+   */
+  it('recusa campo que o save não tem, inclusive no progresso', () => {
+    const extra = { ...forSync(emptySave()), loja: { moedas: 9999 } }
+    const extraProgress = {
+      ...forSync(emptySave()),
+      progress: { ...emptySave().progress, admin: true },
+    }
+
+    expect(isSaveData(extra), 'o guarda de forma ignora campo extra de propósito').toBe(true)
+
+    expect(isSyncBody(extra)).toBe(false)
+    expect(isSyncBody(extraProgress)).toBe(false)
+  })
+
+  /**
+   * `__proto__` vindo de `JSON.parse` é **chave própria**, e entra como qualquer
+   * outra — é o caminho pelo qual ela atravessaria o `jsonb` sem ninguém decidir.
+   *
+   * Por isso o corpo é montado por texto e não por literal: `{ __proto__: … }` num
+   * objeto de JavaScript define protótipo e não campo, e o teste passaria sem
+   * medir nada. E a primeira asserção é o que impede a recusa de vir da forma.
+   */
+  it('recusa `__proto__` como a chave comum que ele é depois do parse', () => {
+    const body = JSON.stringify(forSync(emptySave()))
+    const withProto: unknown = JSON.parse(`${body.slice(0, -1)},"__proto__":{"admin":true}}`)
+
+    // O `throw` em vez de um `expect`: ele estreita o tipo, e é o que permite ler
+    // as chaves sem cast. Cair aqui significa que o corpo do teste deixou de ser um
+    // save válido, e a recusa abaixo passaria a vir da forma.
+    if (!isSaveData(withProto)) throw new Error('o corpo de teste precisa ser um save válido')
+
+    expect(Object.keys(withProto), '`__proto__` é chave própria depois do parse').toContain('__proto__')
+
+    expect(isSyncBody(withProto)).toBe(false)
+  })
+
+  /**
+   * **O teto de versão separa gravar de ler**, e é o defeito que ele fecha: sem
+   * ele, um save de build mais nova entrava na tabela como se fosse da versão
+   * corrente, e o `composeSave` seguinte estampava a versão atual em cima de dado
+   * que nunca passou por migração.
+   *
+   * Ler é o caso oposto: quem lê precisa **reconhecer** o documento do futuro para
+   * poder recusar-se a usá-lo — quem faz isso é `migrate`, no `HttpDriver`.
+   */
+  it('a escrita recusa save do futuro; a forma o reconhece', () => {
+    const future = { ...forSync(emptySave()), schemaVersion: SCHEMA_VERSION + 1 }
+    const past = { ...forSync(emptySave()), schemaVersion: 1 }
+
+    expect(isSyncShape(future), 'quem lê precisa reconhecê-lo para recusá-lo').toBe(true)
+    expect(isSyncBody(future)).toBe(false)
+
+    // Aba com o bundle anterior gravando é estado normal de deploy.
+    expect(isSyncBody(past)).toBe(true)
+  })
 })
 
 describe('a decisão do primeiro login', () => {
@@ -96,6 +157,46 @@ describe('a decisão do primeiro login', () => {
     expect(isUntouched({ ...base, progress: { ...base.progress, pity: 1 } })).toBe(false)
     expect(isUntouched({ ...base, progress: { ...base.progress, welcomeClaimed: 1 } })).toBe(false)
     expect(isUntouched({ ...base, progress: { ...base.progress, dailyClaimed: '2026-09-10' } })).toBe(false)
+  })
+
+  /**
+   * **Nenhum campo do save fica fora de `isUntouched` sem alguém decidir.**
+   *
+   * A lista do teste acima é exaustiva hoje, e nada a obrigava a continuar sendo:
+   * um campo novo em `SaveData` que ninguém acrescentasse a `isUntouched` passaria
+   * a ser "intocado" em silêncio — e `isUntouched` é a função que autoriza
+   * sobrescrever uma coleção sem perguntar. O portão é o do tema e o do `nav`: a
+   * lista sai da **fonte** (`emptySave()`), e quem fica de fora é nomeado com o
+   * motivo.
+   *
+   * Campo novo reprova aqui até entrar num dos dois lados. A prova de que ele mede
+   * é a da linha de baixo: tirar `dust` de `isUntouched` deixa o caso `dust: 1`
+   * do teste anterior vermelho, e tirar um campo **de `CHANGED`** deixa este
+   * vermelho por falta de cobertura.
+   */
+  it('toda seção do save entra na decisão, ou está nomeada fora dela', () => {
+    /** Um valor diferente do inicial, por campo de `SaveData`. */
+    const CHANGED: Readonly<Record<string, Partial<SaveData>>> = {
+      collection: { collection: { 25: { c: 1, s: 0 } } },
+      dust: { dust: 1 },
+      deck: { deck: [speciesId(25), null, null, null, null, null] },
+      progress: { progress: { ...emptySave().progress, coins: 1 } },
+    }
+
+    /**
+     * Quem fica fora, e por quê — o mesmo par de motivos do docblock de
+     * `isUntouched`: migração não é jogo, e a batalha não sincroniza.
+     */
+    const OUT = ['schemaVersion', 'battle']
+
+    expect(
+      [...Object.keys(CHANGED), ...OUT].sort(),
+      'campo novo em SaveData: decidir se ele conta como jogo, e escrever aqui',
+    ).toEqual(Object.keys(emptySave()).sort())
+
+    for (const [field, change] of Object.entries(CHANGED)) {
+      expect(isUntouched({ ...emptySave(), ...change }), `${field} mudou e não contou como jogo`).toBe(false)
+    }
   })
 
   it('migração e batalha não contam como jogo', () => {

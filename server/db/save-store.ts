@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { SaveData } from '~~/shared/save/schema'
 import type { RemoteSave } from '~~/shared/save/sync'
-import { isSyncBody } from '~~/shared/save/sync'
+import { isSyncShape } from '~~/shared/save/sync'
 import { db } from '.'
 import { saves } from './schema'
 
@@ -34,7 +34,13 @@ export async function readSave(userId: string): Promise<RemoteSave | null> {
   // guarda da entrada vale aqui, porque a linha pode ter sido escrita por uma
   // build anterior — a mesma razão pela qual a leitura do `localStorage` confere
   // o que ela mesma gravou.
-  if (!isSyncBody(row.data)) {
+  //
+  // **A forma, e não o teto de versão.** `isSyncBody` recusa documento de uma
+  // build mais nova, que é o certo para gravar e errado para ler: depois de um
+  // rollback, recusar aqui devolveria 500 para quem tem save legítimo, quando o
+  // cliente já sabe tratar versão que ele não entende — ele migra ou avisa. Ler
+  // não escreve nada, então não há o que proteger recusando.
+  if (!isSyncShape(row.data)) {
     // **Não devolver `null`.** Nulo significa "não há save no servidor", e é o
     // que autoriza o cliente a subir o dele por cima. Uma linha ilegível tratada
     // como ausente seria a regra de nunca apagar quebrada exatamente onde ela

@@ -1,5 +1,5 @@
 import type { SaveData } from './schema.ts'
-import { isSaveData } from './schema.ts'
+import { SCHEMA_VERSION, emptySave, isSaveData } from './schema.ts'
 
 /**
  * O corpo que sobe para o servidor.
@@ -20,19 +20,74 @@ export function forSync(save: SaveData): SaveData {
 }
 
 /**
- * O guarda do corpo que chega ao servidor.
+ * As chaves que o corpo de sync pode ter — **montadas da fonte**, não à mão.
+ *
+ * `emptySave()` devolve um `SaveData`, então um campo novo no tipo aparece aqui
+ * no mesmo commit em que nasce. Uma lista escrita à mão seria a quinta aparição
+ * do defeito que este repositório já conhece: a regra fica onde estava enquanto
+ * o dado muda de forma.
+ */
+function knownKeys(): readonly string[] {
+  return Object.keys(emptySave())
+}
+
+function knownProgressKeys(): readonly string[] {
+  return Object.keys(emptySave().progress)
+}
+
+function hasOnly(value: object, allowed: readonly string[]): boolean {
+  return Object.keys(value).every(key => allowed.includes(key))
+}
+
+/**
+ * A **forma** do documento que viaja pela rede, sem julgar a versão dele.
  *
  * `isSaveData` já recusa contagem sem ordem de grandeza, insígnia acima da Liga
  * e espécie que não existe — o mesmo trabalho que a leitura do `localStorage`
  * faz, pela mesma razão: os dois são texto que o jogador controla.
  *
- * O que este acrescenta é a metade que só existe na rede: **`battle` precisa
- * chegar nula.** Sem esta linha, um cliente antigo (ou adulterado) subiria o log
- * da luta, e a regra de "a batalha não sincroniza" viraria uma promessa que
- * ninguém verifica.
+ * O que este acrescenta são as duas metades que só existem na rede:
+ *
+ * **`battle` precisa ser nula.** Sem esta linha, um cliente antigo (ou
+ * adulterado) subiria o log da luta, e a regra de "a batalha não sincroniza"
+ * viraria uma promessa que ninguém verifica.
+ *
+ * **Nenhuma chave desconhecida.** `isSaveData` confere os campos que conhece e
+ * ignora o resto, o que é certo para o `localStorage` — lá o documento é nosso e
+ * migrar é o caminho. Aqui o documento é corpo de requisição: aceitar campo
+ * extra é deixar um cliente autenticado guardar o que quiser dentro do `jsonb`
+ * da conta dele, e é por essa porta que uma chave como `__proto__` entraria no
+ * documento sem ninguém ter decidido isso.
+ *
+ * **A versão fica de fora de propósito**, e é o que separa esta função da de
+ * baixo: quem *lê* precisa reconhecer um documento de outra versão para poder
+ * migrá-lo (ou recusar-se a usá-lo), e um guarda que recusasse pela versão
+ * transformaria "save de uma build mais nova" em "corpo fora do contrato" — duas
+ * coisas com tratamentos opostos no cliente.
+ */
+export function isSyncShape(value: unknown): value is SaveData {
+  if (!isSaveData(value) || value.battle !== null) return false
+
+  return hasOnly(value, knownKeys()) && hasOnly(value.progress, knownProgressKeys())
+}
+
+/**
+ * O guarda do corpo que o servidor aceita **gravar**.
+ *
+ * É a forma acima mais o teto de versão. `isSaveData` deixa `schemaVersion` sem
+ * teto de propósito, porque quem confere versão lá é `migrate`; na escrita não há
+ * `migrate` nenhum, e sem este limite um save de uma build mais nova entraria na
+ * tabela como se fosse da versão corrente. O próximo `composeSave` estamparia
+ * `SCHEMA_VERSION` atual em cima de dado que nunca passou por migração — um save
+ * marcado como migrado sem ter sido, que é pior que um save recusado.
+ *
+ * Versão **mais antiga** passa, e isso não é descuido: uma aba aberta com o
+ * bundle anterior gravando é estado normal de deploy, e quem ler aquela linha
+ * depois migra. Recusá-la trancaria a sincronização de quem não recarregou a
+ * página.
  */
 export function isSyncBody(value: unknown): value is SaveData {
-  return isSaveData(value) && value.battle === null
+  return isSyncShape(value) && value.schemaVersion <= SCHEMA_VERSION
 }
 
 /**
