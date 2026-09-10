@@ -42,6 +42,21 @@ export const NAV_RULES: NavLink = { to: '/rules', label: 'Regras', exact: false 
 export const NAV_SETTINGS: NavLink = { to: '/settings', label: 'Ajustes', exact: false }
 
 /**
+ * O canto da conta — *Entrar* sem sessão, o avatar com ela. Ver `AppAccount`.
+ *
+ * **Ele está aqui, e não numa exceção do portão**, e a diferença é a que este
+ * arquivo existe para fazer: `/login` foi escrita no PR anterior sem nenhum link
+ * para ela, e a exceção do `nav-gate` se justificava com "o canto da barra, e o
+ * avatar que a Fase 7 ainda vai pôr lá" — três mecanismos inexistentes. Com a
+ * rota na lista, o portão deixa de aceitar a promessa e passa a medir o link.
+ *
+ * Fica fora de `NAV_LINKS` porque não é uma das seis seções do jogo: jogar nunca
+ * exige conta, e um sétimo link entre *Packs* e *Liga* transformaria a conta em
+ * destino.
+ */
+export const NAV_ACCOUNT: NavLink = { to: '/login', label: 'Entrar', exact: false }
+
+/**
  * Toda rota que a barra liga, sem repetição.
  *
  * O saldo aponta para `/packs` e a marca para `/`, e as duas já estão em
@@ -49,5 +64,5 @@ export const NAV_SETTINGS: NavLink = { to: '/settings', label: 'Ajustes', exact:
  * quando há sete.
  */
 export const NAV_DESTINATIONS: readonly string[] = [
-  ...new Set([...NAV_LINKS, NAV_RULES, NAV_SETTINGS].map(link => link.to)),
+  ...new Set([...NAV_LINKS, NAV_RULES, NAV_SETTINGS, NAV_ACCOUNT].map(link => link.to)),
 ]

@@ -124,10 +124,17 @@ export default defineNuxtConfig({
        * `GYM_COUNT` e não um `9` literal: o número é o mesmo contrato que a
        * store, o guarda do save e a Liga leem, e uma cópia dele aqui só seria
        * descoberta por um ginásio novo que ninguém consegue abrir em produção.
+       *
+       * **`/login` entra pela mesma razão, e não por ser especial.** A barra liga
+       * a rota — é o canto da conta —, mas o link mora dentro de `<ClientOnly>`,
+       * porque a sessão não existe no servidor: o rastreador não o vê. Sem esta
+       * linha, a única tela estática do jogo que renderiza a cada pedido seria
+       * justamente a que mais gente abre sem ter nada no `localStorage`.
        */
       routes: [
         '/pokedex',
         '/league',
+        '/login',
         ...Array.from({ length: GYM_COUNT }, (_, index) => `/battle/${index + 1}`),
       ],
     },

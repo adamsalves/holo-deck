@@ -15,11 +15,15 @@ import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
  * com link quebrado não fecha verde, e a fileira provisória de portas do Hub
  * existiu exatamente para cobrir esse intervalo. Ela sai junto com esta barra.
  *
- * **Duas coisas da prancha não entram**, e as duas por falta de dado: o avatar
- * de 32px no canto direito é a conta, que é Fase 7; e a cor do sublinhado ativo
- * é `--accent` em toda página, contra o azul do *Hub* e o roxo da *Loja* — o
- * mesmo papel em duas cores é variação de mockup desenhado à mão, como o
- * `2px`/`3px` do raio que a Fase 2 normalizou.
+ * **O avatar do canto direito chegou na Fase 7** — é o `AppAccount`, que mostra
+ * *Entrar* sem sessão e a conta com ela. Ele era a metade da prancha que faltava
+ * por falta de dado, e sem ele `/login` existia no build e não existia para quem
+ * joga.
+ *
+ * **Uma coisa da prancha continua fora**: a cor do sublinhado ativo é `--accent`
+ * em toda página, contra o azul do *Hub* e o roxo da *Loja* — o mesmo papel em
+ * duas cores é variação de mockup desenhado à mão, como o `2px`/`3px` do raio que
+ * a Fase 2 normalizou.
  *
  * **A seção atual sai do caminho da rota, e não de `router-link-active`.** O
  * comentário anterior afirmava que aquela classe "casa por prefixo, que é o que
@@ -202,6 +206,12 @@ function isCurrent(link: NavLink): boolean {
           </svg>
         </a>
       </NuxtLink>
+
+      <!-- A sessão só existe no navegador: o HTML pré-renderizado não conhece a
+           de ninguém, e o componente se cala até saber se há conta. -->
+      <ClientOnly>
+        <AppAccount />
+      </ClientOnly>
     </div>
   </header>
 </template>
