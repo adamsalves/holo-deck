@@ -43,9 +43,16 @@ const SKIP = new Set(['node_modules'])
  *   uma luta em andamento é a faixa de retomar do Hub, não um link.
  * - **`/styleguide`** é o espelho do sistema de design, não uma tela do jogo.
  *   Ela também é a única que pede `layout: false` sem ser a batalha.
+ * - **`/login`** sai porque **jogar nunca exige conta** — o princípio que governa
+ *   a fileira 4 do canvas. Um link permanente na barra transformaria a conta em
+ *   destino do jogo, que é o contrário do que a prancha *Convite* desenha: ela
+ *   aparece uma vez, depois do primeiro ginásio, e é recusável. Quem chega em
+ *   `/login` vem do convite ou do canto da barra — e, com sessão, do próprio
+ *   avatar, que a Fase 7 ainda vai pôr lá.
  */
 const NOT_A_DESTINATION = (route: string): boolean =>
-  route.includes('[') || route.startsWith('/battle') || route === '/styleguide'
+  route.includes('[') || route.startsWith('/battle')
+  || route === '/styleguide' || route === '/login'
 
 /** As rotas estáticas que `app/pages/` produz, no formato que o `to=` usa. */
 function routes(): string[] {
