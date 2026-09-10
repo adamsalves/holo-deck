@@ -8,6 +8,13 @@
       "when": 1789048322319,
       "tag": "0000_striped_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789049676119,
+      "tag": "0001_spooky_microbe",
+      "breakpoints": true
     }
   ]
 }

@@ -52,3 +52,27 @@ export const saves = pgTable('saves', {
   previousVersion: integer('previous_version'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * A janela de escrita de cada jogador — o teto de 60 `PUT` por hora que o plano
+ * fixa: folgado para uso real, apertado para abuso.
+ *
+ * **Tabela própria, e não a `rate_limit` do `better-auth`.** Aquela é gerada por
+ * `db:generate:auth` e pertence à biblioteca: sua forma muda quando ela muda, e
+ * apoiar regra nossa nela criaria um acoplamento que nenhum portão daqui
+ * enxerga — inclusive o dia em que `rateLimit.storage` deixar de ser
+ * `'database'` e a tabela parar de ser mantida por alguém.
+ *
+ * Uma linha por jogador e janela fixa: `count` reinicia quando `windowStart`
+ * envelhece mais que a janela. A checagem e o incremento acontecem **na mesma
+ * instrução** (`insert ... on conflict do update ... returning`), porque duas
+ * requisições simultâneas do mesmo jogador leriam o mesmo valor e ambas
+ * passariam — que é o modo clássico de um rate limit não limitar nada.
+ */
+export const saveRateLimit = pgTable('save_rate_limit', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  count: integer('count').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+})
