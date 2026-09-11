@@ -16,6 +16,12 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "data:build": "node scripts/build-dex.ts",
+    "db:generate:auth": "node --env-file=.env node_modules/.bin/better-auth generate --config server/utils/auth.ts --output server/db/auth-schema.ts --yes && eslint server/db/auth-schema.ts --fix",
+    "db:generate": "node --env-file=.env node_modules/.bin/drizzle-kit generate",
+    "db:check": "node node_modules/.bin/drizzle-kit generate",
+    "db:seed-remote": "node --env-file=.env node_modules/.bin/tsx --tsconfig tsconfig.tools.json scripts/seed-remote-save.ts",
+    "db:verify": "node --env-file=.env node_modules/.bin/tsx --tsconfig tsconfig.tools.json scripts/verify-save-store.ts",
+    "db:migrate": "node --env-file=.env node_modules/.bin/drizzle-kit migrate",
     "prepare": "husky",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -25,9 +31,12 @@
     "test:e2e": "playwright test --pass-with-no-tests"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@nuxt/ui": "4.11.0",
     "@pinia/nuxt": "1.0.2",
     "@tanstack/vue-virtual": "3.13.36",
+    "better-auth": "^1.7.4",
+    "drizzle-orm": "^0.45.2",
     "fuse.js": "7.5.0",
     "nuxt": "4.5.2",
     "pinia": "4.0.3",
@@ -35,6 +44,7 @@
     "vue": "3.5.42"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@commitlint/cli": "21.2.2",
     "@commitlint/config-conventional": "21.2.2",
     "@commitlint/types": "21.2.0",
@@ -43,6 +53,7 @@
     "@playwright/test": "1.62.1",
     "@vue/test-utils": "2.4.6",
     "@vueuse/nuxt": "14.4.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "10.9.1",
     "happy-dom": "20.11.13",
     "husky": "9.1.7",

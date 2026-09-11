@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
@@ -30,11 +30,35 @@ const TS_BEARING = ['.ts', '.mts', '.cts', '.tsx']
 /**
  * As raízes de código do repositório. `.nuxt/` e `.output/` são gerados.
  *
- * `server/` ainda não existe — ela chega com a API da Fase 7 —, e está na lista
- * de propósito: no dia em que nascer, ela já é medida. A lista é filtrada por
+ * `server/` nasceu na Fase 3, antes da API da Fase 7, e já estava na lista: é o
+ * ponto de declarar a raiz antes de ela existir. A lista é filtrada por
  * existência, não podada.
  */
 const SCANNED_ROOTS = ['app', 'shared', 'server', 'scripts', 'test']
+
+/**
+ * Os arquivos da **raiz** que carregam TypeScript.
+ *
+ * **Eles ficaram fora deste portão até a Fase 7, e o defeito que escapou por aí é
+ * o mesmo que este arquivo existe para pegar.** `drizzle.config.ts` nasceu fora
+ * dos seis projetos da solução, e a consequência é a que o docblock acima
+ * descreve: o `yarn typecheck` passava por cima dele — um `out: 42` plantado
+ * dentro passava limpo — e o ESLint recusava o arquivo inteiro. Quem acusou foi o
+ * `lint-gate`, que mede outro portão; este, que mede exatamente o `tsconfig`,
+ * dava verde, porque só andava por **diretório**.
+ *
+ * E o `README` afirmava que ele *"pergunta ao próprio TypeScript quais arquivos
+ * cada projeto cobre e reprova se algum ficar de fora"* — verdade para as pastas
+ * e falso para a raiz, que é onde o arquivo de configuração mora.
+ *
+ * Lido do disco como tudo aqui: configuração nova na raiz entra na medição por
+ * existir, sem ninguém precisar lembrar de acrescentá-la a uma lista.
+ */
+function rootSources(): string[] {
+  return readdirSync(REPO_ROOT, { withFileTypes: true })
+    .filter(entry => entry.isFile() && !entry.name.startsWith('.') && hasExtension(TS_BEARING)(entry.name))
+    .map(entry => entry.name)
+}
 
 /** Os projetos referenciados pela solução da raiz. */
 function solutionProjects(): string[] {
@@ -70,10 +94,13 @@ const projects = solutionProjects()
 
 const covered = new Set(projects.flatMap(filesOf))
 
-const onDisk = SCANNED_ROOTS
-  .map(root => join(REPO_ROOT, root))
-  .filter(existsSync)
-  .flatMap(dir => walkFiles(dir, SKIP, hasExtension(TS_BEARING)))
+const onDisk = [
+  ...SCANNED_ROOTS
+    .map(root => join(REPO_ROOT, root))
+    .filter(existsSync)
+    .flatMap(dir => walkFiles(dir, SKIP, hasExtension(TS_BEARING))),
+  ...rootSources(),
+]
 
 describe('cobertura do tsconfig', () => {
   it('a solução referencia os projetos gerados e os escritos à mão', () => {
@@ -106,5 +133,18 @@ describe('cobertura do tsconfig', () => {
   it('encontrou código para medir', () => {
     // O `walkFiles` devolvendo vazio faria a asserção acima passar sobre nada.
     expect(onDisk.length).toBeGreaterThan(20)
+  })
+
+  /**
+   * O outro lado da varredura da raiz: ela não pode ficar vazia.
+   *
+   * `rootSources()` devolvendo `[]` — um `readdirSync` que passe a filtrar demais,
+   * um `hasExtension` que mude de forma — faria a asserção de cobertura passar
+   * sobre nada, e o buraco da Fase 7 voltaria a ser invisível exatamente aqui.
+   * Os quatro de hoje são `drizzle`, `nuxt`, `playwright` e `vitest`.
+   */
+  it('e mede também os arquivos de configuração da raiz', () => {
+    expect(rootSources().length).toBeGreaterThanOrEqual(4)
+    expect(rootSources()).toContain('nuxt.config.ts')
   })
 })

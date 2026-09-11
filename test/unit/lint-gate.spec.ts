@@ -25,10 +25,13 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
  * de carregar TypeScript fora do alcance do bloco, ele falha — sem precisar
  * saber de antemão qual pasta ou extensão alguém inventou.
  *
- * Os outros três portões da mesma checagem não são verificáveis daqui e
- * continuam sendo trabalho de review ao criar pasta nova de TS:
- * `tsconfig.tools.json`, os aliases do Vitest, e a escolha entre `test/nuxt/`
- * e `test/unit/`.
+ * **Dois dos outros três deixaram de ser trabalho de review.** A cobertura dos
+ * projetos de `tsconfig` tem portão próprio desde a Fase 3 — `tsconfig-gate.spec.ts`,
+ * que pergunta ao compilador quais arquivos cada projeto cobre — e na Fase 7 ele
+ * passou a medir também os arquivos da **raiz**, que era metade do defeito daquela
+ * fase: `drizzle.config.ts` caiu fora deste bloco *e* dos seis projetos, e só este
+ * arquivo acusou. Restam os aliases do Vitest e a escolha entre `test/nuxt/` e
+ * `test/unit/`.
  */
 
 const BLOCK = 'holo-deck/typing-honesty-type-aware'
@@ -53,20 +56,35 @@ const UNGUARDED_CONFIG = [
   'vitest.config.ts',
 ]
 
-/** Um glob do bloco, na única forma que ele usa: `<raiz>/**\/*.<ext>`. */
-interface ParsedGlob {
-  root: string
-  ext: string
-}
+/**
+ * Uma entrada do `files` do bloco, nas duas formas que ele usa.
+ *
+ * `tree` é o glob de pasta (`<raiz>/**\/*.<ext>`), que cobre o código. `file` é
+ * um caminho literal da raiz, usado por arquivo de configuração que **é**
+ * fronteira de dados — hoje só o `drizzle.config.ts`, que lê `process.env` e
+ * monta credencial de banco. Ele entra nomeado pela mesma razão que o
+ * `UNGUARDED_CONFIG` lista os isentos um a um: a exceção precisa ser visível, e
+ * um `*.config.ts` genérico decidiria por omissão o lado de todo arquivo futuro.
+ */
+type ParsedGlob
+  = { kind: 'tree', root: string, ext: string }
+    | { kind: 'file', path: string }
 
 function parseGlob(glob: string): ParsedGlob | null {
-  const match = /^([\w-]+)\/\*\*\/\*(\.\w+)$/.exec(glob)
-  if (!match) return null
+  const tree = /^([\w-]+)\/\*\*\/\*(\.\w+)$/.exec(glob)
+  if (tree) {
+    const [, root, ext] = tree
+    if (root === undefined || ext === undefined) return null
 
-  const [, root, ext] = match
-  if (root === undefined || ext === undefined) return null
+    return { kind: 'tree', root, ext }
+  }
 
-  return { root, ext }
+  // Caminho literal da raiz: sem barra e sem curinga. Um `*.config.ts` cai aqui
+  // e devolve `null` de propósito — o teste reprova em vez de aceitar um glob
+  // que esconderia arquivo novo.
+  if (/^[\w-]+(?:\.[\w-]+)+$/.test(glob)) return { kind: 'file', path: glob }
+
+  return null
 }
 
 /** Diretórios que o próprio `eslint.config.mjs` manda ignorar, mais os de sempre. */
@@ -90,11 +108,13 @@ describe('portão de tipagem type-aware', () => {
 
     // Um glob que este teste não sabe ler é um buraco que ele não sabe medir:
     // reprova em vez de dar verde por não entender a pergunta.
-    expect(globs, `todo glob do bloco precisa ter a forma \`<raiz>/**/*.<ext>\``).not.toContain(null)
+    expect(globs, 'todo item do `files` precisa ser `<raiz>/**/*.<ext>` ou um caminho literal da raiz').not.toContain(null)
 
     const covered = globs.filter(glob => glob !== null)
     const reach = (file: string) =>
-      covered.some(({ root, ext }) => file.startsWith(`${root}/`) && file.endsWith(ext))
+      covered.some(glob => glob.kind === 'file'
+        ? file === glob.path
+        : file.startsWith(`${glob.root}/`) && file.endsWith(glob.ext))
 
     const sources = walkFiles(REPO_ROOT, skippedDirs(ignores), hasExtension(TS_BEARING))
     const unguarded = sources.filter(file => !reach(file) && !UNGUARDED_CONFIG.includes(file))
@@ -105,10 +125,15 @@ describe('portão de tipagem type-aware', () => {
   it('cobre as raízes de código que o plano declara', async () => {
     const config = await eslintConfig
     const block = config.find(entry => entry.name === BLOCK)
+    // Só as entradas de pasta têm raiz: o caminho literal (`drizzle.config.ts`)
+    // não é uma raiz de código e não entra nesta contagem.
     const roots = new Set(
-      (block?.files ?? []).flatMap(glob =>
-        typeof glob === 'string' ? (parseGlob(glob)?.root ?? []) : [],
-      ),
+      (block?.files ?? []).flatMap((glob) => {
+        if (typeof glob !== 'string') return []
+
+        const parsed = parseGlob(glob)
+        return parsed?.kind === 'tree' ? [parsed.root] : []
+      }),
     )
 
     expect([...roots].sort()).toEqual(['app', 'scripts', 'server', 'shared', 'test'])
@@ -127,7 +152,10 @@ describe('portão de tipagem type-aware', () => {
      * e nenhum precisou mudar: o glob do ESLint já listava `server/**\/*.ts`, o
      * `tsconfig.server.json` que o `nuxt prepare` gera já cobre a pasta — o que
      * `tsconfig-gate.spec.ts` verifica sozinho —, e os aliases do Vitest não
-     * entram porque nenhum teste importa de `server/`.
+     * entravam porque nenhum teste importava de `server/`. **Na Fase 7 passou a
+     * importar**: `test/unit/save-body.spec.ts` lê a regra da borda do `PUT` por
+     * `~~/server/utils/save-body`, e o alias resolveu sem mudança — `~~` é a raiz,
+     * e a pasta está debaixo dela como qualquer outra.
      *
      * A asserção fica invertida em vez de apagada: a pasta ter sumido enquanto o
      * glob continua armado é o mesmo defeito de cabeça para baixo.

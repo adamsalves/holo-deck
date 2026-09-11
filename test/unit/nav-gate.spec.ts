@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
-import { NAV_DESTINATIONS, NAV_LINKS } from '~~/app/utils/nav-links'
+import { NAV_ACCOUNT, NAV_DESTINATIONS, NAV_LINKS } from '~~/app/utils/nav-links'
 
 /**
  * Toda tela do jogo é alcançável pela barra global — ou está escrita aqui como
@@ -43,9 +43,20 @@ const SKIP = new Set(['node_modules'])
  *   uma luta em andamento é a faixa de retomar do Hub, não um link.
  * - **`/styleguide`** é o espelho do sistema de design, não uma tela do jogo.
  *   Ela também é a única que pede `layout: false` sem ser a batalha.
+ *
+ * **`/login` saiu desta lista, e a saída é a correção de um defeito.** Ela estava
+ * escrita aqui como exceção, justificada assim: *"quem chega em `/login` vem do
+ * convite ou do canto da barra — e, com sessão, do próprio avatar, que a Fase 7
+ * ainda vai pôr lá"*. Nenhum dos três existia: nenhum arquivo de `app/` linkava a
+ * rota, não havia `signOut` em lugar nenhum do repositório, e nada na interface
+ * dizia se havia sessão. Era exatamente o defeito deste portão — a tela no build e
+ * fora do alcance de quem joga — passando porque a exceção descrevia o PR
+ * seguinte. Agora `/login` é destino de verdade (`NAV_ACCOUNT`, no canto da
+ * barra), e o portão voltou a medir em vez de acreditar.
  */
 const NOT_A_DESTINATION = (route: string): boolean =>
-  route.includes('[') || route.startsWith('/battle') || route === '/styleguide'
+  route.includes('[') || route.startsWith('/battle')
+  || route === '/styleguide'
 
 /** As rotas estáticas que `app/pages/` produz, no formato que o `to=` usa. */
 function routes(): string[] {
@@ -68,6 +79,20 @@ describe('portão da barra global', () => {
   it('e a barra declara destinos', () => {
     expect(NAV_DESTINATIONS.length).toBeGreaterThan(5)
     expect(NAV_LINKS.filter(link => link.exact)).toHaveLength(1)
+  })
+
+  /**
+   * A conta tem entrada, e **`/login` não é uma das seis seções**.
+   *
+   * As duas metades são a mesma decisão: jogar nunca exige conta, então a entrada
+   * mora no canto direito junto do saldo e da engrenagem, e não entre *Packs* e
+   * *Liga*. A primeira asserção é a que reprova se alguém tirar o canto da barra —
+   * o estado em que este PR nasceu; a segunda, se a conta virar destino do jogo.
+   */
+  it('a conta é alcançável, e fora das seções do jogo', () => {
+    expect(NAV_ACCOUNT.to).toBe('/login')
+    expect(NAV_DESTINATIONS).toContain(NAV_ACCOUNT.to)
+    expect(NAV_LINKS.map(link => link.to)).not.toContain(NAV_ACCOUNT.to)
   })
 
   it('toda tela do jogo está na barra, ou está escrita como exceção', () => {

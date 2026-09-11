@@ -64,10 +64,24 @@ export default withNuxt(
    * de `<script setup>` — a fronteira de dados muda de arquivo, e o portão
    * precisava mudar junto. O parser de `.vue` já vem do `@nuxt/eslint`; não
    * há `extraFileExtensions` a declarar aqui.
+   *
+   * **`drizzle.config.ts` entrou na Fase 7 — quarta vez.** Ele caiu fora dos dois
+   * portões ao mesmo tempo: fora deste bloco e fora dos seis projetos de
+   * `tsconfig.json`. Provado plantando `out: 42` e vendo o typecheck passar limpo.
+   * O segundo buraco ficou sem portão no PR de origem, e agora tem: o
+   * `tsconfig-gate.spec.ts` passou a medir também os arquivos da raiz.
+   *
+   * Ele é fronteira de dados de verdade — lê `process.env` e monta credencial de
+   * banco —, ao contrário dos outros arquivos de configuração da raiz, que o
+   * `UNGUARDED_CONFIG` do `lint-gate.spec.ts` isenta. **Entra nomeado e não por
+   * `*.config.ts`** porque é a mesma regra que aquela lista aplica: a exceção
+   * fica visível, e o próximo arquivo de configuração da raiz reprova até alguém
+   * decidir conscientemente de que lado ele fica. Um glob genérico decidiria por
+   * omissão, que é como o portão perde o sentido.
    */
   {
     name: 'holo-deck/typing-honesty-type-aware',
-    files: ['app/**/*.vue', 'app/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts'],
+    files: ['app/**/*.vue', 'app/**/*.ts', 'shared/**/*.ts', 'server/**/*.ts', 'scripts/**/*.ts', 'test/**/*.ts', 'drizzle.config.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,

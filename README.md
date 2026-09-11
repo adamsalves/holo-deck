@@ -4,11 +4,14 @@ Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de
 e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
 gerados em build-time.
 
-> **Em construção.** Este é o estado da **Fase 6 completa** — a Pokédex, o ciclo
-> de pack e coleção, o deck builder, a Liga com os nove ginásios e a tela de
-> batalha, a loja, `/rules` e `/settings`. O jogo é jogável de ponta a ponta, e
-> roda inteiro em `localStorage`. Conta e sincronização são a Fase 7; o README
-> completo é reescrito na Fase 8.
+> **Em construção.** Este é o estado da **Fase 7, primeira metade** — tudo da Fase
+> 6 (a Pokédex, o ciclo de pack e coleção, o deck builder, a Liga com os nove
+> ginásios e a tela de batalha, a loja, `/rules` e `/settings`), mais conta no
+> GitHub e save no servidor. O jogo continua jogável **sem conta**, inteiro, a
+> partir do `localStorage`. A sincronização contínua — fila offline, debounce, 409
+> com reaplicação, indicador na barra — é a segunda metade da fase; até ela, a
+> conta recebe a coleção no primeiro login e nada além disso. O README completo é
+> reescrito na Fase 8.
 
 ## Rodando
 
@@ -18,6 +21,23 @@ Requer Node na versão do [`.nvmrc`](.nvmrc) e yarn.
 nvm use
 yarn install
 yarn dev
+```
+
+Jogar não precisa de nada além disso. **Conta e save no servidor** precisam de um
+`.env` — ver [`.env.example`](.env.example) —, e sem ele o jogo abre e funciona:
+só `/api/auth/*` e `/api/save` respondem 500, que é o comportamento decidido para
+um jogo local-first (ver o docblock de `server/utils/env.ts`).
+
+Duas variáveis apontam para o **mesmo** banco e as duas são necessárias:
+`DATABASE_URL` é a do pooler, que o runtime usa porque função serverless abre e
+fecha conexão a cada requisição; `DATABASE_URL_UNPOOLED` é a direta, que só a
+migração usa, porque o PgBouncer em modo transaction não sustenta os recursos de
+sessão que DDL pede.
+
+```bash
+yarn db:generate        # gera a migration a partir de server/db/schema.ts
+yarn db:migrate         # aplica as migrations no banco do .env
+yarn db:generate:auth   # reescreve server/db/auth-schema.ts pelo CLI do better-auth
 ```
 
 ## Verificação
@@ -32,6 +52,31 @@ yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
                  # nesta máquina, use `PORT=3100 yarn test:e2e` — ver abaixo
 yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver abaixo
 ```
+
+Dois dos portões da Fase 7 são **manuais**, e a razão de estarem escritos aqui é
+que nada no CI os dispara:
+
+```bash
+yarn db:verify       # o CAS de `PUT /api/save` contra o Postgres do .env
+yarn db:seed-remote  # semeia um save remoto, para testar o primeiro login à mão
+```
+
+**O SQL do save fica descoberto no CI, e isso é decisão, não descuido.** A decisão
+4 da fase fechou o e2e contra um servidor falso em memória, sem banco, para o CI
+não depender de rede nem de segredo — o que cobre o cliente e a tela, e deixa de
+fora o `update` que copia a linha para `previous*` dentro do próprio comando, que
+é exatamente o tipo de coisa que passa em revisão e falha no banco. **Rodar
+`yarn db:verify` antes de mexer em `server/db/save-store.ts`** é o que fecha a
+lacuna, e é trabalho de quem edita lembrar.
+
+O que dá para automatizar sem banco está no CI: o passo *migrations acompanham o
+schema* roda `drizzle-kit generate` com credencial falsa — ele lê o schema e não
+abre conexão — e reprova se sobrar migration por gerar.
+
+**Login não se valida em preview da Vercel**, e também não é defeito: cada deploy
+tem URL própria, que nunca casa com a redirect URI registrada no OAuth App do
+GitHub nem com o `BETTER_AUTH_URL`, e os previews estão atrás do Vercel
+Authentication. Valida-se em `localhost` e em produção.
 
 O `reuseExistingServer` do Playwright reaproveita um servidor que já esteja de
 pé na porta configurada — e ele confere que **alguém** atende, não **quem**. Um
@@ -73,6 +118,15 @@ para a configuração. Isso também virou teste:
 **próprio TypeScript** quais arquivos cada projeto cobre e reprova se algum ficar
 de fora — ou se algum projeto ficar vazio, que é como o `tsconfig.e2e.json`
 nasceu, com o `exclude` herdado do `extends` anulando o `include` dele.
+
+Na quinta vez o defeito achou a metade que aquele portão **não** media. A Fase 7
+criou `drizzle.config.ts`, e ele caiu fora de dois portões ao mesmo tempo: fora do
+bloco type-aware e fora dos seis projetos de `tsconfig`. O `lint-gate` acusou a
+primeira metade; a segunda passou, porque o `tsconfig-gate` só andava por
+**diretório** e nunca por arquivo da raiz — e esta seção afirmava uma cobertura
+que não existia onde o arquivo de configuração mora. Provado plantando `out: 42` e
+vendo `yarn typecheck` passar limpo. Hoje os arquivos da raiz entram na medição
+pelo disco, como tudo aqui: configuração nova é medida por existir.
 
 ## Sistema de design
 
@@ -285,6 +339,18 @@ está aqui é só o que sobrou de propósito.
 |---|---|
 | carta do binder com duas alturas — raridade dentro do rodapé da `PokeCard`, botão de moer fora do link e embaixo do artigo | `RARO` e `2 dup · 10 pó` no **mesmo slot**, com os mesmos estilos, numa carta de altura fixa. A issue #24 supunha uma decisão de canvas; não havia nenhuma |
 
+### Decidido na Fase 7, contra o que o plano fechava
+
+| divergência | por quê |
+|---|---|
+| **sem Redis** — sessão e rate limit no Postgres | o plano fechava um `secondaryStorage` escrito à mão sobre `@upstash/redis`, para consolidar sessão e rate limit no mesmo lugar. `secondaryStorage` é opcional (sem ele a sessão mora na tabela `session`, que existiria de qualquer forma) e `rateLimit` aceita `storage: 'database'`. **O argumento era a consolidação, e ele se dissolve quando não há Redis para consolidar** — sobrava escrever um adaptador à mão, porque o helper oficial pressupõe ioredis por TCP, ruim em serverless. O ganho de latência também não existia: `GET` e `PUT /api/save` precisam do Postgres no mesmo request que lê a sessão, então um Redis não evitaria acordar o compute do Neon — só somaria um segundo lugar capaz de estar fora do ar |
+| tabela `save_rate_limit` nossa, ao lado da `rate_limit` do `better-auth` | a da biblioteca é gerada por `db:generate:auth` e a forma dela muda quando ela muda. Apoiar regra nossa nela criaria um acoplamento que nenhum portão daqui enxerga — inclusive o dia em que `rateLimit.storage` deixar de ser `'database'` e a tabela parar de ser mantida |
+| o corpo que sincroniza é o próprio `SaveData`, com `battle` sempre nula | e não um tipo recortado sem o campo. Assim o mesmo guarda vale nos dois lados, sem uma segunda definição de "save válido" livre para divergir da primeira — o repositório já sabe o que acontece com duas definições da mesma regra |
+| `GET /api/save` responde **404**, e não um save vazio | as duas respostas levam a ações opostas no cliente: sem linha, o local vence e sobe; com linha, entra a decisão do primeiro login. Um save vazio com 200 apagaria a diferença justamente no caso em que ela custa uma coleção |
+| a entrada da conta é o **canto** da barra, não uma sétima seção | jogar nunca exige conta — o princípio que governa a fileira 4 do canvas. Um link entre *Packs* e *Liga* transformaria a conta em destino do jogo, que é o contrário do que a prancha *Convite* desenha. A prancha já punha o avatar de 32px à direita; o que mudou é que agora ele também é a porta de entrada de quem **não** tem conta |
+| a prancha *Convite* ainda não existe em código | ela aparece uma vez, depois do primeiro ginásio, e é recusável. Fica para a segunda metade da fase; até lá, o canto da barra é a única entrada — e é o que o `nav-gate` afirma |
+| a tela *Duas coleções* usa `h2`, não `h1` | a prancha desenha o título como o maior da tela, e ele continua sendo visualmente. Na marcação ele é `h2`: a página por baixo continua montada com o `h1` dela, e dois `h1` na mesma árvore é sumário quebrado para quem navega por cabeçalho |
+
 ### Decidido na Fase 6, contra o que a prancha desenhava
 
 | divergência | por quê |
@@ -312,7 +378,7 @@ está aqui é só o que sobrou de propósito.
 |---|---|
 | a loja tem **três** cartões, e não dois | os packs de boas-vindas existem desde a Fase 5 e precisam de onde ser abertos. Virá-los o primeiro da fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário; a alternativa — a loja só aparecer depois deles — esconderia saldo e preço de quem está começando |
 | sublinhado ativo em `--accent` em toda página | a prancha *Hub* o desenha azul e a *Loja* roxo, para o mesmo papel. É variação de mockup desenhado à mão, como o `2px`/`3px` que a Fase 2 normalizou num `--radius` só |
-| sem o avatar de 32px no canto da barra | é a conta, que é Fase 7. Ver *Segurado até a fase que cria o dado* |
+| ~~sem o avatar de 32px no canto da barra~~ | **Entregue na Fase 7**, e com um papel a mais do que a prancha desenhava: sem sessão, o mesmo canto é o link *Entrar*. Ver a linha correspondente em *Decidido na Fase 7* |
 | `/settings` sem os painéis de conta, idioma, som e offline | mesma razão, e eles aparecem **nomeados** num painel *Ainda não* em vez de virarem controles cinzas: um botão desligado promete uma coisa que o jogo não faz |
 | apagar o save guarda uma cópia | a prancha põe *apagar local* na zona de perigo e não diz o que sobra. Sem conta não existe segunda cópia em lugar nenhum, e a regra inegociável do plano existe para a coleção de meses não depender de um clique não ter sido acidental. A tela avisa que a cópia fica |
 
@@ -368,7 +434,12 @@ progresso que ninguém pode mover.
 - **Fase 7, e o que `/settings` deixa de fora por causa dela:** o painel de conta,
   o estado de sincronização e *restaurar a gravação anterior do servidor*. Os três
   aparecem nomeados na tela, num painel *Ainda não* — a ausência é dado que não
-  existe, e o jogador precisa saber disso.
+  existe, e o jogador precisa saber disso. **A primeira metade da fase entregou a
+  conta**, mas por fora de `/settings`: entrar e sair moram no canto da barra, e o
+  painel continua *Ainda não* porque o que ele promete é o **estado de
+  sincronização**, que é a segunda metade. `previousData` já é gravado a cada
+  `PUT`, então *restaurar a gravação anterior do servidor* passou a ter dado — o
+  que falta é a rota que o devolve.
 - **Sem a peça que os sustenta:** o seletor de **idioma** (não há i18n), o
   interruptor de **som** (não há áudio) e *baixar tudo para offline* (não há PWA).
   Os três estão na prancha *Ajustes*, e nenhum dos três tem o que ligar.
