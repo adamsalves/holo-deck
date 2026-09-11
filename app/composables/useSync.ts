@@ -1,6 +1,6 @@
 import { useState } from 'nuxt/app'
 import type { Ref } from 'vue'
-import type { SyncStatus } from '~~/app/utils/save-sync'
+import type { SyncStatus } from '~~/app/utils/sync-status'
 
 /** O aviso do estado 04 da prancha *Sync*: quantas mudanças deste aparelho venceram. */
 export interface SyncConflict {

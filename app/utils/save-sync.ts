@@ -3,6 +3,7 @@ import { forSync, isUntouched } from '~~/shared/save/sync'
 import type { RemoteLoad, Written } from './save-http'
 import { SaveConflict } from './save-http'
 import type { SyncState } from './sync-state'
+import type { SyncPhase, SyncStatus } from './sync-status'
 
 /**
  * O sync contínuo — o que acontece depois do primeiro login.
@@ -24,15 +25,6 @@ import type { SyncState } from './sync-state'
  * que deixa as regras acima serem afirmadas com um servidor falso e um agendador
  * manual, sem relógio nem navegador.
  */
-
-/** Os três estados do indicador que não falam com o jogador. */
-export type SyncPhase = 'synced' | 'sending' | 'queued'
-
-export interface SyncStatus {
-  readonly phase: SyncPhase
-  readonly pending: number
-  readonly syncedAt: string | null
-}
 
 /** A rede, do ponto de vista do sync. O `HttpDriver` a implementa. */
 export interface SyncRemote {
@@ -293,7 +285,15 @@ export class SyncDriver {
     await this.flush()
     if (this.#state.pending > 0) throw new Error('Há mudanças que ainda não subiram')
 
-    const restored = await this.#deps.remote.restore(this.#state.base)
+    let restored: RemoteLoad
+    try {
+      restored = await this.#deps.remote.restore(this.#state.base)
+    }
+    catch (error) {
+      if (error instanceof SaveConflict) await this.#afterRestoreConflict(error.current)
+      throw error
+    }
+
     await this.#adopt(restored, this.#deps.compose())
     this.#persist()
     this.#settlePhase()
@@ -348,6 +348,30 @@ export class SyncDriver {
     this.#state = { base: remote.version, pending: equal ? 0 : 1, syncedAt: remote.updatedAt, sent: null }
     this.#persist()
     this.#afterBoot()
+  }
+
+  /**
+   * O 409 do restaurar: outro aparelho gravou depois do último acerto, e nada foi
+   * trocado.
+   *
+   * **Este aparelho está limpo** — a fila acabou de subir —, e limpo aceita o
+   * servidor. Sem isto o 409 deixava o `HttpDriver` já na versão nova e o estado
+   * de sync na velha, e a jogada seguinte subiria por cima do outro aparelho sem
+   * conflito, sem backup e sem aviso. Documento de build mais nova para o sync,
+   * pela mesma razão do boot.
+   */
+  async #afterRestoreConflict(current: RemoteLoad | null): Promise<void> {
+    if (current === null) return
+
+    if (current.recovered !== null) {
+      this.#running = false
+      this.#settlePhase()
+      return
+    }
+
+    await this.#adopt(current, this.#deps.compose())
+    this.#persist()
+    this.#settlePhase()
   }
 
   async #adopt(remote: RemoteLoad, local: SaveData): Promise<void> {
@@ -455,9 +479,19 @@ export class SyncDriver {
     options: { keepalive?: boolean },
   ): Promise<void> {
     const current = conflict.current
-    if (current === null || current.recovered !== null) {
-      // Sem o documento do servidor, ou com um de build mais nova: nada se
-      // sobrescreve às cegas.
+    if (current !== null && current.recovered !== null) {
+      // Documento de uma build mais nova: nada se sobrescreve, **e o sync para**,
+      // como no boot. O 409 já levou a versão do `HttpDriver` para a do
+      // servidor, e só marcar a fila deixava a jogada seguinte subir o formato
+      // velho por cima do novo sem colidir. O boot com o bundle novo retoma.
+      this.#running = false
+      this.#setPhase('queued')
+      return
+    }
+
+    if (current === null) {
+      // Sem o documento do servidor, nada se sobrescreve às cegas: a versão não
+      // andou, e a próxima tentativa colide de novo em vez de gravar por cima.
       this.#setPhase('queued')
       return
     }
