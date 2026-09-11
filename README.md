@@ -871,6 +871,44 @@ não cobra nada — revanche imediata, nada é perdido.
   commitados para uma tela que mostra dois Pokémon por vez. Nem todas existem no
   conjunto, e o recuo é a miniatura local de 128 px.
 
+### O time do líder é JSON, e o Hub já abriu sem ele
+
+`useLeague` monta o time de cada ginásio aberto num `useAsyncData`, e **o handler
+devolve um objeto simples, não um `Map`**. A diferença apagava a fileira *Time do
+líder* do Hub para todo jogador sem insígnia — a primeira tela de todo jogador
+novo — desde a `v0.7.0`, com build verde, console limpo e `_errors` vazio no
+payload. Foi achada em produção, testando o primeiro login numa janela anônima.
+
+No pré-render, o Nuxt 4 reaproveita o resultado de uma chave entre as páginas que
+a usam — `/` e `/league` dividem `league-teams:1` — guardando-o num storage que só
+serializa JSON. Um `Map` não passa: o `setItem` lança, o próprio Nuxt engole o
+erro, e a página gerada depois recebe `null`. No cliente, `null` conta como dado já
+carregado — só `undefined` dispara busca —, então o time nunca chegava. Com uma
+insígnia a chave vira `league-teams:2`, que não está no payload de página nenhuma,
+a busca acontece, e o defeito se escondia justamente de quem já tinha jogado.
+
+A regra vale para todo `useAsyncData` do repositório: o handler devolve JSON, e o
+`Map` que a tela quiser nasce num `computed`, depois. O `useDeck` tinha a mesma
+forma nos status de Lv50 e foi junto, antes de virar defeito — só `/deck` usa
+aquela chave, então nenhuma página a recebia do cache. Para ler o que a build
+gravou, o lugar é o `_payload.json` da rota: o HTML pré-renderizado só carrega o
+`_errors`, e o `data` vai para o arquivo extraído.
+
+Dois portões, e eles medem lugares diferentes:
+
+- [`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts)
+  decodifica todos os `_payload.json` da build e reprova valor com tipo que não
+  seja JSON e chave com valor diferente entre páginas. É o que pega a classe
+  inteira, inclusive quando a ordem do pré-render esconde o defeito.
+- [`test/e2e/hub-team.spec.ts`](test/e2e/hub-team.spec.ts) confere o time na tela
+  pelas quatro portas: carga direta do Hub, chegada ao Hub por outra página, Hub
+  depois de adotar o save da conta, e carga direta da Liga.
+
+Provados recolocando o `Map`: as duas perguntas do primeiro acusam
+(`/league/ league-teams:1 Map` e `league-teams:1: / ≠ /league/`), e três dos quatro
+testes do segundo reprovam com `Expected: 3, Received: 0`. O da Liga passa, e o
+próprio teste diz por quê: com a ordem de hoje, quem perde é o Hub.
+
 ## A loja, as regras e os ajustes
 
 O que fecha a Fase 6: um lugar para gastar as moedas, a referência que se gera
