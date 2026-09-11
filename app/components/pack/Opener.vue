@@ -249,6 +249,10 @@ function labelOf(card: PackCard, entry: SearchEntry | null): string {
   inset: -18%;
   z-index: -1;
   opacity: 0.4;
+  /* Enfeite, e enfeite não recebe clique. Os raios passam 18% para fora da carta
+     e caíam por cima do botão ABRIR O PRÓXIMO: o clique ia para eles e o botão
+     não respondia — só quando a carta de raios saía no slot vizinho. */
+  pointer-events: none;
   background: repeating-conic-gradient(
     from 0deg,
     color-mix(in oklab, var(--rarity) 50%, transparent) 0deg 2deg,
