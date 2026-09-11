@@ -138,6 +138,15 @@ test('outro aparelho gravou antes: o local vence e a cópia dele fica no backup'
   // Nada foi destruído: o que o outro aparelho gravou está no anel deste.
   const saved = await backups(page)
   expect(saved.some(raw => raw.includes('"dust":777'))).toBe(true)
+
+  // O aviso, com a porta que devolve a cópia do outro aparelho nomeada nele — e
+  // um botão só, porque não há o que decidir.
+  const notice = page.locator('.conflict')
+  await expect(notice).toContainText('Outro aparelho gravou antes')
+  await expect(notice).toContainText('Ajustes → Cópias de segurança')
+
+  await notice.getByRole('button', { name: 'ENTENDI' }).click()
+  await expect(notice).toHaveCount(0)
 })
 
 test('boot com outro aparelho à frente: o aparelho limpo adota o servidor', async ({ page }) => {
@@ -148,4 +157,45 @@ test('boot com outro aparelho à frente: o aparelho limpo adota o servidor', asy
 
   await expect.poll(() => localDust(page), 'o save do outro aparelho desceu').toBe(777)
   expect(sync.puts, 'adotar não sobe nada').toHaveLength(0)
+})
+
+/**
+ * O indicador — os estados 01 e 02 da prancha *Estados de sync*, no canto da
+ * conta. O tempo do *há X* depende do dia em que a suíte roda, e o que se afirma
+ * é o estado, não o relógio.
+ */
+test('o indicador acompanha a jogada: enviando, e sincronizado de novo', async ({ page }) => {
+  const sync = await syncedDevice(page)
+  await openDeck(page, sync)
+
+  const chip = page.locator('.sync')
+  await expect(chip).toContainText('sincronizado')
+
+  await pickCard(page)
+  await expect(chip).toHaveText('enviando…')
+
+  await expect.poll(() => sync.puts.length, { timeout: 12_000 }).toBe(1)
+  await expect(chip).toContainText('sincronizado')
+})
+
+/**
+ * O estado 03: sem rede o jogo não muda em nada, o indicador conta a fila, e ela
+ * sobe sozinha quando a conexão volta — pelo evento `online`, sem jogada nova.
+ */
+test('sem rede o indicador conta a fila, e ela sobe sozinha ao reconectar', async ({ page, context }) => {
+  const sync = await syncedDevice(page)
+  await openDeck(page, sync)
+
+  await context.setOffline(true)
+  await pickCard(page)
+
+  const chip = page.locator('.sync')
+  await expect(chip).toHaveText('1 mudança na fila')
+  expect(sync.puts, 'offline, nada sai').toHaveLength(0)
+
+  await context.setOffline(false)
+
+  // Cinco segundos é o ócio inteiro: se subiu antes dele, foi pelo `online`.
+  await expect.poll(() => sync.puts.length, { timeout: 4000 }).toBe(1)
+  await expect(chip).toContainText('sincronizado')
 })

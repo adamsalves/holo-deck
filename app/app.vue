@@ -12,6 +12,11 @@
            jogo não sabe qual coleção é a do jogador. Ver a prancha
            *Duas coleções* — a única do sistema que pede decisão. -->
       <SaveChoice />
+
+      <!-- O aviso de conflito do sync, pelo mesmo motivo: ele é estado da
+           sessão, e não de uma tela — o 409 se resolve em qualquer rota,
+           inclusive na batalha, que não tem a barra. -->
+      <SyncConflictNotice />
     </ClientOnly>
 
     <!-- Sem NuxtLayout aqui, o primeiro app/layouts/default.vue da Fase 2 é

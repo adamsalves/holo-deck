@@ -76,6 +76,10 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
     </template>
 
     <template v-else>
+      <!-- O indicador de sync mora aqui, e só aqui: sem conta ele não existe, e
+           o ramo acima é o de quem não tem. -->
+      <SyncIndicator />
+
       <span
         class="account__avatar"
         :title="account.name"
