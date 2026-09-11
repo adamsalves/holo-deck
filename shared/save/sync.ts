@@ -106,6 +106,31 @@ export interface RemoteSave {
 }
 
 /**
+ * O resumo da versão anterior que o servidor guarda — o que *Restaurar versão
+ * anterior* mostra antes de o jogador decidir.
+ *
+ * Mora aqui, e não no servidor, porque os dois lados leem a mesma forma: o
+ * servidor a monta em `readPrevious`, o cliente a confere na chegada.
+ */
+export interface PreviousSummary {
+  readonly version: number
+  /** Nulo em linha gravada antes da migração `0002`, que não guardava o instante. */
+  readonly updatedAt: string | null
+  /** Espécies na coleção — o número que as telas do jogo chamam de "cartas". */
+  readonly cards: number
+}
+
+/** O resumo como ele chega da rede, conferido como qualquer fronteira. */
+export function isPreviousSummary(value: unknown): value is PreviousSummary {
+  if (typeof value !== 'object' || value === null) return false
+  if (!('version' in value) || !('updatedAt' in value) || !('cards' in value)) return false
+
+  return typeof value.version === 'number' && Number.isInteger(value.version) && value.version > 0
+    && (value.updatedAt === null || typeof value.updatedAt === 'string')
+    && typeof value.cards === 'number' && Number.isInteger(value.cards) && value.cards >= 0
+}
+
+/**
  * O save de quem ainda não fez nada.
  *
  * Ele decide o primeiro login: com um dos dois lados intocado, a resposta é

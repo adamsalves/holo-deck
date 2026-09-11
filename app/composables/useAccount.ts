@@ -2,6 +2,7 @@ import { useState } from 'nuxt/app'
 import type { Ref } from 'vue'
 import { authClient } from '~~/app/utils/auth-client'
 import { clearSyncedWith } from '~~/app/utils/last-write'
+import { clearSyncState } from '~~/app/utils/sync-state'
 
 /** Quem está logado, do jeito que a barra precisa mostrar. */
 export interface Account {
@@ -77,8 +78,10 @@ export function useAccount(): {
     finally {
       // Antes da recarga, e mesmo se o `signOut` falhar: a marca é local, e um
       // acerto registrado sem conta do outro lado é o que faria a pergunta do
-      // primeiro login nunca mais aparecer.
+      // primeiro login nunca mais aparecer. O estado de sync vai junto: ele
+      // descreve este aparelho diante desta conta, e sem a conta não descreve nada.
       clearSyncedWith()
+      clearSyncState()
       account.value = null
       known.value = true
 

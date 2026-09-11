@@ -1,7 +1,7 @@
 import type { LoadResult, RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { emptySave, migrate } from '~~/shared/save/schema'
-import type { RemoteSave } from '~~/shared/save/sync'
-import { forSync, isSyncShape } from '~~/shared/save/sync'
+import type { PreviousSummary, RemoteSave } from '~~/shared/save/sync'
+import { forSync, isPreviousSummary, isSyncShape } from '~~/shared/save/sync'
 import type { SaveDriver } from './save-driver'
 
 /**
@@ -25,6 +25,12 @@ export interface RemoteLoad {
   readonly recovered: RecoveryReason | null
 }
 
+/** O que o servidor respondeu a uma gravação aceita. */
+export interface Written {
+  readonly version: number
+  readonly updatedAt: string
+}
+
 /**
  * A colisão do CAS, com o que o servidor tem agora — **migrado**, como tudo que
  * sai desta fronteira. Quem trata é o `SyncDriver`.
@@ -33,6 +39,14 @@ export class SaveConflict extends Error {
   constructor(readonly current: RemoteLoad | null) {
     super('Outro aparelho gravou antes')
     this.name = 'SaveConflict'
+  }
+}
+
+/** O servidor não tem versão anterior para restaurar. */
+export class NoPreviousVersion extends Error {
+  constructor() {
+    super('Nenhuma versão anterior no servidor')
+    this.name = 'NoPreviousVersion'
   }
 }
 
@@ -55,6 +69,18 @@ export class HttpDriver implements SaveDriver {
   /** A versão em que a última leitura ou gravação deixou o servidor. Zero = nenhuma. */
   get version(): number {
     return this.#version
+  }
+
+  /**
+   * Retoma a versão que este aparelho guardou da última vez.
+   *
+   * **Sem isto, o boot que não conseguiu ler o servidor gravaria com zero** — que
+   * é "nunca subi" — sobre uma linha que existe, e toda gravação feita offline
+   * voltaria como conflito com o próprio save. A versão mora no estado de sync do
+   * aparelho (`holodeck:syncState`), que é quem a entrega aqui.
+   */
+  resume(version: number): void {
+    this.#version = version
   }
 
   /**
@@ -114,37 +140,98 @@ export class HttpDriver implements SaveDriver {
   }
 
   /**
-   * Sobe o save, com a versão que esta instância leu por último.
+   * Sobe o save — na forma que a interface `SaveDriver` pede, sem recibo.
    *
-   * Colisão lança `SaveConflict` **com o corpo do servidor dentro**: o cliente
-   * reaplica sua mutação por cima do que recebeu e tenta uma vez mais, sem
-   * precisar de um `GET` extra justamente no caminho em que já perdeu uma ida.
+   * Quem precisa da versão e do instante que o servidor respondeu usa `write`. A
+   * interface é a mesma do `localStorage`, que não tem recibo nenhum para dar, e
+   * mudá-la obrigaria o driver local a inventar um.
    */
   async save(data: SaveData): Promise<void> {
+    await this.write(data)
+  }
+
+  /**
+   * Sobe o save, com a versão que esta instância leu por último, e devolve o
+   * recibo do servidor.
+   *
+   * Colisão lança `SaveConflict` **com o corpo do servidor dentro**: o cliente
+   * decide o conflito com o que recebeu, sem precisar de um `GET` extra justamente
+   * no caminho em que já perdeu uma ida.
+   *
+   * **`keepalive` é o envio garantido de quem está saindo.** A prancha *Sync* pede
+   * envio em `visibilitychange` e `pagehide`, e um `fetch` comum morre com a aba.
+   * Com a flag o navegador termina a requisição depois do fechamento — até 64 KB
+   * de corpo, e o pior caso do save é 21 KB. A resposta pode não voltar a ninguém,
+   * e é por isso que o estado de sync guarda a impressão do que foi mandado.
+   */
+  async write(data: SaveData, options: { keepalive?: boolean } = {}): Promise<Written> {
     const response = await fetch('/api/save', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: forSync(data), baseVersion: this.#version }),
+      keepalive: options.keepalive === true,
     })
 
-    if (response.status === 409) {
-      const body: unknown = await response.json().catch(() => null)
-      const current = isRecord(body) && isRemoteSave(body.data) ? migrated(body.data) : null
-      if (current) this.#version = current.version
-
-      throw new SaveConflict(current)
-    }
+    if (response.status === 409) throw await this.#conflict(response)
 
     if (!response.ok) {
       throw new Error(`PUT /api/save respondeu ${response.status}`)
     }
 
     const body: unknown = await response.json()
-    if (!isRecord(body) || typeof body.version !== 'number') {
+    if (!isRecord(body) || typeof body.version !== 'number' || typeof body.updatedAt !== 'string') {
       throw new Error('PUT /api/save devolveu corpo fora do contrato')
     }
 
     this.#version = body.version
+    return { version: body.version, updatedAt: body.updatedAt }
+  }
+
+  /**
+   * O resumo da versão anterior que o servidor guarda, ou `null` sem nenhuma.
+   *
+   * É o que *Restaurar versão anterior* mostra antes de o jogador decidir — quando
+   * ela foi gravada e com quantas cartas. O documento inteiro não viaja.
+   */
+  async fetchPrevious(): Promise<PreviousSummary | null> {
+    const response = await fetch('/api/save/previous')
+
+    if (response.status === 404) return null
+    if (!response.ok) throw new Error(`GET /api/save/previous respondeu ${response.status}`)
+
+    const body: unknown = await response.json()
+    if (!isPreviousSummary(body)) {
+      throw new Error('GET /api/save/previous devolveu corpo fora do contrato')
+    }
+
+    return body
+  }
+
+  /**
+   * Troca a versão atual do servidor pela anterior e devolve a restaurada.
+   *
+   * Passa pelo mesmo CAS da gravação: a versão trocada precisa ser a que o
+   * jogador estava vendo, e colisão lança `SaveConflict` como no `PUT`. Sem
+   * anterior, `NoPreviousVersion` — que não é erro de rede e não deve parecer um.
+   */
+  async restore(baseVersion: number): Promise<RemoteLoad> {
+    const response = await fetch('/api/save/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseVersion }),
+    })
+
+    if (response.status === 409) throw await this.#conflict(response)
+    if (response.status === 404) throw new NoPreviousVersion()
+    if (!response.ok) throw new Error(`POST /api/save/restore respondeu ${response.status}`)
+
+    const body: unknown = await response.json()
+    if (!isRemoteSave(body)) {
+      throw new Error('POST /api/save/restore devolveu corpo fora do contrato')
+    }
+
+    this.#version = body.version
+    return migrated(body)
   }
 
   /**
@@ -153,29 +240,35 @@ export class HttpDriver implements SaveDriver {
    * `clear()` é o *Apagar save deste aparelho* de `/settings`, e a própria tela
    * promete: "com conta, ele volta na próxima sincronização". Apagar o servidor
    * aqui transformaria essa frase em mentira — e transformaria um botão de
-   * limpar um aparelho no botão de perder a coleção. Quem vai apagar do servidor
-   * é a exclusão de conta, que ainda não existe como rota — o `onDelete:
-   * 'cascade'` de `saves` já está posto esperando por ela.
+   * limpar um aparelho no botão de perder a coleção. Quem apaga do servidor é a
+   * exclusão de conta, pelo `deleteUser` do `better-auth`.
    *
    * **`#version` volta a zero porque esta instância deixou de ter leitura**, e
-   * zero significa "nunca subi" para o CAS. Hoje isto é inalcançável: nada compõe
-   * este driver com o local, e `/settings` apaga pelo driver local. No dia em que
-   * *Apagar save deste aparelho* passar por um driver composto, zerar aqui manda o
-   * `PUT` seguinte pelo caminho do `insert ... on conflict do nothing` e ele
-   * colide para sempre contra a linha que continua lá — o certo naquele dia é
-   * reler o servidor, não esquecer a versão.
+   * zero significa "nunca subi" para o CAS. O `SyncDriver` não passa por aqui:
+   * apagar local com conta relê o servidor em vez de esquecer a versão, porque
+   * zerar mandaria o `PUT` seguinte pelo caminho do `insert ... on conflict do
+   * nothing`, colidindo para sempre contra a linha que continua lá.
    */
   async clear(): Promise<void> {
     this.#version = 0
+  }
+
+  /** O 409, com o save do servidor dentro — migrado, e a versão dele como base. */
+  async #conflict(response: Response): Promise<SaveConflict> {
+    const body: unknown = await response.json().catch(() => null)
+    const current = isRecord(body) && isRemoteSave(body.data) ? migrated(body.data) : null
+    if (current) this.#version = current.version
+
+    return new SaveConflict(current)
   }
 }
 
 /**
  * O documento do servidor passado pela cadeia de migração.
  *
- * Um lugar só porque são dois os caminhos por onde o servidor entrega save — o
- * `GET` e o corpo do 409 —, e duas chamadas a `migrate` é como uma das duas fica
- * para trás.
+ * Um lugar só porque são três os caminhos por onde o servidor entrega save — o
+ * `GET`, o corpo do 409 e o restaurar —, e três chamadas a `migrate` é como uma
+ * delas fica para trás.
  */
 function migrated(remote: RemoteSave): RemoteLoad {
   const { data, recovered } = migrate(remote.data)

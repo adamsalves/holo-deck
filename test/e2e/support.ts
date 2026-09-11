@@ -53,10 +53,10 @@ export interface FakeSync {
    * Quantas vezes o cliente perguntou quem está logado.
    *
    * **É a âncora positiva do boot**, e existe porque a outra não servia para o
-   * teste que mais precisa dela: provar que um boot já acertado **não** lê o save
-   * é provar uma ausência, e `gets()` não cresce para ancorá-la. Este cresce — a
-   * sessão é lida em todo boot, antes da decisão —, então esperar por ele é
-   * esperar o plugin ter chegado ao ponto em que leria. Era um
+   * teste que mais precisa dela: provar que um boot já acertado **não** faz algo
+   * é provar uma ausência, e o que se nega não cresce para ancorá-la. Este cresce
+   * — a sessão é lida em todo boot, antes da decisão —, então esperar por ele é
+   * esperar o plugin ter chegado ao ponto em que decidiria. Era um
    * `waitForTimeout(1500)`, que é a mesma forma de falso verde que esta suíte
    * corrigiu nos outros testes: numa máquina lenta ele dá verde com o defeito.
    */
@@ -64,17 +64,21 @@ export interface FakeSync {
   /**
    * Quantas leituras o cliente fez.
    *
-   * **É o sinal que ancora as asserções de ausência.** `toHaveCount(0)` passa no
-   * instante em que roda, então "a tela não apareceu" é verde antes de o plugin
-   * assíncrono ter tido chance de mostrá-la — o portão dava verde com o defeito
-   * reintroduzido. Esperar o `GET` acontecer é esperar a decisão ser tomada.
-   *
-   * E ele mede a coisa certa por construção: o boot já acertado com a conta sai
-   * **antes** de ler, então um `GET` a mais é exatamente o defeito.
+   * **É o sinal que ancora as asserções de ausência da tela de escolha.**
+   * `toHaveCount(0)` passa no instante em que roda, então "a tela não apareceu" é
+   * verde antes de o plugin assíncrono ter tido chance de mostrá-la. Esperar o
+   * `GET` acontecer é esperar a decisão ser tomada.
    */
   gets: () => number
   /** O que o servidor tem agora — nulo quando ninguém subiu nada. */
   current: () => StoredSave | null
+  /**
+   * Outro aparelho grava: a versão anda sem este navegador saber.
+   *
+   * É o que produz o 409 de verdade no meio da sessão — e o boot que encontra o
+   * servidor à frente do que este aparelho conhece.
+   */
+  elsewhere: (data: unknown) => void
 }
 
 /**
@@ -152,7 +156,15 @@ export async function fakeSync(page: Page, remote: unknown | null = null): Promi
     await route.fulfill({ json: { version: stored.version, updatedAt: stored.updatedAt } })
   })
 
-  return { puts, gets: () => gets, sessions: () => sessions, current: () => stored }
+  return {
+    puts,
+    gets: () => gets,
+    sessions: () => sessions,
+    current: () => stored,
+    elsewhere: (data) => {
+      stored = { data, version: (stored?.version ?? 0) + 1, updatedAt: '2026-09-11T09:00:00.000Z' }
+    },
+  }
 }
 
 /** A sessão falsa. O consentimento do GitHub exige um humano — ver o docblock. */
@@ -181,6 +193,22 @@ export async function seedLocalSave(page: Page, save: unknown): Promise<void> {
       window.localStorage.setItem('holodeck:save', JSON.stringify(value))
     }
   }, save)
+}
+
+/**
+ * Semeia um aparelho já acertado com a conta falsa — `syncedWith` e o estado do
+ * sync contínuo —, como se o primeiro login tivesse acontecido antes.
+ *
+ * Mesma guarda de `seedLocalSave`, pelo mesmo motivo: sem ela, cada `goto`
+ * reescreveria o estado que o sync acabou de gravar.
+ */
+export async function seedSynced(page: Page, state: { base: number, pending?: number }): Promise<void> {
+  await page.addInitScript((value) => {
+    if (window.localStorage.getItem('holodeck:syncedWith') === null) {
+      window.localStorage.setItem('holodeck:syncedWith', 'e2e')
+      window.localStorage.setItem('holodeck:syncState', JSON.stringify(value))
+    }
+  }, { base: state.base, pending: state.pending ?? 0, syncedAt: '2026-09-01T12:00:00.000Z', sent: null })
 }
 
 function isPutBody(value: unknown): value is { data: unknown, baseVersion: number } {

@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import type { SaveData } from '~~/shared/save/schema'
 import { ownedIds } from '~~/shared/save/schema'
-import type { RemoteSave } from '~~/shared/save/sync'
+import type { PreviousSummary, RemoteSave } from '~~/shared/save/sync'
 import { isSyncShape } from '~~/shared/save/sync'
 import { db } from '.'
 import { saves } from './schema'
@@ -93,15 +93,6 @@ export async function writeSave(
   if (updated) return { ok: true, version: updated.version, updatedAt: updated.updatedAt }
 
   return { ok: false, current: await readSave(userId) }
-}
-
-/** A versão anterior, do jeito que *Restaurar versão anterior* a descreve. */
-export interface PreviousSummary {
-  readonly version: number
-  /** Nulo em linha gravada antes da migração `0002`, que não guardava o instante. */
-  readonly updatedAt: string | null
-  /** Espécies na coleção — o número que as telas do jogo chamam de "cartas". */
-  readonly cards: number
 }
 
 /**

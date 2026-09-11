@@ -130,15 +130,21 @@ test('a escolha não reaparece no boot seguinte', async ({ page }) => {
    *
    * Uma recarga é barreira de verdade: quando a sessão do boot 3 é pedida, o
    * boot 2 já rodou inteiro. O contador de sessões é o sinal positivo que cresce,
-   * e `gets()` é o que precisa ter ficado parado.
+   * e o que precisa ter ficado parado é a tela e o `PUT`.
+   *
+   * **O PR 2 mudou a forma da prova, não o defeito.** O boot acertado passou a
+   * ler o servidor — é o sync contínuo, e é assim que ele sabe se outro aparelho
+   * gravou. A versão anterior deste teste afirmava "nem lê o servidor", o que
+   * deixou de ser verdade de propósito; a tela que não volta e o save que não é
+   * regravado continuam sendo o que ele tranca.
    */
   await page.reload()
   await expect(page.locator('.hub')).toBeVisible()
   await expect.poll(() => sync.sessions()).toBe(3)
 
-  expect(sync.gets(), 'boot já acertado nem lê o servidor').toBe(1)
+  expect(sync.gets(), 'o boot 2 leu o servidor — o sync contínuo').toBeGreaterThanOrEqual(2)
   await expect(page.locator('.choice')).toHaveCount(0)
-  expect(sync.puts, 'boot já acertado não regrava').toHaveLength(1)
+  expect(sync.puts, 'boot já acertado não regrava o que o servidor já tem').toHaveLength(1)
 })
 
 /**

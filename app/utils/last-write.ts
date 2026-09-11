@@ -54,8 +54,9 @@ export function lastWrite(): number | null {
  * Chave local pela mesma razão das outras duas: ela descreve **este aparelho**,
  * não a conta, e não teria sentido sincronizada.
  *
- * O que acontece depois dela é o sync contínuo — flag de sujo, fila, 409 com
- * reaplicação —, que é o PR 2. Até lá, boot já acertado não mexe em nada.
+ * Depois dela, quem decide é o sync contínuo — o `SyncDriver` —, que lê o
+ * servidor em todo boot e sobe ou adota pela regra do flag de sujo. O estado dele
+ * mora em `holodeck:syncState`, e o logout apaga os dois juntos.
  */
 export const SYNCED_WITH_KEY = 'holodeck:syncedWith'
 

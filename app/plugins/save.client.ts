@@ -1,6 +1,6 @@
 import { defineNuxtPlugin } from 'nuxt/app'
 import { watch } from 'vue'
-import type { RecoveryReason } from '~~/shared/save/schema'
+import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
@@ -21,8 +21,8 @@ import { markWrite } from '~~/app/utils/last-write'
  * **Uma gravação por mutação, síncrona.** O save realista tem 2,6 KB e o pior
  * caso medido é 21 KB, então debounce local seria complexidade para economizar
  * microssegundos — e a janela que ele abriria é exatamente onde o navegador do
- * celular mata a aba. O debounce que o plano descreve é o da **rede**, e chega
- * com o `HttpDriver` na Fase 7.
+ * celular mata a aba. O debounce que o plano descreve é o da **rede**, e mora no
+ * `SyncDriver`, que escuta as gravações daqui pelo hook `holodeck:saved`.
  */
 export default defineNuxtPlugin({
   /**
@@ -67,17 +67,22 @@ export default defineNuxtPlugin({
         progress.dailyClaimed,
         // O log cresce por uma ação a cada turno, e é isso que faz fechar a aba no
         // meio de um ginásio não perder a luta. São ~30 bytes por turno: a
-        // gravação síncrona continua barata, e o debounce que o plano descreve é
-        // o da rede, que chega com o `HttpDriver` na Fase 7.
+        // gravação síncrona continua barata, e a rede nem vê esses turnos — o
+        // `SyncDriver` compara o documento de sync, que não carrega a batalha.
         battle.log,
       ],
       () => {
-        void driver.save(composeSave(nuxtApp.$pinia))
+        const doc = composeSave(nuxtApp.$pinia)
+        void driver.save(doc)
         // O carimbo de "última partida", que a tela *Duas coleções* compara com
         // o `updatedAt` do servidor. Mora em chave própria, fora do save: dentro
         // dele subiria junto com a coleção e passaria a mostrar, na coluna da
         // conta, o instante gravado pelo outro aparelho.
         markWrite()
+        // O sync escuta aqui, e não com um segundo observador: a lista de campos
+        // acima continua existindo num lugar só, e um campo novo no save entra na
+        // rede no mesmo commit em que entra no disco.
+        void nuxtApp.callHook('holodeck:saved', doc)
       },
       { deep: true },
     )
@@ -110,3 +115,10 @@ export default defineNuxtPlugin({
     }
   },
 })
+
+declare module '#app' {
+  interface RuntimeNuxtHooks {
+    /** Toda gravação local do save. O sync contínuo escuta para montar a fila. */
+    'holodeck:saved': (doc: SaveData) => void
+  }
+}

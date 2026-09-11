@@ -79,7 +79,11 @@ export function useFirstSync(): { pending: Ref<PendingChoice | null>, choose: (s
       }
 
       // Recomposto agora, e não o retrato do boot: ver `PendingChoice.remote`.
-      await remote.save(composeSave(app.$pinia))
+      const doc = composeSave(app.$pinia)
+      const written = await remote.write(doc)
+
+      // O sync contínuo começa do acerto que acabou de acontecer.
+      app.$sync.begin({ base: written.version, pending: 0, syncedAt: written.updatedAt }, doc)
     }
     else {
       // A perdedora é a deste aparelho, e dela existe o texto original — que é o
@@ -93,6 +97,9 @@ export function useFirstSync(): { pending: Ref<PendingChoice | null>, choose: (s
       hydrateSave(choice.remote, app.$pinia)
       await local.save(composeSave(app.$pinia))
       markWrite()
+
+      // A versão é a que o `GET` do boot leu — o driver HTTP a guardou.
+      app.$sync.begin({ base: remote.version, pending: 0, syncedAt: choice.remoteUpdatedAt }, choice.remote)
     }
 
     // Só aqui, e não antes: um acerto marcado antes de a escrita dar certo
