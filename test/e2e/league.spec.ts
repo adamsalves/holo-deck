@@ -300,7 +300,14 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   // nova, do turno 1. O que ele **não** pode ser é o campo montando para sempre.
   await page.goto('/battle/1')
   await expect(page.getByText('TURNO 01')).toBeVisible()
-  await expect(page.locator('.move')).toHaveCount(4)
+
+  // De um a quatro golpes, pelo sorteio que o teste do começo de batalha já
+  // registra: o deck sai das seis primeiras cartas de um pack, e com uma espécie
+  // de golpe único na frente a tela desenha um. O `ab9c622` consertou lá e não
+  // aqui.
+  const moves = page.locator('.move')
+  await expect.poll(() => moves.count()).toBeGreaterThan(0)
+  expect(await moves.count()).toBeLessThanOrEqual(MOVES_IN_BATTLE)
   await expect(page.getByText('Montando o campo…')).toHaveCount(0)
 
   // A outra metade: o deck pode ter esvaziado desde que o log foi gravado — nada
