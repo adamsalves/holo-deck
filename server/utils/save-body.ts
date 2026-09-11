@@ -29,7 +29,14 @@ export const MAX_BODY_BYTES = 256 * 1024
  */
 export type PutBodyResult
   = | { readonly ok: true, readonly data: SaveData, readonly baseVersion: number }
-    | { readonly ok: false, readonly status: 400 | 413, readonly message: string }
+    | BodyRefusal
+
+/** A recusa de um corpo, com o status que a rota devolve. */
+export interface BodyRefusal {
+  readonly ok: false
+  readonly status: 400 | 413
+  readonly message: string
+}
 
 /**
  * Lê o corpo do `PUT /api/save` e diz se ele serve.
@@ -42,6 +49,58 @@ export type PutBodyResult
  * que o defeito é do servidor quando ele é do corpo.
  */
 export function readPutBody(raw: string | undefined): PutBodyResult {
+  const parsed = parseJsonBody(raw)
+  if (!parsed.ok) return parsed
+
+  if (!isPutBody(parsed.value)) {
+    return { ok: false, status: 400, message: 'Corpo inválido' }
+  }
+
+  return { ok: true, data: parsed.value.data, baseVersion: parsed.value.baseVersion }
+}
+
+/** O que a leitura do corpo do restaurar decidiu. */
+export type RestoreBodyResult
+  = | { readonly ok: true, readonly baseVersion: number }
+    | BodyRefusal
+
+/**
+ * Lê o corpo do `POST /api/save/restore` — `{ baseVersion }`, e nada mais.
+ *
+ * **Restaurar também passa pelo CAS.** Ele troca a versão atual pela anterior, e
+ * "a atual" precisa ser a que o jogador estava vendo quando clicou: se outro
+ * aparelho gravou no meio, restaurar trocaria a gravação nova — que ninguém
+ * olhou — pela de antes dela. Com `baseVersion`, isso vira 409 como qualquer
+ * outra colisão.
+ *
+ * **Zero não serve aqui**, ao contrário do `PUT`: zero é "nunca subi", e quem
+ * nunca subiu não tem versão anterior para restaurar.
+ */
+export function readRestoreBody(raw: string | undefined): RestoreBodyResult {
+  const parsed = parseJsonBody(raw)
+  if (!parsed.ok) return parsed
+
+  const value = parsed.value
+  if (!isRecord(value) || Object.keys(value).length !== 1) {
+    return { ok: false, status: 400, message: 'Corpo inválido' }
+  }
+
+  const baseVersion = value.baseVersion
+  if (!isBaseVersion(baseVersion) || baseVersion === 0) {
+    return { ok: false, status: 400, message: 'Corpo inválido' }
+  }
+
+  return { ok: true, baseVersion }
+}
+
+/**
+ * As três recusas que valem para todo corpo desta API, antes de olhar a forma:
+ * ausente, grande demais, e texto que não é JSON.
+ *
+ * Um lugar só porque são duas as rotas que leem corpo, e duas cópias da ordem
+ * destas checagens é como uma delas volta a responder 413 para corpo vazio.
+ */
+function parseJsonBody(raw: string | undefined): { readonly ok: true, readonly value: unknown } | BodyRefusal {
   if (raw === undefined || raw.length === 0) {
     return { ok: false, status: 400, message: 'Corpo ausente' }
   }
@@ -50,19 +109,13 @@ export function readPutBody(raw: string | undefined): PutBodyResult {
     return { ok: false, status: 413, message: 'Corpo grande demais' }
   }
 
-  let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    const value: unknown = JSON.parse(raw)
+    return { ok: true, value }
   }
   catch {
     return { ok: false, status: 400, message: 'Corpo não é JSON' }
   }
-
-  if (!isPutBody(parsed)) {
-    return { ok: false, status: 400, message: 'Corpo inválido' }
-  }
-
-  return { ok: true, data: parsed.data, baseVersion: parsed.baseVersion }
 }
 
 /**

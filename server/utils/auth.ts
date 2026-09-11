@@ -50,4 +50,17 @@ export const auth = betterAuth({
   trustedOrigins: [requireEnv('BETTER_AUTH_URL')],
 
   rateLimit: { storage: 'database' },
+
+  /**
+   * **Excluir conta é o `deleteUser` da própria biblioteca**, e não uma rota nossa.
+   *
+   * Ele apaga o `user` e encerra a sessão; save, contador de escritas, contas e
+   * sessões vão pelo `onDelete: 'cascade'` do banco. A trava que vem junto é o
+   * motivo de não reescrevê-lo: conta sem senha — todas aqui, só GitHub — só se
+   * exclui com sessão criada há menos de `freshAge`, um dia no padrão. Um
+   * aparelho esquecido logado há uma semana não apaga a coleção de ninguém com um
+   * clique: a tela pede para entrar de novo. O plano nomeava `DELETE
+   * /api/account`, e a divergência está no README.
+   */
+  user: { deleteUser: { enabled: true } },
 })
