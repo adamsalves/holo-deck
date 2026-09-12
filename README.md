@@ -384,6 +384,12 @@ está aqui é só o que sobrou de propósito.
 | restaurar **troca** a versão atual e a anterior, e o servidor guarda o instante da anterior (`previous_updated_at`, migration `0002`) | o plano escreve "volta para `previousData`". Voltar sem trocar perderia a atual, e um restaurar sem querer não teria desfazer; com a troca, restaurar de novo desfaz. O instante é o que deixa a tela escrever "feita há 2 min", que a prancha *Ajustes* pede e a tabela do plano não guardava |
 | excluir a conta é o `deleteUser` do `better-auth`, e não uma rota `DELETE /api/account` nossa | o endpoint da biblioteca apaga o usuário e as sessões e limpa o cookie; o save e o contador de escritas vão pelo `onDelete: 'cascade'` do banco, que o plano já previa. O que decide é a trava que vem junto: conta sem senha — todas aqui — só se exclui com sessão de menos de um dia (`freshAge`), então um aparelho esquecido logado não apaga a coleção de ninguém num clique. **O save deste aparelho fica**: excluir a conta não é *Apagar save deste aparelho* |
 
+### Decidido na Fase 7, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| o estado 03 do indicador cobre **toda fila que não subiu**, e não só a falta de rede | a prancha o chama de *offline*, e o chip escreve `N mudanças na fila` também quando o servidor responde 5xx ou quando o teto de 60 escritas por hora fecha. Para quem joga, "sem rede" e "o servidor não aceitou agora" levam à mesma ação — nenhuma —, e o jogo não muda em nada nos dois casos. O que difere é **quando** a fila sobe: no evento `online` ela sobe sozinha, e nos outros dois ela espera a próxima jogada, a aba sair de vista ou o próximo boot |
+
 ### Decidido na Fase 6, contra o que a prancha desenhava
 
 | divergência | por quê |
