@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.8.0](https://github.com/adamsalves/holo-deck/compare/v0.7.0...v0.8.0) (2026-09-12)
+
+
+### Features
+
+* **account:** o convite de conta, uma vez por aparelho ([7ce399e](https://github.com/adamsalves/holo-deck/commit/7ce399ed6119344cca62ab281404a34057704824))
+* **api:** os dois endpoints do save, com CAS e teto de escrita ([a503253](https://github.com/adamsalves/holo-deck/commit/a503253cf0a364ff73373fcd350f187340e4cad0))
+* **api:** restaurar a versão anterior e excluir a conta ([ed8f428](https://github.com/adamsalves/holo-deck/commit/ed8f428acf9f5705ecafed1389775072a3136b14))
+* **auth:** a rota que o better-auth atende, e o comentário que mentia ([ef85ac5](https://github.com/adamsalves/holo-deck/commit/ef85ac585f8613f9f624f1e9a0c47584618c8fc9))
+* **auth:** conta e save no servidor, ponta a ponta ([1276954](https://github.com/adamsalves/holo-deck/commit/1276954868ae543bb64cbc8b6d22df8f60e01654))
+* **auth:** o canto da conta na barra, que é a entrada que faltava ([a5f774e](https://github.com/adamsalves/holo-deck/commit/a5f774ee70e255666df07a8d034abce7fda26828))
+* **auth:** o HttpDriver e a porta de entrada ([a0edb96](https://github.com/adamsalves/holo-deck/commit/a0edb96b09f8fa0bf7ab3f69738a664bc9480bb3))
+* **db:** as seis tabelas de conta e save, e o portão que não via a config ([4461552](https://github.com/adamsalves/holo-deck/commit/4461552451352f7807f5a3d9e3780f4c4db0ed93))
+* **settings:** a conta em Ajustes — sync, restaurar e excluir ([8aa1cfd](https://github.com/adamsalves/holo-deck/commit/8aa1cfdbcc888700d8fbae65f06a693a8fbf6eb0))
+* **sync:** a regra do primeiro login, pura e afirmável sem servidor ([9a1f6d2](https://github.com/adamsalves/holo-deck/commit/9a1f6d2b26a5b7a61ed0cd6fd79688bd6e47d5a9))
+* **sync:** a tela Duas coleções, com as miniaturas da prancha ([2facd58](https://github.com/adamsalves/holo-deck/commit/2facd58ebaf9a14fe0f0b625f1cdad48860687af))
+* **sync:** o indicador no canto da conta e o aviso de conflito ([89d136c](https://github.com/adamsalves/holo-deck/commit/89d136cecc1fe28f6da7c1f7ced8aa26ae16f9ef))
+* **sync:** o save sobe a cada jogada, com indicador, Ajustes da conta e convite ([22d715e](https://github.com/adamsalves/holo-deck/commit/22d715e8480bf5c6c3902a5c21909f0c6b428b60))
+* **sync:** o save sobe sozinho, com fila offline e conflito pelo flag de sujo ([bb61d5f](https://github.com/adamsalves/holo-deck/commit/bb61d5f824a510420e5cd3efa9c6c745c8a2e481))
+
+
+### Bug Fixes
+
+* **a11y:** o Shift+Tab escapava da armadilha de foco do convite ([3cefc09](https://github.com/adamsalves/holo-deck/commit/3cefc0931af0646cf6ccc0bae83ddbb4b5b81b3a))
+* **account:** sair não parava o sync, e o login falho calava o indicador ([afbbd4a](https://github.com/adamsalves/holo-deck/commit/afbbd4a237bb3ceebd1e35a29e43999de9171b52))
+* **api:** a colisão no CAS queimava cota do teto de escritas ([06d12fc](https://github.com/adamsalves/holo-deck/commit/06d12fc98344ecc60281677c453e7ab47f31f9ef))
+* **api:** corpo ausente respondia 413, e JSON malformado respondia 500 ([4678710](https://github.com/adamsalves/holo-deck/commit/4678710e92105b8ccd5f14f31ef8b6d5f09ce80e))
+* **league:** o time do líder sumia do Hub para quem não tinha insígnia ([b9adbed](https://github.com/adamsalves/holo-deck/commit/b9adbed07cb2fd385e57919a551011847b9d95d0))
+* **login:** a tela ainda dizia que gravar a cada jogada chegava depois ([e63f1ed](https://github.com/adamsalves/holo-deck/commit/e63f1eda7f167fa8a18e0afaa05069c81b4a8bd2))
+* **pack:** os raios da abertura engoliam o clique de ABRIR O PRÓXIMO ([7d3134e](https://github.com/adamsalves/holo-deck/commit/7d3134e46908f00f131afb22a1f6cd1139384e0c))
+* **sync:** a escolha do primeiro login rodava em todo boot ([9dc0cc3](https://github.com/adamsalves/holo-deck/commit/9dc0cc394ab09b67e4eb61c89fe8adced84fd20b))
+* **sync:** o 409 do restaurar e o de uma build mais nova sobrescreviam o outro aparelho ([94e59bc](https://github.com/adamsalves/holo-deck/commit/94e59bc057ca979bd4d140a83726bdebec91acbb))
+* **sync:** o apagar local sem rede sobrescrevia a coleção da conta ([7088791](https://github.com/adamsalves/holo-deck/commit/7088791d454509cb8ae5b77fa2c212f6fe2a95d0))
+* **sync:** o boot engolia rejeição e decidia por um retrato velho ([72bca3b](https://github.com/adamsalves/holo-deck/commit/72bca3b0e3b6fb0c6a9e028bc7c10e62af874525))
+* **sync:** o save da conta entrava nas stores sem passar por migração ([2b8fc2f](https://github.com/adamsalves/holo-deck/commit/2b8fc2ff148f614b03aa72b7109426d1783151fd))
+* **ui:** a tela Duas coleções pedia decisão irreversível exibindo zeros ([fecf52d](https://github.com/adamsalves/holo-deck/commit/fecf52d0c1fc5001ea8a63b14e06ac7af2d3895c))
+
 ## [0.7.0](https://github.com/adamsalves/holo-deck/compare/v0.6.0...v0.7.0) (2026-09-06)
 
 
