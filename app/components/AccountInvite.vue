@@ -98,7 +98,11 @@ function trapTab(event: KeyboardEvent): void {
   const last = items[items.length - 1]
   if (first === undefined || last === undefined) return
 
-  if (event.shiftKey && event.target === first) {
+  // **A folha entra no ramo de trás junto com o primeiro item.** Ela tem
+  // `tabindex="-1"` e recebe o foco ao abrir, então não está em `items`: sem
+  // isto, o primeiro `Shift+Tab` de um diálogo recém-aberto saía para a página
+  // por baixo — a que o `aria-modal="true"` promete não existir.
+  if (event.shiftKey && (event.target === first || event.target === root)) {
     event.preventDefault()
     last.focus()
   }
