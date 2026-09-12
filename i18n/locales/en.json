@@ -1,0 +1,13 @@
+{
+  "nav": {
+    "base": "Base",
+    "packs": "Packs",
+    "pokedex": "Pokédex",
+    "collection": "Binder",
+    "deck": "Deck",
+    "league": "League",
+    "rules": "Rules",
+    "settings": "Settings",
+    "account": "Sign in"
+  }
+}

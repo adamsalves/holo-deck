@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import { ENGINE_VERSION } from '../../shared/game/battle.ts'
-import { fakeSync, saveWith, seedLocalSave } from './support'
+import { fakeSync, navLabel, saveWith, seedLocalSave } from './support'
 
 /**
  * A decisão do primeiro login num navegador de verdade.
@@ -228,7 +228,7 @@ test('sem sessão, a barra oferece entrar — e leva à tela de entrar', async (
   // `.env` é erro — a condição do CI, e o caminho de 99% dos boots deste jogo.
   await page.goto('/')
 
-  const enter = page.locator('.nav').getByRole('link', { name: 'Entrar' })
+  const enter = page.locator('.nav').getByRole('link', { name: navLabel('nav.account') })
   await expect(enter, 'a conta precisa ter entrada pela interface').toBeVisible()
 
   await enter.click()
@@ -246,7 +246,7 @@ test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', a
 
   const nav = page.locator('.nav')
   await expect(nav.getByText('Conectada como Treinadora Ash')).toBeAttached()
-  await expect(nav.getByRole('link', { name: 'Entrar' })).toHaveCount(0)
+  await expect(nav.getByRole('link', { name: navLabel('nav.account') })).toHaveCount(0)
 
   // O acerto do primeiro login ficou marcado; sair precisa desfazê-lo, senão
   // entrar de novo pularia a pergunta com duas coleções em desacordo.
@@ -264,7 +264,7 @@ test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', a
     nav.getByRole('button', { name: 'SAIR' }).click(),
   ])
 
-  await expect(nav.getByRole('link', { name: 'Entrar' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: navLabel('nav.account') })).toBeVisible()
   expect(await page.evaluate(() => window.localStorage.getItem('holodeck:syncedWith'))).toBeNull()
 
   // Sair não é apagar o save deste aparelho: a coleção continua aqui.

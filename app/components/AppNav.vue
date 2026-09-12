@@ -5,6 +5,10 @@ import { useRoute } from 'nuxt/app'
 import type { NavLink } from '~~/app/utils/nav-links'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 
+// Os rótulos da barra são chave de i18n desde a Fase 8, não texto — ver o
+// docblock de `NavLink`. Quem resolve é este `t`.
+const { t } = useI18n()
+
 /**
  * A barra de navegação global — a que as pranchas *Hub*, *Loja* e *Regras*
  * desenham no topo, idêntica nas três.
@@ -119,7 +123,7 @@ function isCurrent(link: NavLink): boolean {
             :aria-current="isCurrent(link) ? 'page' : undefined"
             @click="navigate"
           >
-            {{ link.label }}
+            {{ t(link.label) }}
           </a>
         </NuxtLink>
       </nav>
@@ -168,7 +172,7 @@ function isCurrent(link: NavLink): boolean {
           :aria-current="isCurrent(NAV_RULES) ? 'page' : undefined"
           @click="navigate"
         >
-          {{ NAV_RULES.label }}
+          {{ t(NAV_RULES.label) }}
         </a>
       </NuxtLink>
 
@@ -181,7 +185,7 @@ function isCurrent(link: NavLink): boolean {
           :href="href ?? undefined"
           class="nav__gear"
           :class="{ 'nav__gear--current': isCurrent(NAV_SETTINGS) }"
-          :aria-label="NAV_SETTINGS.label"
+          :aria-label="t(NAV_SETTINGS.label)"
           :aria-current="isCurrent(NAV_SETTINGS) ? 'page' : undefined"
           @click="navigate"
         >

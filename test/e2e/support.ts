@@ -1,7 +1,38 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import ptBR from '../../i18n/locales/pt-BR.json' with { type: 'json' }
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
 import { isSyncBody } from '../../shared/save/sync.ts'
+
+/**
+ * O rótulo que a barra **renderiza**, resolvido da mesma fonte que o navegador lê.
+ *
+ * Os rótulos de `NavLink` viraram chave de i18n na Fase 8, e cinco suítes procuram
+ * link da barra pelo nome acessível. Resolver a chave aqui mantém a inversão que
+ * `nav-gate` e o e2e da barra aplicam — a lista continua vindo de `nav-links`, não
+ * escrita à mão — e dá um segundo efeito de graça: chave sem tradução em pt-BR
+ * reprova o teste, em vez de virar um link chamado `nav.collection` na tela.
+ *
+ * Mora aqui, e não em cada arquivo, pela razão que este módulo já registra acima:
+ * helper copiado em cinco lugares quebra nos cinco no mesmo commit.
+ *
+ * Lê o JSON **importado** porque o Playwright roda fora do Vite: dentro do Vitest o
+ * mesmo import volta compilado em AST pelo `@intlify/unplugin-vue-i18n`, e é por
+ * isso que o portão de paridade (`test/unit/i18n-gate.spec.ts`) lê do disco. Aqui
+ * o import devolve a string — medido nos dois lados.
+ */
+export function navLabel(chave: string): string {
+  const [namespace, nome] = chave.split('.')
+  if (namespace !== 'nav' || nome === undefined) {
+    throw new Error(`rótulo da barra fora do namespace \`nav\`: ${chave}`)
+  }
+
+  const rotulos: Record<string, string | undefined> = ptBR.nav
+  const rotulo = rotulos[nome]
+  if (rotulo === undefined) throw new Error(`sem tradução pt-BR para \`${chave}\``)
+
+  return rotulo
+}
 
 /**
  * O que toda suíte E2E precisa fazer antes de poder afirmar qualquer coisa:

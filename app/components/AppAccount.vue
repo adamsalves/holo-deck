@@ -5,6 +5,9 @@ import { useAccount } from '~/composables/useAccount'
 import { initialsOf } from '~~/app/utils/initials'
 import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
 
+// `NAV_ACCOUNT.label` é chave de i18n desde a Fase 8, não texto.
+const { t } = useI18n()
+
 /**
  * O canto da conta — o avatar de 32px que a prancha desenha à direita da barra.
  *
@@ -62,7 +65,7 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
           :aria-current="atLogin ? 'page' : undefined"
           @click="navigate"
         >
-          {{ NAV_ACCOUNT.label }}
+          {{ t(NAV_ACCOUNT.label) }}
         </a>
       </NuxtLink>
     </template>

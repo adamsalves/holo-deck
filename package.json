@@ -34,6 +34,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "@nuxt/ui": "4.11.0",
+    "@nuxtjs/i18n": "10.6.0",
     "@pinia/nuxt": "1.0.2",
     "@tanstack/vue-virtual": "3.13.36",
     "better-auth": "^1.7.4",

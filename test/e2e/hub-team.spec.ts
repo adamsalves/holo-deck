@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { GYM_LEADERS } from '../../shared/game/gyms.ts'
-import { fakeSync, saveWith, seedLocalSave } from './support'
+import { fakeSync, navLabel, saveWith, seedLocalSave } from './support'
 
 /**
  * O time do líder aparece — no Hub e na Liga —, pela porta que o jogador usar.
@@ -46,7 +46,7 @@ test('chegar ao Hub por outra página: o time do líder aparece', async ({ page 
   await page.goto('/packs')
   await expect(page.locator('.packs__offers')).toBeVisible()
 
-  await page.locator('.nav').getByRole('link', { name: 'Base' }).click()
+  await page.locator('.nav').getByRole('link', { name: navLabel('nav.base') }).click()
   await expect(page.locator('.hub')).toBeVisible()
 
   await expect.poll(() => hubTeam(page).count()).toBe(TEAM)
