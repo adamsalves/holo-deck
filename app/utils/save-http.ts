@@ -1,54 +1,21 @@
-import type { LoadResult, RecoveryReason, SaveData } from '~~/shared/save/schema'
+import type { LoadResult, SaveData } from '~~/shared/save/schema'
 import { emptySave, migrate } from '~~/shared/save/schema'
 import type { PreviousSummary, RemoteSave } from '~~/shared/save/sync'
 import { forSync, isPreviousSummary, isSyncShape } from '~~/shared/save/sync'
 import type { SaveDriver } from './save-driver'
+import type { RemoteLoad, Written } from './save-remote'
+import { NoPreviousVersion, SaveConflict } from './save-remote'
 
 /**
- * O save do servidor **depois de migrado** — o que o cliente pode usar.
+ * O contrato do save do servidor mora em `save-remote.ts`, e **não é reexportado
+ * daqui**: quem precisa dele importa de lá.
  *
- * Ele existe para que não haja como obter o documento cru: `fetchRemote` devolve
- * isto e nada mais, então nenhum chamador consegue hidratar store com save de
- * outra versão por ter esquecido de migrar. A fronteira local tem essa garantia
- * desde a Fase 5 — `LocalStorageDriver.load` chama `migrate` —, e era a única das
- * duas a ter.
- *
- * Com `recovered` não nulo, `data` é save limpo e **não serve para adotar**: é o
- * mesmo contrato do `LoadResult`, e quem chama precisa tratar como "não foi
- * possível ler", nunca como "o servidor está vazio". As duas coisas autorizam
- * ações opostas.
+ * A primeira tentativa reexportava, para quem já importava não mudar de
+ * endereço, e o Nuxt reclamou dos quatro nomes — o auto-import varre
+ * `app/utils/` e passou a achar cada um em dois arquivos. Um nome com duas
+ * origens é exatamente o tipo de ambiguidade que este repositório evita em
+ * outros lugares; são dois importadores a ajustar, e fica um endereço só.
  */
-export interface RemoteLoad {
-  readonly data: SaveData
-  readonly version: number
-  readonly updatedAt: string
-  readonly recovered: RecoveryReason | null
-}
-
-/** O que o servidor respondeu a uma gravação aceita. */
-export interface Written {
-  readonly version: number
-  readonly updatedAt: string
-}
-
-/**
- * A colisão do CAS, com o que o servidor tem agora — **migrado**, como tudo que
- * sai desta fronteira. Quem trata é o `SyncDriver`.
- */
-export class SaveConflict extends Error {
-  constructor(readonly current: RemoteLoad | null) {
-    super('Outro aparelho gravou antes')
-    this.name = 'SaveConflict'
-  }
-}
-
-/** O servidor não tem versão anterior para restaurar. */
-export class NoPreviousVersion extends Error {
-  constructor() {
-    super('Nenhuma versão anterior no servidor')
-    this.name = 'NoPreviousVersion'
-  }
-}
 
 /**
  * O save do servidor, do outro lado da mesma interface que o `localStorage` usa.

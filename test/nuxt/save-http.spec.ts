@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SCHEMA_VERSION, emptySave } from '~~/shared/save/schema'
 import type { SaveData } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
-import { HttpDriver, NoPreviousVersion, SaveConflict } from '~~/app/utils/save-http'
+import { HttpDriver } from '~~/app/utils/save-http'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
 
 /**
  * A fronteira HTTP do save, com `fetch` dublado.

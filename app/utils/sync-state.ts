@@ -1,34 +1,8 @@
 import { browserStorage } from './save-driver'
-
-/**
- * O que este aparelho sabe do servidor, e o que ele ainda não mandou.
- *
- * **Chave local, fora do save**, pela mesma razão de `holodeck:lastWrite` e
- * `holodeck:syncedWith`: o estado descreve **este aparelho** diante da conta, e
- * sincronizado ele descreveria o outro. Vale só enquanto `syncedWith` for a conta
- * logada; o logout apaga os dois juntos.
- */
-export interface SyncState {
-  /** A versão do servidor em que o save local se baseia. Zero: nunca subiu. */
-  readonly base: number
-  /**
-   * Mudanças locais desde a última gravação aceita — o "3 mudanças na fila" da
-   * prancha *Sync*. **Acima de zero é o flag de sujo** que decide o conflito:
-   * local com mutação pendente vence; local limpo aceita o servidor.
-   */
-  readonly pending: number
-  /** O `updatedAt` do servidor na última vez que os dois bateram. */
-  readonly syncedAt: string | null
-  /**
-   * A impressão do último documento enviado e ainda sem resposta.
-   *
-   * **É o que separa conflito de verdade da própria gravação que chegou sem
-   * volta.** O envio garantido de `pagehide` sai com `keepalive` e a aba fecha
-   * antes da resposta: no boot seguinte o servidor está uma versão à frente, e sem
-   * isto o jogo acusaria "outro aparelho gravou antes" diante do próprio save.
-   */
-  readonly sent: string | null
-}
+// A forma mora em `sync-status.ts`, e este arquivo é só quem a lê e grava: é o
+// que impede o `import type` do `SyncDriver` de arrastar o `browserStorage`
+// acima — e com ele o `window` — para o typecheck de um módulo sem navegador.
+import type { SyncState } from './sync-status'
 
 export const SYNC_STATE_KEY = 'holodeck:syncState'
 
