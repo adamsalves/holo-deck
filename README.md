@@ -1034,10 +1034,13 @@ portão sozinho passaria numa página que não renderiza nada.
 ### `/settings` entrega só o que tem dado
 
 Entram o painel *Save* — exportar JSON, importar, apagar deste aparelho —, a
-fileira de números, o interruptor de animação e a versão com o sha. Ficam
-segurados a conta e a sincronização (Fase 7), *restaurar a gravação anterior do
-servidor* (idem), idioma (não há i18n), som (não há áudio) e *baixar tudo para
-offline* (não há PWA). **Eles aparecem nomeados na própria tela**, num painel
+fileira de números, o interruptor de animação e a versão com o sha. **A Fase 7
+trouxe a metade que dependia de conta**: o painel da conta com e-mail e estado do
+sync, *Restaurar versão anterior* e *Excluir conta e save do servidor* — e o
+título passa a dizer de quem é a tela (*Sua conta e seu save* com sessão, *Seu
+save e este aparelho* sem). Ficam segurados só os três que não têm a peça que os
+sustenta: idioma (não há i18n), som (não há áudio) e *baixar tudo para offline*
+(não há PWA). **Eles aparecem nomeados na própria tela**, num painel
 *Ainda não*, em vez de virarem controles cinzas: um botão desligado promete uma
 coisa que o jogo não faz.
 
@@ -1053,8 +1056,21 @@ nos dois sentidos. Ele nasceu do review: as duas telas prometiam que a cópia fi
 guardada e o único caminho de volta era o DevTools. O argumento do aviso de boot
 para não oferecer restauração — a chave crua é de uma versão que este código, por
 definição, não soube ler — não vale aqui: nestes dois caminhos o texto arquivado é
-um save que este mesmo código acabou de escrever. *Restaurar a gravação anterior*
-do painel *Ainda não* é outra coisa: aquela é a versão do servidor, Fase 7.
+um save que este mesmo código acabou de escrever. *Restaurar versão anterior* é outra
+coisa: aquela é a versão do **servidor**, entregue na Fase 7, e mora no painel
+*Save* ao lado de exportar e importar — só aparece com conta e só quando o
+servidor tem uma.
+
+**Com conta, *APAGAR LOCAL* passa pelo `discardLocal`, e o vazio não sobe:** o
+save deste aparelho é zerado, a cópia vai para o anel, e o do servidor é relido e
+adotado — que é o que a tela promete ao escrever "com conta, ele volta na próxima
+sincronização". **Quando essa releitura não acontece — sem rede, ou o servidor
+fora —, o sync para e a tela diz isso**, num quarto estado que não tem prancha:
+*"o da sua conta não pôde ser lido agora"*. Sem parar, a jogada seguinte já não
+seria intocada, a guarda do envio não dispararia, a `baseVersion` ainda casaria, e
+a coleção da conta viraria o save que o jogador acabou de apagar — em silêncio, e
+contra o que a própria tela acabou de prometer. Foi o achado crítico do review do
+PR 2 da fase.
 
 O import recusa arquivo acima de 1 MB **antes** de o ler (o save realista tem ~3 KB
 e o pior caso documentado 21 KB), e reinicia o `<input type="file">` num `finally`.
