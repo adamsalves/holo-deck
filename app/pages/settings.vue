@@ -1,33 +1,43 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useNuxtApp, useRuntimeConfig } from 'nuxt/app'
 import { dayKey } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { SCHEMA_VERSION, emptySave, migrate } from '~~/shared/save/schema'
+import type { PreviousSummary } from '~~/shared/save/sync'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
+import { initialsOf } from '~~/app/utils/initials'
+import { agoLabel } from '~~/app/utils/relative-time'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
+import { syncLabel } from '~~/app/utils/sync-label'
+import { useAccount } from '~/composables/useAccount'
+import { useGameClock } from '~/composables/useGameClock'
 import { useMotionSwitch } from '~/composables/useMotion'
+import { useSync } from '~/composables/useSync'
 
 /**
  * `/settings` — a prancha *Ajustes*, do que existe.
  *
- * **Ela desenha quatro painéis e três deles dependem do que ainda não há.** A
- * conta, o estado de sincronização e o *restaurar versão anterior* são da Fase 7;
- * idioma pede i18n, som pede áudio, e *baixar tudo para offline* pede PWA —
- * nenhum dos três existe no repositório. Decidido em 05/09: entra só o que tem
- * dado, e o resto fica **segurado e registrado** no README, pela mesma regra que
- * segurou o contador de coleção na Fase 5. Inventar um zero desenha um progresso
- * que ninguém pode mover.
+ * **A Fase 7 trouxe a metade da prancha que dependia de conta**: o painel da
+ * conta com o estado da sincronização, *Restaurar versão anterior* e *Excluir
+ * conta e save do servidor*. Sem conta a tela continua sendo a do aparelho — o
+ * título diz isso —, e as três coisas somem em vez de aparecer desligadas.
  *
- * O que sobra é o painel *Save* — que o plano quer desde o começo, e que é o
- * único backup possível sem servidor —, a fileira de números, o interruptor de
- * movimento e a versão.
+ * O que continua segurado é o que não tem a peça que o sustenta: idioma pede
+ * i18n, som pede áudio, e *baixar tudo para offline* pede PWA. Decidido em 05/09:
+ * entra só o que tem dado, e o resto fica **nomeado** num painel *Ainda não* e
+ * registrado no README. Inventar um zero desenha um progresso que ninguém pode
+ * mover.
  */
 const collection = useCollectionStore()
 const progress = useProgressStore()
 const motion = useMotionSwitch()
+const { account, signOut, deleteAccount } = useAccount()
+const { status } = useSync()
+const now = useGameClock()
 
 /**
  * `$pinia` explícito, e não a instância ativa por acaso.
@@ -39,7 +49,7 @@ const motion = useMotionSwitch()
  * simultâneas dividem esse global. Passar a instância fecha a porta antes de a
  * Fase 7 abrir qualquer coisa no servidor.
  */
-const { $saveDriver, $pinia } = useNuxtApp()
+const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
 const { appVersion, gitSha } = useRuntimeConfig().public
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -202,17 +212,62 @@ async function importSave(event: Event): Promise<void> {
  * meses não depender de um clique não ter sido acidental. O anel guarda três, e
  * a mais antiga é podada, então nada cresce sem limite.
  */
-function clearSave(): void {
+async function clearSave(): Promise<void> {
+  const synced = account.value !== null && $sync.running
+
   // `window.confirm` e não um modal próprio: é uma pergunta de sim ou não num
   // caminho destrutivo, e o nativo bloqueia de verdade — um diálogo escrito à
   // mão precisaria de foco, escape, e de não deixar o clique passar por baixo.
-  if (!window.confirm('Apagar o save deste aparelho? Uma cópia de segurança fica guardada.')) return
+  const question = synced
+    ? 'Apagar o save deste aparelho? O da sua conta volta em seguida, e uma cópia do deste aparelho fica guardada.'
+    : 'Apagar o save deste aparelho? Uma cópia de segurança fica guardada.'
+  if (!window.confirm(question)) return
 
   archiveCurrent()
-  void $saveDriver.clear()
-  apply(emptySave())
+
+  if (!synced) {
+    void $saveDriver.clear()
+    apply(emptySave())
+    refreshBackups()
+    notice.value = { tone: 'done', text: 'Save apagado. A cópia de segurança continua no navegador — dá para voltar por ela aqui embaixo.' }
+    return
+  }
+
+  /**
+   * **Com conta, o vazio não sobe, e o servidor volta.** A tela promete "com
+   * conta, ele volta na próxima sincronização", e sem o `discardLocal` o save
+   * vazio seria uma mudança como outra qualquer: subiria por cima da coleção da
+   * conta, que é exatamente o que a frase diz que não acontece.
+   */
+  const adopted = await $sync.discardLocal(() => {
+    void $saveDriver.clear()
+    apply(emptySave())
+  })
   refreshBackups()
-  notice.value = { tone: 'done', text: 'Save apagado. A cópia de segurança continua no navegador — dá para voltar por ela aqui embaixo.' }
+
+  /**
+   * **Sem resposta do servidor, a tela diz isso** — e não a promessa.
+   *
+   * O `discardLocal` engolia a falha de rede e voltava como se tivesse trazido a
+   * coleção da conta; a tela escrevia "o da conta volta na próxima
+   * sincronização" e a jogada seguinte subia o vazio por cima dela. Agora o
+   * driver para, nada sobe deste aparelho até o próximo boot com rede, e a frase
+   * descreve o que de fato aconteceu.
+   */
+  if (!adopted) {
+    notice.value = {
+      tone: 'failed',
+      text: 'Save deste aparelho apagado, e a cópia ficou nas cópias de segurança. O da sua conta não pôde ser lido agora — ele volta quando houver rede, e nada sobe deste aparelho até lá.',
+    }
+    return
+  }
+
+  notice.value = {
+    tone: 'done',
+    text: collection.ownedCount > 0
+      ? `Save deste aparelho apagado, e o da conta voltou — ${gameNumber(collection.ownedCount)} cartas. O que estava aqui ficou nas cópias de segurança.`
+      : 'Save deste aparelho apagado. O da conta volta na próxima sincronização, e o que estava aqui ficou nas cópias de segurança.',
+  }
 }
 
 function archiveCurrent(): void {
@@ -293,6 +348,128 @@ function restoreBackup(key: string): void {
 
 onMounted(refreshBackups)
 
+/** As iniciais, para quem não tem foto no provedor — o mesmo cálculo da barra. */
+const initials = computed(() => initialsOf(account.value?.name ?? ''))
+
+/** A frase do indicador da barra, repetida na linha da conta como a prancha faz. */
+const syncText = computed(() => (status.value === null ? null : syncLabel(status.value, now.value)))
+
+/**
+ * O resumo da versão anterior do servidor — *Restaurar versão anterior*.
+ *
+ * **Relido a cada acerto com o servidor, e não só ao abrir a tela.** Cada
+ * gravação aceita empurra a atual para a anterior, e um resumo lido antes dela
+ * descreveria uma versão que o botão já não restaura. Pelo mesmo motivo o botão
+ * espera a fila: restaurar sobe o pendente antes, e a anterior passaria a ser
+ * outra.
+ */
+const previous = ref<PreviousSummary | null>(null)
+const restoring = ref(false)
+
+const idle = computed(() => status.value?.phase === 'synced')
+
+const previousAgo = computed(() => {
+  const at = previous.value?.updatedAt ?? null
+  return at === null ? null : agoLabel(at, now.value)
+})
+
+async function refreshPrevious(): Promise<void> {
+  try {
+    previous.value = await $httpDriver.fetchPrevious()
+  }
+  catch {
+    // Sem rede, ou o servidor fora: a linha some em vez de oferecer um restaurar
+    // que ninguém consegue conferir.
+    previous.value = null
+  }
+}
+
+watch(
+  () => [account.value?.id ?? null, status.value?.phase ?? null] as const,
+  ([id, phase], before) => {
+    if (id === null) {
+      previous.value = null
+      return
+    }
+
+    // **Só na transição para `synced`.** O observador incluía `syncedAt`, que
+    // muda a cada gravação aceita: com a tela aberta, cada carta escalada virava
+    // um `GET /api/save/previous`. Toda gravação passa por `sending` antes de
+    // voltar a `synced`, então a transição não perde nenhuma troca de versão
+    // anterior — e o restaurar relê por conta própria, no `finally`.
+    if (phase === 'synced' && before?.[1] !== 'synced') void refreshPrevious()
+  },
+  { immediate: true },
+)
+
+/**
+ * Troca a atual do servidor pela anterior, e adota.
+ *
+ * **Sem confirmação, porque desfaz.** A que estava no ar vira a anterior, a um
+ * clique de volta — é o mesmo motivo de o *restaurar* das cópias locais não
+ * perguntar nada.
+ */
+async function restorePrevious(): Promise<void> {
+  restoring.value = true
+
+  try {
+    await $sync.restore()
+    notice.value = {
+      tone: 'done',
+      text: `Versão anterior restaurada — ${gameNumber(collection.ownedCount)} cartas. A que estava no ar virou a anterior: restaurar de novo desfaz.`,
+    }
+  }
+  catch (error) {
+    notice.value = { tone: 'failed', text: restoreFailure(error) }
+  }
+  finally {
+    restoring.value = false
+    await refreshPrevious()
+  }
+}
+
+function restoreFailure(error: unknown): string {
+  if (error instanceof NoPreviousVersion) return 'O servidor não tem mais versão anterior para restaurar.'
+
+  if (error instanceof SaveConflict) {
+    return 'Outro aparelho gravou antes, e a coleção dele é a que vale agora. Nada foi restaurado — confira a versão anterior de novo.'
+  }
+
+  return 'Não deu para restaurar agora. Nada foi alterado.'
+}
+
+/** O botão não aceita dois cliques: o segundo sairia de uma sessão já encerrada. */
+const signingOut = ref(false)
+
+async function leave(): Promise<void> {
+  signingOut.value = true
+  await signOut()
+}
+
+const deleting = ref(false)
+
+/**
+ * *Excluir conta e save do servidor* — o `deleteUser` do `better-auth`.
+ *
+ * `window.confirm`, como o *APAGAR LOCAL*. O save deste aparelho fica, e a
+ * pergunta diz isso: é a diferença entre as duas linhas da zona de perigo.
+ */
+async function removeAccount(): Promise<void> {
+  if (!window.confirm('Excluir a conta e o save do servidor? É permanente. O save deste aparelho continua aqui.')) return
+
+  deleting.value = true
+  const outcome = await deleteAccount()
+  if (outcome === 'deleted') return
+
+  deleting.value = false
+  notice.value = {
+    tone: 'failed',
+    text: outcome === 'stale-session'
+      ? 'Por segurança, excluir a conta pede uma entrada recente. Saia, entre de novo e volte aqui — nada foi apagado.'
+      : 'Não deu para excluir a conta agora. Nada foi apagado.',
+  }
+}
+
 /**
  * Devolve o save às stores e grava.
  *
@@ -307,7 +484,7 @@ function apply(data: SaveData): void {
 
 useSeoMeta({
   title: 'Ajustes — Holo Deck',
-  description: 'Exportar e importar o save, o interruptor de animações e a versão do jogo.',
+  description: 'A conta e a sincronização, exportar e importar o save, as cópias de segurança, o interruptor de animações e a versão do jogo.',
 })
 </script>
 
@@ -317,8 +494,10 @@ useSeoMeta({
       <p class="settings__eyebrow">
         Ajustes
       </p>
+      <!-- O título diz de quem é a tela: com conta, o da prancha; sem ela, o do
+           aparelho, que era o único até a Fase 7. -->
       <h1 class="settings__title">
-        Seu save e este aparelho
+        {{ account ? 'Sua conta e seu save' : 'Seu save e este aparelho' }}
       </h1>
     </header>
 
@@ -332,8 +511,62 @@ useSeoMeta({
         {{ notice.text }}
       </p>
 
-      <!-- OS NÚMEROS -->
+      <!-- A CONTA E OS NÚMEROS — com conta, a prancha põe os dois no mesmo
+           painel; sem ela, sobram os números. -->
       <section class="settings__panel">
+        <div
+          v-if="account"
+          class="settings__account"
+        >
+          <span class="settings__avatar">
+            <img
+              v-if="account.image !== null"
+              :src="account.image"
+              alt=""
+              width="46"
+              height="46"
+            >
+            <span
+              v-else
+              aria-hidden="true"
+            >{{ initials }}</span>
+          </span>
+
+          <div class="settings__who">
+            <p class="settings__email">
+              {{ account.email }}
+            </p>
+            <p class="numeric settings__sync-line">
+              <span
+                v-if="status && syncText"
+                class="settings__sync"
+                :class="`settings__sync--${status.phase}`"
+              >
+                <span
+                  v-if="status.phase === 'synced'"
+                  class="settings__sync-dot"
+                  aria-hidden="true"
+                />
+                {{ syncText }}
+              </span>
+              <span
+                v-if="status"
+                aria-hidden="true"
+              >·</span>
+              via GitHub
+            </p>
+          </div>
+
+          <button
+            type="button"
+            class="settings__action bevel-control"
+            :disabled="signingOut"
+            @click="leave()"
+          >
+            SAIR
+          </button>
+        </div>
+
         <dl class="settings__stats">
           <div
             v-for="stat in stats"
@@ -395,6 +628,42 @@ useSeoMeta({
               @change="importSave"
             >
           </label>
+        </div>
+
+        <!-- A rede do servidor: a gravação anterior, que todo PUT guarda. Só com
+             conta e só quando há uma — como as cópias locais, a linha não existe
+             sem ter o que devolver. -->
+        <div
+          v-if="account && previous"
+          class="settings__row"
+        >
+          <div>
+            <p class="settings__row-title">
+              Restaurar versão anterior
+            </p>
+            <p class="settings__row-note">
+              O servidor guarda a gravação imediatamente anterior.
+              <template v-if="previousAgo">
+                Feita <span class="numeric settings__when">{{ previousAgo }}</span>,
+                com {{ gameNumber(previous.cards) }} {{ previous.cards === 1 ? 'carta' : 'cartas' }}.
+              </template>
+              <template v-else>
+                Ela tem {{ gameNumber(previous.cards) }} {{ previous.cards === 1 ? 'carta' : 'cartas' }}.
+              </template>
+              <template v-if="!idle">
+                Espera a fila subir para restaurar.
+              </template>
+            </p>
+          </div>
+          <button
+            type="button"
+            class="settings__action settings__action--caution bevel-control"
+            aria-label="Restaurar a versão anterior do servidor"
+            :disabled="restoring || !idle"
+            @click="restorePrevious()"
+          >
+            {{ restoring ? 'RESTAURANDO…' : 'RESTAURAR' }}
+          </button>
         </div>
       </section>
 
@@ -492,7 +761,16 @@ useSeoMeta({
             <p class="settings__row-title">
               Apagar save deste aparelho
             </p>
-            <p class="settings__row-note">
+            <p
+              v-if="account"
+              class="settings__row-note"
+            >
+              Com conta, ele volta na próxima sincronização.
+            </p>
+            <p
+              v-else
+              class="settings__row-note"
+            >
               Coleção, deck e progresso voltam ao zero. Uma cópia de segurança
               fica guardada no navegador — exporte antes se quiser levá-la junto.
             </p>
@@ -503,6 +781,28 @@ useSeoMeta({
             @click="clearSave()"
           >
             APAGAR LOCAL
+          </button>
+        </div>
+
+        <div
+          v-if="account"
+          class="settings__row"
+        >
+          <div>
+            <p class="settings__row-title">
+              Excluir conta e save do servidor
+            </p>
+            <p class="settings__row-note">
+              Permanente. Exporte antes se quiser guardar.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="settings__action settings__action--destroy bevel-control"
+            :disabled="deleting"
+            @click="removeAccount()"
+          >
+            {{ deleting ? 'EXCLUINDO…' : 'EXCLUIR TUDO' }}
           </button>
         </div>
       </section>
@@ -522,12 +822,10 @@ useSeoMeta({
         </p>
       </div>
       <p class="settings__row-note settings__held">
-        A prancha desta tela desenha mais quatro coisas, e nenhuma delas tem de
-        onde tirar dado ainda: <b>conta e sincronização</b> e <b>restaurar a
-          gravação anterior do servidor</b> chegam com a conta; <b>idioma</b>,
-        <b>som</b> e <b>baixar tudo para offline</b> chegam com o que os
-        sustenta. Elas não aparecem aqui de propósito — um controle desligado
-        promete uma coisa que o jogo não faz.
+        A prancha desta tela desenha mais três coisas, e nenhuma delas tem de
+        onde tirar dado ainda: <b>idioma</b>, <b>som</b> e <b>baixar tudo para
+          offline</b> chegam com o que os sustenta. Elas não aparecem aqui de
+        propósito — um controle desligado promete uma coisa que o jogo não faz.
       </p>
     </section>
 
@@ -537,7 +835,7 @@ useSeoMeta({
 
     <p class="numeric settings__foot">
       Animação é preferência de aparelho e não sincroniza, de propósito.
-      Coleção, progresso e deck sincronizam — quando houver conta.
+      Coleção, progresso e deck sincronizam{{ account ? '.' : ' — quando houver conta.' }}
     </p>
   </main>
 </template>
@@ -621,15 +919,20 @@ useSeoMeta({
   border-bottom: 1px solid var(--surface-raised);
 }
 
+/**
+ * O *SÓ NESTE APARELHO* é `--caution`, e não o ouro das moedas que ele usava: a
+ * prancha dá o mesmo amarelo a ele, à fila offline e ao *Restaurar versão
+ * anterior* — isto não está no servidor, ou vai substituir o que está.
+ */
 .settings__scope {
   padding: 4px 9px;
-  border: 1px solid color-mix(in oklab, var(--coin) 45%, var(--bg));
+  border: 1px solid color-mix(in oklab, var(--caution) 45%, var(--bg));
   border-radius: var(--radius);
-  background: color-mix(in oklab, var(--coin) 8%, transparent);
+  background: color-mix(in oklab, var(--caution) 8%, transparent);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--coin);
+  color: var(--caution);
 }
 
 .settings__stats {
@@ -655,6 +958,91 @@ useSeoMeta({
 
 .settings__stats dt {
   margin-top: 5px;
+}
+
+.settings__account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-bottom: 1px solid var(--surface-raised);
+}
+
+.settings__avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-body);
+}
+
+.settings__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings__who {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.settings__email {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.settings__sync-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings__sync--synced {
+  color: var(--synced);
+}
+
+.settings__sync--sending {
+  color: var(--accent);
+}
+
+.settings__sync--queued {
+  color: var(--caution);
+}
+
+.settings__sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.settings__when {
+  color: var(--text-body);
 }
 
 .settings__row {
@@ -704,6 +1092,24 @@ useSeoMeta({
 .settings__action--danger {
   border-color: color-mix(in oklab, var(--deficit) 55%, var(--border));
   color: var(--deficit);
+}
+
+.settings__action--caution {
+  border-color: color-mix(in oklab, var(--caution) 55%, var(--border));
+  color: var(--caution);
+}
+
+/* O único botão cheio da zona de perigo, como a prancha o desenha: é o que não
+   tem cópia de segurança do outro lado. */
+.settings__action--destroy {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--deficit) 22%, var(--surface));
+  color: var(--deficit);
+}
+
+.settings__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .settings__action:focus-visible,

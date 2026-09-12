@@ -110,6 +110,18 @@ const UI_ROLES = [
    * comprou ao inverter a lista.
    */
   { token: '--brand', minimum: NON_TEXT },
+  /**
+   * Os três que o sync ao vivo trouxe, e os três carregam texto.
+   *
+   * `--synced` pinta o *sincronizado há 2 min*; `--caution`, o `1 mudança na
+   * fila`, o *SÓ NESTE APARELHO* e o botão de restaurar; `--conflict` é o fundo
+   * do botão do aviso de conflito, com `--bg` escrito por cima. Contraste é
+   * simétrico, então o piso de texto contra `--bg` que a matriz cobra é o mesmo
+   * piso do texto escuro sobre o roxo.
+   */
+  { token: '--synced', minimum: AA_NORMAL },
+  { token: '--caution', minimum: AA_NORMAL },
+  { token: '--conflict', minimum: AA_NORMAL },
 ]
 
 /** Todo papel de cor que a matriz de contraste cobra, seja qual for o nome. */

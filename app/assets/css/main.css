@@ -585,6 +585,29 @@
    */
   --hp: var(--color-type-grass);
 
+  /**
+   * As cores do sync ao vivo — o indicador da barra, o aviso de conflito e a
+   * linha da conta em Ajustes.
+   *
+   * A prancha *Estados de sync* pinta cada estado numa cor, e as três abaixo são
+   * primitivos que o sistema já tem. O que faltava era o **nome**, pela razão de
+   * sempre: um chip lendo `--color-type-ground` diria que a fila é do tipo
+   * terrestre, e um aviso lendo `--color-rarity-ultra` afirmaria uma raridade.
+   *
+   * - `--synced` é o verde do *sincronizado há 2 min*, no chip e na conta.
+   * - `--caution` é o amarelo de "atenção, e nada quebrou". A prancha dá o mesmo
+   *   tratamento a três coisas — a fila offline, o *SÓ NESTE APARELHO* das
+   *   cópias e das preferências, e o *Restaurar versão anterior* —, e as três são
+   *   a mesma ideia: isto não está no servidor, ou vai substituir o que está.
+   * - `--conflict` é o roxo do único estado que fala com o jogador.
+   *
+   * O *enviando* não ganha nome: a prancha o pinta com o acento, e ele **é** o
+   * acento.
+   */
+  --synced: var(--color-type-grass);
+  --caution: var(--color-type-ground);
+  --conflict: var(--color-rarity-ultra);
+
   --text: var(--color-ink-50); /* 17.19 / 14.62 — primário */
   --text-body: var(--color-ink-200); /* 7.57 / 6.43 — corpo */
   --text-muted: var(--color-ink-325); /* 6.07 / 5.16 — rótulo, metadado */

@@ -15,6 +15,13 @@
       "when": 1789049676119,
       "tag": "0001_spooky_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789134670854,
+      "tag": "0002_low_diamondback",
+      "breakpoints": true
     }
   ]
 }

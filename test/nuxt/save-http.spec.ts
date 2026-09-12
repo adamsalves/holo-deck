@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SCHEMA_VERSION, emptySave } from '~~/shared/save/schema'
 import type { SaveData } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
-import { HttpDriver, SaveConflict } from '~~/app/utils/save-http'
+import { HttpDriver } from '~~/app/utils/save-http'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
 
 /**
  * A fronteira HTTP do save, com `fetch` dublado.
@@ -32,14 +33,20 @@ function response(status: number, body: unknown): Response {
   })
 }
 
+interface Call {
+  url: string
+  body: unknown
+  keepalive: boolean
+}
+
 /** Dubla `fetch` e devolve as chamadas, para afirmar o que foi mandado. */
-function stubFetch(...replies: Response[]): { calls: { url: string, body: unknown }[] } {
-  const calls: { url: string, body: unknown }[] = []
+function stubFetch(...replies: Response[]): { calls: Call[] } {
+  const calls: Call[] = []
   let next = 0
 
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
     const raw = init?.body
-    calls.push({ url, body: typeof raw === 'string' ? JSON.parse(raw) : null })
+    calls.push({ url, body: typeof raw === 'string' ? JSON.parse(raw) : null, keepalive: init?.keepalive === true })
 
     const reply = replies[next]
     next += 1
@@ -159,9 +166,9 @@ describe('a gravação no servidor', () => {
   })
 
   /**
-   * O 409 traz o save do servidor dentro, e ele também vem migrado: quem reaplica
-   * a mutação por cima (o sync contínuo, no PR 2) receberia documento de outra
-   * versão pelo mesmo caminho que o `GET` já fechou.
+   * O 409 traz o save do servidor dentro, e ele também vem migrado: quem decide o
+   * conflito — o `SyncDriver` — receberia documento de outra versão pelo mesmo
+   * caminho que o `GET` já fechou.
    */
   it('409 lança `SaveConflict` com o save do servidor, migrado', async () => {
     stubFetch(response(409, { data: remoteBody({ ...emptySave(), dust: 11 }, 9) }))
@@ -193,5 +200,86 @@ describe('a gravação no servidor', () => {
     await new HttpDriver().clear()
 
     expect(calls).toEqual([])
+  })
+})
+
+describe('o recibo, a versão guardada e a restauração', () => {
+  it('`write` devolve a versão e o instante que o servidor respondeu', async () => {
+    stubFetch(response(200, { version: 5, updatedAt: '2026-09-11T12:00:00.000Z' }))
+
+    await expect(new HttpDriver().write(emptySave()))
+      .resolves.toEqual({ version: 5, updatedAt: '2026-09-11T12:00:00.000Z' })
+  })
+
+  it('recibo sem o instante é corpo fora do contrato', async () => {
+    stubFetch(response(200, { version: 5 }))
+
+    await expect(new HttpDriver().write(emptySave())).rejects.toThrow('fora do contrato')
+  })
+
+  /**
+   * A prancha *Sync* pede envio garantido em `pagehide`, e um `fetch` comum morre
+   * com a aba. Sem a flag chegando ao `fetch`, o "garantido" seria só um nome.
+   */
+  it('o envio de quem está saindo vai com `keepalive`, e o comum não', async () => {
+    const { calls } = stubFetch(
+      response(200, { version: 1, updatedAt: 'agora' }),
+      response(200, { version: 2, updatedAt: 'agora' }),
+    )
+
+    const driver = new HttpDriver()
+    await driver.write(emptySave(), { keepalive: true })
+    await driver.write(emptySave())
+
+    expect(calls.map(call => call.keepalive)).toEqual([true, false])
+  })
+
+  /**
+   * Sem `resume`, o boot que não conseguiu ler o servidor gravaria com zero —
+   * "nunca subi" — sobre uma linha que existe, e cada jogada offline voltaria
+   * como conflito com o próprio save.
+   */
+  it('`resume` devolve ao CAS a versão que o aparelho guardou', async () => {
+    const { calls } = stubFetch(response(200, { version: 8, updatedAt: 'agora' }))
+
+    const driver = new HttpDriver()
+    driver.resume(7)
+    await driver.write(emptySave())
+
+    expect(calls[0]?.body).toMatchObject({ baseVersion: 7 })
+  })
+
+  it('o resumo da anterior: 404 é ausência, e o corpo é conferido', async () => {
+    stubFetch(response(404, {}))
+    await expect(new HttpDriver().fetchPrevious()).resolves.toBeNull()
+
+    vi.unstubAllGlobals()
+    stubFetch(response(200, { version: 2, updatedAt: null, cards: 138 }))
+    await expect(new HttpDriver().fetchPrevious()).resolves.toEqual({ version: 2, updatedAt: null, cards: 138 })
+
+    vi.unstubAllGlobals()
+    stubFetch(response(200, { version: 0, updatedAt: null, cards: -1 }))
+    await expect(new HttpDriver().fetchPrevious()).rejects.toThrow('fora do contrato')
+  })
+
+  it('restaurar manda a versão base e devolve o save restaurado, migrado', async () => {
+    const { calls } = stubFetch(response(200, remoteBody({ ...emptySave(), dust: 12 }, 6)))
+
+    const driver = new HttpDriver()
+    const restored = await driver.restore(5)
+
+    expect(calls[0]).toMatchObject({ url: '/api/save/restore', body: { baseVersion: 5 } })
+    expect(restored.data.dust).toBe(12)
+    expect(restored.recovered).toBeNull()
+    expect(driver.version, 'a versão restaurada vira a base').toBe(6)
+  })
+
+  it('restaurar sem anterior é `NoPreviousVersion`, e colisão é `SaveConflict`', async () => {
+    stubFetch(response(404, {}))
+    await expect(new HttpDriver().restore(3)).rejects.toBeInstanceOf(NoPreviousVersion)
+
+    vi.unstubAllGlobals()
+    stubFetch(response(409, { data: remoteBody(emptySave(), 9) }))
+    await expect(new HttpDriver().restore(3)).rejects.toBeInstanceOf(SaveConflict)
   })
 })

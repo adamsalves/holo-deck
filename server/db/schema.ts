@@ -39,11 +39,17 @@ export * from './auth-schema'
  * decide é o flag de sujo do cliente; este campo existe para a tela escrever
  * "sincronizado há X".
  *
- * O `onDelete: 'cascade'` é o que **vai** fazer a exclusão de conta levar o save
- * junto sem uma segunda instrução que alguém possa esquecer de escrever. A rota
- * que apaga conta ainda não existe — não há `DELETE /api/account`, e a única
- * coisa que apaga linha de `saves` hoje é apagar o `user` à mão. O cascade entra
- * agora porque ele é coluna, não rota: acrescentá-lo depois seria migração.
+ * **`previousUpdatedAt` é o instante da versão anterior**, e entrou na segunda
+ * metade da Fase 7 para *Restaurar versão anterior* poder dizer quando ela foi
+ * gravada — a prancha *Ajustes* escreve "feita há 2 min". É copiado de
+ * `updatedAt` na mesma instrução que copia o resto para `previous*`. Linha
+ * gravada antes da migração `0002` tem versão anterior sem instante, e a tela diz
+ * só as cartas.
+ *
+ * O `onDelete: 'cascade'` é o que faz a exclusão de conta levar o save junto sem
+ * uma segunda instrução que alguém possa esquecer de escrever. Quem exclui é o
+ * `deleteUser` do `better-auth` — ver `server/utils/auth.ts` —, que apaga o
+ * `user`; save, contador de escritas e sessões vão pelo cascade.
  *
  * **`withTimezone` aqui e não nas tabelas do `better-auth`.** As quatro geradas
  * usam `timestamp` sem fuso, e a divergência é conhecida: `auth-schema.ts` é
@@ -60,6 +66,7 @@ export const saves = pgTable('saves', {
   version: integer('version').notNull().default(1),
   previousData: jsonb('previous_data'),
   previousVersion: integer('previous_version'),
+  previousUpdatedAt: timestamp('previous_updated_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

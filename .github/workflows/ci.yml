@@ -138,3 +138,27 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # A issue #15. O portão do 404 (`server-runtime.spec.ts`, no job acima) mede o
+  # preset `node-server`, e a Vercel constrói com o preset `vercel` — onde o dex
+  # só chega à função por `serverAssets`. Este job constrói com o preset de
+  # verdade e cobra que cada arquivo de `public/data/` tenha cópia lá dentro. Em
+  # paralelo com o e2e, porque os dois constroem e nenhum depende do outro.
+  vercel-bundle:
+    name: dex na função da Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn build
+        env:
+          NITRO_PRESET: vercel
+
+      - run: yarn check:vercel-bundle

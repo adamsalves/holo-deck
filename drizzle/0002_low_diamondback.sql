@@ -1,0 +1,1 @@
+ALTER TABLE "saves" ADD COLUMN "previous_updated_at" timestamp with time zone;

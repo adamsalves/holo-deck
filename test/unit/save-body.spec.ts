@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { SCHEMA_VERSION, emptySave } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
-import { MAX_BODY_BYTES, readPutBody } from '~~/server/utils/save-body'
+import { MAX_BODY_BYTES, readPutBody, readRestoreBody } from '~~/server/utils/save-body'
 
 /**
- * A borda do `PUT /api/save`, afirmada sem subir servidor.
+ * As bordas do `PUT /api/save` e do `POST /api/save/restore`, afirmadas sem subir
+ * servidor.
  *
- * **Os dois defeitos que ela tinha eram de tradução para HTTP, não de regra:**
- * corpo ausente respondia **413 "Corpo grande demais"** — mandando quem depura
- * procurar um tamanho que não era o problema — e `JSON.parse` sem guarda
+ * **Os dois defeitos que a do `PUT` tinha eram de tradução para HTTP, não de
+ * regra:** corpo ausente respondia **413 "Corpo grande demais"** — mandando quem
+ * depura procurar um tamanho que não era o problema — e `JSON.parse` sem guarda
  * transformava um `{` solto num **500**, que diz que o defeito é do servidor
- * quando ele é do corpo. Os dois são invisíveis em review e óbvios aqui.
+ * quando ele é do corpo. Os dois são invisíveis em review e óbvios aqui. O
+ * restaurar divide com o `PUT` essas três recusas, e os dois são afirmados aqui.
  *
  * O teste importa de `server/`, e é o primeiro a fazê-lo: é o que a separação da
  * rota compra. A função não toca `createError` nem `readRawBody`, então ela roda
@@ -94,5 +96,39 @@ describe('a leitura do corpo do PUT', () => {
 
     expect(readPutBody(body({ data: future }))).toMatchObject({ ok: false, status: 400 })
     expect(readPutBody(body({ data: past }))).toMatchObject({ ok: true })
+  })
+})
+
+describe('a leitura do corpo do restaurar', () => {
+  it('aceita `{ baseVersion }` e devolve a versão', () => {
+    expect(readRestoreBody(JSON.stringify({ baseVersion: 4 }))).toEqual({ ok: true, baseVersion: 4 })
+  })
+
+  /**
+   * Zero é "nunca subi" no `PUT`, e quem nunca subiu não tem versão anterior:
+   * aceitar zero aqui mandaria para o banco um restaurar que não tem como dar
+   * certo, respondido como se o problema fosse do servidor.
+   */
+  it('zero não é versão para restaurar', () => {
+    expect(readRestoreBody(JSON.stringify({ baseVersion: 0 }))).toMatchObject({ ok: false, status: 400 })
+  })
+
+  it('as mesmas três recusas do PUT: ausente, malformado e grande demais', () => {
+    expect(readRestoreBody(undefined)).toMatchObject({ ok: false, status: 400, message: 'Corpo ausente' })
+    expect(readRestoreBody('{')).toMatchObject({ ok: false, status: 400, message: 'Corpo não é JSON' })
+    expect(readRestoreBody(JSON.stringify({ baseVersion: 1, lixo: 'x'.repeat(MAX_BODY_BYTES) })))
+      .toMatchObject({ ok: false, status: 413 })
+  })
+
+  it('chave a mais, ou o documento junto, é 400', () => {
+    expect(readRestoreBody(JSON.stringify({ baseVersion: 2, force: true }))).toMatchObject({ ok: false, status: 400 })
+    expect(readRestoreBody(body({ baseVersion: 2 }))).toMatchObject({ ok: false, status: 400 })
+  })
+
+  it('`baseVersion` precisa ser contagem', () => {
+    for (const baseVersion of [-1, 1.5, '3', null, 1_000_000, Number.NaN]) {
+      expect(readRestoreBody(JSON.stringify({ baseVersion })), String(baseVersion))
+        .toMatchObject({ ok: false, status: 400 })
+    }
   })
 })

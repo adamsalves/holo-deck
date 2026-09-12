@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useGameClock } from '~/composables/useGameClock'
 import { useLeague } from '~/composables/useLeague'
 import { useCollection } from '~/composables/useCollection'
+import { useInvite } from '~/composables/useInvite'
 import { loadBattleContext } from '~/composables/useBattleContext'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useCollectionStore } from '~~/app/stores/collection'
@@ -117,6 +118,36 @@ const tiers = computed(() => [
   { label: RARITY_LABELS.ultra, value: collection.ownedByRarity.value.ultra },
   { label: 'Shiny', value: owned.shinyCount },
 ])
+
+/**
+ * O convite para quem já cumpria antes de ele existir — a metade retroativa da
+ * decisão 4 da Fase 7.
+ *
+ * Quem venceu um ginásio ou tirou um ultra numa versão sem convite nunca passou
+ * pelos dois momentos que o pedem, e o Hub é o lugar a que todo jogador volta.
+ * **Ultra ou acima**: lendário e mítico são mais raros que ultra, e quem abriu a
+ * escada por um deles cumpre a regra com folga.
+ *
+ * Dentro do `onMounted`, e não no `setup`: o Hub é pré-renderizado, e um
+ * pedido feito no servidor viajaria no payload para o navegador de todo mundo.
+ * Pedir não é abrir — quem decide é o `AccountInvite`.
+ */
+const invite = useInvite()
+
+const topTierOwned = computed(() => {
+  const counts = collection.ownedByRarity.value
+  return counts.ultra + counts.legendary + counts.mythic
+})
+
+onMounted(() => {
+  watch(
+    () => progress.badges > 0 || topTierOwned.value > 0,
+    (qualifies) => {
+      if (qualifies) invite.offer()
+    },
+    { immediate: true },
+  )
+})
 </script>
 
 <template>

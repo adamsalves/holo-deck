@@ -102,17 +102,33 @@ export async function useLeague(): Promise<LeagueView> {
    */
   const teamsKey = computed(() => `league-teams:${progress.nextGym}`)
 
+  /**
+   * **Objeto simples, e não `Map`** — e a diferença apagava o time do Hub.
+   *
+   * No pré-render, o Nuxt 4 reaproveita o resultado de uma chave entre as páginas
+   * que a usam (`/` e `/league` dividem esta) guardando-o num storage que só sabe
+   * serializar JSON. Um `Map` não passa: o `setItem` lança, o próprio Nuxt engole
+   * o erro, e a página seguinte recebe `null`. No cliente, `null` conta como dado
+   * já carregado — só `undefined` dispara busca —, então o time nunca chegava:
+   * todo jogador sem insígnia abria o site com a fileira *Time do líder* vazia.
+   * Com uma insígnia a chave muda, a busca acontece, e o defeito se escondia.
+   *
+   * A regra vale para todo `useAsyncData` deste repositório: o handler devolve
+   * JSON — objeto, array, primitivo. O `Map` que a tela quiser nasce num
+   * `computed`, depois. Os portões são `test/e2e/hub-team.spec.ts`, que confere o
+   * render, e `test/e2e/prerender-payload.spec.ts`, que confere o payload.
+   */
   const teamsAsync = useAsyncData(teamsKey, async () => {
     // Ginásio N é a geração N — a regra "uma geração, um líder", e é por isso
     // que `GymLeader.generation` existe como campo em vez de ser deduzido aqui.
     const open = GYM_LEADERS.filter(leader => leader.gym <= progress.nextGym)
     const loaded = await Promise.all(open.map(leader => loadGeneration(leader.generation)))
 
-    const teams = new Map<number, readonly SpeciesEntry[]>()
+    const teams: Record<number, readonly SpeciesEntry[]> = {}
     for (const [index, leader] of open.entries()) {
       const generation = loaded[index]
       if (generation === undefined) continue
-      teams.set(leader.gym, buildGymTeam(leader.gym, generation.species))
+      teams[leader.gym] = buildGymTeam(leader.gym, generation.species)
     }
     return teams
   })
@@ -129,7 +145,7 @@ export async function useLeague(): Promise<LeagueView> {
       leader,
       status,
       reward: progress.rewardPreview(leader.gym),
-      team: status === 'locked' ? [] : teams.value?.get(leader.gym) ?? [],
+      team: status === 'locked' ? [] : teams.value?.[leader.gym] ?? [],
     }
   }))
 

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { MOVES_IN_BATTLE } from '../../shared/types/dex.ts'
 import { openWelcomePack } from './support'
 
 /**
@@ -81,10 +82,17 @@ test('a batalha começa, sobrevive ao reload e termina', async ({ page }) => {
   await page.goto('/league')
   await page.getByRole('link', { name: 'DESAFIAR', exact: true }).click()
 
-  // O campo montou: dois painéis de combatente, quatro golpes e o cabeçalho.
+  // O campo montou: dois painéis de combatente, os golpes e o cabeçalho.
   await expect(page.getByText('Ginásio 1 / 9')).toBeVisible()
   await expect(page.locator('.combatant')).toHaveCount(2)
-  await expect(page.locator('.move')).toHaveCount(4)
+
+  // **De um a quatro golpes, e não quatro.** O deck sai das seis primeiras cartas
+  // de um pack sorteado, e nem toda espécie tem quatro golpes elegíveis: com um
+  // Caterpie na frente — Bug Bite e Tackle — a tela desenhava dois, certa, e o
+  // teste reprovava uma vez a cada três rodadas da suíte em série.
+  const moves = page.locator('.move')
+  await expect.poll(() => moves.count()).toBeGreaterThan(0)
+  expect(await moves.count()).toBeLessThanOrEqual(MOVES_IN_BATTLE)
   await expect(page.getByText('TURNO 01')).toBeVisible()
 
   await playTurn(page)
@@ -292,7 +300,14 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   // nova, do turno 1. O que ele **não** pode ser é o campo montando para sempre.
   await page.goto('/battle/1')
   await expect(page.getByText('TURNO 01')).toBeVisible()
-  await expect(page.locator('.move')).toHaveCount(4)
+
+  // De um a quatro golpes, pelo sorteio que o teste do começo de batalha já
+  // registra: o deck sai das seis primeiras cartas de um pack, e com uma espécie
+  // de golpe único na frente a tela desenha um. O `ab9c622` consertou lá e não
+  // aqui.
+  const moves = page.locator('.move')
+  await expect.poll(() => moves.count()).toBeGreaterThan(0)
+  expect(await moves.count()).toBeLessThanOrEqual(MOVES_IN_BATTLE)
   await expect(page.getByText('Montando o campo…')).toHaveCount(0)
 
   // A outra metade: o deck pode ter esvaziado desde que o log foi gravado — nada

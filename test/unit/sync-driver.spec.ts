@@ -1,0 +1,820 @@
+import { describe, expect, it } from 'vitest'
+import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
+import { emptySave } from '~~/shared/save/schema'
+import { forSync } from '~~/shared/save/sync'
+import type { RemoteLoad, Written } from '~~/app/utils/save-remote'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
+import type { SyncRemote } from '~~/app/utils/save-sync'
+import { SyncDriver, digest, fingerprint } from '~~/app/utils/save-sync'
+import type { SyncState } from '~~/app/utils/sync-status'
+
+/**
+ * O sync contínuo contra um servidor falso que implementa o CAS de verdade.
+ *
+ * **O servidor falso fala o protocolo, e não o que o teste gostaria.** Versão que
+ * não bate é 409 com o documento dele dentro; gravação aceita sobe a versão. Um
+ * dublê que aceitasse tudo testaria o dublê — é a mesma regra do `fakeSync` do
+ * e2e.
+ *
+ * O agendador é manual: o *debounce* de 5 s vira uma fila de funções que o teste
+ * roda quando quer, e nenhum teste espera relógio.
+ *
+ * **Mora em `test/unit/`, e antes não podia.** O `SyncDriver` importava
+ * `SaveConflict` de `save-http.ts`, que puxa `save-driver.ts`, que cita `window`:
+ * o teste de uma regra pura precisava de um ambiente de navegador para existir.
+ * Com o contrato do servidor em `save-remote.ts`, a cadeia acabou — ver o
+ * docblock de lá.
+ */
+
+interface Row {
+  data: SaveData
+  version: number
+  updatedAt: string
+  /** Documento de uma build mais nova — o que `migrate` recusaria ler. */
+  recovered?: RecoveryReason
+}
+
+class FakeServer implements SyncRemote {
+  row: Row | null
+  /** A coluna `previous_*`: toda gravação aceita empurra a atual para cá. */
+  previous: Row | null
+  readonly puts: { baseVersion: number, keepalive: boolean }[] = []
+  /** As versões base que o cliente mandou restaurar, na ordem. */
+  readonly restores: number[] = []
+  /** Segura as gravações até o teste soltar — o envio "em voo". */
+  hold: Promise<void> | null = null
+  /** A rede caída na leitura: `fetchRemote` rejeita, como um `fetch` sem conexão. */
+  offline = false
+  #version = 0
+
+  constructor(row: Row | null, previous: Row | null = null) {
+    this.row = row
+    this.previous = previous
+  }
+
+  resume(version: number): void {
+    this.#version = version
+  }
+
+  fetchRemote(): Promise<RemoteLoad | null> {
+    if (this.offline) return Promise.reject(new Error('sem rede'))
+
+    if (this.row === null) {
+      this.#version = 0
+      return Promise.resolve(null)
+    }
+
+    this.#version = this.row.version
+    return Promise.resolve(load(this.row))
+  }
+
+  async write(data: SaveData, options: { keepalive?: boolean } = {}): Promise<Written> {
+    this.puts.push({ baseVersion: this.#version, keepalive: options.keepalive === true })
+    if (this.hold !== null) await this.hold
+
+    const current = this.row?.version ?? 0
+    if (this.#version !== current) {
+      this.#version = current
+      throw new SaveConflict(this.row === null ? null : load(this.row))
+    }
+
+    const version = current + 1
+    this.previous = this.row
+    this.row = { data: forSync(data), version, updatedAt: `t${version}` }
+    this.#version = version
+
+    return { version, updatedAt: `t${version}` }
+  }
+
+  /**
+   * O `POST /api/save/restore`, na ordem do SQL de verdade: troca atual e
+   * anterior sob o CAS e sobe a versão; sem troca, versão diferente é 409 com o
+   * que está lá, e versão igual é "não há anterior".
+   */
+  restore(baseVersion: number): Promise<RemoteLoad> {
+    this.restores.push(baseVersion)
+    const current = this.row
+
+    if (current !== null && current.version === baseVersion && this.previous !== null) {
+      const version = current.version + 1
+      this.row = { data: this.previous.data, version, updatedAt: `t${version}` }
+      this.previous = current
+      this.#version = version
+      return Promise.resolve(load(this.row))
+    }
+
+    if (current !== null && current.version !== baseVersion) {
+      this.#version = current.version
+      return Promise.reject(new SaveConflict(load(current)))
+    }
+
+    return Promise.reject(new NoPreviousVersion())
+  }
+
+  /**
+   * Outro aparelho grava: a versão anda sem este cliente saber. Com `recovered`,
+   * quem gravou foi uma build mais nova, que este cliente não sabe ler.
+   */
+  elsewhere(data: SaveData, recovered?: RecoveryReason): void {
+    const version = (this.row?.version ?? 0) + 1
+    this.previous = this.row
+    this.row = { data: forSync(data), version, updatedAt: `t${version}`, ...(recovered === undefined ? {} : { recovered }) }
+  }
+}
+
+/** Um clone, como a rede entregaria: o teste não divide objeto com o servidor. */
+function load(row: Row): RemoteLoad {
+  return { data: structuredClone(row.data), version: row.version, updatedAt: row.updatedAt, recovered: row.recovered ?? null }
+}
+
+/** Um save com jogo — `welcomeClaimed` acima de zero já tira do estado inicial. */
+function played(dust: number): SaveData {
+  return { ...emptySave(), dust, progress: { ...emptySave().progress, welcomeClaimed: 3 } }
+}
+
+const BATTLE: NonNullable<SaveData['battle']> = {
+  gymId: 1,
+  seed: 7,
+  engineVersion: 1,
+  dexVersion: 'a1b2c3d4',
+  team: [],
+  actions: [],
+}
+
+/** Espera toda a cadeia de promessas da rede falsa terminar. */
+function settleNetwork(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
+interface Options {
+  row?: Row | null
+  previous?: Row | null
+  stored?: SyncState | null
+  local?: SaveData
+}
+
+function harness(options: Options = {}) {
+  let local = options.local ?? emptySave()
+  let stored = options.stored ?? null
+  let online = true
+  const timers: (() => void)[] = []
+  const archived: string[] = []
+  const conflicts: number[] = []
+  const server = new FakeServer(options.row ?? null, options.previous ?? null)
+
+  const driver: SyncDriver = new SyncDriver({
+    remote: server,
+    compose: () => local,
+    hydrate: (data) => {
+      apply(data)
+    },
+    archive: (raw) => {
+      archived.push(raw)
+    },
+    state: {
+      read: () => stored,
+      write: (state) => {
+        stored = state
+      },
+    },
+    settle: () => Promise.resolve(),
+    online: () => online,
+    schedule: (run) => {
+      timers.push(run)
+      return () => {
+        const index = timers.indexOf(run)
+        if (index >= 0) timers.splice(index, 1)
+      }
+    },
+    onStatus: () => {},
+    onConflict: (won) => {
+      conflicts.push(won)
+    },
+  })
+
+  /** Grava um save e dispara o observador — o que o plugin de save faz. */
+  function apply(data: SaveData): void {
+    local = data
+    driver.noteSaved(data)
+  }
+
+  return {
+    driver,
+    server,
+    archived,
+    conflicts,
+    apply,
+    local: () => local,
+    stored: () => stored,
+    timers: () => timers.length,
+    /** Uma jogada: muda o save por cima do atual. */
+    play: (change: Partial<SaveData>) => {
+      apply({ ...local, ...change })
+    },
+    /** Roda o que o *debounce* agendou e espera a rede. */
+    tick: async () => {
+      for (const run of timers.splice(0)) run()
+      await settleNetwork()
+    },
+    setOnline: (value: boolean) => {
+      online = value
+    },
+  }
+}
+
+/** Um aparelho que acabou de se acertar na versão 3, com o servidor lá também. */
+function synced(at = played(5)) {
+  const h = harness({ row: { data: forSync(at), version: 3, updatedAt: 't3' }, local: at })
+  h.driver.begin({ base: 3, pending: 0, syncedAt: 't3' }, at)
+  return h
+}
+
+describe('o sync contínuo, depois do primeiro login', () => {
+  it('uma jogada sobe depois do ócio, com a versão em que se baseou', async () => {
+    const h = synced()
+
+    h.play({ dust: 6 })
+
+    expect(h.driver.status).toMatchObject({ phase: 'sending', pending: 1 })
+    expect(h.server.puts, 'nada sobe antes do ócio').toHaveLength(0)
+
+    await h.tick()
+
+    expect(h.server.puts).toEqual([{ baseVersion: 3, keepalive: false }])
+    expect(h.stored()).toMatchObject({ base: 4, pending: 0, syncedAt: 't4', sent: null })
+    expect(h.driver.status.phase).toBe('synced')
+  })
+
+  /**
+   * A batalha grava a cada turno e nunca sobe: um `PUT` por turno durante a luta
+   * seria o que o plano recusou ao tirar a batalha do corpo de sync.
+   */
+  it('turno de batalha não entra na fila: o documento de sync não mudou', async () => {
+    const h = synced()
+
+    h.play({ battle: BATTLE })
+    h.play({ battle: { ...BATTLE, actions: [] } })
+    await h.tick()
+
+    expect(h.stored()?.pending).toBe(0)
+    expect(h.server.puts).toHaveLength(0)
+  })
+
+  it('jogada durante o envio vira um segundo envio, sem perder a conta', async () => {
+    const h = synced()
+    let release = (): void => {}
+    h.server.hold = new Promise((resolve) => {
+      release = resolve
+    })
+
+    h.play({ dust: 6 })
+    await h.tick()
+    expect(h.server.puts, 'o primeiro envio saiu e está no ar').toHaveLength(1)
+
+    h.play({ dust: 7 })
+    expect(h.stored()?.pending).toBe(2)
+
+    h.server.hold = null
+    release()
+    await settleNetwork()
+
+    expect(h.stored()?.pending, 'a jogada do meio continua pendente').toBe(1)
+    await h.tick()
+
+    expect(h.server.puts).toHaveLength(2)
+    expect(h.server.row?.data.dust).toBe(7)
+    expect(h.stored()?.pending).toBe(0)
+  })
+
+  it('sem rede a fila espera, e sobe quando a conexão volta', async () => {
+    const h = synced()
+    h.setOnline(false)
+
+    h.play({ dust: 6 })
+    h.play({ dust: 7 })
+    await h.tick()
+
+    expect(h.driver.status).toMatchObject({ phase: 'queued', pending: 2 })
+    expect(h.server.puts).toHaveLength(0)
+
+    h.setOnline(true)
+    h.driver.retry()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(1)
+    expect(h.driver.status).toMatchObject({ phase: 'synced', pending: 0 })
+  })
+
+  it('o envio de quem está saindo vai com keepalive', async () => {
+    const h = synced()
+
+    h.play({ dust: 6 })
+    await h.driver.flush({ keepalive: true })
+
+    expect(h.server.puts).toEqual([{ baseVersion: 3, keepalive: true }])
+    expect(h.timers(), 'o envio imediato cancela o do ócio').toBe(0)
+  })
+
+  /**
+   * **O envio garantido não vira um envio comum por ter caído em cima de outro.**
+   *
+   * `flush({keepalive})` durante um voo só marcava `#again` e voltava, e o pedido
+   * perdia a flag: o reenvio ia para a fila do ócio, que é justamente o que a aba
+   * que está morrendo não alcança. Reintroduzir o defeito deixa `puts` com um
+   * item só — o segundo envio fica esperando um agendador que este teste não roda.
+   */
+  it('quem sai durante um envio recebe envio garantido, não a fila do ócio', async () => {
+    const h = synced()
+    let release = (): void => {}
+    h.server.hold = new Promise((resolve) => {
+      release = resolve
+    })
+
+    h.play({ dust: 6 })
+    await h.tick()
+    expect(h.server.puts, 'o primeiro envio está no ar').toHaveLength(1)
+
+    h.play({ dust: 7 })
+    void h.driver.flush({ keepalive: true })
+
+    h.server.hold = null
+    release()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(2)
+    expect(h.server.puts[1]?.keepalive, 'o segundo saiu com keepalive').toBe(true)
+  })
+
+  it('hidratação sem rastreio não conta como jogada', async () => {
+    const h = synced()
+
+    await h.driver.untracked(() => {
+      h.apply(played(9))
+    })
+    await h.tick()
+
+    expect(h.stored()?.pending).toBe(0)
+    expect(h.server.puts).toHaveLength(0)
+  })
+})
+
+describe('o 409 no meio da sessão', () => {
+  it('outro aparelho gravou: o local vence e a cópia do servidor vai para o backup', async () => {
+    const h = synced()
+    h.server.elsewhere(played(6))
+
+    h.play({ dust: 7 })
+    await h.tick()
+
+    expect(h.archived, 'a cópia do outro aparelho foi guardada').toHaveLength(1)
+    expect(h.archived[0]).toContain('"dust":6')
+    expect(h.server.puts.map(put => put.baseVersion)).toEqual([3, 4])
+    expect(h.server.row?.data.dust, 'o local venceu').toBe(7)
+    expect(h.conflicts, 'o aviso sai depois de resolvido').toEqual([1])
+  })
+
+  /**
+   * O envio de `pagehide` sai com `keepalive` e a resposta pode não voltar. Na
+   * gravação seguinte o servidor está uma versão à frente — com o documento deste
+   * próprio aparelho. Acusar conflito aqui seria o jogo dizendo "outro aparelho
+   * gravou antes" diante do próprio save.
+   */
+  it('o servidor já tem este documento: é recibo atrasado, não conflito', async () => {
+    const h = synced()
+
+    h.play({ dust: 7 })
+    h.server.elsewhere(h.local())
+    await h.tick()
+
+    expect(h.server.puts, 'nenhuma segunda gravação').toHaveLength(1)
+    expect(h.archived).toHaveLength(0)
+    expect(h.conflicts).toEqual([])
+    expect(h.stored()).toMatchObject({ base: 4, pending: 0 })
+  })
+
+  /**
+   * Um aparelho atualizado gravou com uma build mais nova, e este, com o bundle
+   * antigo em cache, não sabe ler o que está lá. O boot já para nesse caso; no
+   * meio da sessão o 409 só marcava a fila — e ele já tinha levado a versão do
+   * `HttpDriver` para a do servidor, então a jogada seguinte subia o formato
+   * velho por cima do novo sem colidir.
+   */
+  it('409 com save de uma build mais nova: o sync para, e nunca sobrescreve', async () => {
+    const h = synced()
+    h.server.elsewhere(played(6), 'unknown-version')
+
+    h.play({ dust: 7 })
+    await h.tick()
+    h.play({ dust: 8 })
+    await h.tick()
+    await h.driver.flush()
+
+    expect(h.server.puts, 'só a tentativa que descobriu').toHaveLength(1)
+    expect(h.server.row?.data.dust, 'o do aparelho novo continua lá').toBe(6)
+    expect(h.driver.running).toBe(false)
+  })
+})
+
+describe('o boot de um aparelho já acertado', () => {
+  it('limpo com o servidor à frente: adota — e a batalha deste aparelho fica', async () => {
+    const h = harness({
+      row: { data: forSync(played(9)), version: 5, updatedAt: 't5' },
+      stored: { base: 3, pending: 0, syncedAt: 't3', sent: null },
+      local: { ...played(5), battle: BATTLE },
+    })
+
+    await h.driver.start()
+
+    expect(h.local().dust).toBe(9)
+    expect(h.local().battle, 'a batalha nunca subiu, e adotar não a leva').toEqual(BATTLE)
+    expect(h.stored()).toMatchObject({ base: 5, pending: 0, syncedAt: 't5' })
+    expect(h.server.puts).toHaveLength(0)
+  })
+
+  it('sujo com o servidor na mesma versão: sobe', async () => {
+    const h = harness({
+      row: { data: forSync(played(5)), version: 3, updatedAt: 't3' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: played(8),
+    })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts).toEqual([{ baseVersion: 3, keepalive: false }])
+    expect(h.server.row?.data.dust).toBe(8)
+    expect(h.conflicts).toEqual([])
+  })
+
+  /**
+   * **O save zerado antes de a sessão resolver, e o ramo do boot que não aprendia
+   * nada.**
+   *
+   * Com `pending` acima de zero e o servidor na mesma versão, nenhum dos ramos
+   * internos rodava: `#markSynced` ficava sem ser chamado, `#syncedTouched` ficava
+   * falso, e a guarda do envio — *um save intocado nunca sobe por cima de um
+   * documento com jogo* — não via a coleção do outro lado. O vazio subia com um
+   * CAS que casava.
+   *
+   * **Honestidade sobre a prova:** duas linhas consertam este caso — o
+   * `#markSynced` antes dos ramos e o `#synced === null` na guarda —, e remover
+   * só uma delas mantém este teste verde, porque a outra ainda pega. Reintroduzir
+   * as duas reprova. Ele afirma o comportamento; quem separa as duas linhas é o
+   * teste do aviso, logo abaixo, que depende de `#synced` estar aprendido.
+   */
+  it('sujo, servidor na mesma versão e local zerado: o vazio não sobe', async () => {
+    const h = harness({
+      row: { data: forSync(played(5)), version: 3, updatedAt: 't3' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: emptySave(),
+    })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts, 'o vazio não sobe por cima da coleção').toHaveLength(0)
+    expect(h.local().dust, 'e o servidor volta').toBe(5)
+  })
+
+  it('sujo com outro aparelho à frente: arquiva, sobe e avisa depois', async () => {
+    const h = harness({
+      row: { data: forSync(played(6)), version: 4, updatedAt: 't4' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: played(8),
+    })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived[0]).toContain('"dust":6')
+    expect(h.server.puts).toEqual([{ baseVersion: 4, keepalive: false }])
+    expect(h.server.row?.data.dust).toBe(8)
+    expect(h.conflicts).toEqual([2])
+  })
+
+  it('sujo com a própria gravação no servidor: não é conflito', async () => {
+    const local = played(8)
+    const h = harness({
+      row: { data: forSync(local), version: 4, updatedAt: 't4' },
+      stored: { base: 3, pending: 1, syncedAt: 't3', sent: digest(fingerprint(local)) },
+      local,
+    })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(0)
+    expect(h.archived).toHaveLength(0)
+    expect(h.conflicts).toEqual([])
+    expect(h.stored()).toMatchObject({ base: 4, pending: 0 })
+  })
+})
+
+/**
+ * O PR 1 subia só no primeiro login e não guardava estado de sync. Um aparelho
+ * vindo dele tem `syncedWith` e nada mais — e o que ele jogou depois de entrar
+ * nunca chegou ao servidor.
+ */
+describe('o aparelho que veio do PR 1, sem estado de sync', () => {
+  it('igual ao servidor: fica quieto', async () => {
+    const h = harness({ row: { data: forSync(played(5)), version: 2, updatedAt: 't2' }, local: played(5) })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(0)
+    expect(h.archived).toHaveLength(0)
+    expect(h.stored()).toMatchObject({ base: 2, pending: 0 })
+  })
+
+  it('diferente: a jogada que nunca subiu sobe, e o servidor vai para o backup', async () => {
+    const h = harness({ row: { data: forSync(played(5)), version: 2, updatedAt: 't2' }, local: played(8) })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived[0]).toContain('"dust":5')
+    expect(h.server.puts).toEqual([{ baseVersion: 2, keepalive: false }])
+    expect(h.server.row?.data.dust).toBe(8)
+    expect(h.conflicts, 'não houve outro aparelho, não há aviso').toEqual([])
+  })
+
+  /**
+   * O *APAGAR LOCAL* do PR 1 zerava o save e mantinha o `syncedWith`. "Difere do
+   * servidor" subiria o vazio por cima da coleção da conta.
+   */
+  it('intocado: adota o servidor — nunca sobe vazio por cima de uma coleção', async () => {
+    const h = harness({ row: { data: forSync(played(5)), version: 2, updatedAt: 't2' }, local: emptySave() })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(0)
+    expect(h.local().dust).toBe(5)
+    expect(h.stored()).toMatchObject({ base: 2, pending: 0 })
+  })
+})
+
+describe('apagar local com conta', () => {
+  it('o vazio não sobe, e o servidor volta', async () => {
+    const h = synced()
+
+    await h.driver.discardLocal(() => {
+      h.apply(emptySave())
+    })
+    await h.tick()
+
+    expect(h.server.puts).toHaveLength(0)
+    expect(h.local().dust, 'a coleção da conta voltou').toBe(5)
+    expect(h.stored()).toMatchObject({ base: 3, pending: 0 })
+  })
+
+  it('e um save intocado que chegue à fila por outro caminho também não sobe', async () => {
+    const h = synced()
+
+    h.apply(emptySave())
+    await h.tick()
+
+    expect(h.server.puts).toHaveLength(0)
+    expect(h.server.row?.data.dust).toBe(5)
+    expect(h.local().dust).toBe(5)
+  })
+
+  /**
+   * **O achado crítico do review, e o pior caminho do PR.**
+   *
+   * O `#pull` engolia a falha de rede num `catch` vazio e seguia como se tivesse
+   * adotado: o `discardLocal` voltava "feito", e a tela escrevia que a coleção da
+   * conta volta na próxima sincronização. Só que o save local já estava zerado, e
+   * a jogada seguinte **não** é mais intocada — a guarda do envio não dispara, a
+   * `baseVersion` ainda casa, e o CAS aceita. A coleção da conta vira o save que
+   * o jogador acabou de apagar, em silêncio.
+   *
+   * Reintroduzir o defeito — `#pull` sem valor de retorno e `discardLocal` sem o
+   * `#running = false` — faz a jogada abaixo subir e o `dust` do servidor virar
+   * 99.
+   */
+  it('sem rede, não adota, para o sync — e a jogada seguinte não sobe nada', async () => {
+    const h = synced()
+    h.server.offline = true
+
+    const adopted = await h.driver.discardLocal(() => {
+      h.apply(emptySave())
+    })
+
+    expect(adopted, 'não deu para ler o servidor').toBe(false)
+    expect(h.driver.running, 'parado, o boot seguinte resolve').toBe(false)
+
+    h.play({ dust: 99 })
+    await h.tick()
+
+    expect(h.server.puts, 'nada sobe por cima da coleção da conta').toHaveLength(0)
+    expect(h.server.row?.data.dust, 'a coleção da conta continua lá').toBe(5)
+  })
+})
+
+describe('restaurar a versão anterior', () => {
+  /** Acertado na 3 com 5 de pó, e a anterior do servidor com 4. */
+  function withPrevious() {
+    const h = harness({
+      row: { data: forSync(played(5)), version: 3, updatedAt: 't3' },
+      previous: { data: forSync(played(4)), version: 2, updatedAt: 't2' },
+      local: played(5),
+    })
+    h.driver.begin({ base: 3, pending: 0, syncedAt: 't3' }, played(5))
+    return h
+  }
+
+  it('troca pela anterior e adota — e a que estava no ar vira a anterior', async () => {
+    const h = withPrevious()
+
+    await h.driver.restore()
+
+    expect(h.local().dust).toBe(4)
+    expect(h.server.previous?.data.dust, 'restaurar de novo desfaz').toBe(5)
+    expect(h.stored()).toMatchObject({ base: 4, pending: 0 })
+    expect(h.server.puts, 'nada foi regravado por cima').toHaveLength(0)
+  })
+
+  /**
+   * A troca põe a atual do servidor como anterior, então o que este aparelho
+   * acabou de subir continua a um restaurar de distância — é por isso que o
+   * pendente sobe antes, em vez de ser trocado por cima.
+   */
+  it('sobe antes o que está na fila, e o que subiu fica restaurável', async () => {
+    const h = withPrevious()
+    h.play({ dust: 6 })
+
+    await h.driver.restore()
+
+    expect(h.server.puts).toHaveLength(1)
+    expect(h.local().dust, 'voltou ao que o servidor tinha antes da jogada').toBe(5)
+    expect(h.server.previous?.data.dust, 'a jogada é a anterior agora').toBe(6)
+  })
+
+  it('offline com fila não restaura, e diz por quê', async () => {
+    const h = withPrevious()
+    h.setOnline(false)
+    h.play({ dust: 6 })
+
+    await expect(h.driver.restore()).rejects.toThrow('ainda não subiram')
+
+    expect(h.server.restores).toHaveLength(0)
+    expect(h.local().dust).toBe(6)
+  })
+
+  it('sem anterior no servidor, nada muda', async () => {
+    const h = synced()
+
+    await expect(h.driver.restore()).rejects.toBeInstanceOf(NoPreviousVersion)
+
+    expect(h.local().dust).toBe(5)
+    expect(h.stored()).toMatchObject({ base: 3, pending: 0 })
+  })
+
+  /**
+   * Outro aparelho gravou depois do último acerto, e o CAS do restaurar recusa.
+   *
+   * O aparelho está limpo — a fila subiu antes de restaurar —, e limpo aceita o
+   * servidor. Sem isto o 409 deixava o `HttpDriver` já na versão nova e o estado
+   * de sync na velha: a jogada seguinte subiria por cima do outro aparelho sem
+   * conflito, sem backup e sem aviso.
+   */
+  it('com outro aparelho à frente: não troca nada, e o limpo adota o servidor', async () => {
+    const h = withPrevious()
+    h.server.elsewhere(played(9))
+
+    await expect(h.driver.restore()).rejects.toBeInstanceOf(SaveConflict)
+
+    expect(h.local().dust, 'o do outro aparelho desceu').toBe(9)
+    expect(h.stored()).toMatchObject({ base: 4, pending: 0 })
+
+    h.play({ dust: 10 })
+    await h.tick()
+
+    expect(h.server.puts, 'a jogada seguinte parte do que desceu').toEqual([{ baseVersion: 4, keepalive: false }])
+    expect(h.archived, 'o local era limpo: nada a arquivar').toHaveLength(0)
+  })
+})
+
+describe('as guardas que só aparecem de perto', () => {
+  /**
+   * A guarda do envio sozinha já impede o vazio de subir — e mascara a do PR 1.
+   * O que as separa é o backup: sem a do PR 1, o servidor seria arquivado como
+   * "cópia perdedora" de um conflito com um save que não tem jogada nenhuma, e
+   * empurraria para fora do anel de três uma cópia que talvez importasse.
+   */
+  it('o aparelho intocado do PR 1 nem arquiva: não há jogada a proteger', async () => {
+    const h = harness({ row: { data: forSync(played(5)), version: 2, updatedAt: 't2' }, local: emptySave() })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived).toHaveLength(0)
+    expect(h.stored()?.pending).toBe(0)
+  })
+
+  /**
+   * O boot acha o conflito, arquiva a cópia do servidor — e a rede cai antes do
+   * envio. A prancha diz que o aviso sai **depois** de resolvido; sem envio
+   * aceito, não há o que avisar ainda.
+   */
+  it('o aviso do conflito do boot espera o envio dar certo', async () => {
+    const h = harness({
+      row: { data: forSync(played(6)), version: 4, updatedAt: 't4' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: played(8),
+    })
+    h.setOnline(false)
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived).toHaveLength(1)
+    expect(h.conflicts, 'sem envio aceito, ainda não há aviso').toEqual([])
+
+    h.setOnline(true)
+    h.driver.retry()
+    await settleNetwork()
+
+    expect(h.server.row?.data.dust).toBe(8)
+    expect(h.conflicts).toEqual([2])
+  })
+
+  /**
+   * **O aviso armado não sobrevive a uma adoção.**
+   *
+   * `#announce` só era desligado ao ser dado, então um conflito cujo envio falhou
+   * ficava armado indefinidamente. Bastava o jogador apagar o local — que adota o
+   * servidor — e voltar a jogar horas depois: a primeira gravação aceita
+   * anunciava *"as N mudanças deste aparelho venceram e já subiram"* e mandava
+   * procurar a cópia do outro aparelho em *Cópias de segurança*. As duas frases
+   * são falsas — quem venceu foi o servidor —, e o N é a contagem de uma jogada
+   * sem relação com o conflito.
+   *
+   * Reintroduzir o defeito faz `conflicts` terminar com um aviso.
+   */
+  it('o aviso morre com a adoção: ninguém venceu conflito nenhum', async () => {
+    const h = harness({
+      row: { data: forSync(played(6)), version: 4, updatedAt: 't4' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: played(8),
+    })
+    h.setOnline(false)
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived, 'o conflito do boot arquivou').toHaveLength(1)
+    expect(h.conflicts, 'e ficou por avisar').toEqual([])
+
+    /**
+     * O save é zerado e a rede volta: a guarda do envio manda ler o servidor, e
+     * é o `#adopt` que apaga o conflito.
+     *
+     * **Este caminho não passa por `discardLocal` de propósito.** Aquele limpa o
+     * aviso por conta própria, e ir por ele deixaria o teste verde com a linha
+     * do `#adopt` removida — uma prova falsa, que é exatamente o defeito que
+     * este arquivo existe para não repetir.
+     */
+    h.setOnline(true)
+    h.apply(emptySave())
+    await h.tick()
+
+    expect(h.local().dust, 'o servidor desceu').toBe(6)
+
+    h.play({ dust: 12 })
+    await h.tick()
+
+    expect(h.server.puts.length, 'a jogada subiu').toBeGreaterThan(0)
+    expect(h.conflicts, 'e nenhum aviso saiu').toEqual([])
+  })
+})
+
+describe('a impressão do documento', () => {
+  /**
+   * O `jsonb` do Postgres devolve as chaves em outra ordem. Sem a impressão
+   * canônica, todo boot veria o save do servidor como diferente do local — o
+   * aparelho limpo adotaria de novo e o sujo acusaria conflito, sem nada mudar.
+   */
+  it('não depende da ordem das chaves', () => {
+    const save = played(5)
+    const reordered: SaveData = {
+      battle: null,
+      progress: { dailyClaimed: null, badges: 0, coins: 0, welcomeClaimed: 3, pity: 0 },
+      deck: save.deck,
+      dust: 5,
+      collection: {},
+      schemaVersion: save.schemaVersion,
+    }
+
+    expect(JSON.stringify(reordered), 'o texto cru difere').not.toBe(JSON.stringify(save))
+    expect(fingerprint(reordered)).toBe(fingerprint(save))
+  })
+
+  it('ignora a batalha, que nunca sobe', () => {
+    expect(fingerprint({ ...played(5), battle: BATTLE })).toBe(fingerprint(played(5)))
+  })
+})

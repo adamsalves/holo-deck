@@ -1,6 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import type { SaveData } from '~~/shared/save/schema'
-import type { RemoteSave } from '~~/shared/save/sync'
+import { ownedIds } from '~~/shared/save/schema'
+import type { PreviousSummary, RemoteSave } from '~~/shared/save/sync'
 import { isSyncShape } from '~~/shared/save/sync'
 import { db } from '.'
 import { saves } from './schema'
@@ -81,6 +82,7 @@ export async function writeSave(
     .set({
       previousData: sql`${saves.data}`,
       previousVersion: sql`${saves.version}`,
+      previousUpdatedAt: sql`${saves.updatedAt}`,
       data,
       version: sql`${saves.version} + 1`,
       updatedAt: now,
@@ -91,4 +93,86 @@ export async function writeSave(
   if (updated) return { ok: true, version: updated.version, updatedAt: updated.updatedAt }
 
   return { ok: false, current: await readSave(userId) }
+}
+
+/**
+ * O resumo da versão anterior, ou `null` quando não há nenhuma.
+ *
+ * **Só o resumo.** A prancha *Ajustes* escreve "feita há 2 min, com 138 cartas"
+ * para o jogador decidir se restaura; o documento inteiro não muda essa decisão.
+ * A versão anterior passa pelo mesmo guarda de forma que a atual: ela também é
+ * `jsonb` que uma build anterior pode ter escrito.
+ */
+export async function readPrevious(userId: string): Promise<PreviousSummary | null> {
+  const [row] = await db
+    .select({ data: saves.previousData, version: saves.previousVersion, updatedAt: saves.previousUpdatedAt })
+    .from(saves)
+    .where(eq(saves.userId, userId))
+    .limit(1)
+
+  if (!row || row.data === null || row.version === null) return null
+
+  if (!isSyncShape(row.data)) {
+    throw new Error(`Versão anterior ilegível no servidor para o usuário ${userId}`)
+  }
+
+  return {
+    version: row.version,
+    updatedAt: row.updatedAt?.toISOString() ?? null,
+    // A mesma régua das telas: `ownedIds` descarta chave que não é espécie.
+    cards: ownedIds(row.data.collection).length,
+  }
+}
+
+/** O resultado de um restaurar: trocou, colidiu, ou não havia o que restaurar. */
+export type RestoreResult
+  = | { readonly ok: true, readonly remote: RemoteSave }
+    | { readonly ok: false, readonly reason: 'conflict', readonly current: RemoteSave }
+    | { readonly ok: false, readonly reason: 'no-previous' }
+
+/**
+ * Troca a versão atual pela anterior — **as duas, numa instrução só**.
+ *
+ * Troca e não cópia: a atual vira a anterior, então restaurar de novo desfaz o
+ * restaurar. No Postgres o lado direito de cada `SET` enxerga a linha **antes**
+ * da atualização, e é isso que faz `data = previous_data, previous_data = data`
+ * ser uma troca e não duas cópias da mesma coisa. A versão sobe como num `PUT`,
+ * para os outros aparelhos enxergarem que a linha mudou.
+ *
+ * Passa pelo mesmo CAS do `PUT`, pela razão escrita em `readRestoreBody`: a
+ * versão trocada precisa ser a que o jogador estava vendo quando clicou.
+ */
+export async function restoreSave(userId: string, baseVersion: number, now: Date): Promise<RestoreResult> {
+  const [restored] = await db
+    .update(saves)
+    .set({
+      data: sql`${saves.previousData}`,
+      version: sql`${saves.version} + 1`,
+      updatedAt: now,
+      previousData: sql`${saves.data}`,
+      previousVersion: sql`${saves.version}`,
+      previousUpdatedAt: sql`${saves.updatedAt}`,
+    })
+    .where(and(eq(saves.userId, userId), eq(saves.version, baseVersion), isNotNull(saves.previousData)))
+    .returning({ data: saves.data, version: saves.version, updatedAt: saves.updatedAt })
+
+  if (restored) {
+    // A troca já aconteceu, e é por isso que ilegível aqui lança em vez de
+    // devolver algo: restaurar de novo desfaz, e nada foi apagado.
+    if (!isSyncShape(restored.data)) {
+      throw new Error(`Versão restaurada ilegível no servidor para o usuário ${userId}`)
+    }
+
+    return {
+      ok: true,
+      remote: { data: restored.data, version: restored.version, updatedAt: restored.updatedAt.toISOString() },
+    }
+  }
+
+  // Nada trocou: ou a versão mudou no meio — colisão, e o cliente precisa do que
+  // está lá —, ou não havia versão anterior. Sem linha nenhuma é o segundo caso.
+  const current = await readSave(userId)
+  if (current !== null && current.version !== baseVersion) return { ok: false, reason: 'conflict', current }
+
+  return { ok: false, reason: 'no-previous' }
 }

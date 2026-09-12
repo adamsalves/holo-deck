@@ -116,15 +116,6 @@ useSeoMeta({
         Pedimos só sua identidade — nenhum repositório, nenhum dado seu do GitHub.
       </p>
 
-      <!-- O que esta versão faz de verdade, e não o que a conta vai fazer. A
-           sincronização contínua — gravar a cada jogada — é o PR seguinte da
-           fase; até ele, a conta recebe a coleção quando você entra. Prometer o
-           resto agora seria vender durabilidade que o código ainda não tem. -->
-      <p class="login__scope">
-        <strong>Nesta versão</strong> a coleção sobe quando você entra. Gravar a
-        cada jogada chega em seguida.
-      </p>
-
       <p
         v-if="failed"
         class="login__failed"

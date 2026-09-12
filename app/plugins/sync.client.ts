@@ -1,29 +1,91 @@
 import type { useNuxtApp } from 'nuxt/app'
 import { defineNuxtPlugin } from 'nuxt/app'
+import { nextTick } from 'vue'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import { HttpDriver } from '~~/app/utils/save-http'
+import { SyncDriver } from '~~/app/utils/save-sync'
+import { readSyncState, writeSyncState } from '~~/app/utils/sync-state'
 import { lastWrite, markSyncedWith, markWrite, syncedWith } from '~~/app/utils/last-write'
 import { decideFirstSync } from '~~/shared/save/sync'
 import { useAccount } from '~~/app/composables/useAccount'
 import { useFirstSync } from '~~/app/composables/useFirstSync'
+import { useSync } from '~~/app/composables/useSync'
 
 /**
- * O primeiro `GET` depois de entrar — e só ele.
+ * A rede do save: a decisão do primeiro login e, depois dela, o sync contínuo.
  *
  * **Roda depois do `save.client`**, por `dependsOn` e não pela ordem alfabética
  * dos arquivos: a dependência é real — o boot local hidrata as stores, e este
  * plugin compara o que elas têm com o que o servidor tem —, e mantê-la por
  * acidente de nome é como ela se perde num rename.
  *
- * O sync contínuo — fila offline, debounce, 409 com reaplicação — é o PR 2.
- * Aqui existe só a decisão de entrada, que é a que pode custar uma coleção.
+ * O sync contínuo é o `SyncDriver`, e as regras dele moram lá, afirmadas sem
+ * navegador. Aqui fica só o que é deste ambiente: o hook que entrega cada
+ * gravação local, os três eventos do navegador que a prancha *Sync* nomeia —
+ * `online`, `visibilitychange` e `pagehide` — e a tradução do estado para as
+ * duas coisas que a tela mostra, o indicador e o aviso de conflito.
  */
 export default defineNuxtPlugin({
   name: 'holo-deck:sync',
   dependsOn: ['holo-deck:save'],
 
-  setup(nuxtApp) {
+  /**
+   * **O tipo de retorno é escrito, e não inferido.** O `setup` usa
+   * `nuxtApp.$saveDriver`, e o tipo de `nuxtApp` inclui o que este próprio plugin
+   * provê: inferir o retorno daqui fecha um ciclo, e o TypeScript o resolve como
+   * tipo de erro em todo `$` do app — o ESLint acusou os 14 usos de `useFirstSync`,
+   * inclusive os que existiam antes deste plugin tocar no driver local.
+   */
+  setup(nuxtApp): { provide: { httpDriver: HttpDriver, sync: SyncDriver } } {
     const http = new HttpDriver()
+    const { status, conflict } = useSync()
+
+    const sync = new SyncDriver({
+      remote: http,
+      compose: () => composeSave(nuxtApp.$pinia),
+      hydrate: (data) => {
+        hydrateSave(data, nuxtApp.$pinia)
+      },
+      archive: (raw) => {
+        nuxtApp.$saveDriver.archive(raw)
+      },
+      state: { read: readSyncState, write: writeSyncState },
+      settle: () => nextTick(),
+      online: () => navigator.onLine,
+      schedule: (run, ms) => {
+        const timer = setTimeout(run, ms)
+        return () => {
+          clearTimeout(timer)
+        }
+      },
+      onStatus: (next) => {
+        status.value = next
+      },
+      onConflict: (won) => {
+        conflict.value = { won }
+      },
+    })
+
+    // Cada gravação local, anunciada pelo plugin de save. Sem conta, ou antes do
+    // acerto, o driver não está rodando e ignora — o jogo local não muda em nada.
+    nuxtApp.hook('holodeck:saved', (doc) => {
+      sync.noteSaved(doc)
+    })
+
+    // "A fila sobe sozinha ao reconectar", como a prancha escreve.
+    window.addEventListener('online', () => {
+      sync.retry()
+    })
+
+    // O envio garantido de quem sai: aba escondida e página descarregada. Os dois
+    // porque nenhum sozinho cobre tudo — o celular troca de app sem descarregar a
+    // página, e fechar a aba no computador nem sempre passa pelo primeiro.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') void sync.flush({ keepalive: true })
+    })
+    window.addEventListener('pagehide', () => {
+      void sync.flush({ keepalive: true })
+    })
 
     /**
      * **Disparada sem `await`, e é o ponto inteiro desta forma.**
@@ -31,42 +93,33 @@ export default defineNuxtPlugin({
      * O Nuxt espera os plugins antes de montar o app, então um `setup` assíncrono
      * faz todo boot aguardar uma ida à rede — o contrário do que o plano fecha
      * por escrito: *"lê `localStorage` e renderiza na hora; instantâneo, funciona
-     * offline, não espera rede"*. Com o `.env` local isso era uma viagem até o
-     * Neon a cada abertura de página, e apareceu como instabilidade em testes
-     * antigos sensíveis a tempo, não como erro.
-     *
-     * O plano descreve exatamente esta forma: *"com sessão — `GET` em segundo
-     * plano"*. A tela de escolha entra por estado reativo quando a resposta
-     * chega, e até lá o jogo já está jogável.
+     * offline, não espera rede"*. Apareceu como instabilidade em testes antigos
+     * sensíveis a tempo, não como erro.
      *
      * **O `catch` não é decoração.** Disparar sem `await` é disparar sem ninguém
-     * para pegar a rejeição: um 409, um 5xx ou um cabo arrancado entre o `GET` e
-     * o `PUT` viravam `unhandledrejection` no console, e o docblock de `reconcile`
-     * prometia que nada ali derrubava o boot sem que o código cumprisse a
-     * promessa nos dois ramos que escrevem.
+     * para pegar a rejeição, e nada aqui pode derrubar o boot de um jogo que
+     * funciona inteiro sem rede.
      *
-     * **E `runWithContext` porque `reconcile` continua depois de dois `await`.**
-     * O `useState` da tela de escolha precisa da instância do Nuxt, e fora do
+     * **E `runWithContext` porque `reconcile` continua depois de `await`s.** O
+     * `useState` da tela de escolha precisa da instância do Nuxt, e fora do
      * contexto ele cai na instância global — que no cliente é a mesma, hoje, por
-     * acidente. O `runWithContext` é a forma que o Nuxt documenta para exatamente
-     * esta continuação.
+     * acidente.
      */
-    void nuxtApp.runWithContext(() => reconcile(nuxtApp, http)).catch((error: unknown) => {
+    void nuxtApp.runWithContext(() => reconcile(nuxtApp, http, sync)).catch((error: unknown) => {
       console.warn('[holo-deck] a sincronização de entrada não concluiu', error)
     })
 
-    return { provide: { httpDriver: http } }
+    return { provide: { httpDriver: http, sync } }
   },
 })
 
-async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDriver): Promise<void> {
+async function reconcile(
+  nuxtApp: ReturnType<typeof useNuxtApp>,
+  http: HttpDriver,
+  sync: SyncDriver,
+): Promise<void> {
   /**
    * A sessão, e **nada aqui pode derrubar o boot**.
-   *
-   * O jogo é local-first: sem rede, sem banco, sem conta, ele abre e funciona
-   * inteiro. Um plugin que lançasse aqui levaria junto a coleção que já estava
-   * na tela — trocando "a sincronização não subiu" por "o jogo não abre".
-   * Conferido rodando a suíte E2E inteira sem `.env`, que é a condição do CI.
    *
    * A leitura é do `useAccount`, que a faz **uma vez** e a compartilha com o
    * canto da barra: duas chamadas a `getSession()` seriam duas idas à rede em
@@ -77,11 +130,14 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
 
   const userId = account.id
 
-  // Aparelho já acertado com esta conta não repete a pergunta do primeiro
-  // login: sem esta linha, escolher "neste aparelho" sobe o local, e no boot
-  // seguinte os dois lados cheios devolvem `ask` outra vez — para sempre. O
-  // que roda daqui em diante é o sync contínuo, que é o PR 2.
-  if (syncedWith() === userId) return
+  // Aparelho já acertado com esta conta: a pergunta do primeiro login não se
+  // repete — sem esta linha, escolher "neste aparelho" subiria o local e o boot
+  // seguinte veria os dois lados cheios outra vez, para sempre. Daqui em diante
+  // quem decide é o sync contínuo, que lê o servidor e sobe ou adota.
+  if (syncedWith() === userId) {
+    await sync.start()
+    return
+  }
 
   let remote
   try {
@@ -97,16 +153,11 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
   /**
    * Save que existe e não pôde ser migrado: **não se faz nada**.
    *
-   * `recovered` vem de `migrate`, e o caso que ele nomeia aqui é o de uma build
-   * mais nova ter gravado nesta conta — um aparelho atualizado, este com o bundle
-   * antigo em cache. Nenhuma das três saídas serve: adotar seria hidratar store
-   * com dado que este código não entende, subir o local seria sobrescrever a
-   * coleção boa com a deste navegador, e perguntar seria pedir uma decisão
-   * mostrando um dos lados como "nenhuma carta". Ficar quieto deixa o jogo local
-   * funcionando e o servidor intacto, que é o par certo de ações.
-   *
-   * **E não marca acerto nenhum**: no boot seguinte — já com o bundle novo — a
-   * leitura migra e a decisão acontece de verdade.
+   * O caso é o de uma build mais nova ter gravado nesta conta — um aparelho
+   * atualizado, este com o bundle antigo em cache. Adotar hidrataria store com
+   * dado que este código não entende; subir sobrescreveria a coleção boa;
+   * perguntar mostraria um dos lados como "nenhuma carta". **E não marca acerto
+   * nenhum**: no boot seguinte, já com o bundle novo, a decisão acontece.
    */
   if (remote !== null && remote.recovered !== null) {
     console.warn('[holo-deck] o save da conta é de outra versão deste jogo; nada foi alterado')
@@ -115,26 +166,58 @@ async function reconcile(nuxtApp: ReturnType<typeof useNuxtApp>, http: HttpDrive
 
   const local = composeSave(nuxtApp.$pinia)
 
-  const decision = decideFirstSync(local, remote?.data ?? null)
-
-  switch (decision) {
-    // `idle` e `push` terminam iguais: os dois deixam este aparelho acertado
-    // com a conta. A diferença é só se havia algo a subir — e um `PUT` de save
-    // vazio queimaria uma versão sem dizer nada a ninguém.
+  switch (decideFirstSync(local, remote?.data ?? null)) {
+    // Nada a subir, e um `PUT` de save vazio queimaria uma versão sem dizer nada a
+    // ninguém. A primeira jogada sobe como quem nunca subiu.
     case 'idle':
-    case 'push':
-      if (decision === 'push') await http.save(local)
       markSyncedWith(userId)
+      sync.begin({ base: 0, pending: 0, syncedAt: null }, local)
       break
+
+    case 'push': {
+      try {
+        const written = await http.write(local)
+        markSyncedWith(userId)
+        sync.begin({ base: written.version, pending: 0, syncedAt: written.updatedAt }, local)
+      }
+      catch {
+        /**
+         * **A subida falhou, e o sync continua nascendo.**
+         *
+         * Sem isto o driver nunca arrancava: `status` ficava nulo, e nulo é
+         * "sem conta" para a tela — o indicador some da barra e a linha de sync
+         * some de Ajustes. O jogador terminava o primeiro login com conta e
+         * **nenhum** sinal de que nada está subindo, que é o contrário do que o
+         * indicador existe para fazer. Só o `console.warn` sabia.
+         *
+         * Começa com a mudança pendente: o chip escreve "1 mudança na fila" e o
+         * envio sai pelo ócio, pelo evento `online` ou pelo próximo boot. O
+         * documento de referência é o que o **servidor** tem — nada, ou o save
+         * intocado que a decisão mandou sobrescrever —, e não o local, senão a
+         * guarda do envio passaria a acreditar que os dois lados já batem.
+         *
+         * **O acerto não é marcado**: o primeiro login só terminou quando o
+         * servidor recebeu, e o boot seguinte refaz a decisão inteira.
+         */
+        sync.begin(
+          { base: remote?.version ?? 0, pending: 1, syncedAt: remote?.updatedAt ?? null },
+          remote?.data ?? local,
+        )
+      }
+      break
+    }
 
     case 'adopt':
       if (remote) {
         hydrateSave(remote.data, nuxtApp.$pinia)
         markWrite()
+        markSyncedWith(userId)
+        sync.begin({ base: remote.version, pending: 0, syncedAt: remote.updatedAt }, remote.data)
       }
-      markSyncedWith(userId)
       break
 
+    // A tela *Duas coleções* decide, e é ela que começa o sync — ver
+    // `useFirstSync().choose`.
     case 'ask':
       if (remote) {
         useFirstSync().pending.value = {

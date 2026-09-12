@@ -17,6 +17,7 @@ import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { loadBattleContext } from '~/composables/useBattleContext'
+import { useInvite } from '~/composables/useInvite'
 import type { NarratedTurn } from '~~/app/utils/battle-narration'
 import { narrate } from '~~/app/utils/battle-narration'
 
@@ -35,6 +36,7 @@ import { narrate } from '~~/app/utils/battle-narration'
  */
 const route = useRoute()
 const battle = useBattleStore()
+const invite = useInvite()
 const deck = useDeckStore()
 const progress = useProgressStore()
 
@@ -399,6 +401,11 @@ function play(action: BattleAction): void {
   if (before === null || ctx === null || before.outcome !== 'ongoing') return
 
   battle.act(action, ctx)
+
+  // A vitória é um dos dois momentos que pedem o convite de conta. Pedir não é
+  // abrir: quem decide se ele aparece — sem conta, uma vez por aparelho — é o
+  // `AccountInvite`.
+  if (state.value?.outcome === 'won') invite.offer()
 
   const turn = narrate(before, battle.events, ctx.moves)
   if (turn.lines.length > 0) history.value = [...history.value, turn].slice(-LOG_LINES)

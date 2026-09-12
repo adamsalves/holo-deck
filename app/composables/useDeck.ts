@@ -134,7 +134,7 @@ export async function useDeck(): Promise<DeckView> {
    * slots.**
    *
    * `/deck` é pré-renderizada. No servidor o deck está sempre vazio, então
-   * `generations` é `[]` e o handler devolve um mapa vazio — que vai para o
+   * `generations` é `[]` e o handler devolve um objeto vazio — que vai para o
    * payload sob a chave. No cliente, o plugin de save roda antes do mount, então
    * quando isto executa o deck **já** está hidratado e `generations` já vale
    * `[1]`; mas o `useAsyncData` vê dado no payload para aquela chave, marca
@@ -153,15 +153,18 @@ export async function useDeck(): Promise<DeckView> {
    */
   const statsKey = computed(() => `deck-generations:${generations.value.join('-')}`)
 
+  // Objeto e não `Map`: o handler de `useAsyncData` devolve JSON neste
+  // repositório. O motivo — e o time do Hub que ele custou — está no handler dos
+  // times em `useLeague`.
   const statsAsync = useAsyncData(
     statsKey,
     async () => {
       const loaded = await Promise.all(generations.value.map(loadGeneration))
-      const map = new Map<SpeciesId, BattleStats>()
+      const stats: Record<number, BattleStats> = {}
       for (const generation of loaded) {
-        for (const entry of generation.species) map.set(entry.id, toBattleStats(entry.baseStats))
+        for (const entry of generation.species) stats[entry.id] = toBattleStats(entry.baseStats)
       }
-      return map
+      return stats
     },
   )
   const { data: statsByGeneration } = statsAsync
@@ -170,7 +173,7 @@ export async function useDeck(): Promise<DeckView> {
     Array.from({ length: DECK_SIZE }, (_, index) => {
       const id = deck.slots[index] ?? null
       const entry = id === null ? null : entryById.value.get(id) ?? null
-      const stats = id === null ? null : statsByGeneration.value?.get(id) ?? null
+      const stats = id === null ? null : statsByGeneration.value?.[id] ?? null
       return { index, entry, stats }
     }))
 

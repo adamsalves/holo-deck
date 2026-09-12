@@ -1,12 +1,19 @@
-import { useState } from 'nuxt/app'
+import { tryUseNuxtApp, useState } from 'nuxt/app'
 import type { Ref } from 'vue'
 import { authClient } from '~~/app/utils/auth-client'
+import { markInviteSeen } from '~~/app/utils/invite'
 import { clearSyncedWith } from '~~/app/utils/last-write'
+import { clearSyncState } from '~~/app/utils/sync-state'
+
+/** Por que a exclusão de conta não excluiu — ou que excluiu. Ver `deleteAccount`. */
+export type AccountRemoval = 'deleted' | 'stale-session' | 'failed'
 
 /** Quem está logado, do jeito que a barra precisa mostrar. */
 export interface Account {
   readonly id: string
   readonly name: string
+  /** O e-mail da conta — a linha principal do painel de conta em Ajustes, como a prancha desenha. */
+  readonly email: string
   /** A foto do provedor, quando há uma. A barra cai nas iniciais sem ela. */
   readonly image: string | null
 }
@@ -37,6 +44,7 @@ export function useAccount(): {
   known: Ref<boolean>
   load: () => Promise<Account | null>
   signOut: () => Promise<void>
+  deleteAccount: () => Promise<AccountRemoval>
 } {
   const account = useState<Account | null>('account', () => null)
   const known = useState<boolean>('account-known', () => false)
@@ -50,7 +58,14 @@ export function useAccount(): {
 
       account.value = user === undefined
         ? null
-        : { id: user.id, name: user.name, image: user.image ?? null }
+        : { id: user.id, name: user.name, email: user.email, image: user.image ?? null }
+
+      // Um aparelho que já viu uma conta deixou de ser o de quem nunca teve
+      // uma, e o convite existe só para esse. Marcar aqui cobre os dois casos em
+      // que ele mentiria depois: a sessão que não pôde ser lida — sem rede, a
+      // conta parece não existir — e o logout, que devolve o aparelho ao modo
+      // sem conta com a coleção que a conta já guarda.
+      if (account.value !== null) markInviteSeen()
     }
     catch {
       // Sem sessão legível o jogo é o de quem não tem conta — que é um modo
@@ -75,16 +90,66 @@ export function useAccount(): {
       await authClient.signOut()
     }
     finally {
-      // Antes da recarga, e mesmo se o `signOut` falhar: a marca é local, e um
-      // acerto registrado sem conta do outro lado é o que faria a pergunta do
-      // primeiro login nunca mais aparecer.
-      clearSyncedWith()
-      account.value = null
-      known.value = true
-
-      if (typeof window !== 'undefined') window.location.assign('/')
+      // Mesmo se o `signOut` falhar: ver `forget`.
+      forget()
     }
   }
 
-  return { account, known, load, signOut }
+  /**
+   * Exclui a conta e o save do servidor — o `deleteUser` do `better-auth`.
+   *
+   * Devolve por que não excluiu, quando não excluiu: conta sem senha — todas aqui
+   * — só se exclui com sessão de menos de um dia (`freshAge`), e a resposta a isso
+   * é entrar de novo, não tentar de novo. A tela diz qual das duas.
+   *
+   * **O save deste aparelho fica.** Excluir a conta não é *Apagar save deste
+   * aparelho*: a coleção continua jogável aqui, sem conta, como antes de entrar.
+   * O que sai é o acerto com a conta, pelo mesmo caminho do logout.
+   */
+  async function deleteAccount(): Promise<AccountRemoval> {
+    try {
+      const { error } = await authClient.deleteUser()
+      if (error) return error.code === 'SESSION_EXPIRED' ? 'stale-session' : 'failed'
+    }
+    catch {
+      return 'failed'
+    }
+
+    forget()
+    return 'deleted'
+  }
+
+  /**
+   * Esquece a conta neste aparelho, e recarrega.
+   *
+   * A marca de acerto é local, e um acerto registrado sem conta do outro lado é
+   * o que faria a pergunta do primeiro login nunca mais aparecer. O estado de sync
+   * vai junto: ele descreve este aparelho diante desta conta, e sem a conta não
+   * descreve nada. A recarga é a de `signOut`, pelo motivo escrito lá.
+   */
+  function forget(): void {
+    /**
+     * **O sync para antes de a marca sumir, e `stop()` existe para este momento.**
+     *
+     * Sair recarrega a página, e a recarga dispara o `pagehide` que o plugin de
+     * sync escuta: sem esta linha, um envio garantido saía **depois** do logout
+     * e regravava, ao persistir o estado, o `holodeck:syncState` que as duas
+     * linhas abaixo acabaram de apagar. O método era público e não tinha um
+     * chamador no repositório inteiro — uma API descrevendo um ciclo de vida que
+     * ninguém executava.
+     *
+     * `tryUseNuxtApp` e não `useNuxtApp`: isto roda num handler de clique, fora
+     * do `setup`, e o plugin de sync pode nem ter provido nada ainda no boot em
+     * que a sessão falha.
+     */
+    tryUseNuxtApp()?.$sync?.stop()
+    clearSyncedWith()
+    clearSyncState()
+    account.value = null
+    known.value = true
+
+    if (typeof window !== 'undefined') window.location.assign('/')
+  }
+
+  return { account, known, load, signOut, deleteAccount }
 }
