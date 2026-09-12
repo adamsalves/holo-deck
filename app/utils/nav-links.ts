@@ -14,6 +14,15 @@
 
 export interface NavLink {
   readonly to: string
+  /**
+   * A **chave** de i18n do rótulo, não o rótulo — `t(link.label)` é quem resolve.
+   *
+   * Era texto pt-BR até a Fase 8. O que se perde é ler neste arquivo o que
+   * aparece na tela; o que se ganha é um lugar só onde a tradução mora
+   * (`i18n/locales/*.json`), que é o que o portão de paridade de chaves vigia.
+   * `nav-gate` nunca afirmou nada sobre o rótulo — ele mede `to` e `exact` —,
+   * então a troca não afrouxa portão nenhum.
+   */
   readonly label: string
   /**
    * `exact` só na Base — e ele é load-bearing, não decorativo.
@@ -27,19 +36,19 @@ export interface NavLink {
 
 /** As seis seções da esquerda. */
 export const NAV_LINKS: readonly NavLink[] = [
-  { to: '/', label: 'Base', exact: true },
-  { to: '/packs', label: 'Packs', exact: false },
-  { to: '/pokedex', label: 'Pokédex', exact: false },
-  { to: '/collection', label: 'Coleção', exact: false },
-  { to: '/deck', label: 'Deck', exact: false },
-  { to: '/league', label: 'Liga', exact: false },
+  { to: '/', label: 'nav.base', exact: true },
+  { to: '/packs', label: 'nav.packs', exact: false },
+  { to: '/pokedex', label: 'nav.pokedex', exact: false },
+  { to: '/collection', label: 'nav.collection', exact: false },
+  { to: '/deck', label: 'nav.deck', exact: false },
+  { to: '/league', label: 'nav.league', exact: false },
 ]
 
 /** O link de *Regras*, à direita do saldo. */
-export const NAV_RULES: NavLink = { to: '/rules', label: 'Regras', exact: false }
+export const NAV_RULES: NavLink = { to: '/rules', label: 'nav.rules', exact: false }
 
 /** A engrenagem. O rótulo é o nome acessível — ela não tem texto visível. */
-export const NAV_SETTINGS: NavLink = { to: '/settings', label: 'Ajustes', exact: false }
+export const NAV_SETTINGS: NavLink = { to: '/settings', label: 'nav.settings', exact: false }
 
 /**
  * O canto da conta — *Entrar* sem sessão, o avatar com ela. Ver `AppAccount`.
@@ -54,7 +63,7 @@ export const NAV_SETTINGS: NavLink = { to: '/settings', label: 'Ajustes', exact:
  * exige conta, e um sétimo link entre *Packs* e *Liga* transformaria a conta em
  * destino.
  */
-export const NAV_ACCOUNT: NavLink = { to: '/login', label: 'Entrar', exact: false }
+export const NAV_ACCOUNT: NavLink = { to: '/login', label: 'nav.account', exact: false }
 
 /**
  * Toda rota que a barra liga, sem repetição.

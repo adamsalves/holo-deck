@@ -33,6 +33,7 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@pinia/nuxt',
     '@vueuse/nuxt',
+    '@nuxtjs/i18n',
 
     /**
      * `/styleguide` existe só em desenvolvimento.
@@ -62,7 +63,11 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      htmlAttrs: { lang: 'pt-BR', class: 'dark' },
+      // `lang` **não** mora mais aqui: quem o escreve é o `@nuxtjs/i18n`, a
+      // partir do locale ativo. Fixo em `pt-BR`, ele mentiria em toda rota
+      // `/en/…` — e mentir no `lang` é o leitor de tela lendo inglês com voz
+      // portuguesa. A classe `dark` continua, que é tema e não idioma.
+      htmlAttrs: { class: 'dark' },
       title: 'Holo Deck',
       // O `preconnect` da arte oficial **não** mora aqui: quem carrega imagem de
       // terceiro é só `/pokemon/[name]`, e no `app.head` as outras 11 rotas
@@ -198,6 +203,51 @@ export default defineNuxtConfig({
     families: [
       { name: 'Chakra Petch', provider: 'google', weights: [400, 500, 600, 700] },
       { name: 'JetBrains Mono', provider: 'google', weights: [400, 700] },
+    ],
+  },
+
+  /**
+   * pt-BR na raiz, inglês em `/en/…`.
+   *
+   * `prefix_except_default` é o que mantém as URLs de hoje intactas: o locale
+   * padrão não recebe prefixo, então `/collection` continua sendo `/collection`
+   * e nenhum link, rota pré-renderizada ou teste existente muda de endereço.
+   *
+   * O módulo também passa a ser o dono do atributo `lang` do `<html>` e das
+   * tags `hreflang` — ver a nota em `app.head.htmlAttrs` acima.
+   *
+   * `language` é a etiqueta BCP 47 que vai para o `lang` e para o `hreflang`, e
+   * não é redundante com `code`: `code` é a chave interna que nomeia o arquivo e
+   * o prefixo da rota, e os dois divergem no inglês (`en` contra `en-US`).
+   */
+  i18n: {
+    strategy: 'prefix_except_default',
+    defaultLocale: 'pt-BR',
+    langDir: 'locales',
+
+    /**
+     * **Desligada, e isto conserta um defeito medido.**
+     *
+     * O módulo liga a detecção por padrão, com `useCookie` e `redirectOn: 'root'`:
+     * quem chega em `/` com `Accept-Language: en-US` é trocado para o inglês na
+     * hidratação. O efeito é pior do que parece, porque o HTML **pré-renderizado**
+     * da raiz é pt-BR — sai `lang="pt-BR"` com *Coleção* escrito — e a hidratação
+     * reescreve a barra para *Binder*, *League*, *Sign in*. Um jogador brasileiro
+     * de navegador em inglês via a tela trocar de idioma sozinha, com o `lang` do
+     * documento discordando do texto.
+     *
+     * Medido no e2e: a árvore de acessibilidade da raiz vinha em inglês, porque o
+     * Chromium do Playwright não declara locale e manda `en-US`. Quatro suítes
+     * reprovaram procurando *Entrar* num link que dizia *Sign in*.
+     *
+     * O plano fecha **pt-BR na raiz e inglês em `/en/…`** — o idioma é escolha de
+     * URL, e a partir da Fase 8 também do seletor em *Ajustes*. Adivinhar pelo
+     * cabeçalho do navegador contradiz as duas coisas.
+     */
+    detectBrowserLanguage: false,
+    locales: [
+      { code: 'pt-BR', language: 'pt-BR', name: 'Português', file: 'pt-BR.json' },
+      { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },
     ],
   },
 

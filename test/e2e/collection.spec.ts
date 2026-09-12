@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
-import { skipInvite } from './support'
+import { navLabel, skipInvite } from './support'
 
 /**
  * O ciclo da Fase 5, num navegador de verdade.
@@ -206,7 +206,7 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
    * e a barra sem o link — e só um clique de verdade percebe.
    */
   for (const destino of destinos) {
-    await expect(page.getByRole('link', { name: destino.label, exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: navLabel(destino.label), exact: true })).toBeVisible()
   }
 
   for (const destino of destinos) {
@@ -214,7 +214,7 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
     if (esperado === undefined) continue
 
     await page.goto('/collection')
-    await page.getByRole('link', { name: destino.label, exact: true }).click()
+    await page.getByRole('link', { name: navLabel(destino.label), exact: true }).click()
     await expect(page).toHaveURL(esperado.url)
 
     /**
@@ -244,13 +244,13 @@ test('a barra marca a seção atual, e só uma', async ({ page }) => {
 
   const atual = page.locator('.nav__link[aria-current="page"]')
   await expect(atual).toHaveCount(1)
-  await expect(atual).toHaveText('Pokédex')
+  await expect(atual).toHaveText(navLabel('nav.pokedex'))
 
   // A raiz é o caso em que a marca e *Base* apontam para o mesmo lugar: só o
   // link da seção carrega `aria-current`, e a marca não.
   await page.goto('/')
   await expect(page.locator('[aria-current="page"]')).toHaveCount(1)
-  await expect(page.locator('[aria-current="page"]')).toHaveText('Base')
+  await expect(page.locator('[aria-current="page"]')).toHaveText(navLabel('nav.base'))
 })
 
 /**
