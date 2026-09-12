@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
 import { emptySave } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
-import type { RemoteLoad, Written } from '~~/app/utils/save-http'
-import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-http'
+import type { RemoteLoad, Written } from '~~/app/utils/save-remote'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
 import type { SyncRemote } from '~~/app/utils/save-sync'
 import { SyncDriver, digest, fingerprint } from '~~/app/utils/save-sync'
-import type { SyncState } from '~~/app/utils/sync-state'
+import type { SyncState } from '~~/app/utils/sync-status'
 
 /**
  * O sync contínuo contra um servidor falso que implementa o CAS de verdade.
@@ -17,9 +17,13 @@ import type { SyncState } from '~~/app/utils/sync-state'
  * e2e.
  *
  * O agendador é manual: o *debounce* de 5 s vira uma fila de funções que o teste
- * roda quando quer, e nenhum teste espera relógio. Mora em `test/nuxt/` pelo
- * mesmo motivo de `save-http.spec.ts`: o `SyncDriver` importa o `HttpDriver`, que
- * importa `save-driver`, que cita `window`.
+ * roda quando quer, e nenhum teste espera relógio.
+ *
+ * **Mora em `test/unit/`, e antes não podia.** O `SyncDriver` importava
+ * `SaveConflict` de `save-http.ts`, que puxa `save-driver.ts`, que cita `window`:
+ * o teste de uma regra pura precisava de um ambiente de navegador para existir.
+ * Com o contrato do servidor em `save-remote.ts`, a cadeia acabou — ver o
+ * docblock de lá.
  */
 
 interface Row {
@@ -39,6 +43,8 @@ class FakeServer implements SyncRemote {
   readonly restores: number[] = []
   /** Segura as gravações até o teste soltar — o envio "em voo". */
   hold: Promise<void> | null = null
+  /** A rede caída na leitura: `fetchRemote` rejeita, como um `fetch` sem conexão. */
+  offline = false
   #version = 0
 
   constructor(row: Row | null, previous: Row | null = null) {
@@ -51,6 +57,8 @@ class FakeServer implements SyncRemote {
   }
 
   fetchRemote(): Promise<RemoteLoad | null> {
+    if (this.offline) return Promise.reject(new Error('sem rede'))
+
     if (this.row === null) {
       this.#version = 0
       return Promise.resolve(null)
@@ -309,6 +317,36 @@ describe('o sync contínuo, depois do primeiro login', () => {
     expect(h.timers(), 'o envio imediato cancela o do ócio').toBe(0)
   })
 
+  /**
+   * **O envio garantido não vira um envio comum por ter caído em cima de outro.**
+   *
+   * `flush({keepalive})` durante um voo só marcava `#again` e voltava, e o pedido
+   * perdia a flag: o reenvio ia para a fila do ócio, que é justamente o que a aba
+   * que está morrendo não alcança. Reintroduzir o defeito deixa `puts` com um
+   * item só — o segundo envio fica esperando um agendador que este teste não roda.
+   */
+  it('quem sai durante um envio recebe envio garantido, não a fila do ócio', async () => {
+    const h = synced()
+    let release = (): void => {}
+    h.server.hold = new Promise((resolve) => {
+      release = resolve
+    })
+
+    h.play({ dust: 6 })
+    await h.tick()
+    expect(h.server.puts, 'o primeiro envio está no ar').toHaveLength(1)
+
+    h.play({ dust: 7 })
+    void h.driver.flush({ keepalive: true })
+
+    h.server.hold = null
+    release()
+    await settleNetwork()
+
+    expect(h.server.puts).toHaveLength(2)
+    expect(h.server.puts[1]?.keepalive, 'o segundo saiu com keepalive').toBe(true)
+  })
+
   it('hidratação sem rastreio não conta como jogada', async () => {
     const h = synced()
 
@@ -408,6 +446,36 @@ describe('o boot de um aparelho já acertado', () => {
     expect(h.server.puts).toEqual([{ baseVersion: 3, keepalive: false }])
     expect(h.server.row?.data.dust).toBe(8)
     expect(h.conflicts).toEqual([])
+  })
+
+  /**
+   * **O save zerado antes de a sessão resolver, e o ramo do boot que não aprendia
+   * nada.**
+   *
+   * Com `pending` acima de zero e o servidor na mesma versão, nenhum dos ramos
+   * internos rodava: `#markSynced` ficava sem ser chamado, `#syncedTouched` ficava
+   * falso, e a guarda do envio — *um save intocado nunca sobe por cima de um
+   * documento com jogo* — não via a coleção do outro lado. O vazio subia com um
+   * CAS que casava.
+   *
+   * **Honestidade sobre a prova:** duas linhas consertam este caso — o
+   * `#markSynced` antes dos ramos e o `#synced === null` na guarda —, e remover
+   * só uma delas mantém este teste verde, porque a outra ainda pega. Reintroduzir
+   * as duas reprova. Ele afirma o comportamento; quem separa as duas linhas é o
+   * teste do aviso, logo abaixo, que depende de `#synced` estar aprendido.
+   */
+  it('sujo, servidor na mesma versão e local zerado: o vazio não sobe', async () => {
+    const h = harness({
+      row: { data: forSync(played(5)), version: 3, updatedAt: 't3' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: emptySave(),
+    })
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.server.puts, 'o vazio não sobe por cima da coleção').toHaveLength(0)
+    expect(h.local().dust, 'e o servidor volta').toBe(5)
   })
 
   it('sujo com outro aparelho à frente: arquiva, sobe e avisa depois', async () => {
@@ -512,6 +580,38 @@ describe('apagar local com conta', () => {
     expect(h.server.puts).toHaveLength(0)
     expect(h.server.row?.data.dust).toBe(5)
     expect(h.local().dust).toBe(5)
+  })
+
+  /**
+   * **O achado crítico do review, e o pior caminho do PR.**
+   *
+   * O `#pull` engolia a falha de rede num `catch` vazio e seguia como se tivesse
+   * adotado: o `discardLocal` voltava "feito", e a tela escrevia que a coleção da
+   * conta volta na próxima sincronização. Só que o save local já estava zerado, e
+   * a jogada seguinte **não** é mais intocada — a guarda do envio não dispara, a
+   * `baseVersion` ainda casa, e o CAS aceita. A coleção da conta vira o save que
+   * o jogador acabou de apagar, em silêncio.
+   *
+   * Reintroduzir o defeito — `#pull` sem valor de retorno e `discardLocal` sem o
+   * `#running = false` — faz a jogada abaixo subir e o `dust` do servidor virar
+   * 99.
+   */
+  it('sem rede, não adota, para o sync — e a jogada seguinte não sobe nada', async () => {
+    const h = synced()
+    h.server.offline = true
+
+    const adopted = await h.driver.discardLocal(() => {
+      h.apply(emptySave())
+    })
+
+    expect(adopted, 'não deu para ler o servidor').toBe(false)
+    expect(h.driver.running, 'parado, o boot seguinte resolve').toBe(false)
+
+    h.play({ dust: 99 })
+    await h.tick()
+
+    expect(h.server.puts, 'nada sobe por cima da coleção da conta').toHaveLength(0)
+    expect(h.server.row?.data.dust, 'a coleção da conta continua lá').toBe(5)
   })
 })
 
@@ -641,6 +741,55 @@ describe('as guardas que só aparecem de perto', () => {
 
     expect(h.server.row?.data.dust).toBe(8)
     expect(h.conflicts).toEqual([2])
+  })
+
+  /**
+   * **O aviso armado não sobrevive a uma adoção.**
+   *
+   * `#announce` só era desligado ao ser dado, então um conflito cujo envio falhou
+   * ficava armado indefinidamente. Bastava o jogador apagar o local — que adota o
+   * servidor — e voltar a jogar horas depois: a primeira gravação aceita
+   * anunciava *"as N mudanças deste aparelho venceram e já subiram"* e mandava
+   * procurar a cópia do outro aparelho em *Cópias de segurança*. As duas frases
+   * são falsas — quem venceu foi o servidor —, e o N é a contagem de uma jogada
+   * sem relação com o conflito.
+   *
+   * Reintroduzir o defeito faz `conflicts` terminar com um aviso.
+   */
+  it('o aviso morre com a adoção: ninguém venceu conflito nenhum', async () => {
+    const h = harness({
+      row: { data: forSync(played(6)), version: 4, updatedAt: 't4' },
+      stored: { base: 3, pending: 2, syncedAt: 't3', sent: null },
+      local: played(8),
+    })
+    h.setOnline(false)
+
+    await h.driver.start()
+    await settleNetwork()
+
+    expect(h.archived, 'o conflito do boot arquivou').toHaveLength(1)
+    expect(h.conflicts, 'e ficou por avisar').toEqual([])
+
+    /**
+     * O save é zerado e a rede volta: a guarda do envio manda ler o servidor, e
+     * é o `#adopt` que apaga o conflito.
+     *
+     * **Este caminho não passa por `discardLocal` de propósito.** Aquele limpa o
+     * aviso por conta própria, e ir por ele deixaria o teste verde com a linha
+     * do `#adopt` removida — uma prova falsa, que é exatamente o defeito que
+     * este arquivo existe para não repetir.
+     */
+    h.setOnline(true)
+    h.apply(emptySave())
+    await h.tick()
+
+    expect(h.local().dust, 'o servidor desceu').toBe(6)
+
+    h.play({ dust: 12 })
+    await h.tick()
+
+    expect(h.server.puts.length, 'a jogada subiu').toBeGreaterThan(0)
+    expect(h.conflicts, 'e nenhum aviso saiu').toEqual([])
   })
 })
 

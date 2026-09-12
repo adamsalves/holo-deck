@@ -1,9 +1,12 @@
 import type { SaveData } from '~~/shared/save/schema'
 import { forSync, isUntouched } from '~~/shared/save/sync'
-import type { RemoteLoad, Written } from './save-http'
-import { SaveConflict } from './save-http'
-import type { SyncState } from './sync-state'
-import type { SyncPhase, SyncStatus } from './sync-status'
+// **De `save-remote` e não de `save-http`**, e a diferença é a cadeia de
+// importação: a fronteira HTTP puxa `save-driver.ts`, que cita `window`, e com
+// ela este módulo — que é regra pura — deixava de poder ser medido fora de um
+// navegador. Ver o docblock de `save-remote.ts`.
+import type { RemoteLoad, Written } from './save-remote'
+import { SaveConflict } from './save-remote'
+import type { SyncPhase, SyncState, SyncStatus } from './sync-status'
 
 /**
  * O sync contínuo — o que acontece depois do primeiro login.
@@ -72,6 +75,8 @@ export class SyncDriver {
   #tracking = true
   #inFlight = false
   #again = false
+  /** O envio seguinte precisa sair com `keepalive`: alguém saiu durante um voo. */
+  #againKeepalive = false
   /** Um conflito foi resolvido e o aviso sai no próximo envio aceito. */
   #announce = false
   #cancel: (() => void) | null = null
@@ -159,6 +164,18 @@ export class SyncDriver {
       return
     }
 
+    // **O que o servidor tem, aprendido uma vez, antes de qualquer ramo.**
+    //
+    // A guarda de `#flushOwning` — um save intocado nunca sobe por cima de um
+    // documento com jogo — decide por `#synced`/`#syncedTouched`, e dois
+    // caminhos deste boot não passavam por `#markSynced`: o `pending > 0` com o
+    // servidor na mesma versão, e o `catch` da leitura. Um aparelho cujo save
+    // foi zerado antes de a sessão resolver chegava aqui com a guarda desarmada
+    // e subia o vazio por cima da coleção da conta, com um CAS válido. A
+    // informação é a mesma nos quatro ramos; aprendê-la aqui é o que a torna
+    // impossível de esquecer num deles.
+    this.#markSynced(remote.data)
+
     const remoteKey = fingerprint(remote.data)
     const localKey = this.#seen
 
@@ -243,6 +260,11 @@ export class SyncDriver {
 
     if (this.#inFlight) {
       this.#again = true
+      // **O envio de quem está saindo não vira um envio comum** só porque havia
+      // outro no ar. Sem esta linha o `keepalive` do `pagehide` era engolido
+      // quando calhava de cair em cima de um envio do ócio, e a jogada do meio
+      // esperava o próximo boot — justamente na aba que está morrendo.
+      if (options.keepalive === true) this.#againKeepalive = true
       return
     }
 
@@ -308,12 +330,33 @@ export class SyncDriver {
    * save vazio seria uma mudança como outra qualquer — e subiria por cima da
    * coleção da conta, que é exatamente o que a promessa diz que não acontece.
    */
-  async discardLocal(clear: () => void): Promise<void> {
+  async discardLocal(clear: () => void): Promise<boolean> {
     this.#cancelTimer()
     this.#state = { ...this.#state, pending: 0, sent: null }
+    // O conflito que ficou por avisar não sobrevive a esta tela: ver `#adopt`.
+    this.#announce = false
     await this.untracked(clear)
     this.#persist()
-    await this.#pull()
+
+    const adopted = await this.#pull()
+
+    /**
+     * **Sem resposta do servidor, o sync para — e é o conserto de um caminho que
+     * apagava coleção em silêncio.**
+     *
+     * O `#pull` engolia a falha de rede e seguia como se tivesse adotado. O save
+     * local acabava de ser zerado, então a jogada seguinte já **não** é
+     * intocada: a guarda do envio não dispara, o `PUT` sai com a `baseVersion`
+     * que ainda casa, e o CAS aceita — a coleção da conta vira o save que o
+     * jogador acabou de apagar. A tela promete o contrário ("o da conta volta na
+     * próxima sincronização"), e quem a lê não tem como saber que não voltou.
+     *
+     * Parado, o boot seguinte lê o servidor e retoma. Quem chama recebe o
+     * `false` e conta ao jogador o que de fato aconteceu.
+     */
+    if (!adopted) this.#running = false
+
+    return adopted
   }
 
   stop(): void {
@@ -382,20 +425,44 @@ export class SyncDriver {
     })
     this.#markSynced(remote.data)
     this.#state = { base: remote.version, pending: 0, syncedAt: remote.updatedAt, sent: null }
+
+    /**
+     * **O aviso de conflito morre com a adoção.**
+     *
+     * Ele afirma "as mudanças deste aparelho venceram e já subiram", e adotar é
+     * exatamente o contrário — quem venceu foi o servidor. O `#announce` só era
+     * desligado ao ser dado, então um conflito de boot cujo envio falhou ficava
+     * armado: bastava o jogador apagar o local (que adota) e jogar horas depois
+     * para a primeira gravação aceita anunciar uma disputa já resolvida para o
+     * outro lado, com uma contagem de mudanças sem relação nenhuma com ela.
+     */
+    this.#announce = false
   }
 
-  /** Relê o servidor e o adota — sem rede, fica como está e o boot seguinte resolve. */
-  async #pull(): Promise<void> {
+  /**
+   * Relê o servidor e o adota. **Devolve se adotou**, e a diferença é o conserto:
+   * "adotei" e "não consegui falar com ele" autorizam ações opostas em quem
+   * chama, e tratar as duas como sucesso é o que fazia um save apagado subir por
+   * cima da coleção da conta.
+   */
+  async #pull(): Promise<boolean> {
+    let adopted = false
+
     try {
       const remote = await this.#deps.remote.fetchRemote()
-      if (remote !== null && remote.recovered === null) await this.#adopt(remote, this.#deps.compose())
+      if (remote !== null && remote.recovered === null) {
+        await this.#adopt(remote, this.#deps.compose())
+        adopted = true
+      }
     }
     catch {
-      // Sem rede: o que ficou é limpo, e o boot seguinte adota o servidor.
+      // Sem rede: quem chamou decide o que fazer com a ausência.
     }
 
     this.#persist()
     this.#settlePhase()
+
+    return adopted
   }
 
   #afterBoot(): void {
@@ -414,14 +481,18 @@ export class SyncDriver {
 
     const doc = this.#deps.compose()
 
-    if (isUntouched(doc) && this.#syncedTouched) {
-      // **Um save intocado nunca sobe por cima de um documento com jogo.** Jogar
-      // não devolve save nenhum ao estado inicial — o primeiro pack já muda
-      // `welcomeClaimed` para sempre —, então intocado aqui é save apagado, e o
-      // que vale é o servidor.
+    if (isUntouched(doc) && (this.#syncedTouched || this.#synced === null)) {
+      // **Um save intocado nunca sobe por cima de um documento com jogo** — nem
+      // por cima de um documento que este aparelho ainda não conseguiu ler.
+      // Jogar não devolve save nenhum ao estado inicial — o primeiro pack já
+      // muda `welcomeClaimed` para sempre —, então intocado aqui é save apagado,
+      // e o que vale é o servidor.
+      //
+      // `#synced === null` é o boot que não falou com o servidor: ali não se
+      // sabe o que há do outro lado, e "não sei" não autoriza sobrescrever.
       this.#state = { ...this.#state, pending: 0, sent: null }
       this.#persist()
-      await this.#pull()
+      if (!await this.#pull()) this.#running = false
       return
     }
 
@@ -442,7 +513,15 @@ export class SyncDriver {
 
     if (this.#again) {
       this.#again = false
-      if (this.#state.pending > 0) this.#schedule()
+      const keepalive = this.#againKeepalive
+      this.#againKeepalive = false
+
+      if (this.#state.pending > 0) {
+        // Quem pediu envio garantido no meio do voo recebe um envio garantido, e
+        // não uma volta para a fila do ócio: a aba pode não chegar lá.
+        if (keepalive) await this.#flushOwning({ keepalive: true })
+        else this.#schedule()
+      }
     }
   }
 
@@ -601,8 +680,14 @@ function canonical(value: unknown): string {
  * Um resumo curto de uma impressão — o que o estado persistido guarda em `sent`.
  *
  * FNV-1a de 32 bits: não é segurança, é identidade. O que se pergunta é "o
- * servidor tem o que eu mandei?", e uma colisão só custaria um aviso de conflito
- * a menos numa gravação que por acaso tivesse o mesmo resumo.
+ * servidor tem o que eu mandei?".
+ *
+ * **O custo de uma colisão é maior que um aviso a menos**, e vale escrevê-lo
+ * certo: o boot leria como recibo atrasado um documento que outro aparelho
+ * gravou, e o ramo do recibo não avisa **nem arquiva** a cópia do servidor. Nada
+ * se perde — aquele documento continua na coluna anterior do servidor, a um
+ * *Restaurar versão anterior* de distância —, mas a frase anterior prometia
+ * menos consequência do que há. Um em 2³² por gravação que ficou sem resposta.
  */
 export function digest(text: string): string {
   let hash = 0x811C9DC5

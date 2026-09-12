@@ -11,7 +11,7 @@ import { useProgressStore } from '~~/app/stores/progress'
 import { initialsOf } from '~~/app/utils/initials'
 import { agoLabel } from '~~/app/utils/relative-time'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
-import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-http'
+import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
 import { syncLabel } from '~~/app/utils/sync-label'
 import { useAccount } from '~/composables/useAccount'
 import { useGameClock } from '~/composables/useGameClock'
@@ -239,11 +239,29 @@ async function clearSave(): Promise<void> {
    * vazio seria uma mudança como outra qualquer: subiria por cima da coleção da
    * conta, que é exatamente o que a frase diz que não acontece.
    */
-  await $sync.discardLocal(() => {
+  const adopted = await $sync.discardLocal(() => {
     void $saveDriver.clear()
     apply(emptySave())
   })
   refreshBackups()
+
+  /**
+   * **Sem resposta do servidor, a tela diz isso** — e não a promessa.
+   *
+   * O `discardLocal` engolia a falha de rede e voltava como se tivesse trazido a
+   * coleção da conta; a tela escrevia "o da conta volta na próxima
+   * sincronização" e a jogada seguinte subia o vazio por cima dela. Agora o
+   * driver para, nada sobe deste aparelho até o próximo boot com rede, e a frase
+   * descreve o que de fato aconteceu.
+   */
+  if (!adopted) {
+    notice.value = {
+      tone: 'failed',
+      text: 'Save deste aparelho apagado, e a cópia ficou nas cópias de segurança. O da sua conta não pôde ser lido agora — ele volta quando houver rede, e nada sobe deste aparelho até lá.',
+    }
+    return
+  }
+
   notice.value = {
     tone: 'done',
     text: collection.ownedCount > 0
@@ -367,14 +385,19 @@ async function refreshPrevious(): Promise<void> {
 }
 
 watch(
-  () => [account.value?.id ?? null, status.value?.phase ?? null, status.value?.syncedAt ?? null] as const,
-  ([id, phase]) => {
+  () => [account.value?.id ?? null, status.value?.phase ?? null] as const,
+  ([id, phase], before) => {
     if (id === null) {
       previous.value = null
       return
     }
 
-    if (phase === 'synced') void refreshPrevious()
+    // **Só na transição para `synced`.** O observador incluía `syncedAt`, que
+    // muda a cada gravação aceita: com a tela aberta, cada carta escalada virava
+    // um `GET /api/save/previous`. Toda gravação passa por `sending` antes de
+    // voltar a `synced`, então a transição não perde nenhuma troca de versão
+    // anterior — e o restaurar relê por conta própria, no `finally`.
+    if (phase === 'synced' && before?.[1] !== 'synced') void refreshPrevious()
   },
   { immediate: true },
 )
