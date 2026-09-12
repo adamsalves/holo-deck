@@ -1,6 +1,7 @@
 import { useState } from 'nuxt/app'
 import type { Ref } from 'vue'
 import { authClient } from '~~/app/utils/auth-client'
+import { markInviteSeen } from '~~/app/utils/invite'
 import { clearSyncedWith } from '~~/app/utils/last-write'
 import { clearSyncState } from '~~/app/utils/sync-state'
 
@@ -8,6 +9,8 @@ import { clearSyncState } from '~~/app/utils/sync-state'
 export interface Account {
   readonly id: string
   readonly name: string
+  /** O e-mail da conta — a linha principal do painel de conta em Ajustes, como a prancha desenha. */
+  readonly email: string
   /** A foto do provedor, quando há uma. A barra cai nas iniciais sem ela. */
   readonly image: string | null
 }
@@ -51,7 +54,14 @@ export function useAccount(): {
 
       account.value = user === undefined
         ? null
-        : { id: user.id, name: user.name, image: user.image ?? null }
+        : { id: user.id, name: user.name, email: user.email, image: user.image ?? null }
+
+      // Um aparelho que já viu uma conta deixou de ser o de quem nunca teve
+      // uma, e o convite existe só para esse. Marcar aqui cobre os dois casos em
+      // que ele mentiria depois: a sessão que não pôde ser lida — sem rede, a
+      // conta parece não existir — e o logout, que devolve o aparelho ao modo
+      // sem conta com a coleção que a conta já guarda.
+      if (account.value !== null) markInviteSeen()
     }
     catch {
       // Sem sessão legível o jogo é o de quem não tem conta — que é um modo

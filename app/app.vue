@@ -17,6 +17,10 @@
            sessão, e não de uma tela — o 409 se resolve em qualquer rota,
            inclusive na batalha, que não tem a barra. -->
       <SyncConflictNotice />
+
+      <!-- O convite de conta, pelo mesmo motivo: quem o pede é o momento — a
+           vitória, o fim de um pack, o Hub —, e não uma tela. -->
+      <AccountInvite />
     </ClientOnly>
 
     <!-- Sem NuxtLayout aqui, o primeiro app/layouts/default.vue da Fase 2 é

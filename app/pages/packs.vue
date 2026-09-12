@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'nuxt/app'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
   PACK_PRICE,
   WELCOME_PACKS,
@@ -21,12 +21,13 @@ import {
 import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
-import { RARITY_LABELS } from '~~/shared/types/game'
+import { RARITY_LABELS, rarityRank } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from '~/composables/useDex'
 import { useGameClock } from '~/composables/useGameClock'
 import { useReduceMotion } from '~/composables/useMotion'
+import { useInvite } from '~/composables/useInvite'
 
 /**
  * A loja e a abertura — as pranchas *Loja* e *Abertura de pack*, nessa ordem.
@@ -94,6 +95,23 @@ function revealAll(): void {
 
 const openedEntries = computed(() =>
   opened.value.map(card => entryById.value.get(card.speciesId) ?? null))
+
+/**
+ * O convite de conta, no fim da virada de um pack que trouxe ultra ou acima — a
+ * outra metade do "após o primeiro ginásio ou o primeiro ultra" da prancha
+ * *Convite*.
+ *
+ * **No fim da virada, e não no crédito.** A coleção recebe as dez antes da
+ * animação, e um convite aberto na frente da carta que ainda vai virar estragaria
+ * a única revelação que o jogo tem. Pular e o interruptor de movimento chegam ao
+ * mesmo lugar, porque os dois levam `revealed` ao total.
+ */
+const invite = useInvite()
+
+watch(revealed, (count) => {
+  if (count === 0 || count < opened.value.length) return
+  if (opened.value.some(card => rarityRank(card.rarity) >= rarityRank('ultra'))) invite.offer()
+})
 
 const dailyReady = computed(() => progress.dailyReadyAt(now.value))
 
