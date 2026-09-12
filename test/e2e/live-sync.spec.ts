@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { FakeSync } from './support'
-import { fakeSync, saveWith, seedLocalSave, seedSynced } from './support'
+import { backups, fakeSync, localDust, saveWith, seedLocalSave, seedSynced } from './support'
 
 /**
  * O sync contínuo num navegador de verdade — depois do primeiro login.
@@ -65,24 +65,6 @@ async function pickCard(page: Page): Promise<void> {
     await page.locator('.deck__pick').first().click()
     await expect.poll(() => page.locator('.deck-slot--empty').count(), { timeout: 1000 }).toBeLessThan(6)
   }).toPass({ timeout: 15_000 })
-}
-
-function localDust(page: Page): Promise<number | null> {
-  return page.evaluate(() => {
-    const raw = window.localStorage.getItem('holodeck:save')
-    if (raw === null) return null
-
-    const save: unknown = JSON.parse(raw)
-    return typeof save === 'object' && save !== null && 'dust' in save && typeof save.dust === 'number'
-      ? save.dust
-      : null
-  })
-}
-
-function backups(page: Page): Promise<string[]> {
-  return page.evaluate(() => Object.keys(window.localStorage)
-    .filter(key => key.startsWith('holodeck:backup:'))
-    .map(key => window.localStorage.getItem(key) ?? ''))
 }
 
 test('uma jogada sobe sozinha, depois do ócio, na versão em que se baseou', async ({ page }) => {

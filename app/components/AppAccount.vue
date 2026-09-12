@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'nuxt/app'
 import { useAccount } from '~/composables/useAccount'
+import { initialsOf } from '~~/app/utils/initials'
 import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
 
 /**
@@ -36,16 +37,7 @@ async function leave(): Promise<void> {
 }
 
 /** As iniciais, para quem não tem foto no provedor. */
-const initials = computed(() => {
-  const name = account.value?.name.trim() ?? ''
-  if (name === '') return '?'
-
-  const parts = name.split(/\s+/)
-  const first = parts[0]?.[0] ?? ''
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : ''
-
-  return `${first}${last}`.toUpperCase()
-})
+const initials = computed(() => initialsOf(account.value?.name ?? ''))
 
 const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
 </script>
