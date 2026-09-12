@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
+import { isSyncBody } from '../../shared/save/sync.ts'
 
 /**
  * O que toda suíte E2E precisa fazer antes de poder afirmar qualquer coisa:
@@ -25,12 +26,35 @@ import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
  * casasse.
  */
 export async function openWelcomePack(page: Page): Promise<void> {
+  await skipInvite(page)
   await page.goto('/packs')
 
   await expect(async () => {
     await page.locator('.packs__buy--gift').click()
     await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
+}
+
+/**
+ * Marca o convite como já visto, **antes de a página abrir**.
+ *
+ * O convite é pedido no fim de um pack que traz ultra ou acima, e o conteúdo do
+ * pack é **sorteado**: qualquer suíte que abra packs passa a ter, de vez em
+ * quando, um diálogo modal por cima da tela — e o `aria-modal` faz dele um
+ * interceptador de clique. Foi assim que `collection.spec.ts` reprovou no clique
+ * de *ABRIR O PRÓXIMO*, com o Playwright nomeando o culpado: `<div
+ * role="dialog" class="invite"> intercepts pointer events`.
+ *
+ * **Localmente não há `retries` e no CI há dois**, então este é exatamente o
+ * defeito que reprova aqui e passa lá — a tentativa seguinte sorteia um pack sem
+ * ultra. Suíte que não é sobre o convite não pode depender de sorte; quem o
+ * testa é `invite.spec.ts`, que semeia o save por conta própria e não passa por
+ * este helper.
+ */
+export async function skipInvite(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('holodeck:invite', '1')
+  })
 }
 
 /** Volta da abertura para a loja, para abrir o próximo. */
@@ -86,6 +110,11 @@ export interface FakeSync {
    * — o `SESSION_EXPIRED` que o `better-auth` dá a conta sem senha.
    */
   staleSession: () => void
+  /**
+   * Fecha o teto de escritas depois de `n` gravações — o 429 do servidor de
+   * verdade, que é o que produz "N mudanças na fila" **sem** falta de rede.
+   */
+  capWrites: (n: number) => void
 }
 
 /**
@@ -127,6 +156,7 @@ export async function fakeSync(
   let sessions = 0
   let signedOut = false
   let stale = false
+  let writeCap = Number.POSITIVE_INFINITY
 
   await page.route('**/api/auth/get-session', async (route) => {
     sessions += 1
@@ -163,6 +193,25 @@ export async function fakeSync(
     const parsed: unknown = JSON.parse(request.postData() ?? '{}')
     const body = isPutBody(parsed) ? parsed : { data: null, baseVersion: -1 }
     puts.push(body)
+
+    /**
+     * As duas recusas que o servidor de verdade tem e este fake não tinha.
+     *
+     * `isSyncBody` é o mesmo guarda da rota — recusa chave desconhecida, batalha
+     * não nula e `schemaVersion` acima do teto —, e sem ele o caminho 400 nunca
+     * atravessava o navegador. O teto de escritas é o outro: ele produz o estado
+     * 03 do indicador (*N mudanças na fila*) **sem** falta de rede, que é
+     * exatamente a divergência da prancha que o README registra neste PR.
+     */
+    if (!isSyncBody(body.data)) {
+      await route.fulfill({ status: 400, json: { statusMessage: 'Corpo inválido' } })
+      return
+    }
+
+    if (puts.length > writeCap) {
+      await route.fulfill({ status: 429, json: { statusMessage: 'Escritas demais nesta hora' } })
+      return
+    }
 
     if (body.baseVersion !== (stored?.version ?? 0)) {
       await route.fulfill({ status: 409, json: { data: stored } })
@@ -237,6 +286,9 @@ export async function fakeSync(
     previous: () => previous,
     staleSession: () => {
       stale = true
+    },
+    capWrites: (n) => {
+      writeCap = n
     },
   }
 }

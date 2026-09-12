@@ -161,6 +161,29 @@ test('o indicador acompanha a jogada: enviando, e sincronizado de novo', async (
 })
 
 /**
+ * O estado 03 cobre **toda fila que não subiu**, e não só a falta de rede — é a
+ * divergência da prancha que o README registra neste PR. O teto de 60 escritas
+ * por hora é o outro caminho até ele, e o que o separa do offline é que a
+ * tentativa **acontece**: o `PUT` sai, o servidor recusa, e a fila espera a
+ * próxima jogada em vez do evento `online`.
+ */
+test('o servidor recusando também conta a fila, sem falta de rede', async ({ page }) => {
+  const sync = await syncedDevice(page)
+  await openDeck(page, sync)
+
+  // O teto fecha antes da jogada: o próximo `PUT` sai e volta 429.
+  sync.capWrites(0)
+  await pickCard(page)
+
+  // A tentativa aconteceu — é o que distingue este caminho do offline, em que
+  // nada chega a sair.
+  await expect.poll(() => sync.puts.length, { timeout: 12_000 }).toBe(1)
+
+  await expect(page.locator('.sync')).toHaveText('1 mudança na fila')
+  expect(sync.current()?.version, 'e nada foi gravado').toBe(1)
+})
+
+/**
  * O estado 03: sem rede o jogo não muda em nada, o indicador conta a fila, e ela
  * sobe sozinha quando a conexão volta — pelo evento `online`, sem jogada nova.
  */

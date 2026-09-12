@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { SaveData } from '../../shared/save/schema.ts'
 import { isSaveData } from '../../shared/save/schema.ts'
+import { skipInvite } from './support'
 
 /**
  * A loja, as regras e os ajustes num navegador de verdade.
@@ -66,6 +67,8 @@ function copies(save: SaveData): number {
 
 test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
   await seedSave(page, 400)
+  // Ver `skipInvite`: um ultra sorteado abre um modal por cima da tela.
+  await skipInvite(page)
   await page.goto('/packs')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Packs' })).toBeVisible()
@@ -110,6 +113,9 @@ test('sem saldo, o botão da loja fecha e diz quanto falta', async ({ page }) =>
 
 test('o pack diário sai de graça, some da loja e volta a contar', async ({ page }) => {
   await seedSave(page, 0)
+  // Depois da revelação este teste **clica** — em `.packs__skip--primary` —, e é
+  // aí que o convite intercepta o ponteiro. Ver `skipInvite`.
+  await skipInvite(page)
   await page.goto('/packs')
 
   // Dois cartões: o diário e o da loja. As boas-vindas já foram no save plantado.
@@ -167,6 +173,9 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
  * defeito.
  */
 test('dois packs abertos em sequência não saem idênticos', async ({ page }) => {
+  // O clique imediato do segundo pack é a coisa inteira deste teste, e é
+  // exatamente o clique que o convite engole. Ver `skipInvite`.
+  await skipInvite(page)
   await page.goto('/packs')
 
   const sprites = async (): Promise<string[]> =>

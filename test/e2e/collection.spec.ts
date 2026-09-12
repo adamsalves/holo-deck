@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
+import { skipInvite } from './support'
 
 /**
  * O ciclo da Fase 5, num navegador de verdade.
@@ -28,6 +29,9 @@ import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts
  */
 
 test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reload', async ({ page }) => {
+  // O convite sai da frente: um dos três packs pode sortear um ultra, e o
+  // diálogo modal engoliria o clique de *ABRIR O PRÓXIMO*. Ver `skipInvite`.
+  await skipInvite(page)
   await page.goto('/packs')
 
   // A loja abre em `Packs`, e o cartão de estreia é o primeiro da fileira. O
@@ -95,6 +99,8 @@ test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reloa
 })
 
 test('a Pokédex conta o que o binder tem, e o filtro de posse separa os dois lados', async ({ page }) => {
+  // Um ultra sorteado abriria o convite por cima da tela. Ver `skipInvite`.
+  await skipInvite(page)
   await page.goto('/packs')
 
   await expect(async () => {
@@ -296,6 +302,9 @@ test('a tela de batalha não recebe a barra global', async ({ page }) => {
  * pediu para moer, perdendo o pó sem nenhum erro aparecer.
  */
 test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', async ({ page }) => {
+  // Este teste é sobre qual elemento recebe o clique: um modal sorteado por cima
+  // dele mediria o convite, não o empilhamento. Ver `skipInvite`.
+  await skipInvite(page)
   await page.goto('/packs')
 
   await expect(async () => {
