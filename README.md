@@ -78,6 +78,26 @@ tem URL própria, que nunca casa com a redirect URI registrada no OAuth App do
 GitHub nem com o `BETTER_AUTH_URL`, e os previews estão atrás do Vercel
 Authentication. Valida-se em `localhost` e em produção.
 
+**O terceiro portão manual é o login em produção, e os passos são estes.** Sem
+eles, "entrar e ver a coleção subir" não é observável: o sync de entrada roda em
+segundo plano e, se o `GET` falha, a tela fica idêntica à do sucesso.
+
+1. No navegador de sempre, entre pelo GitHub. O canto da barra passa a mostrar o
+   avatar e *SAIR*, e o indicador ao lado deles diz *sincronizado há X*.
+2. No mesmo navegador, confira que `holodeck:syncedWith` existe no Local Storage e
+   guarda o **id do usuário**: ele só é escrito quando o acerto de entrada termina.
+3. Numa janela anônima **intocada** — sem abrir pack antes, o que trocaria `adopt`
+   por `ask` —, entre pelo GitHub. O Hub tem de mostrar a mesma contagem de cartas,
+   insígnias e raridades do primeiro navegador.
+4. De volta ao navegador de sempre, escale uma carta no deck e espere ~5 s: o
+   indicador vai a *enviando…* e volta a *sincronizado*. Feche **todas** as janelas
+   anônimas — elas dividem o armazenamento —, abra uma nova, entre, e a carta
+   escalada tem de estar no deck.
+
+Dar diferente no passo 2 é sync de entrada que não concluiu; no 3, `GET /api/save`
+que não voltou; no 4, `PUT /api/save` que não subiu — e o indicador do canto diz
+em qual dos três o jogo parou.
+
 O `reuseExistingServer` do Playwright reaproveita um servidor que já esteja de
 pé na porta configurada — e ele confere que **alguém** atende, não **quem**. Um
 serviço alheio na 3000 faz a suíte inteira rodar contra ele e reprovar dizendo
@@ -144,7 +164,7 @@ vez de manter um sistema paralelo:
 | | |
 |---|---|
 | **Primitivos** | a escada `ink` de 16 degraus, as 18 cores de tipo, as 5 de raridade, o verde de progresso, os 4 chanfros, o raio e as duas famílias |
-| **Semânticos** | superfície e fio: `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` · texto: `--text` `--text-body` `--text-muted` `--text-faint` · papel: `--accent` `--focus` `--shiny` `--forge` `--deficit` `--progress-high` `--progress-mid` `--progress-low` `--progress-track` |
+| **Semânticos** | superfície e fio: `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` · texto: `--text` `--text-body` `--text-muted` `--text-faint` · papel: `--accent` `--focus` `--shiny` `--forge` `--deficit` `--progress-high` `--progress-mid` `--progress-low` `--progress-track` `--coin` `--hp` `--brand` `--synced` `--caution` `--conflict` |
 
 Dois deles — `--surface-sunken` e `--text-faint` — estão declarados à frente do
 consumidor, e o portão de tema reprova qualquer terceiro que apareça: token sem
@@ -165,6 +185,14 @@ certo, e a recusa é o que os transformou em nome:
 Os três degraus de progresso e os cinco papéis entraram também na matriz de
 contraste, que hoje cobra `--accent`, `--focus` e os `--text-*` sobre **todas** as
 superfícies descobertas no tema.
+
+A Fase 6 acrescentou `--coin`, `--hp` e `--brand` pelo mesmo caminho, e a Fase 7
+os três do sync ao vivo: `--synced` (o verde do *sincronizado há 2 min*),
+`--caution` (o amarelo que a prancha dá à fila offline, ao *SÓ NESTE APARELHO* e ao
+*Restaurar versão anterior* — isto não está no servidor, ou vai substituir o que
+está) e `--conflict` (o roxo do único estado que fala com o jogador). Os seis
+estão na matriz de contraste; a linha dos semânticos acima não tinha os três da
+Fase 6 e passou a ter os seis.
 
 **Regra dura: componente consome semântico. Nunca primitivo, nunca hex cru.** As
 pranchas do canvas usam hex inline porque são mockup, e copiar da prancha para o
@@ -348,8 +376,13 @@ está aqui é só o que sobrou de propósito.
 | o corpo que sincroniza é o próprio `SaveData`, com `battle` sempre nula | e não um tipo recortado sem o campo. Assim o mesmo guarda vale nos dois lados, sem uma segunda definição de "save válido" livre para divergir da primeira — o repositório já sabe o que acontece com duas definições da mesma regra |
 | `GET /api/save` responde **404**, e não um save vazio | as duas respostas levam a ações opostas no cliente: sem linha, o local vence e sobe; com linha, entra a decisão do primeiro login. Um save vazio com 200 apagaria a diferença justamente no caso em que ela custa uma coleção |
 | a entrada da conta é o **canto** da barra, não uma sétima seção | jogar nunca exige conta — o princípio que governa a fileira 4 do canvas. Um link entre *Packs* e *Liga* transformaria a conta em destino do jogo, que é o contrário do que a prancha *Convite* desenha. A prancha já punha o avatar de 32px à direita; o que mudou é que agora ele também é a porta de entrada de quem **não** tem conta |
-| a prancha *Convite* ainda não existe em código | ela aparece uma vez, depois do primeiro ginásio, e é recusável. Fica para a segunda metade da fase; até lá, o canto da barra é a única entrada — e é o que o `nav-gate` afirma |
+| o convite aparece uma vez **por aparelho**, e não uma vez por jogador | ele só existe para quem não tem conta, e cada navegador sem conta guarda uma coleção que só ele tem. A marca mora em `holodeck:invite`, chave local fora do save, pela mesma razão de `holodeck:lastWrite`: dentro do save ela subiria junto com a coleção e passaria a valer para o outro aparelho. Um aparelho que **vê** uma sessão também se marca — senão o convite voltaria no dia em que a sessão não pudesse ser lida, dizendo a quem tem conta que a coleção existe só ali |
+| o convite é **pedido** em três momentos, e uma regra só decide | a prancha diz "após o primeiro ginásio ou o primeiro ultra": pedem a vitória, no fim da batalha, e a última carta virada de um pack que trouxe ultra ou acima. O terceiro pedido é o do Hub, retroativo, para quem já cumpria antes de o convite existir. Quem confere as quatro travas — sem conta, com carta, uma vez por aparelho, recusável — é o `AccountInvite`, e é por isso que um pedido feito antes de a sessão ser lida espera em vez de se perder |
 | a tela *Duas coleções* usa `h2`, não `h1` | a prancha desenha o título como o maior da tela, e ele continua sendo visualmente. Na marcação ele é `h2`: a página por baixo continua montada com o `h1` dela, e dois `h1` na mesma árvore é sumário quebrado para quem navega por cabeçalho |
+| no 409, o documento deste aparelho vence **inteiro** — sem reaplicar mudança por mudança | o plano escreve que o cliente "reaplica sua mutação pendente sobre o save que o servidor devolveu", e reaplicar mudança por mudança exige guardar as operações e juntá-las com as do outro aparelho — é merge, que o mesmo parágrafo do plano recusa. O flag de sujo aplicado ao 409 é a regra do boot: local com mutação pendente vence. O custo aceito é o que o outro aparelho gravou no intervalo sair do save vivo, e ele não some: vai para as *Cópias de segurança* deste aparelho antes de ser sobrescrito, e o aviso diz onde. A prancha *Sync* dizia "reaplicamos suas 3 mudanças por cima" e foi corrigida no canvas |
+| "N mudanças na fila" conta **gravações**, não operações | o sync sobe o documento inteiro, então não existe fila de operações para contar. O número é quantos documentos diferentes este aparelho gravou desde o último envio aceito, e turno de batalha não entra: ele não muda o documento que sobe |
+| restaurar **troca** a versão atual e a anterior, e o servidor guarda o instante da anterior (`previous_updated_at`, migration `0002`) | o plano escreve "volta para `previousData`". Voltar sem trocar perderia a atual, e um restaurar sem querer não teria desfazer; com a troca, restaurar de novo desfaz. O instante é o que deixa a tela escrever "feita há 2 min", que a prancha *Ajustes* pede e a tabela do plano não guardava |
+| excluir a conta é o `deleteUser` do `better-auth`, e não uma rota `DELETE /api/account` nossa | o endpoint da biblioteca apaga o usuário e as sessões e limpa o cookie; o save e o contador de escritas vão pelo `onDelete: 'cascade'` do banco, que o plano já previa. O que decide é a trava que vem junto: conta sem senha — todas aqui — só se exclui com sessão de menos de um dia (`freshAge`), então um aparelho esquecido logado não apaga a coleção de ninguém num clique. **O save deste aparelho fica**: excluir a conta não é *Apagar save deste aparelho* |
 
 ### Decidido na Fase 6, contra o que a prancha desenhava
 
@@ -431,15 +464,13 @@ progresso que ninguém pode mover.
   da loja**, que é o que criou os destinos da primeira (`/rules`, `/settings`,
   `/packs` como loja) e a economia do segundo. Com eles saíram a barra própria do
   Hub e a fileira provisória de portas.
-- **Fase 7, e o que `/settings` deixa de fora por causa dela:** o painel de conta,
-  o estado de sincronização e *restaurar a gravação anterior do servidor*. Os três
-  aparecem nomeados na tela, num painel *Ainda não* — a ausência é dado que não
-  existe, e o jogador precisa saber disso. **A primeira metade da fase entregou a
-  conta**, mas por fora de `/settings`: entrar e sair moram no canto da barra, e o
-  painel continua *Ainda não* porque o que ele promete é o **estado de
-  sincronização**, que é a segunda metade. `previousData` já é gravado a cada
-  `PUT`, então *restaurar a gravação anterior do servidor* passou a ter dado — o
-  que falta é a rota que o devolve.
+- ~~**Fase 7, e o que `/settings` deixa de fora por causa dela:** o painel de
+  conta, o estado de sincronização e *restaurar a gravação anterior do
+  servidor*.~~ **Entregues no PR 2 da fase.** O painel de conta traz o e-mail, o
+  estado do sync e *SAIR*; *Restaurar versão anterior* aparece quando o servidor
+  tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
+  de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
+  *Ainda não* ficou com três coisas, e as três são da Fase 8.
 - **Sem a peça que os sustenta:** o seletor de **idioma** (não há i18n), o
   interruptor de **som** (não há áudio) e *baixar tudo para offline* (não há PWA).
   Os três estão na prancha *Ajustes*, e nenhum dos três tem o que ligar.
@@ -456,18 +487,19 @@ progresso que ninguém pode mover.
   Fase 2 e só a `/styleguide` a chama; sem ela, a inclinação do foil não funciona
   em iPhone nenhum. A prancha *Ajustes* não desenha o controle, e `/settings`
   respeitou isso — decidir onde ele mora é decisão de canvas, não de código.
-- **Sincronização.** O plano fechou *last-write-wins* por `updatedAt`, sem merge.
-  A prancha *Sync* diz o contrário, por escrito: o `updatedAt` "nunca é usado
-  para resolver conflito", e a regra dos quatro estados é "local com mutação
-  pendente vence; local limpo aceita o servidor, sem comparar relógio de
-  aparelho". São regras diferentes, e a Fase 8 não pode escolher no meio da
-  implementação.
-
 Uma das perguntas desta lista **foi respondida na Fase 5**, e fica registrada
 aqui porque o canvas não a respondia sozinho: as barras de progresso por região
 aparecem em três cores sempre nas mesmas regiões, o que não distingue *escala de
 progresso* de *cor da região*. Decidido: **escala**, com cortes em 50% e 15%,
 e a regra mora em `shared/game/progress.ts` para `/rules` poder lê-la.
+
+Outra **nunca foi pergunta**, e fica registrada pelo mesmo motivo. Esta lista
+dizia que o plano fechava *last-write-wins* por `updatedAt` e que a prancha
+*Sync* dizia o contrário. O plano fecha o **flag de sujo** — *local com mutação
+pendente vence; local limpo aceita o servidor* —, pela mesma razão que a prancha
+escreve: comparar relógio entre aparelhos faz um celular com a data errada ganhar
+sempre. Quem punha os dois em lados opostos era este README, e a Fase 7
+implementou a regra que os dois já diziam.
 
 ## Dados do jogo
 
