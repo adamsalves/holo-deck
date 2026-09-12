@@ -175,9 +175,35 @@ async function reconcile(
       break
 
     case 'push': {
-      const written = await http.write(local)
-      markSyncedWith(userId)
-      sync.begin({ base: written.version, pending: 0, syncedAt: written.updatedAt }, local)
+      try {
+        const written = await http.write(local)
+        markSyncedWith(userId)
+        sync.begin({ base: written.version, pending: 0, syncedAt: written.updatedAt }, local)
+      }
+      catch {
+        /**
+         * **A subida falhou, e o sync continua nascendo.**
+         *
+         * Sem isto o driver nunca arrancava: `status` ficava nulo, e nulo é
+         * "sem conta" para a tela — o indicador some da barra e a linha de sync
+         * some de Ajustes. O jogador terminava o primeiro login com conta e
+         * **nenhum** sinal de que nada está subindo, que é o contrário do que o
+         * indicador existe para fazer. Só o `console.warn` sabia.
+         *
+         * Começa com a mudança pendente: o chip escreve "1 mudança na fila" e o
+         * envio sai pelo ócio, pelo evento `online` ou pelo próximo boot. O
+         * documento de referência é o que o **servidor** tem — nada, ou o save
+         * intocado que a decisão mandou sobrescrever —, e não o local, senão a
+         * guarda do envio passaria a acreditar que os dois lados já batem.
+         *
+         * **O acerto não é marcado**: o primeiro login só terminou quando o
+         * servidor recebeu, e o boot seguinte refaz a decisão inteira.
+         */
+        sync.begin(
+          { base: remote?.version ?? 0, pending: 1, syncedAt: remote?.updatedAt ?? null },
+          remote?.data ?? local,
+        )
+      }
       break
     }
 

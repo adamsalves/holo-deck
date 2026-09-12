@@ -1,4 +1,4 @@
-import { useState } from 'nuxt/app'
+import { tryUseNuxtApp, useState } from 'nuxt/app'
 import type { Ref } from 'vue'
 import { authClient } from '~~/app/utils/auth-client'
 import { markInviteSeen } from '~~/app/utils/invite'
@@ -128,6 +128,21 @@ export function useAccount(): {
    * descreve nada. A recarga é a de `signOut`, pelo motivo escrito lá.
    */
   function forget(): void {
+    /**
+     * **O sync para antes de a marca sumir, e `stop()` existe para este momento.**
+     *
+     * Sair recarrega a página, e a recarga dispara o `pagehide` que o plugin de
+     * sync escuta: sem esta linha, um envio garantido saía **depois** do logout
+     * e regravava, ao persistir o estado, o `holodeck:syncState` que as duas
+     * linhas abaixo acabaram de apagar. O método era público e não tinha um
+     * chamador no repositório inteiro — uma API descrevendo um ciclo de vida que
+     * ninguém executava.
+     *
+     * `tryUseNuxtApp` e não `useNuxtApp`: isto roda num handler de clique, fora
+     * do `setup`, e o plugin de sync pode nem ter provido nada ainda no boot em
+     * que a sessão falha.
+     */
+    tryUseNuxtApp()?.$sync?.stop()
     clearSyncedWith()
     clearSyncState()
     account.value = null
