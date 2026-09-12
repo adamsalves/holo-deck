@@ -20,7 +20,7 @@
  */
 
 import { eq } from 'drizzle-orm'
-import { db } from '~~/server/db'
+import { getDb } from '~~/server/db'
 import { saves, user } from '~~/server/db/schema'
 import { readPrevious, readSave, restoreSave, writeSave } from '~~/server/db/save-store'
 import { WINDOW_MS, countWrite, refundWrite } from '~~/server/db/save-rate-limit'
@@ -36,8 +36,8 @@ const ok = (label: string, cond: boolean): void => {
   console.log(`${cond ? '  OK  ' : ' FALHA'}  ${label}`)
 }
 
-await db.delete(user).where(eq(user.id, UID))
-await db.insert(user).values({ id: UID, name: 'verificação', email: `${UID}@exemplo.invalido` })
+await getDb().delete(user).where(eq(user.id, UID))
+await getDb().insert(user).values({ id: UID, name: 'verificação', email: `${UID}@exemplo.invalido` })
 
 const first = await writeSave(UID, base, 0, new Date())
 ok('primeiro PUT (baseVersion 0) grava versão 1', first.ok && first.version === 1)
@@ -54,7 +54,7 @@ ok('segundo PUT com baseVersion 0 colide em vez de sobrescrever', !again.ok)
 const second = await writeSave(UID, { ...base, dust: 42, collection: { 25: { c: 1, s: 0 } } }, 1, new Date())
 ok('PUT com baseVersion correta grava versão 2', second.ok && second.version === 2)
 
-const [row] = await db.select().from(saves).where(eq(saves.userId, UID)).limit(1)
+const [row] = await getDb().select().from(saves).where(eq(saves.userId, UID)).limit(1)
 ok('previousVersion virou 1 na mesma instrução', row?.previousVersion === 1)
 ok('previousData guardou o save anterior (dust 0)',
   typeof row?.previousData === 'object' && row.previousData !== null
@@ -113,8 +113,8 @@ await refundWrite(UID, new Date(now.getTime() - WINDOW_MS * 2))
 const untouched = await countWrite(UID, now)
 ok('devolver citando outra janela não mexe no contador', untouched.count === 62)
 
-await db.delete(user).where(eq(user.id, UID))
-const gone = await db.select().from(saves).where(eq(saves.userId, UID))
+await getDb().delete(user).where(eq(user.id, UID))
+const gone = await getDb().select().from(saves).where(eq(saves.userId, UID))
 ok('apagar o usuário levou o save junto (cascade)', gone.length === 0)
 
 process.exit(failures === 0 ? 0 : 1)
