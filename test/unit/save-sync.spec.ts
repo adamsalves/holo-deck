@@ -67,9 +67,17 @@ describe('o corpo que sobe para o servidor', () => {
    *
    * As duas asserções juntas é que provam a regra: se a primeira cair, a segunda
    * passa a medir a forma em vez do campo extra, e a recusa vira acidente.
+   *
+   * **A chave extra precisa ser impossível, e não só ausente hoje.** `knownKeys()`
+   * deriva o permitido de `Object.keys(emptySave())`, então um campo novo no
+   * `SaveData` entra aqui sozinho — e no dia em que ele calhar de ter o nome usado
+   * aqui, este teste fica verde e para de medir campo extra nenhum. Foi o que
+   * quase aconteceu: a chave era `loja: { moedas }`, impossível porque a regra de
+   * nomes da casa proíbe campo em português; traduzi-la para `shop: { coins }` a
+   * tornou plausível, já que o jogo tem loja e `coins` **já é** campo do save.
    */
   it('recusa campo que o save não tem, inclusive no progresso', () => {
-    const extra = { ...forSync(emptySave()), shop: { coins: 9999 } }
+    const extra = { ...forSync(emptySave()), notASaveField: true }
     const extraProgress = {
       ...forSync(emptySave()),
       progress: { ...emptySave().progress, admin: true },
