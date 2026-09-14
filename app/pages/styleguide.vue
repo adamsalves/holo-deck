@@ -179,16 +179,16 @@ const tiltSummary = computed(() => {
       </h2>
       <div class="flex flex-wrap gap-2">
         <DexTypeBadge
-          v-for="tipo in TYPE_NAMES"
-          :key="tipo"
-          :type="tipo"
+          v-for="type in TYPE_NAMES"
+          :key="type"
+          :type="type"
         />
       </div>
       <div class="flex flex-wrap gap-3">
         <div
-          v-for="tipo in TYPE_NAMES"
-          :key="tipo"
-          :data-type="tipo"
+          v-for="type in TYPE_NAMES"
+          :key="type"
+          :data-type="type"
           class="h-2 w-28"
           :style="{ background: 'var(--type)', boxShadow: '0 0 16px var(--type)' }"
         />
