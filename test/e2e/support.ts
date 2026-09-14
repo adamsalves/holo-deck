@@ -1,7 +1,32 @@
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { defaultLocale, label } from '../support/locales'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
 import { isSyncBody } from '../../shared/save/sync.ts'
+
+/**
+ * O rótulo que a barra **renderiza**, no idioma pedido.
+ *
+ * Os rótulos de `NavLink` viraram chave de i18n na Fase 8, e cinco suítes procuram
+ * link da barra pelo nome acessível. Resolver a chave aqui mantém a inversão que
+ * `nav-gate` e o e2e da barra aplicam — a lista continua vindo de `nav-links`, não
+ * escrita à mão — e dá um segundo efeito de graça: chave sem tradução reprova o
+ * teste, em vez de virar um link chamado `nav.collection` na tela.
+ *
+ * **O locale é parâmetro, e a primeira versão o fechava em pt-BR.** Isso deixava
+ * o único idioma que este PR entrega fora do alcance de qualquer teste — e três
+ * defeitos de `/en/…` atravessaram cinco checks verdes por causa disso. A leitura
+ * mora em `test/support/locales.ts`, que o portão unitário também usa: os dois
+ * medem a mesma fonte, que é o que o `CLAUDE.md` pede ao dizer que o e2e itera
+ * sobre a mesma lista que o componente renderiza.
+ */
+export function navLabel(key: string, locale: string = defaultLocale()): string {
+  if (!key.startsWith('nav.')) {
+    throw new Error(`rótulo da barra fora do namespace \`nav\`: ${key}`)
+  }
+
+  return label(key, locale)
+}
 
 /**
  * O que toda suíte E2E precisa fazer antes de poder afirmar qualquer coisa:

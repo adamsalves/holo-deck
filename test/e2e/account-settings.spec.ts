@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { FakeSync } from './support'
-import { backups, fakeSync, localDust, saveWith, seedLocalSave, seedSynced } from './support'
+import { backups, fakeSync, localDust, navLabel, saveWith, seedLocalSave, seedSynced } from './support'
 
 /**
  * A metade de Ajustes que depende de conta — a prancha *Ajustes*, com sessão.
@@ -118,7 +118,7 @@ test('excluir a conta sai dela, e o save deste aparelho fica', async ({ page }) 
     page.getByRole('button', { name: 'EXCLUIR TUDO' }).click(),
   ])
 
-  await expect(page.locator('.nav').getByRole('link', { name: 'Entrar' })).toBeVisible()
+  await expect(page.locator('.nav').getByRole('link', { name: navLabel('nav.account') })).toBeVisible()
   await expect.poll(() => localDust(page), 'a coleção deste aparelho continua jogável').toBe(100)
   expect(await page.evaluate(() => window.localStorage.getItem('holodeck:syncedWith'))).toBeNull()
   expect(sync.current(), 'o servidor não tem mais o save').toBeNull()

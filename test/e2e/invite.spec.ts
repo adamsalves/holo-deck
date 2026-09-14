@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { fakeSync, saveWith, seedLocalSave, seedSynced } from './support'
+import { fakeSync, navLabel, saveWith, seedLocalSave, seedSynced } from './support'
 
 /**
  * O convite de conta — a prancha *Convite de conta*, num navegador de verdade.
@@ -58,7 +58,7 @@ test('recusado, ele não volta — uma vez por aparelho', async ({ page }) => {
    * antes de o pedido do Hub existir.
    */
   await page.reload()
-  await expect(page.locator('.nav').getByRole('link', { name: 'Entrar' })).toBeVisible()
+  await expect(page.locator('.nav').getByRole('link', { name: navLabel('nav.account') })).toBeVisible()
   await expect(invite(page)).toHaveCount(0)
 })
 

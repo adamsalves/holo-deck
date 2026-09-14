@@ -5,6 +5,21 @@ import { useRoute } from 'nuxt/app'
 import type { NavLink } from '~~/app/utils/nav-links'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 
+// Os rótulos da barra são chave de i18n desde a Fase 8, não texto — ver o
+// docblock de `NavLink`. Quem resolve é este `t`.
+const { t } = useI18n()
+
+/**
+ * O caminho de cada destino no idioma da vez.
+ *
+ * `NuxtLink` com caminho literal **não** é localizado pelo módulo — quem faz
+ * isso é `localePath` (ou `NuxtLinkLocale`). Com `prefix_except_default`,
+ * `to="/deck"` significa "o `/deck` português", não "a rota deck": medido no
+ * `.output`, a barra de `/en/collection` saía com `href="/deck"`, e um clique
+ * tirava o jogador do inglês sem caminho de volta.
+ */
+const localePath = useLocalePath()
+
 /**
  * A barra de navegação global — a que as pranchas *Hub*, *Loja* e *Regras*
  * desenham no topo, idêntica nas três.
@@ -39,6 +54,14 @@ import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
  * `exact` da Base passa a ser **necessário de verdade** pela primeira vez —
  * `/` é prefixo de toda rota, que era o problema que ele dizia resolver.
  *
+ * **O prefixo comparado é o do locale ativo, não o literal.** Com
+ * `prefix_except_default`, `/collection` é o caminho do português e
+ * `/en/collection` o do inglês. Comparar `route.path` com o `to` cru deixava
+ * **toda** rota `/en/…` sem seção marcada — nem sublinhado, nem `aria-current`,
+ * medido no `.output` —, que é este mesmo defeito entrando por outra porta duas
+ * fases depois. O e2e passa a iterar os dois locales, senão ele volta na
+ * terceira.
+ *
  * Uma consequência boa: o mesmo booleano decide a classe e o `aria-current`, e
  * eles não têm como discordar. Antes eram dois mecanismos, e quem navega por
  * leitor de tela ficava sem a informação que quem enxerga tinha.
@@ -52,8 +75,10 @@ const route = useRoute()
 
 /** A seção atual, por prefixo de caminho — exato só onde `exact` pede. */
 function isCurrent(link: NavLink): boolean {
-  if (link.exact) return route.path === link.to
-  return route.path === link.to || route.path.startsWith(`${link.to}/`)
+  const to = localePath(link.to)
+
+  if (link.exact) return route.path === to
+  return route.path === to || route.path.startsWith(`${to}/`)
 }
 </script>
 
@@ -62,7 +87,7 @@ function isCurrent(link: NavLink): boolean {
     <div class="nav__side">
       <NuxtLink
         v-slot="{ href, navigate }"
-        to="/"
+        :to="localePath('/')"
         custom
       >
         <a
@@ -103,13 +128,13 @@ function isCurrent(link: NavLink): boolean {
 
       <nav
         class="nav__links"
-        aria-label="Seções do jogo"
+        :aria-label="t('nav.sections')"
       >
         <NuxtLink
           v-for="link in NAV_LINKS"
           :key="link.to"
           v-slot="{ href, navigate }"
-          :to="link.to"
+          :to="localePath(link.to)"
           custom
         >
           <a
@@ -119,7 +144,7 @@ function isCurrent(link: NavLink): boolean {
             :aria-current="isCurrent(link) ? 'page' : undefined"
             @click="navigate"
           >
-            {{ link.label }}
+            {{ t(link.label) }}
           </a>
         </NuxtLink>
       </nav>
@@ -128,7 +153,7 @@ function isCurrent(link: NavLink): boolean {
     <div class="nav__side nav__side--end">
       <ClientOnly>
         <NuxtLink
-          to="/packs"
+          :to="localePath('/packs')"
           class="numeric nav__coins"
         >
           <svg
@@ -152,13 +177,13 @@ function isCurrent(link: NavLink): boolean {
             />
           </svg>
           {{ gameNumber(progress.coins) }}
-          <span class="nav__coins-label">moedas</span>
+          <span class="nav__coins-label">{{ t('nav.coins') }}</span>
         </NuxtLink>
       </ClientOnly>
 
       <NuxtLink
         v-slot="{ href, navigate }"
-        :to="NAV_RULES.to"
+        :to="localePath(NAV_RULES.to)"
         custom
       >
         <a
@@ -168,20 +193,20 @@ function isCurrent(link: NavLink): boolean {
           :aria-current="isCurrent(NAV_RULES) ? 'page' : undefined"
           @click="navigate"
         >
-          {{ NAV_RULES.label }}
+          {{ t(NAV_RULES.label) }}
         </a>
       </NuxtLink>
 
       <NuxtLink
         v-slot="{ href, navigate }"
-        :to="NAV_SETTINGS.to"
+        :to="localePath(NAV_SETTINGS.to)"
         custom
       >
         <a
           :href="href ?? undefined"
           class="nav__gear"
           :class="{ 'nav__gear--current': isCurrent(NAV_SETTINGS) }"
-          :aria-label="NAV_SETTINGS.label"
+          :aria-label="t(NAV_SETTINGS.label)"
           :aria-current="isCurrent(NAV_SETTINGS) ? 'page' : undefined"
           @click="navigate"
         >

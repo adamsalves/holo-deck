@@ -3,7 +3,7 @@ import type { SaveData } from '~~/shared/save/schema'
 import { ownedIds } from '~~/shared/save/schema'
 import type { PreviousSummary, RemoteSave } from '~~/shared/save/sync'
 import { isSyncShape } from '~~/shared/save/sync'
-import { db } from '.'
+import { getDb } from '.'
 import { saves } from './schema'
 
 /**
@@ -23,7 +23,7 @@ export type WriteResult
     | { readonly ok: false, readonly current: RemoteSave | null }
 
 export async function readSave(userId: string): Promise<RemoteSave | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({ data: saves.data, version: saves.version, updatedAt: saves.updatedAt })
     .from(saves)
     .where(eq(saves.userId, userId))
@@ -66,7 +66,7 @@ export async function writeSave(
   now: Date,
 ): Promise<WriteResult> {
   if (baseVersion === 0) {
-    const [created] = await db
+    const [created] = await getDb()
       .insert(saves)
       .values({ userId, data, version: 1, updatedAt: now })
       .onConflictDoNothing({ target: saves.userId })
@@ -77,7 +77,7 @@ export async function writeSave(
     return { ok: false, current: await readSave(userId) }
   }
 
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(saves)
     .set({
       previousData: sql`${saves.data}`,
@@ -104,7 +104,7 @@ export async function writeSave(
  * `jsonb` que uma build anterior pode ter escrito.
  */
 export async function readPrevious(userId: string): Promise<PreviousSummary | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({ data: saves.previousData, version: saves.previousVersion, updatedAt: saves.previousUpdatedAt })
     .from(saves)
     .where(eq(saves.userId, userId))
@@ -143,7 +143,7 @@ export type RestoreResult
  * versão trocada precisa ser a que o jogador estava vendo quando clicou.
  */
 export async function restoreSave(userId: string, baseVersion: number, now: Date): Promise<RestoreResult> {
-  const [restored] = await db
+  const [restored] = await getDb()
     .update(saves)
     .set({
       data: sql`${saves.previousData}`,

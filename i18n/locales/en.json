@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "base": "Base",
+    "packs": "Packs",
+    "pokedex": "Pokédex",
+    "collection": "Binder",
+    "deck": "Deck",
+    "league": "League",
+    "rules": "Rules",
+    "settings": "Settings",
+    "account": "Sign in",
+    "sections": "Game sections",
+    "coins": "coins"
+  },
+  "account": {
+    "avatarAlt": "{name}'s account",
+    "signedInAs": "Signed in as {name}",
+    "signOut": "SIGN OUT"
+  },
+  "a11y": {
+    "skipToContent": "Skip to content"
+  }
+}

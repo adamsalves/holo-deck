@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { db } from '.'
+import { getDb } from '.'
 import { saveRateLimit } from './schema'
 
 /** O teto por janela, e a janela. O plano fixa 60 por hora. */
@@ -34,7 +34,7 @@ export interface WriteCount {
 export async function countWrite(userId: string, now: Date): Promise<WriteCount> {
   const cutoff = new Date(now.getTime() - WINDOW_MS)
 
-  const [row] = await db
+  const [row] = await getDb()
     .insert(saveRateLimit)
     .values({ userId, count: 1, windowStart: now })
     .onConflictDoUpdate({
@@ -69,7 +69,7 @@ export async function countWrite(userId: string, now: Date): Promise<WriteCount>
  * seria um teto que não limita.
  */
 export async function refundWrite(userId: string, windowStart: Date): Promise<void> {
-  await db
+  await getDb()
     .update(saveRateLimit)
     .set({ count: sql`greatest(${saveRateLimit.count} - 1, 0)` })
     .where(and(eq(saveRateLimit.userId, userId), eq(saveRateLimit.windowStart, windowStart)))

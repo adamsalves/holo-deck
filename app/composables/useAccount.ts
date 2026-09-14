@@ -148,7 +148,12 @@ export function useAccount(): {
     account.value = null
     known.value = true
 
-    if (typeof window !== 'undefined') window.location.assign('/')
+    // O destino guarda o idioma: sem `localePath`, sair de `/en/settings`
+    // devolvia o jogador ao Hub em português. `tryUseNuxtApp` pelo mesmo motivo
+    // do `$sync` acima — isto roda num handler de clique, fora do `setup`.
+    const home = tryUseNuxtApp()?.$localePath('/') ?? '/'
+
+    if (typeof window !== 'undefined') window.location.assign(home)
   }
 
   return { account, known, load, signOut, deleteAccount }

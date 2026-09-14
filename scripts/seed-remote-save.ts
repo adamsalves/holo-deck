@@ -14,12 +14,12 @@
  * `delete from saves where user_id = (select id from "user" limit 1)`
  */
 import { eq } from 'drizzle-orm'
-import { db } from '~~/server/db'
+import { getDb } from '~~/server/db'
 import { saves, user } from '~~/server/db/schema'
 import { emptySave } from '~~/shared/save/schema'
 import { forSync } from '~~/shared/save/sync'
 
-const [owner] = await db.select({ id: user.id, name: user.name }).from(user).limit(1)
+const [owner] = await getDb().select({ id: user.id, name: user.name }).from(user).limit(1)
 
 if (!owner) {
   console.error('Nenhum usuário no banco — entre uma vez pelo /login antes.')
@@ -43,7 +43,7 @@ const seeded = forSync({
   progress: { pity: 3, welcomeClaimed: 3, coins: 1640, badges: 4, dailyClaimed: null },
 })
 
-await db
+await getDb()
   .insert(saves)
   .values({ userId: owner.id, data: seeded, version: 1, updatedAt: new Date() })
   .onConflictDoUpdate({
@@ -51,6 +51,6 @@ await db
     set: { data: seeded, updatedAt: new Date() },
   })
 
-const [row] = await db.select({ version: saves.version }).from(saves).where(eq(saves.userId, owner.id))
+const [row] = await getDb().select({ version: saves.version }).from(saves).where(eq(saves.userId, owner.id))
 console.log(`save plantado para ${owner.name} — versão ${row?.version ?? '?'}, 8 espécies, 4 insígnias, 1.180 de pó`)
 process.exit(0)

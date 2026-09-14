@@ -1,0 +1,23 @@
+{
+  "nav": {
+    "base": "Base",
+    "packs": "Packs",
+    "pokedex": "Pokédex",
+    "collection": "Coleção",
+    "deck": "Deck",
+    "league": "Liga",
+    "rules": "Regras",
+    "settings": "Ajustes",
+    "account": "Entrar",
+    "sections": "Seções do jogo",
+    "coins": "moedas"
+  },
+  "account": {
+    "avatarAlt": "Conta de {name}",
+    "signedInAs": "Conectada como {name}",
+    "signOut": "SAIR"
+  },
+  "a11y": {
+    "skipToContent": "Pular para o conteúdo"
+  }
+}

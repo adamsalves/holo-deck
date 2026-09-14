@@ -82,6 +82,7 @@ export interface LeagueView {
 export async function useLeague(): Promise<LeagueView> {
   const { loadCore, loadGeneration, loadIndex } = useDex()
   const progress = useProgressStore()
+  const { locale } = useI18n()
   const deck = useDeckStore()
 
   // Registrados antes de qualquer `await`, e por isso não é estilo: ver o
@@ -93,14 +94,23 @@ export async function useLeague(): Promise<LeagueView> {
   const { data } = dexAsync
 
   /**
-   * A chave carrega quantos ginásios estão abertos.
+   * A chave carrega o idioma e quantos ginásios estão abertos.
    *
    * `/league` é pré-renderizada e no servidor o progresso está sempre zerado. Sem
    * a contagem dentro da chave, o cliente encontraria o payload do servidor —
    * só o ginásio 1 — e não buscaria de novo, deixando as cartas vencidas sem
    * time. É o mesmo defeito que `deck-generations:` pagou.
+   *
+   * **O locale entra pela mesma razão, uma fase antes de doer.** `/league` e
+   * `/en/league` são duas páginas pré-renderizadas, e o Nuxt 4 reaproveita o
+   * resultado de uma chave entre as páginas que a usam: medido no `.output`, as
+   * duas gravavam `league-teams:1`. Enquanto o time não carrega texto traduzido
+   * isso é inócuo; no PR que traduzir `GYM_LEADERS`, `/en/league` passaria a
+   * receber o payload português — e o `prerender-payload` ficaria **cego**, não
+   * vermelho, porque a asserção dele é que chave repetida tenha o mesmo valor em
+   * toda página, o que sob esse defeito é verdade.
    */
-  const teamsKey = computed(() => `league-teams:${progress.nextGym}`)
+  const teamsKey = computed(() => `league-teams:${locale.value}:${progress.nextGym}`)
 
   /**
    * **Objeto simples, e não `Map`** — e a diferença apagava o time do Hub.

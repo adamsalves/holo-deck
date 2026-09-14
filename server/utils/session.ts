@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { auth } from './auth'
+import { getAuth } from './auth'
 
 /**
  * O usuário desta requisição, ou 401.
@@ -9,7 +9,7 @@ import { auth } from './auth'
  * que esquece de conferir.
  */
 export async function requireUserId(event: H3Event): Promise<string> {
-  const session = await auth.api.getSession({ headers: event.headers })
+  const session = await getAuth().api.getSession({ headers: event.headers })
 
   if (!session?.user) {
     throw createError({ statusCode: 401, statusMessage: 'Sem sessão' })

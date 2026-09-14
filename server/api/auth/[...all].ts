@@ -1,4 +1,4 @@
-import { auth } from '~~/server/utils/auth'
+import { getAuth } from '~~/server/utils/auth'
 
 /**
  * A rota que o `better-auth` inteiro atende — login, callback do GitHub,
@@ -13,4 +13,4 @@ import { auth } from '~~/server/utils/auth'
  * O `toWebRequest` traduz o evento do h3 para a `Request` padrão da web, que é
  * a fronteira que a biblioteca fala.
  */
-export default defineEventHandler(event => auth.handler(toWebRequest(event)))
+export default defineEventHandler(event => getAuth().handler(toWebRequest(event)))
