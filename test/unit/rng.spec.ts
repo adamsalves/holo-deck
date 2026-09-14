@@ -33,10 +33,10 @@ describe('createRng', () => {
     // cursor, e a batalha continua sem repetir nem pular uma rolagem.
     const original = createRng(7)
     take(original, 5)
-    const meio = original.state()
-    const resto = take(original, 10)
+    const midpoint = original.state()
+    const rest = take(original, 10)
 
-    expect(take(createRng(meio), 10)).toEqual(resto)
+    expect(take(createRng(midpoint), 10)).toEqual(rest)
   })
 
   it('normaliza a seed para uint32, venha ela como for', () => {
@@ -52,14 +52,14 @@ describe('int', () => {
     // 1 a 3 turnos de sono: um `max` exclusivo aqui tiraria o terceiro turno da
     // condição inteira, e nenhum teste de faixa notaria.
     const rng = createRng(42)
-    const vistos = new Set<number>()
+    const seen = new Set<number>()
     for (let i = 0; i < 2000; i++) {
       const value = rng.int(1, 3)
       expect(value).toBeGreaterThanOrEqual(1)
       expect(value).toBeLessThanOrEqual(3)
-      vistos.add(value)
+      seen.add(value)
     }
-    expect([...vistos].sort()).toEqual([1, 2, 3])
+    expect([...seen].sort()).toEqual([1, 2, 3])
   })
 
   it('faixa de um valor só devolve sempre ele', () => {
@@ -87,22 +87,22 @@ describe('chance', () => {
     // determinístico; a faixa existe para o teste continuar significando "a
     // distribuição está certa" se alguém trocar a seed.
     const rng = createRng(2024)
-    let passou = 0
-    for (let i = 0; i < 10_000; i++) if (rng.chance(0.25)) passou += 1
+    let passed = 0
+    for (let i = 0; i < 10_000; i++) if (rng.chance(0.25)) passed += 1
 
-    expect(passou / 10_000).toBeGreaterThan(0.235)
-    expect(passou / 10_000).toBeLessThan(0.265)
+    expect(passed / 10_000).toBeGreaterThan(0.235)
+    expect(passed / 10_000).toBeLessThan(0.265)
   })
 })
 
 describe('pick', () => {
   it('devolve só itens da lista, e alcança todos', () => {
     const rng = createRng(5)
-    const itens = ['a', 'b', 'c', 'd'] as const
-    const vistos = new Set<string>()
-    for (let i = 0; i < 500; i++) vistos.add(rng.pick(itens))
+    const items = ['a', 'b', 'c', 'd'] as const
+    const seen = new Set<string>()
+    for (let i = 0; i < 500; i++) seen.add(rng.pick(items))
 
-    expect([...vistos].sort()).toEqual(['a', 'b', 'c', 'd'])
+    expect([...seen].sort()).toEqual(['a', 'b', 'c', 'd'])
   })
 
   it('lista de um item devolve o item', () => {

@@ -77,13 +77,13 @@ describe('a forma dos seis slots', () => {
   })
 
   it('só está pronto para a batalha com os seis cheios', () => {
-    const cinco = [PIKACHU, SQUIRTLE, MACHOP, GEODUDE, species(65), null]
-    expect(isBattleReady(cinco)).toBe(false)
-    expect(filledCount(cinco)).toBe(5)
+    const five = [PIKACHU, SQUIRTLE, MACHOP, GEODUDE, species(65), null]
+    expect(isBattleReady(five)).toBe(false)
+    expect(filledCount(five)).toBe(5)
 
-    const seis = place(cinco, 5, species(6))
-    expect(isBattleReady(seis)).toBe(true)
-    expect(deckTeam(seis)).toHaveLength(DECK_SIZE)
+    const six = place(five, 5, species(6))
+    expect(isBattleReady(six)).toBe(true)
+    expect(deckTeam(six)).toHaveLength(DECK_SIZE)
   })
 
   it('entrega o time na ordem dos slots, sem os vazios', () => {
@@ -99,12 +99,12 @@ describe('mover uma carta', () => {
    * próxima leitura do save — depois de a tela já ter mostrado o deck errado.
    */
   it('tira a carta de onde ela estava', () => {
-    const antes = place(emptyDeck(), 1, PIKACHU)
-    expect(antes).toEqual([null, PIKACHU, null, null, null, null])
+    const before = place(emptyDeck(), 1, PIKACHU)
+    expect(before).toEqual([null, PIKACHU, null, null, null, null])
 
-    const depois = place(antes, 4, PIKACHU)
-    expect(depois).toEqual([null, null, null, null, PIKACHU, null])
-    expect(filledCount(depois)).toBe(1)
+    const after = place(before, 4, PIKACHU)
+    expect(after).toEqual([null, null, null, null, PIKACHU, null])
+    expect(filledCount(after)).toBe(1)
   })
 
   it('troca o conteúdo de um slot ocupado', () => {
@@ -167,8 +167,8 @@ describe('a leitura de cobertura', () => {
   it('ordena o dano de saída do que resolve para o que não afeta', () => {
     const { outgoing } = deckCoverage(effectiveness, cards(PIKACHU, GEODUDE, MACHOP), FLYING)
 
-    const lidos = outgoing.map(linha => [linha.type, linha.multiplier])
-    expect(lidos).toEqual([
+    const read = outgoing.map(row => [row.type, row.multiplier])
+    expect(read).toEqual([
       ['electric', 2],
       ['rock', 2],
       ['fighting', 0.5],
@@ -182,7 +182,7 @@ describe('a leitura de cobertura', () => {
     // Geodude é pedra/terrestre: uma carta abre **duas** linhas, uma por tipo que
     // ela cobre. E dois Pokémon do mesmo tipo abririam uma só — a leitura é sobre
     // o que o time alcança, não sobre quantas cartas o alcançam.
-    expect(outgoing.map(linha => linha.type)).toEqual(['electric', 'rock', 'ground'])
+    expect(outgoing.map(row => row.type)).toEqual(['electric', 'rock', 'ground'])
   })
 
   /**

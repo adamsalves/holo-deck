@@ -9,10 +9,10 @@ describe('escada de raridade', () => {
   })
 
   it('ordena por posição, e a ordem é a da lista', () => {
-    const postos = RARITY_NAMES.map(rarityRank)
+    const ranks = RARITY_NAMES.map(rarityRank)
 
-    expect(postos).toEqual([...postos].sort((a, b) => a - b))
-    expect(new Set(postos).size).toBe(RARITY_COUNT)
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b))
+    expect(new Set(ranks).size).toBe(RARITY_COUNT)
   })
 
   it('reconhece só os seis nomes', () => {
@@ -41,9 +41,9 @@ describe('foil', () => {
   })
 
   it('aparece de raro para cima, sem buraco no meio', () => {
-    const comFoil = RARITY_NAMES.filter(hasFoil)
+    const withFoil = RARITY_NAMES.filter(hasFoil)
 
-    expect(comFoil).toEqual(['rare', 'ultra', 'legendary', 'mythic'])
+    expect(withFoil).toEqual(['rare', 'ultra', 'legendary', 'mythic'])
   })
 })
 
@@ -63,8 +63,8 @@ describe('rótulos em português', () => {
 
   it('não deixa o identificador em inglês vazar como rótulo', () => {
     // `ultra` é o único que é a mesma palavra nos dois idiomas.
-    const iguais = RARITY_NAMES.filter(r => RARITY_LABELS[r].toLowerCase() === r && r !== 'ultra')
-    expect(iguais, 'raridade com o identificador no lugar do rótulo').toEqual([])
+    const same = RARITY_NAMES.filter(r => RARITY_LABELS[r].toLowerCase() === r && r !== 'ultra')
+    expect(same, 'raridade com o identificador no lugar do rótulo').toEqual([])
 
     expect(TYPE_NAMES.filter(t => TYPE_LABELS[t].toLowerCase() === t && t !== 'normal'), 'tipo com o identificador no lugar do rótulo').toEqual([])
   })

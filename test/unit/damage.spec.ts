@@ -39,16 +39,16 @@ describe('rollDamage — o caso da prancha da Batalha', () => {
     const noctowl = combatant(2, 'noctowl')
     const thunderbolt = moveBySlug('thunderbolt')
 
-    const semCritico: number[] = []
+    const withoutCritical: number[] = []
     for (let seed = 0; seed < 400; seed++) {
       const roll = rollDamage(pikachu, noctowl, thunderbolt, matrix, createRng(seed))
       expect(roll.effectiveness).toBe(2)
-      if (!roll.critical) semCritico.push(roll.damage)
+      if (!roll.critical) withoutCritical.push(roll.damage)
     }
 
-    expect(Math.min(...semCritico)).toBe(62)
-    expect(Math.max(...semCritico)).toBe(74)
-    expect(semCritico).toContain(68)
+    expect(Math.min(...withoutCritical)).toBe(62)
+    expect(Math.max(...withoutCritical)).toBe(74)
+    expect(withoutCritical).toContain(68)
   })
 })
 
@@ -64,11 +64,11 @@ describe('rollDamage', () => {
     const rngA = createRng(9)
     const rngB = createRng(9)
 
-    const imune = rollDamage(onix, charizard, earthquake, matrix, rngA)
+    const immune = rollDamage(onix, charizard, earthquake, matrix, rngA)
     rollDamage(charizard, onix, earthquake, matrix, rngB)
 
-    expect(imune.damage).toBe(0)
-    expect(imune.effectiveness).toBe(0)
+    expect(immune.damage).toBe(0)
+    expect(immune.effectiveness).toBe(0)
     expect(rngA.state()).toBe(rngB.state())
   })
 
@@ -117,35 +117,35 @@ describe('rollDamage', () => {
 
     const rolls = Array.from({ length: 400 }, (_, seed) =>
       rollDamage(pikachu, noctowl, thunderbolt, matrix, createRng(seed)))
-    const criticos = rolls.filter(roll => roll.critical)
-    const normais = rolls.filter(roll => !roll.critical)
+    const criticals = rolls.filter(roll => roll.critical)
+    const normals = rolls.filter(roll => !roll.critical)
 
-    expect(criticos.length).toBeGreaterThan(0)
-    expect(Math.min(...criticos.map(roll => roll.damage)))
-      .toBeGreaterThan(Math.max(...normais.map(roll => roll.damage)))
+    expect(criticals.length).toBeGreaterThan(0)
+    expect(Math.min(...criticals.map(roll => roll.damage)))
+      .toBeGreaterThan(Math.max(...normals.map(roll => roll.damage)))
   })
 
   it('a queimadura corta o golpe físico e deixa o especial em paz', () => {
     const machamp = combatant(1, 'machamp')
-    const queimado: Combatant = { ...machamp, condition: { kind: 'burn' } }
-    const fisico = moveBySlug('cross-chop')
+    const burned: Combatant = { ...machamp, condition: { kind: 'burn' } }
+    const physical = moveBySlug('cross-chop')
     const especial = moveBySlug('flamethrower')
 
-    const puro = rollDamage(machamp, onix, fisico, matrix, createRng(3)).damage
-    const comQueimadura = rollDamage(queimado, onix, fisico, matrix, createRng(3)).damage
-    expect(comQueimadura).toBeLessThan(puro)
+    const plain = rollDamage(machamp, onix, physical, matrix, createRng(3)).damage
+    const withBurn = rollDamage(burned, onix, physical, matrix, createRng(3)).damage
+    expect(withBurn).toBeLessThan(plain)
 
-    expect(rollDamage(queimado, onix, especial, matrix, createRng(3)).damage)
+    expect(rollDamage(burned, onix, especial, matrix, createRng(3)).damage)
       .toBe(rollDamage(machamp, onix, especial, matrix, createRng(3)).damage)
   })
 
   it('golpe que acerta tira pelo menos 1', () => {
     // Sem o piso, golpe fraco contra defesa alta com ×¼ chega a zero e a
     // batalha empata para sempre.
-    const fraco = moveBySlug('ruination')
+    const weak = moveBySlug('ruination')
     const shuckle = combatant(2, 'shuckle')
     for (let seed = 0; seed < 50; seed++) {
-      expect(rollDamage(shuckle, shuckle, fraco, matrix, createRng(seed)).damage)
+      expect(rollDamage(shuckle, shuckle, weak, matrix, createRng(seed)).damage)
         .toBeGreaterThanOrEqual(1)
     }
   })

@@ -304,13 +304,13 @@ describe('a Liga', () => {
   it('vencer um ginásio já vencido paga revanche e não move a insígnia', () => {
     const progress = useProgressStore()
 
-    const estreia = progress.recordVictory(gym(1), false)
-    const revanche = progress.recordVictory(gym(1), false)
+    const firstWin = progress.recordVictory(gym(1), false)
+    const rematch = progress.recordVictory(gym(1), false)
 
-    expect(estreia.total).toBe(gymReward(gym(1)))
-    expect(revanche.total).toBe(Math.floor(gymReward(gym(1)) * 0.25))
+    expect(firstWin.total).toBe(gymReward(gym(1)))
+    expect(rematch.total).toBe(Math.floor(gymReward(gym(1)) * 0.25))
     expect(progress.badges).toBe(1)
-    expect(progress.coins).toBe(estreia.total + revanche.total)
+    expect(progress.coins).toBe(firstWin.total + rematch.total)
   })
 
   it('o preview é o que o botão estampa, sem o bônus que só se sabe no fim', () => {
@@ -359,14 +359,14 @@ describe('a Liga', () => {
     const progress = useProgressStore()
 
     progress.recordVictory(gym(1), true)
-    const gravado = progress.snapshot()
+    const saved = progress.snapshot()
 
     setActivePinia(createPinia())
-    const depois = useProgressStore()
-    depois.hydrate(gravado)
+    const after = useProgressStore()
+    after.hydrate(saved)
 
-    expect(depois.coins).toBe(375)
-    expect(depois.badges).toBe(1)
-    expect(depois.nextGym).toBe(2)
+    expect(after.coins).toBe(375)
+    expect(after.badges).toBe(1)
+    expect(after.nextGym).toBe(2)
   })
 })

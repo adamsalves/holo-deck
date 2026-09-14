@@ -76,8 +76,8 @@ test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre ele
   await page.goto('/pokedex/1')
   await expect(page.getByRole('link', { name: /^Bulbasaur,/ })).toBeVisible()
 
-  const contador = page.getByRole('button', { name: /^Todos/ })
-  await expect(contador).toHaveText(/151$/)
+  const counter = page.getByRole('button', { name: /^Todos/ })
+  await expect(counter).toHaveText(/151$/)
 
   /**
    * O primeiro clique espera a hidratação; os seguintes não precisam.
@@ -96,22 +96,22 @@ test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre ele
   await expect(async () => {
     await page.getByRole('button', { name: 'Fogo', exact: true }).click()
     // Kanto tem 12 espécies de fogo.
-    await expect(contador).toHaveText(/12 de 151/, { timeout: 1000 })
+    await expect(counter).toHaveText(/12 de 151/, { timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   // Ligar um segundo tipo amplia — é OU dentro do grupo.
   await page.getByRole('button', { name: 'Água', exact: true }).click()
-  await expect(contador).toHaveText(/44 de 151/)
+  await expect(counter).toHaveText(/44 de 151/)
 
   // Ligar raridade restringe — é E entre os grupos.
   await page.getByRole('button', { name: 'Raro', exact: true }).click()
-  const comRaridade = await page.locator('.dex-card').count()
-  expect(comRaridade).toBeGreaterThan(0)
-  expect(comRaridade).toBeLessThan(44)
+  const withRarity = await page.locator('.dex-card').count()
+  expect(withRarity).toBeGreaterThan(0)
+  expect(withRarity).toBeLessThan(44)
 
   // A chip Todos limpa os dois grupos.
-  await contador.click()
-  await expect(contador).toHaveText(/151$/)
+  await counter.click()
+  await expect(counter).toHaveText(/151$/)
 })
 
 test('a busca abre por atalho, filtra e navega', async ({ page }) => {

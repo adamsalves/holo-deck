@@ -35,17 +35,17 @@ describe('índice do dex', () => {
   })
 
   it('concorda com gen-N.json em id, slug, nome e tipos', () => {
-    const porId = new Map(species.map(entry => [entry.id, entry]))
+    const byId = new Map(species.map(entry => [entry.id, entry]))
 
-    const divergentes = index.filter((entry) => {
-      const source = porId.get(entry.id)
+    const diverging = index.filter((entry) => {
+      const source = byId.get(entry.id)
       return source === undefined
         || source.slug !== entry.slug
         || source.displayName !== entry.displayName
         || source.types.join() !== entry.types.join()
     })
 
-    expect(divergentes.map(entry => entry.slug)).toEqual([])
+    expect(diverging.map(entry => entry.slug)).toEqual([])
   })
 
   /**
@@ -57,17 +57,17 @@ describe('índice do dex', () => {
    * afirmar uma raridade que `gen-N.json` não sustenta.
    */
   it('concorda com gen-N.json em BST e nas duas marcas', () => {
-    const porId = new Map(species.map(entry => [entry.id, entry]))
+    const byId = new Map(species.map(entry => [entry.id, entry]))
 
-    const divergentes = index.filter((entry) => {
-      const source = porId.get(entry.id)
+    const diverging = index.filter((entry) => {
+      const source = byId.get(entry.id)
       return source === undefined
         || entry.bst !== baseStatTotal(source.baseStats)
         || source.isLegendary !== entry.isLegendary
         || source.isMythical !== entry.isMythical
     })
 
-    expect(divergentes.map(entry => entry.slug)).toEqual([])
+    expect(diverging.map(entry => entry.slug)).toEqual([])
   })
 
   /**
@@ -80,19 +80,19 @@ describe('índice do dex', () => {
    * obviamente errado no diff.
    */
   it('produz a mesma raridade pelos dois caminhos, para as 1025', () => {
-    const porId = new Map(species.map(entry => [entry.id, entry]))
+    const byId = new Map(species.map(entry => [entry.id, entry]))
 
-    const divergentes = index.flatMap((entry) => {
-      const source = porId.get(entry.id)
+    const diverging = index.flatMap((entry) => {
+      const source = byId.get(entry.id)
       if (source === undefined) return [`${entry.slug} não está em gen-N.json`]
 
-      const doIndice = rarityFrom(entry)
-      const daEspecie = rarityOf(source)
+      const fromIndex = rarityFrom(entry)
+      const fromSpecies = rarityOf(source)
 
-      return doIndice === daEspecie ? [] : [`${entry.slug}: índice ${doIndice} ≠ gen ${daEspecie}`]
+      return fromIndex === fromSpecies ? [] : [`${entry.slug}: índice ${fromIndex} ≠ gen ${fromSpecies}`]
     })
 
-    expect(divergentes).toEqual([])
+    expect(diverging).toEqual([])
   })
 
   /**
@@ -101,9 +101,9 @@ describe('índice do dex', () => {
    * faz `/pokemon/[name]` não depender disso continuar verdadeiro.
    */
   it('aponta cada espécie para a geração em cujo arquivo ela realmente está', () => {
-    const errados = index.filter(entry => generationOfId.get(entry.id) !== entry.generation)
+    const wrong = index.filter(entry => generationOfId.get(entry.id) !== entry.generation)
 
-    expect(errados.map(entry => `${entry.slug} diz gen ${entry.generation}`)).toEqual([])
+    expect(wrong.map(entry => `${entry.slug} diz gen ${entry.generation}`)).toEqual([])
   })
 
   it('está na ordem do dex nacional', () => {

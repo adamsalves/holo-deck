@@ -34,7 +34,7 @@ function gym(number: number): GymId {
 
 const GYMS: readonly GymId[] = Array.from({ length: GYM_COUNT }, (_, index) => gym(index + 1))
 
-function somaDaLiga(terms: { rematch: boolean, flawless: boolean }): number {
+function leagueTotal(terms: { rematch: boolean, flawless: boolean }): number {
   return GYMS.reduce((total, id) => total + rewardFor({ gym: id, ...terms }).total, 0)
 }
 
@@ -48,14 +48,14 @@ describe('recompensa de ginásio', () => {
   })
 
   it('cresce a cada ginásio, porque o time do líder cresce junto', () => {
-    const valores = GYMS.map(gymReward)
+    const values = GYMS.map(gymReward)
 
-    expect(valores).toEqual([...valores].sort((a, b) => a - b))
-    expect(new Set(valores).size).toBe(GYM_COUNT)
+    expect(values).toEqual([...values].sort((a, b) => a - b))
+    expect(new Set(values).size).toBe(GYM_COUNT)
   })
 
   it('a campanha inteira paga 6.300', () => {
-    expect(somaDaLiga({ rematch: false, flawless: false })).toBe(6300)
+    expect(leagueTotal({ rematch: false, flawless: false })).toBe(6300)
   })
 })
 
@@ -71,10 +71,10 @@ describe('revanche', () => {
    * de packs.
    */
   it('mantém a Liga rendendo depois de completada, sem alcançar a estreia', () => {
-    const ciclo = somaDaLiga({ rematch: true, flawless: false })
+    const cycle = leagueTotal({ rematch: true, flawless: false })
 
-    expect(ciclo).toBe(1575)
-    expect(ciclo).toBeLessThan(somaDaLiga({ rematch: false, flawless: false }))
+    expect(cycle).toBe(1575)
+    expect(cycle).toBeLessThan(leagueTotal({ rematch: false, flawless: false }))
   })
 })
 
@@ -92,11 +92,11 @@ describe('vitória imaculada', () => {
    * repetição de volta ao preço da estreia, que é justamente o que a taxa de
    * revanche existe para impedir.
    */
-  it('acompanha a revanche em vez de inflá-la de volta à estreia', () => {
-    const revanche = rewardFor({ gym: gym(1), rematch: true, flawless: true })
+  it('acompanha a rematchReward em vez de inflá-la de volta à estreia', () => {
+    const rematchReward = rewardFor({ gym: gym(1), rematch: true, flawless: true })
 
-    expect(revanche).toEqual({ base: 300, earned: 75, flawless: 18, total: 93 })
-    expect(revanche.total).toBeLessThan(gymReward(gym(1)))
+    expect(rematchReward).toEqual({ base: 300, earned: 75, flawless: 18, total: 93 })
+    expect(rematchReward.total).toBeLessThan(gymReward(gym(1)))
   })
 
   it('não paga nada quando alguém caiu', () => {
@@ -104,7 +104,7 @@ describe('vitória imaculada', () => {
   })
 
   it('a campanha imaculada paga 7.875, contra os 6.300 normais', () => {
-    expect(somaDaLiga({ rematch: false, flawless: true })).toBe(7875)
+    expect(leagueTotal({ rematch: false, flawless: true })).toBe(7875)
   })
 
   /**
@@ -136,7 +136,7 @@ describe('vitória imaculada', () => {
 describe('o preço do pack', () => {
   it('é 150, e a campanha compra 42', () => {
     expect(PACK_PRICE).toBe(150)
-    expect(Math.floor(somaDaLiga({ rematch: false, flawless: false }) / PACK_PRICE)).toBe(42)
+    expect(Math.floor(leagueTotal({ rematch: false, flawless: false }) / PACK_PRICE)).toBe(42)
   })
 
   it('divide o saldo em packs inteiros — a prancha escreve `dá para 8`', () => {

@@ -43,13 +43,13 @@ describe('consulta', () => {
   })
 
   it('não deixa nenhum par produzir valor fora da escala', () => {
-    const possiveis = new Set([0, 0.25, 0.5, 1, 2, 4])
+    const possible = new Set([0, 0.25, 0.5, 1, 2, 4])
 
     const fora = TYPE_NAMES.flatMap(attacker =>
       TYPE_NAMES.flatMap(first =>
         TYPE_NAMES
           .map(second => effectivenessAgainst(effectiveness, attacker, [first, second]))
-          .filter(multiplier => !possiveis.has(multiplier)),
+          .filter(multiplier => !possible.has(multiplier)),
       ),
     )
 
@@ -81,20 +81,20 @@ describe('relações de dano recebido', () => {
   })
 
   it('deixa o neutro fora dos dois grupos', () => {
-    const citados = [...weak, ...resistant].map(relation => relation.type)
+    const listed = [...weak, ...resistant].map(relation => relation.type)
 
-    expect(citados.filter(type => effectivenessAgainst(effectiveness, type, ['fire', 'flying']) === 1))
+    expect(listed.filter(type => effectivenessAgainst(effectiveness, type, ['fire', 'flying']) === 1))
       .toEqual([])
-    expect(new Set(citados).size, 'um tipo em dois grupos ao mesmo tempo').toBe(citados.length)
+    expect(new Set(listed).size, 'um tipo em dois grupos ao mesmo tempo').toBe(listed.length)
   })
 
   it('devolve os dois grupos vazios para quem não tem relação nenhuma', () => {
     // Nenhuma espécie é assim, mas a função não pode depender disso: um grupo
     // vazio é seção que não se desenha, não `undefined` chegando ao template.
-    const neutro = incomingDamageRelations(effectiveness, [])
+    const neutral = incomingDamageRelations(effectiveness, [])
 
-    expect(neutro.weak).toEqual([])
-    expect(neutro.resistant).toEqual([])
+    expect(neutral.weak).toEqual([])
+    expect(neutral.resistant).toEqual([])
   })
 })
 

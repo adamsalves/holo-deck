@@ -40,9 +40,9 @@ describe('rótulo da geração', () => {
   })
 
   it('cobre todas as gerações que o dex tem', () => {
-    const semRomano = generations.filter(meta => /\d/.test(generationLabel(meta.generation)))
+    const withoutRoman = generations.filter(meta => /\d/.test(generationLabel(meta.generation)))
 
-    expect(semRomano.map(meta => meta.generation)).toEqual([])
+    expect(withoutRoman.map(meta => meta.generation)).toEqual([])
   })
 })
 

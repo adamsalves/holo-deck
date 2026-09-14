@@ -77,13 +77,13 @@ describe('GYM_BANDS', () => {
    * Sem ele, o resumo esconderia o divergente atrás dos números do vizinho.
    */
   it('e todo ginásio de uma faixa cobra o que a faixa diz cobrar', () => {
-    const divergentes = GYM_BANDS.flatMap(band =>
+    const diverging = GYM_BANDS.flatMap(band =>
       GYM_LEADERS
         .filter(leader => leader.gym >= band.first && leader.gym <= band.last)
         .filter(leader => leader.teamSize !== band.teamSize || leader.bstCap !== band.bstCap)
         .map(leader => `ginásio ${leader.gym}`))
 
-    expect(divergentes).toEqual([])
+    expect(diverging).toEqual([])
   })
 })
 
@@ -97,10 +97,10 @@ describe('buildGymTeam', () => {
     for (const { leader, team } of times) {
       expect(team, leader.name).toHaveLength(leader.teamSize)
 
-      const daGeracao = new Set(readGeneration(leader.generation).species.map(species => species.id))
+      const fromGeneration = new Set(readGeneration(leader.generation).species.map(species => species.id))
       for (const species of team) {
         expect(species.types, `${leader.name} · ${species.slug}`).toContain(leader.type)
-        expect(daGeracao.has(species.id), `${leader.name} · ${species.slug}`).toBe(true)
+        expect(fromGeneration.has(species.id), `${leader.name} · ${species.slug}`).toBe(true)
         expect(baseStatTotal(species.baseStats), `${leader.name} · ${species.slug}`)
           .toBeLessThanOrEqual(leader.bstCap)
       }
@@ -133,15 +133,15 @@ describe('buildGymTeam', () => {
     // segundo são **8**, porque Blacephalon é Ultra Beast e a PokeAPI não a
     // marca como lendária. Este teste é o que avisa se uma geração futura
     // apertar mais.
-    const candidatos = (generation: number, type: string, cap: number) =>
+    const candidates = (generation: number, type: string, cap: number) =>
       readGeneration(generation).species
         .filter(species => species.types.some(known => known === type))
         .filter(species => baseStatTotal(species.baseStats) <= cap)
         .filter(species => !species.isLegendary && !species.isMythical)
         .length
 
-    expect(candidatos(3, 'electric', 480)).toBe(4)
-    expect(candidatos(7, 'fire', 600)).toBe(8)
+    expect(candidates(3, 'electric', 480)).toBe(4)
+    expect(candidates(7, 'fire', 600)).toBe(8)
   })
 
   it('reprova alto quando o pool não enche o time', () => {

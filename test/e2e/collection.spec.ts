@@ -176,22 +176,22 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
    * o que uma lista de portas escrita à mão fazia. Era a mesma lista de entrada
    * que o `nav-gate` tinha, e pela mesma razão ela falhava em silêncio.
    */
-  const chegada: Record<string, { url: RegExp, titulo: string | null, raiz: string }> = {
-    '/': { url: /\/$/, titulo: null, raiz: '.hub' },
-    '/packs': { url: /\/packs$/, titulo: 'Packs', raiz: '.packs' },
-    '/pokedex': { url: /\/pokedex$/, titulo: 'Pokédex', raiz: 'main' },
-    '/collection': { url: /\/collection$/, titulo: 'Binder', raiz: '.collection' },
-    '/deck': { url: /\/deck$/, titulo: 'Seu time', raiz: '.deck' },
-    '/league': { url: /\/league$/, titulo: 'A Liga', raiz: '.league' },
-    '/rules': { url: /\/rules$/, titulo: 'Regras', raiz: '.rules' },
-    '/settings': { url: /\/settings$/, titulo: 'Seu save e este aparelho', raiz: '.settings' },
+  const arrivals: Record<string, { url: RegExp, title: string | null, root: string }> = {
+    '/': { url: /\/$/, title: null, root: '.hub' },
+    '/packs': { url: /\/packs$/, title: 'Packs', root: '.packs' },
+    '/pokedex': { url: /\/pokedex$/, title: 'Pokédex', root: 'main' },
+    '/collection': { url: /\/collection$/, title: 'Binder', root: '.collection' },
+    '/deck': { url: /\/deck$/, title: 'Seu time', root: '.deck' },
+    '/league': { url: /\/league$/, title: 'A Liga', root: '.league' },
+    '/rules': { url: /\/rules$/, title: 'Regras', root: '.rules' },
+    '/settings': { url: /\/settings$/, title: 'Seu save e este aparelho', root: '.settings' },
   }
 
-  const destinos = [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]
+  const destinations = [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]
 
   // O par da lista de saída: todo destino que a barra declara é visitado abaixo.
-  expect(destinos.filter(destino => !(destino.to in chegada)).map(d => d.to)).toEqual([])
-  expect(destinos.length).toBeGreaterThan(5)
+  expect(destinations.filter(destination => !(destination.to in arrivals)).map(d => d.to)).toEqual([])
+  expect(destinations.length).toBeGreaterThan(5)
 
   // De uma tela **interna**, não da raiz: é a barra que precisa estar em toda
   // parte, e sair sempre do Hub esconderia um layout aplicado só a ele.
@@ -206,17 +206,17 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
    * `<NuxtLink>`, ou um `v-if` de feature flag esquecido, deixa a lista intacta
    * e a barra sem o link — e só um clique de verdade percebe.
    */
-  for (const destino of destinos) {
-    await expect(page.getByRole('link', { name: navLabel(destino.label), exact: true })).toBeVisible()
+  for (const destination of destinations) {
+    await expect(page.getByRole('link', { name: navLabel(destination.label), exact: true })).toBeVisible()
   }
 
-  for (const destino of destinos) {
-    const esperado = chegada[destino.to]
-    if (esperado === undefined) continue
+  for (const destination of destinations) {
+    const expected = arrivals[destination.to]
+    if (expected === undefined) continue
 
     await page.goto('/collection')
-    await page.getByRole('link', { name: navLabel(destino.label), exact: true }).click()
-    await expect(page).toHaveURL(esperado.url)
+    await page.getByRole('link', { name: navLabel(destination.label), exact: true }).click()
+    await expect(page).toHaveURL(expected.url)
 
     /**
      * A Base é a única sem `<h1>` — o Hub não tem um, e a prancha *Hub* não
@@ -225,10 +225,10 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
      * a única das oito a provar só a URL, que é o que a versão anterior deste
      * teste fazia sem escrever por quê.
      */
-    if (esperado.titulo !== null) {
-      await expect(page.getByRole('heading', { level: 1, name: esperado.titulo })).toBeVisible()
+    if (expected.title !== null) {
+      await expect(page.getByRole('heading', { level: 1, name: expected.title })).toBeVisible()
     }
-    await expect(page.locator(esperado.raiz).first()).toBeVisible()
+    await expect(page.locator(expected.root).first()).toBeVisible()
   }
 })
 
@@ -308,10 +308,10 @@ test('a primeira tabulação de qualquer tela é pular para o conteúdo', async 
 
   await page.keyboard.press('Tab')
 
-  const pular = page.getByRole('link', { name: 'Pular para o conteúdo' })
-  await expect(pular).toBeFocused()
+  const skipLink = page.getByRole('link', { name: 'Pular para o conteúdo' })
+  await expect(skipLink).toBeFocused()
 
-  await pular.click()
+  await skipLink.click()
   await expect(page.locator('#conteudo')).toBeFocused()
 })
 

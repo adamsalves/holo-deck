@@ -116,9 +116,9 @@ describe('cobertura do tsconfig', () => {
     // se anulam produzem zero arquivo e nenhum erro. Foi assim que o
     // `tsconfig.e2e.json` nasceu quebrado — o `exclude` herdado do `extends`
     // apagava o `include` dele.
-    const vazios = projects.filter(project => filesOf(project).length === 0)
+    const empty = projects.filter(project => filesOf(project).length === 0)
 
-    expect(vazios.map(project => relative(REPO_ROOT, project))).toEqual([])
+    expect(empty.map(project => relative(REPO_ROOT, project))).toEqual([])
   })
 
   it('não deixa nenhum arquivo de TypeScript fora de todos os projetos', () => {

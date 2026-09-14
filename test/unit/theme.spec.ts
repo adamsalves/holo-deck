@@ -176,14 +176,14 @@ describe('cobertura da paleta', () => {
   it('dá cor e escopo a cada um dos 18 tipos do contrato', () => {
     const source = themeSource()
 
-    const semCor = TYPE_NAMES.filter(type => resolveToken(`--color-type-${type}`, source) === null)
-    const semEscopo = TYPE_NAMES.filter(type => !source.includes(`[data-type="${type}"]`))
+    const withoutColor = TYPE_NAMES.filter(type => resolveToken(`--color-type-${type}`, source) === null)
+    const withoutScope = TYPE_NAMES.filter(type => !source.includes(`[data-type="${type}"]`))
 
     // A lista canônica é a de `shared/types/dex.ts`. Um tipo entrar lá e não
     // entrar aqui é o defeito que este teste existe para pegar — o componente
     // renderiza, só que sem cor nenhuma, e nada acusa.
-    expect(semCor, 'tipos sem token de cor').toEqual([])
-    expect(semEscopo, 'tipos sem regra [data-type]').toEqual([])
+    expect(withoutColor, 'tipos sem token de cor').toEqual([])
+    expect(withoutScope, 'tipos sem regra [data-type]').toEqual([])
   })
 
   it('dá escopo a cada uma das 6 raridades', () => {
@@ -191,10 +191,10 @@ describe('cobertura da paleta', () => {
 
     // `common` é o default do bloco `[data-rarity]`, então não tem seletor
     // próprio — e é assim de propósito: comum não se anuncia.
-    const comSeletorProprio = RARITY_NAMES.filter(rarity => rarity !== 'common')
-    const semEscopo = comSeletorProprio.filter(r => !source.includes(`[data-rarity="${r}"]`))
+    const withOwnSelector = RARITY_NAMES.filter(rarity => rarity !== 'common')
+    const withoutScope = withOwnSelector.filter(r => !source.includes(`[data-rarity="${r}"]`))
 
-    expect(semEscopo, 'raridades sem regra [data-rarity]').toEqual([])
+    expect(withoutScope, 'raridades sem regra [data-rarity]').toEqual([])
     expect(resolveToken('--rarity', source), 'o bloco base precisa publicar --rarity').not.toBeNull()
   })
 
@@ -231,45 +231,45 @@ describe('contraste do tema', () => {
 
   it('mantém os papéis legíveis sobre TODA superfície, não só sobre o fundo', () => {
     const source = themeSource()
-    const fundos = surfaces(source)
+    const backgrounds = surfaces(source)
 
-    expect(fundos.length, 'nenhuma superfície encontrada no tema').toBeGreaterThan(1)
+    expect(backgrounds.length, 'nenhuma superfície encontrada no tema').toBeGreaterThan(1)
 
-    const reprovam = COLOR_ROLES.flatMap(({ token, minimum }) => {
+    const failing = COLOR_ROLES.flatMap(({ token, minimum }) => {
       const hex = resolveToken(token, source)
       expect(hex, `${token} não resolve em cor`).not.toBeNull()
 
-      return fundos.flatMap((fundo) => {
-        const ratio = contrastRatio(hex ?? '', fundo.value)
-        return ratio >= minimum ? [] : [`${token} sobre ${fundo.name} → ${ratio.toFixed(2)} (mínimo ${minimum})`]
+      return backgrounds.flatMap((background) => {
+        const ratio = contrastRatio(hex ?? '', background.value)
+        return ratio >= minimum ? [] : [`${token} sobre ${background.name} → ${ratio.toFixed(2)} (mínimo ${minimum})`]
       })
     })
 
     // O par que reprovava antes deste portão existir: `--text-faint` sobre
     // `--surface-raised`, a 2.84 — o topo do gradiente de toda carta.
-    expect(reprovam, 'papel de cor abaixo do piso em alguma superfície').toEqual([])
+    expect(failing, 'papel de cor abaixo do piso em alguma superfície').toEqual([])
   })
 
   it('mantém a hierarquia visível em toda superfície, e não só legível', () => {
     const source = themeSource()
-    const cores = TEXT_ROLES.map(({ token }) => resolveToken(token, source) ?? '')
+    const colors = TEXT_ROLES.map(({ token }) => resolveToken(token, source) ?? '')
 
-    const colados = surfaces(source).flatMap((fundo) => {
-      const razoes = cores.map(cor => contrastRatio(cor, fundo.value))
+    const tooClose = surfaces(source).flatMap((background) => {
+      const ratios = colors.map(color => contrastRatio(color, background.value))
 
       // Estritamente decrescente: dois papéis com a mesma força são um papel só.
       // É o que descartou pôr `--text-muted` em `ink-300` (5.79 sobre `ink-800`,
       // contra os 6.43 do corpo) e o que fez `ink-325` entrar na escada.
-      return razoes.flatMap((razao, i) => {
+      return ratios.flatMap((ratio, i) => {
         if (i === 0) return []
-        const anterior = razoes[i - 1] ?? 0
-        return anterior - razao > 1
+        const previous = ratios[i - 1] ?? 0
+        return previous - ratio > 1
           ? []
-          : [`${TEXT_ROLES[i - 1]?.token} → ${TEXT_ROLES[i]?.token} sobre ${fundo.name}: ${anterior.toFixed(2)} → ${razao.toFixed(2)}`]
+          : [`${TEXT_ROLES[i - 1]?.token} → ${TEXT_ROLES[i]?.token} sobre ${background.name}: ${previous.toFixed(2)} → ${ratio.toFixed(2)}`]
       })
     })
 
-    expect(colados, 'papéis de texto sem separação visível').toEqual([])
+    expect(tooClose, 'papéis de texto sem separação visível').toEqual([])
   })
 
   it('mantém o rótulo de raridade legível sobre a carta', () => {
@@ -278,46 +278,46 @@ describe('contraste do tema', () => {
     // O rótulo mora na carta, que é o gradiente `--surface-raised` →
     // `--surface-cell`. Medi-lo contra o fundo da página seria o mesmo erro de
     // fundo que os papéis de texto tinham.
-    const fundos = ['--surface-raised', '--surface-cell']
+    const backgrounds = ['--surface-raised', '--surface-cell']
       .map(name => ({ name, value: resolveToken(name, source) ?? '' }))
 
-    const reprovam = RARITY_NAMES.flatMap((rarity) => {
-      const bloco = rarity === 'common' ? '[data-rarity]' : `[data-rarity="${rarity}"]`
-      const block = blockFor(bloco, source)
+    const failing = RARITY_NAMES.flatMap((rarity) => {
+      const blockSelector = rarity === 'common' ? '[data-rarity]' : `[data-rarity="${rarity}"]`
+      const block = blockFor(blockSelector, source)
       expect(block, `bloco de ${rarity}`).not.toBeNull()
 
-      const declarado = declarationIn(block ?? '', '--rarity-label')
+      const declared = declarationIn(block ?? '', '--rarity-label')
       // `mythic` pinta o rótulo com a varredura recortada no texto, não com cor.
-      if (declarado === null && rarity === 'mythic') return []
-      expect(declarado, `${rarity} não publica --rarity-label`).not.toBeNull()
+      if (declared === null && rarity === 'mythic') return []
+      expect(declared, `${rarity} não publica --rarity-label`).not.toBeNull()
 
-      const hex = resolveToken(/^var\(\s*(--[\w-]+)\s*\)$/.exec(declarado ?? '')?.[1] ?? '', source)
+      const hex = resolveToken(/^var\(\s*(--[\w-]+)\s*\)$/.exec(declared ?? '')?.[1] ?? '', source)
         ?? resolveToken('--rarity-label', source)
 
-      return fundos.flatMap((fundo) => {
-        const ratio = contrastRatio(hex ?? '', fundo.value)
-        return ratio >= AA_NORMAL ? [] : [`${rarity} sobre ${fundo.name} → ${ratio.toFixed(2)}`]
+      return backgrounds.flatMap((background) => {
+        const ratio = contrastRatio(hex ?? '', background.value)
+        return ratio >= AA_NORMAL ? [] : [`${rarity} sobre ${background.name} → ${ratio.toFixed(2)}`]
       })
     })
 
-    expect(reprovam, 'rótulo de raridade abaixo do AA na carta').toEqual([])
+    expect(failing, 'rótulo de raridade abaixo do AA na carta').toEqual([])
   })
 
   it('mantém a etiqueta de tipo legível — a cor é fundo, e o texto é `--bg`', () => {
     const source = themeSource()
-    const fundo = resolveToken('--bg', source) ?? ''
+    const background = resolveToken('--bg', source) ?? ''
 
     // Este é o par que existe hoje, em `TypeBadge`: a cor do tipo preenche o
     // chip e o texto é o fundo da página por cima. O contraste é simétrico, então
     // o mesmo número cobre o outro uso — tipo como texto sobre `--bg`, que é o
     // cabeçalho de região.
-    const reprovam = TYPE_NAMES.flatMap((type) => {
+    const failing = TYPE_NAMES.flatMap((type) => {
       const hex = resolveToken(`--color-type-${type}`, source) ?? ''
-      const ratio = contrastRatio(hex, fundo)
+      const ratio = contrastRatio(hex, background)
       return ratio >= AA_NORMAL ? [] : [`${type} → ${ratio.toFixed(2)}`]
     })
 
-    expect(reprovam, 'tipos abaixo do AA na etiqueta').toEqual([])
+    expect(failing, 'tipos abaixo do AA na etiqueta').toEqual([])
   })
 
   /**
@@ -348,15 +348,15 @@ describe('contraste do tema', () => {
    */
   it('mantém as 18 cores de tipo acima do AA em toda superfície', () => {
     const source = themeSource()
-    const fundos = surfaces(source)
+    const backgrounds = surfaces(source)
 
-    const reprovam = TYPE_NAMES.flatMap(type => fundos.flatMap((fundo) => {
+    const failing = TYPE_NAMES.flatMap(type => backgrounds.flatMap((background) => {
       const hex = resolveToken(`--color-type-${type}`, source) ?? ''
-      const ratio = contrastRatio(hex, fundo.value)
-      return ratio >= AA_NORMAL ? [] : [`${type} sobre ${fundo.name} → ${ratio.toFixed(2)}`]
+      const ratio = contrastRatio(hex, background.value)
+      return ratio >= AA_NORMAL ? [] : [`${type} sobre ${background.name} → ${ratio.toFixed(2)}`]
     }))
 
-    expect(reprovam, 'pares tipo × superfície abaixo do AA').toEqual([])
+    expect(failing, 'pares tipo × superfície abaixo do AA').toEqual([])
   })
 })
 
@@ -368,23 +368,23 @@ describe('a regra do foil, escrita uma vez só', () => {
     // ela aparece. São a mesma regra em duas linguagens, e sem este portão
     // mudar `FOIL_FROM_RARITY` deixa o CSS para trás em silêncio: a carta perde
     // a camada e mantém a opacidade, ou ganha a camada e nasce invisível.
-    const divergem = RARITY_NAMES.flatMap((rarity) => {
-      const proprio = blockFor(`[data-rarity="${rarity}"]`, source)
+    const diverging = RARITY_NAMES.flatMap((rarity) => {
+      const own = blockFor(`[data-rarity="${rarity}"]`, source)
       const base = blockFor('[data-rarity]', source) ?? ''
 
-      const declarado = (proprio === null ? null : declarationIn(proprio, '--foil-strength'))
+      const declared = (own === null ? null : declarationIn(own, '--foil-strength'))
         ?? declarationIn(base, '--foil-strength')
 
-      const forca = Number(declarado)
-      expect(Number.isFinite(forca), `${rarity}: --foil-strength não é número`).toBe(true)
+      const strength = Number(declared)
+      expect(Number.isFinite(strength), `${rarity}: --foil-strength não é número`).toBe(true)
 
-      const aceso = forca > 0
-      return aceso === hasFoil(rarity)
+      const lit = strength > 0
+      return lit === hasFoil(rarity)
         ? []
-        : [`${rarity}: hasFoil=${hasFoil(rarity)} mas --foil-strength=${declarado}`]
+        : [`${rarity}: hasFoil=${hasFoil(rarity)} mas --foil-strength=${declared}`]
     })
 
-    expect(divergem, 'o CSS e `shared/types/game.ts` discordam sobre o foil').toEqual([])
+    expect(diverging, 'o CSS e `shared/types/game.ts` discordam sobre o foil').toEqual([])
   })
 })
 
@@ -397,7 +397,7 @@ describe('a regra do foil, escrita uma vez só', () => {
  * de `@theme`: os primitivos de lá são lidos pelo gerador de utilitários do
  * Tailwind, não por `var()`, e cobrá-los daria falso positivo.
  */
-const RESERVADOS = [
+const RESERVED = [
   // Declarado agora, com leitor na Fase 6 (coluna lateral, log de turno). Fica
   // escrito aqui, e não escondido, para a exceção ser uma decisão e não um
   // esquecimento — a próxima que aparecer reprova até alguém decidir.
@@ -415,21 +415,21 @@ describe('a camada semântica não tem token órfão', () => {
     const source = themeSource()
     const semantic = source.slice(source.indexOf('[data-type='))
 
-    const declarados = [...new Set(declarations(semantic).map(({ name }) => name))]
+    const declaredNames = [...new Set(declarations(semantic).map(({ name }) => name))]
       // `--ui-*` são lidos pelo Nuxt UI, e `--bevel` pelo próprio `@utility`.
       .filter(name => !name.startsWith('--ui-') && name !== '--bevel')
-      .filter(name => !RESERVADOS.includes(name))
+      .filter(name => !RESERVED.includes(name))
 
     // Anda pelo disco pelo mesmo motivo dos outros portões: componente novo
     // aparece toda fase, e uma lista de arquivos escrita à mão não o alcança.
-    const lidos = new Set<string | undefined>()
-    const fontes = [source, ...walkFiles(join(REPO_ROOT, 'app'), new Set(['node_modules']), hasExtension(['.vue', '.ts', '.css']))
+    const seen = new Set<string | undefined>()
+    const sources = [source, ...walkFiles(join(REPO_ROOT, 'app'), new Set(['node_modules']), hasExtension(['.vue', '.ts', '.css']))
       .map(file => readFileSync(join(REPO_ROOT, file), 'utf8'))]
 
-    for (const texto of fontes) {
-      for (const hit of texto.matchAll(/var\(\s*(--[\w-]+)/g)) lidos.add(hit[1])
+    for (const text of sources) {
+      for (const hit of text.matchAll(/var\(\s*(--[\w-]+)/g)) seen.add(hit[1])
     }
 
-    expect(declarados.filter(name => !lidos.has(name)), 'tokens declarados e nunca lidos').toEqual([])
+    expect(declaredNames.filter(name => !seen.has(name)), 'tokens declarados e nunca lidos').toEqual([])
   })
 })

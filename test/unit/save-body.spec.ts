@@ -48,7 +48,7 @@ describe('a leitura do corpo do PUT', () => {
   })
 
   it('só o tamanho é 413', () => {
-    const huge = JSON.stringify({ data: forSync(emptySave()), baseVersion: 0, lixo: 'x'.repeat(MAX_BODY_BYTES) })
+    const huge = JSON.stringify({ data: forSync(emptySave()), baseVersion: 0, junk: 'x'.repeat(MAX_BODY_BYTES) })
 
     expect(readPutBody(huge)).toMatchObject({ ok: false, status: 413 })
   })
@@ -116,7 +116,7 @@ describe('a leitura do corpo do restaurar', () => {
   it('as mesmas três recusas do PUT: ausente, malformado e grande demais', () => {
     expect(readRestoreBody(undefined)).toMatchObject({ ok: false, status: 400, message: 'Corpo ausente' })
     expect(readRestoreBody('{')).toMatchObject({ ok: false, status: 400, message: 'Corpo não é JSON' })
-    expect(readRestoreBody(JSON.stringify({ baseVersion: 1, lixo: 'x'.repeat(MAX_BODY_BYTES) })))
+    expect(readRestoreBody(JSON.stringify({ baseVersion: 1, junk: 'x'.repeat(MAX_BODY_BYTES) })))
       .toMatchObject({ ok: false, status: 413 })
   })
 

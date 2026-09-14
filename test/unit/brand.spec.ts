@@ -23,9 +23,9 @@ function gymReward(id: GymId): number {
  * caso — e rodam no portão que já existe, sem ferramenta nova.
  */
 type Assert<T extends true> = T
-type _MoveNaoEhGym = Assert<MoveId extends GymId ? false : true>
-type _GymNaoEhMove = Assert<GymId extends MoveId ? false : true>
-type _SpeciesNaoEhMove = Assert<SpeciesId extends MoveId ? false : true>
+type _MoveIsNotGym = Assert<MoveId extends GymId ? false : true>
+type _GymIsNotMove = Assert<GymId extends MoveId ? false : true>
+type _SpeciesIsNotMove = Assert<SpeciesId extends MoveId ? false : true>
 
 describe('ids marcados', () => {
   it('aceita a faixa real de espécies e recusa o resto', () => {

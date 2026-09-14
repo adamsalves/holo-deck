@@ -87,8 +87,8 @@ describe('pureza de shared/', () => {
       specifiersOf(code)
         .filter(({ specifier }) => {
           if (!specifier.startsWith('.')) return true
-          const alvo = relative(join(REPO_ROOT, SCANNED), resolve(dirname(join(REPO_ROOT, file)), specifier))
-          return alvo.startsWith('..') || alvo.startsWith(`..${sep}`)
+          const target = relative(join(REPO_ROOT, SCANNED), resolve(dirname(join(REPO_ROOT, file)), specifier))
+          return target.startsWith('..') || target.startsWith(`..${sep}`)
         })
         .map(({ specifier, line }) => `${file}:${line} → ${specifier}`),
     )
@@ -100,27 +100,27 @@ describe('pureza de shared/', () => {
   })
 
   it('todo import relativo carrega a extensão .ts', () => {
-    const semExtensao = sources.flatMap(({ file, code }) =>
+    const withoutExtension = sources.flatMap(({ file, code }) =>
       specifiersOf(code)
         .filter(({ specifier }) => specifier.startsWith('.') && !specifier.endsWith('.ts'))
         .map(({ specifier, line }) => `${file}:${line} → ${specifier}`),
     )
 
     expect(
-      semExtensao,
+      withoutExtension,
       '`yarn data:build` carrega shared/ em Node puro, que não resolve import sem extensão',
     ).toEqual([])
   })
 
   it('não sorteia e não lê o relógio', () => {
-    const impuros = sources.flatMap(({ file, code }) =>
+    const impure = sources.flatMap(({ file, code }) =>
       code.split('\n').flatMap((line, index) =>
         (line.match(IMPURE) ?? []).map(hit => `${file}:${index + 1} → ${hit}`),
       ),
     )
 
     expect(
-      impuros,
+      impure,
       'o replay da batalha reproduz o log com a mesma seed: sorteio vem do RngCursor, e instante vem de quem chama',
     ).toEqual([])
   })
@@ -128,14 +128,14 @@ describe('pureza de shared/', () => {
   it('a varredura ignora comentário e não ignora código', () => {
     // A largura da ressalva, medida. Sem isto, um refactor que "simplificasse" o
     // `stripComments` apagaria o portão inteiro sem reprovar nada.
-    const comentado = stripComments('// usa Math.random()\nconst a = 1\n')
-    const emBloco = stripComments('/* Date.now()\n   e mais */\nconst b = 2\n')
-    const codigo = stripComments('const c = Math.random()\n')
+    const lineComment = stripComments('// usa Math.random()\nconst a = 1\n')
+    const blockComment = stripComments('/* Date.now()\n   e mais */\nconst b = 2\n')
+    const code = stripComments('const c = Math.random()\n')
 
-    expect(comentado).not.toMatch(IMPURE)
-    expect(emBloco).not.toMatch(IMPURE)
-    expect(codigo).toMatch(IMPURE)
+    expect(lineComment).not.toMatch(IMPURE)
+    expect(blockComment).not.toMatch(IMPURE)
+    expect(code).toMatch(IMPURE)
     // A linha do código depois do bloco continua sendo a 3ª.
-    expect(emBloco.split('\n')).toHaveLength(4)
+    expect(blockComment.split('\n')).toHaveLength(4)
   })
 })

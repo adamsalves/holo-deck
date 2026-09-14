@@ -34,14 +34,14 @@ test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ 
   await expect.poll(() => picks.count()).toBeGreaterThan(5)
 
   const before = await picks.count()
-  const escalada = (await picks.first().getAttribute('aria-label')) ?? ''
+  const firstPickLabel = (await picks.first().getAttribute('aria-label')) ?? ''
   await picks.first().click()
 
   // Um slot a menos vazio, e a carta saiu da lista: "cartas já no deck saem da
   // lista" é a regra da prancha, e é o que torna clicar uma ação sem ambiguidade.
   await expect(page.locator('.deck-slot--empty')).toHaveCount(5)
   await expect(picks).toHaveCount(before - 1)
-  expect(escalada).toContain('Escalar')
+  expect(firstPickLabel).toContain('Escalar')
 
   // A prova do save: recarregar não é navegação de cliente, é boot do zero — e o
   // deck só chega até aqui através da migração para o schema 2.
@@ -107,22 +107,22 @@ test('a faixa de alerta divide o pé da carta com os stats, sem cobri-los', asyn
   })
   await page.reload()
 
-  const faixa = page.locator('.deck-slot__warning').first()
-  await expect(faixa).toBeVisible()
-  await expect(faixa).toHaveText('LEVA ×2')
+  const warningBand = page.locator('.deck-slot__warning').first()
+  await expect(warningBand).toBeVisible()
+  await expect(warningBand).toHaveText('LEVA ×2')
 
   const stats = page.locator('.deck-slot__foot').first()
   await expect(stats).toHaveText(/HP \d+/)
 
   // As duas caixas não se cruzam: a faixa começa depois de o rodapé terminar.
-  const [caixaFaixa, caixaStats] = await Promise.all([faixa.boundingBox(), stats.boundingBox()])
-  if (caixaFaixa === null || caixaStats === null) throw new Error('faixa ou rodapé sem caixa')
-  expect(caixaFaixa.y).toBeGreaterThanOrEqual(caixaStats.y + caixaStats.height)
+  const [warningBox, statsBox] = await Promise.all([warningBand.boundingBox(), stats.boundingBox()])
+  if (warningBox === null || statsBox === null) throw new Error('faixa ou rodapé sem caixa')
+  expect(warningBox.y).toBeGreaterThanOrEqual(statsBox.y + statsBox.height)
 
   // E os seis slots continuam com a mesma altura, apesar de um deles ter faixa.
-  const alturas = await page.locator('.deck-slot').evaluateAll(slots =>
+  const heights = await page.locator('.deck-slot').evaluateAll(slots =>
     slots.map(slot => Math.round(slot.getBoundingClientRect().height)))
-  expect(new Set(alturas).size, `alturas divergentes: ${alturas.join(', ')}`).toBe(1)
+  expect(new Set(heights).size, `alturas divergentes: ${heights.join(', ')}`).toBe(1)
 })
 
 test('a leitura de cobertura só aparece com carta, e nomeia o líder', async ({ page }) => {
@@ -159,9 +159,9 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
   await page.goto('/deck')
   await expect.poll(() => page.locator('.deck__pick').count()).toBeGreaterThan(5)
 
-  const primeira = page.locator('.deck__pick').first()
-  const nome = (await primeira.locator('.deck__pick-name').textContent())?.trim() ?? ''
-  await primeira.click()
+  const first = page.locator('.deck__pick').first()
+  const name = (await first.locator('.deck__pick-name').textContent())?.trim() ?? ''
+  await first.click()
   await expect(page.locator('.deck-slot--empty')).toHaveCount(5)
 
   // Agora o binder mói essa mesma carta até a última cópia. A moagem passa pelo
@@ -169,7 +169,7 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
   await page.goto('/collection')
   await expect.poll(() => page.locator('.binder-card').count()).toBeGreaterThan(5)
 
-  await page.evaluate((alvo) => {
+  await page.evaluate((target) => {
     const raw = localStorage.getItem('holodeck:save')
     if (raw === null) throw new Error('sem save depois de abrir um pack')
 
@@ -186,18 +186,18 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
     // `Array.isArray` devolve `any[]`, e `any` é o que o lint deste repositório
     // recusa na fronteira: a lista é relida como `unknown[]` e cada degrau
     // estreita de verdade.
-    const escalados: unknown[] = deck
-    const escalada = escalados.find(slot => typeof slot === 'number')
-    if (typeof escalada !== 'number') throw new Error(`${alvo} não chegou ao deck`)
+    const deckSlots: unknown[] = deck
+    const firstDeckCardId = deckSlots.find(slot => typeof slot === 'number')
+    if (typeof firstDeckCardId !== 'number') throw new Error(`${target} não chegou ao deck`)
 
-    Object.assign(collection, { [String(escalada)]: undefined })
+    Object.assign(collection, { [String(firstDeckCardId)]: undefined })
     localStorage.setItem('holodeck:save', JSON.stringify({
       ...save,
       collection: Object.fromEntries(
-        Object.entries(collection).filter(([id]) => id !== String(escalada)),
+        Object.entries(collection).filter(([id]) => id !== String(firstDeckCardId)),
       ),
     }))
-  }, nome)
+  }, name)
 
   // Voltar ao deck é boot do zero: o save traz um deck com uma carta que a
   // coleção não tem mais, e é `deck.hydrate` quem a descarta na entrada — não o

@@ -106,37 +106,37 @@ describe('startBattle', () => {
   })
 
   it('o adversário sai da regra, não de uma lista — mesmo ginásio, mesmo time', () => {
-    const uma = startBattle({ gymId: gym(1), seed: 1, team: DECK }, context)
-    const outra = startBattle({ gymId: gym(1), seed: 999, team: DECK }, context)
+    const one = startBattle({ gymId: gym(1), seed: 1, team: DECK }, context)
+    const another = startBattle({ gymId: gym(1), seed: 999, team: DECK }, context)
 
-    expect(outra.opponent.team.map(pokemon => pokemon.slug))
-      .toEqual(uma.opponent.team.map(pokemon => pokemon.slug))
+    expect(another.opponent.team.map(pokemon => pokemon.slug))
+      .toEqual(one.opponent.team.map(pokemon => pokemon.slug))
   })
 
   it('recusa espécie que o dex não conhece', () => {
     // O id é válido; quem não a conhece é o contexto — que é exatamente a falha
     // real: um deploy com `gen-N.json` truncado. Forjar um id fora da faixa
     // exigiria um `as`, e a marca existe para isso não acontecer.
-    const cego: BattleContext = { ...context, speciesById: () => undefined }
+    const blind: BattleContext = { ...context, speciesById: () => undefined }
 
-    expect(() => startBattle({ gymId: gym(1), seed: 1, team: DECK }, cego)).toThrow(/não está no dex/)
+    expect(() => startBattle({ gymId: gym(1), seed: 1, team: DECK }, blind)).toThrow(/não está no dex/)
   })
 })
 
 describe('determinismo', () => {
   it('a mesma seed com as mesmas ações reproduz a batalha idêntica', () => {
-    const uma = playThrough(4242, 1)
-    const outra = playThrough(4242, 1)
+    const one = playThrough(4242, 1)
+    const another = playThrough(4242, 1)
 
-    expect(JSON.stringify(outra.state)).toBe(JSON.stringify(uma.state))
-    expect(outra.actions).toEqual(uma.actions)
+    expect(JSON.stringify(another.state)).toBe(JSON.stringify(one.state))
+    expect(another.actions).toEqual(one.actions)
   })
 
   it('seeds diferentes produzem batalhas diferentes', () => {
-    const uma = playThrough(1, 1)
-    const outra = playThrough(2, 1)
+    const one = playThrough(1, 1)
+    const another = playThrough(2, 1)
 
-    expect(JSON.stringify(outra.state)).not.toBe(JSON.stringify(uma.state))
+    expect(JSON.stringify(another.state)).not.toBe(JSON.stringify(one.state))
   })
 
   it('a batalha termina nos NOVE ginásios, e com um lado de pé', () => {
@@ -166,14 +166,14 @@ describe('determinismo', () => {
     for (const gymNumber of [7, 8, 9]) {
       for (const seed of [1, 22, 33]) {
         let state = startBattle({ gymId: gym(gymNumber), seed, team: DECK }, context)
-        let trocas = 0
+        let switches = 0
 
         for (let guard = 0; guard < 400 && state.outcome === 'ongoing'; guard++) {
           const action: BattleAction = state.expecting === 'playerSwitch'
             ? { kind: 'switch', index: switchOptions(state)[0] ?? 0 }
             : { kind: 'move', slot: 0 }
           const turn = applyAction(state, action, context)
-          trocas += turn.events.filter(event => event.kind === 'switch' && event.side === 'opponent').length
+          switches += turn.events.filter(event => event.kind === 'switch' && event.side === 'opponent').length
           state = turn.state
         }
 
@@ -181,7 +181,7 @@ describe('determinismo', () => {
         // correção, o máximo nestes nove pares é **9** (5 trocas forçadas pelos
         // desmaios de um time de 6, mais as poucas de matchup); sem ela, o pior
         // par passa de 34 e a média do Ginásio 9 vai a 113.
-        expect(trocas, `ginásio ${gymNumber}, seed ${seed}`).toBeLessThan(20)
+        expect(switches, `ginásio ${gymNumber}, seed ${seed}`).toBeLessThan(20)
       }
     }
   })
@@ -202,20 +202,20 @@ describe('replay', () => {
     // É o caso real: fechar a aba no turno 4 e voltar. No ginásio 9, que é onde
     // a IA troca e a batalha é mais longa.
     const { actions } = playThrough(77, 9)
-    const parcial = actions.slice(0, 4)
+    const partial = actions.slice(0, 4)
     const log: BattleLog = {
       gymId: 9,
       seed: 77,
       engineVersion: ENGINE_VERSION,
       dexVersion: core.dexVersion,
       team: DECK,
-      actions: parcial,
+      actions: partial,
     }
 
-    let esperado = startBattle({ gymId: gym(9), seed: 77, team: DECK }, context)
-    for (const action of parcial) esperado = applyAction(esperado, action, context).state
+    let expected = startBattle({ gymId: gym(9), seed: 77, team: DECK }, context)
+    for (const action of partial) expected = applyAction(expected, action, context).state
 
-    expect(JSON.stringify(replay(log, context))).toBe(JSON.stringify(esperado))
+    expect(JSON.stringify(replay(log, context))).toBe(JSON.stringify(expected))
   })
 
   it('reproduz as três formas de ação, e não só o golpe', () => {
@@ -223,9 +223,9 @@ describe('replay', () => {
     // nem troca voluntária — que são justamente as ações com retorno antecipado
     // antes da rolagem de ruído da IA.
     const { state, actions } = playThrough(2024, 6)
-    const formas = new Set(actions.map(action => action.kind))
+    const kinds = new Set(actions.map(action => action.kind))
 
-    expect(formas).toEqual(new Set(['move', 'switch', 'item']))
+    expect(kinds).toEqual(new Set(['move', 'switch', 'item']))
     expect(JSON.stringify(replay(toBattleLog(state, actions), context))).toBe(JSON.stringify(state))
   })
 
@@ -268,35 +268,35 @@ describe('replay', () => {
 describe('ordem do turno', () => {
   /** Sobrescreve o ativo de um lado — mais direto que procurar a espécie que
    * tem por acaso o Speed ou o golpe que o teste precisa. */
-  function comAtivo(
+  function withActive(
     state: BattleState,
     side: 'player' | 'opponent',
     patch: (pokemon: BattleState['player']['team'][number]) => BattleState['player']['team'][number],
   ): BattleState {
-    const lado = state[side]
-    const team = lado.team.map((pokemon, index) => (index === lado.active ? patch(pokemon) : pokemon))
+    const sideState = state[side]
+    const team = sideState.team.map((pokemon, index) => (index === sideState.active ? patch(pokemon) : pokemon))
     return side === 'player'
-      ? { ...state, player: { ...lado, team } }
-      : { ...state, opponent: { ...lado, team } }
+      ? { ...state, player: { ...sideState, team } }
+      : { ...state, opponent: { ...sideState, team } }
   }
 
   /** Quem apareceu primeiro agindo no log do turno. */
-  function primeiro(events: readonly { kind: string, side?: string }[]): string | undefined {
+  function firstActingSide(events: readonly { kind: string, side?: string }[]): string | undefined {
     return events.find(event => ['hit', 'miss', 'no-effect', 'blocked'].includes(event.kind))?.side
   }
 
-  function comSpeed(state: BattleState, side: 'player' | 'opponent', speed: number): BattleState {
-    return comAtivo(state, side, pokemon => ({ ...pokemon, stats: { ...pokemon.stats, speed } }))
+  function withSpeed(state: BattleState, side: 'player' | 'opponent', speed: number): BattleState {
+    return withActive(state, side, pokemon => ({ ...pokemon, stats: { ...pokemon.stats, speed } }))
   }
 
   it('o mais rápido age primeiro', () => {
     const base = startBattle({ gymId: gym(1), seed: 12, team: DECK }, context)
 
-    const rapido = comSpeed(comSpeed(base, 'player', 999), 'opponent', 1)
-    expect(primeiro(applyAction(rapido, { kind: 'move', slot: 0 }, context).events)).toBe('player')
+    const fast = withSpeed(withSpeed(base, 'player', 999), 'opponent', 1)
+    expect(firstActingSide(applyAction(fast, { kind: 'move', slot: 0 }, context).events)).toBe('player')
 
-    const lento = comSpeed(comSpeed(base, 'player', 1), 'opponent', 999)
-    expect(primeiro(applyAction(lento, { kind: 'move', slot: 0 }, context).events)).toBe('opponent')
+    const slow = withSpeed(withSpeed(base, 'player', 1), 'opponent', 999)
+    expect(firstActingSide(applyAction(slow, { kind: 'move', slot: 0 }, context).events)).toBe('opponent')
   })
 
   it('prioridade ganha de Speed', () => {
@@ -306,13 +306,13 @@ describe('ordem do turno', () => {
     expect(quickAttack.priority).toBeGreaterThan(0)
 
     const base = startBattle({ gymId: gym(1), seed: 12, team: DECK }, context)
-    const comPrioridade = comAtivo(
-      comSpeed(comSpeed(base, 'player', 1), 'opponent', 999),
+    const withPriority = withActive(
+      withSpeed(withSpeed(base, 'player', 1), 'opponent', 999),
       'player',
       pokemon => ({ ...pokemon, slots: [{ move: quickAttack, pp: 30 }, ...pokemon.slots.slice(1)] }),
     )
 
-    expect(primeiro(applyAction(comPrioridade, { kind: 'move', slot: 0 }, context).events)).toBe('player')
+    expect(firstActingSide(applyAction(withPriority, { kind: 'move', slot: 0 }, context).events)).toBe('player')
   })
 
   it('um golpe de 75% de acurácia erra perto de um quarto das vezes', () => {
@@ -322,39 +322,39 @@ describe('ordem do turno', () => {
     if (ironTail === undefined) throw new Error('iron-tail fora do catálogo')
     expect(ironTail.accuracy).toBe(75)
 
-    const base = comAtivo(
+    const base = withActive(
       startBattle({ gymId: gym(1), seed: 0, team: DECK }, context),
       'player',
       pokemon => ({ ...pokemon, slots: [{ move: ironTail, pp: 999 }, ...pokemon.slots.slice(1)] }),
     )
 
-    const rodadas = 2000
-    let erros = 0
-    for (let seed = 0; seed < rodadas; seed++) {
+    const rounds = 2000
+    let errors = 0
+    for (let seed = 0; seed < rounds; seed++) {
       const { events } = applyAction({ ...base, seed, rng: seed }, { kind: 'move', slot: 0 }, context)
-      if (events.some(event => event.kind === 'miss' && event.side === 'player')) erros += 1
+      if (events.some(event => event.kind === 'miss' && event.side === 'player')) errors += 1
     }
 
-    expect(erros / rodadas).toBeGreaterThan(0.22)
-    expect(erros / rodadas).toBeLessThan(0.28)
+    expect(errors / rounds).toBeGreaterThan(0.22)
+    expect(errors / rounds).toBeLessThan(0.28)
   })
 
   it('empate de Speed sorteia pela seed, e o sorteio é estável', () => {
     // É a regra real, e é o que mantém a batalha reproduzível: sem ela, empate
     // de Speed precisaria de um critério fixo, e um dos dois lados sempre
     // ganharia a iniciativa.
-    const ordens = new Set<string | undefined>()
+    const orders = new Set<string | undefined>()
     for (let seed = 0; seed < 40; seed++) {
       const base = startBattle({ gymId: gym(1), seed, team: DECK }, context)
-      const empate = comSpeed(comSpeed(base, 'player', 100), 'opponent', 100)
-      const uma = primeiro(applyAction(empate, { kind: 'move', slot: 0 }, context).events)
-      const outra = primeiro(applyAction(empate, { kind: 'move', slot: 0 }, context).events)
+      const tie = withSpeed(withSpeed(base, 'player', 100), 'opponent', 100)
+      const one = firstActingSide(applyAction(tie, { kind: 'move', slot: 0 }, context).events)
+      const another = firstActingSide(applyAction(tie, { kind: 'move', slot: 0 }, context).events)
 
-      expect(outra, `seed ${seed} não repetiu`).toBe(uma)
-      ordens.add(uma)
+      expect(another, `seed ${seed} não repetiu`).toBe(one)
+      orders.add(one)
     }
 
-    expect(ordens.size, 'a mesma ordem em 40 seeds significa que o desempate não sorteia').toBe(2)
+    expect(orders.size, 'a mesma ordem em 40 seeds significa que o desempate não sorteia').toBe(2)
   })
 })
 
@@ -362,7 +362,7 @@ describe('isBattleLog — a fronteira do save', () => {
   // `Record<string, unknown>` e não `unknown`: os casos abaixo espalham o log
   // válido e trocam um campo, e `unknown` não é espalhável — a fixture precisa
   // ser um objeto de verdade, mesmo que o guarda receba `unknown`.
-  function logValido(): Record<string, unknown> {
+  function validLog(): Record<string, unknown> {
     return {
       gymId: 1,
       seed: 7,
@@ -374,7 +374,7 @@ describe('isBattleLog — a fronteira do save', () => {
   }
 
   it('aceita o log que o motor produz', () => {
-    expect(isBattleLog(logValido())).toBe(true)
+    expect(isBattleLog(validLog())).toBe(true)
   })
 
   it('recusa o que volta de um JSON.parse qualquer', () => {
@@ -388,10 +388,10 @@ describe('isBattleLog — a fronteira do save', () => {
   })
 
   it('recusa ginásio fora da Liga e time vazio', () => {
-    expect(isBattleLog({ ...logValido(), gymId: 0 })).toBe(false)
-    expect(isBattleLog({ ...logValido(), gymId: 10 })).toBe(false)
-    expect(isBattleLog({ ...logValido(), team: [] })).toBe(false)
-    expect(isBattleLog({ ...logValido(), team: [0] })).toBe(false)
+    expect(isBattleLog({ ...validLog(), gymId: 0 })).toBe(false)
+    expect(isBattleLog({ ...validLog(), gymId: 10 })).toBe(false)
+    expect(isBattleLog({ ...validLog(), team: [] })).toBe(false)
+    expect(isBattleLog({ ...validLog(), team: [0] })).toBe(false)
   })
 
   it('recusa time acima do deck, pelo mesmo argumento do teto das contagens', () => {
@@ -399,39 +399,39 @@ describe('isBattleLog — a fronteira do save', () => {
     // os 300, cada um com moveset resolvido no catálogo. Save é texto que o
     // jogador controla: o que atravessa o guarda sem ordem de grandeza vira
     // trabalho absurdo do outro lado, como o `c: 1e15` virava pó infinito.
-    const umAMais = [...DECK, DECK[0]].filter(id => id !== undefined)
-    expect(umAMais).toHaveLength(DECK_SIZE + 1)
-    expect(isBattleLog({ ...logValido(), team: umAMais })).toBe(false)
-    expect(isBattleLog({ ...logValido(), team: [...DECK] })).toBe(true)
+    const oneExtra = [...DECK, DECK[0]].filter(id => id !== undefined)
+    expect(oneExtra).toHaveLength(DECK_SIZE + 1)
+    expect(isBattleLog({ ...validLog(), team: oneExtra })).toBe(false)
+    expect(isBattleLog({ ...validLog(), team: [...DECK] })).toBe(true)
   })
 
   it('recusa ação de kind desconhecido', () => {
     // Sem isto, ela atravessava até o `assertNever` do motor — que agora existe,
     // mas o certo é a forma ser recusada na porta.
-    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'fly', slot: 0 }] })).toBe(false)
-    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'move' }] })).toBe(false)
-    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'switch', index: -1 }] })).toBe(false)
-    expect(isBattleLog({ ...logValido(), actions: [{ kind: 'item' }] })).toBe(true)
+    expect(isBattleLog({ ...validLog(), actions: [{ kind: 'fly', slot: 0 }] })).toBe(false)
+    expect(isBattleLog({ ...validLog(), actions: [{ kind: 'move' }] })).toBe(false)
+    expect(isBattleLog({ ...validLog(), actions: [{ kind: 'switch', index: -1 }] })).toBe(false)
+    expect(isBattleLog({ ...validLog(), actions: [{ kind: 'item' }] })).toBe(true)
   })
 
   it('recusa dexVersion fora do formato, e não julga o valor', () => {
     // Forma na porta, valor no `replay`: um hash de outro build é bem-formado, e
     // o que fazer com a batalha que ele descreve depende do contexto.
-    expect(isBattleLog({ ...logValido(), dexVersion: 'deadbeef' })).toBe(true)
-    expect(isBattleLog({ ...logValido(), dexVersion: '19C9DC2A' })).toBe(false)
-    expect(isBattleLog({ ...logValido(), dexVersion: '19c9dc' })).toBe(false)
-    expect(isBattleLog({ ...logValido(), dexVersion: '' })).toBe(false)
+    expect(isBattleLog({ ...validLog(), dexVersion: 'deadbeef' })).toBe(true)
+    expect(isBattleLog({ ...validLog(), dexVersion: '19C9DC2A' })).toBe(false)
+    expect(isBattleLog({ ...validLog(), dexVersion: '19c9dc' })).toBe(false)
+    expect(isBattleLog({ ...validLog(), dexVersion: '' })).toBe(false)
     // O log da Fase 4, gravado antes de a trava existir. Ele não pode passar: sem
     // o campo não há como saber sobre qual dex ele foi escrito.
-    const semDex: Record<string, unknown> = { ...logValido() }
-    delete semDex.dexVersion
-    expect(isBattleLog(semDex)).toBe(false)
+    const withoutDex: Record<string, unknown> = { ...validLog() }
+    delete withoutDex.dexVersion
+    expect(isBattleLog(withoutDex)).toBe(false)
   })
 
   it('não julga a versão do motor — quem decide isso é o replay', () => {
     // Log de versão anterior é bem-formado; o que fazer com a batalha perdida é
     // decisão de quem sabe o contexto.
-    expect(isBattleLog({ ...logValido(), engineVersion: ENGINE_VERSION - 1 })).toBe(true)
+    expect(isBattleLog({ ...validLog(), engineVersion: ENGINE_VERSION - 1 })).toBe(true)
   })
 })
 
@@ -448,10 +448,10 @@ describe('regras do turno', () => {
       },
     }
 
-    let turnos = 0
-    while (state.outcome === 'ongoing' && state.expecting === 'action' && turnos < 20) {
+    let turns = 0
+    while (state.outcome === 'ongoing' && state.expecting === 'action' && turns < 20) {
       state = applyAction(state, { kind: 'move', slot: 0 }, context).state
-      turnos += 1
+      turns += 1
     }
 
     // A asserção precisa vir **antes** do uso: envolvida num `if`, ela deixaria o
@@ -459,11 +459,11 @@ describe('regras do turno', () => {
     // outro motivo.
     expect(state.expecting).toBe('playerSwitch')
 
-    const antes = state.turn
-    const depois = applyAction(state, { kind: 'switch', index: switchOptions(state)[0] ?? 1 }, context).state
-    expect(depois.turn).toBe(antes)
-    expect(depois.expecting).toBe('action')
-    expect(activeOf(depois.player).hp).toBeGreaterThan(0)
+    const before = state.turn
+    const after = applyAction(state, { kind: 'switch', index: switchOptions(state)[0] ?? 1 }, context).state
+    expect(after.turn).toBe(before)
+    expect(after.expecting).toBe('action')
+    expect(activeOf(after.player).hp).toBeGreaterThan(0)
   })
 
   it('só aceita troca enquanto espera troca', () => {
@@ -482,7 +482,7 @@ describe('regras do turno', () => {
 
   it('a poção devolve 40% do máximo e só funciona uma vez por lado', () => {
     let state = startBattle({ gymId: gym(1), seed: 11, team: DECK }, context)
-    const ativo = activeOf(state.player)
+    const active = activeOf(state.player)
     state = {
       ...state,
       player: {
@@ -492,23 +492,23 @@ describe('regras do turno', () => {
       },
     }
 
-    const { state: curado, events } = applyAction(state, { kind: 'item' }, context)
-    const cura = events.filter(event => event.kind === 'potion')
+    const { state: healed, events } = applyAction(state, { kind: 'item' }, context)
+    const heals = events.filter(event => event.kind === 'potion')
 
     // O quanto curou sai do evento, e não do HP final: o líder ataca no mesmo
     // turno, e o HP que sobra já vem com o golpe dele descontado.
-    expect(cura).toHaveLength(1)
-    expect(cura[0]?.healed).toBe(Math.floor(ativo.maxHp * POTION_HEAL_FRACTION))
-    expect(curado.player.potionsLeft).toBe(0)
+    expect(heals).toHaveLength(1)
+    expect(heals[0]?.healed).toBe(Math.floor(active.maxHp * POTION_HEAL_FRACTION))
+    expect(healed.player.potionsLeft).toBe(0)
 
     // A segunda tentativa, num estado em que o ativo ainda está de pé.
-    const dePe: typeof curado = {
-      ...curado,
+    const dePe: typeof healed = {
+      ...healed,
       expecting: 'action',
       player: {
-        ...curado.player,
-        team: curado.player.team.map((pokemon, index) =>
-          (index === curado.player.active ? { ...pokemon, hp: pokemon.maxHp } : pokemon)),
+        ...healed.player,
+        team: healed.player.team.map((pokemon, index) =>
+          (index === healed.player.active ? { ...pokemon, hp: pokemon.maxHp } : pokemon)),
       },
     }
     expect(() => applyAction(dePe, { kind: 'item' }, context)).toThrow(/já usada/)
@@ -516,11 +516,11 @@ describe('regras do turno', () => {
 
   it('gasta PP a cada golpe, e o slot zerado cai em Struggle', () => {
     let state = startBattle({ gymId: gym(1), seed: 3, team: DECK }, context)
-    const ppInicial = activeOf(state.player).slots[0]?.pp ?? 0
+    const initialPp = activeOf(state.player).slots[0]?.pp ?? 0
 
-    const { state: depois } = applyAction(state, { kind: 'move', slot: 0 }, context)
-    const gastou = activeOf(depois.player).slots[0]?.pp ?? 0
-    expect(gastou).toBe(ppInicial - 1)
+    const { state: after } = applyAction(state, { kind: 'move', slot: 0 }, context)
+    const spent = activeOf(after.player).slots[0]?.pp ?? 0
+    expect(spent).toBe(initialPp - 1)
 
     // Zera o slot e confere que o golpe usado passa a ser Struggle.
     state = {
@@ -533,19 +533,19 @@ describe('regras do turno', () => {
             : pokemon)),
       },
     }
-    const semPp = applyAction(state, { kind: 'move', slot: 0 }, context)
+    const withoutPp = applyAction(state, { kind: 'move', slot: 0 }, context)
 
     // O teste dizia "cai em Struggle" e conferia só que **algum** evento saiu —
     // o que passaria igual se o motor tivesse usado outro golpe. O id está no
     // evento; é ele que prova a queda. `flatMap` em vez de `filter` porque é
     // dentro dele que o `kind` estreita a união e `moveId` passa a existir.
-    const golpesDoJogador = semPp.events.flatMap(event =>
+    const playerMoves = withoutPp.events.flatMap(event =>
       (event.kind === 'hit' || event.kind === 'miss' || event.kind === 'no-effect')
       && event.side === 'player'
         ? [event.moveId]
         : [])
 
-    expect(golpesDoJogador).toEqual([STRUGGLE_MOVE_ID])
+    expect(playerMoves).toEqual([STRUGGLE_MOVE_ID])
   })
 
   it('condição respeita imunidade de tipo — Thunder Wave não paralisa Terrestre', () => {
@@ -557,8 +557,8 @@ describe('regras do turno', () => {
     expect(thunderWave.damageClass).toBe('status')
 
     let state = startBattle({ gymId: gym(1), seed: 4, team: DECK }, context)
-    const terrestre = readGeneration(1).species.find(entry => entry.slug === 'onix')
-    if (terrestre === undefined) throw new Error('onix sumiu do dex')
+    const ground = readGeneration(1).species.find(entry => entry.slug === 'onix')
+    if (ground === undefined) throw new Error('onix sumiu do dex')
 
     state = {
       ...state,
@@ -570,16 +570,16 @@ describe('regras do turno', () => {
       opponent: {
         ...state.opponent,
         team: state.opponent.team.map((pokemon, index) =>
-          (index === state.opponent.active ? { ...pokemon, types: terrestre.types } : pokemon)),
+          (index === state.opponent.active ? { ...pokemon, types: ground.types } : pokemon)),
       },
     }
     expect(activeOf(state.opponent).types).toContain('ground')
 
-    const { state: depois, events } = applyAction(state, { kind: 'move', slot: 0 }, context)
+    const { state: after, events } = applyAction(state, { kind: 'move', slot: 0 }, context)
 
     expect(events.some(event => event.kind === 'ailment')).toBe(false)
     expect(events.some(event => event.kind === 'no-effect' && event.side === 'player')).toBe(true)
-    expect(activeOf(depois.opponent).condition).toBeNull()
+    expect(activeOf(after.opponent).condition).toBeNull()
   })
 
   it('o Struggle do slot não gasta PP', () => {
@@ -598,8 +598,8 @@ describe('regras do turno', () => {
       },
     }
 
-    const { state: depois } = applyAction(state, { kind: 'move', slot: 0 }, context)
-    expect(activeOf(depois.player).slots[0]?.pp).toBe(1)
+    const { state: after } = applyAction(state, { kind: 'move', slot: 0 }, context)
+    expect(activeOf(after.player).slots[0]?.pp).toBe(1)
   })
 
   it('a batalha acabada não aceita mais ação', () => {

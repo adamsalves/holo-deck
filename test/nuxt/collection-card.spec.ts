@@ -72,30 +72,30 @@ function footerParent(html: string): string | null {
 
 describe('o rodapé único da carta do binder', () => {
   it('mantém a mesma árvore com e sem duplicata — a altura não tem por onde divergir', async () => {
-    const comDup = (await card(2)).html()
-    const semDup = (await card(0)).html()
+    const withDuplicate = (await card(2)).html()
+    const withoutDuplicate = (await card(0)).html()
 
     // Se o botão de moer voltar para fora do artigo, esta lista ganha um item
     // só num dos lados, que é a forma exata do defeito da #24.
-    expect(childTags(comDup), 'filhos diretos do artigo').toEqual(childTags(semDup))
+    expect(childTags(withDuplicate), 'filhos diretos do artigo').toEqual(childTags(withoutDuplicate))
 
     // E se ele voltar para um rodapé próprio em vez do slot compartilhado, o pai
     // deixa de ser o mesmo.
-    expect(footerParent(comDup)).toBe(footerParent(semDup))
-    expect(footerParent(comDup)).not.toBeNull()
+    expect(footerParent(withDuplicate)).toBe(footerParent(withoutDuplicate))
+    expect(footerParent(withDuplicate)).not.toBeNull()
   })
 
   it('põe os dois estados na mesma caixa, e só um de cada vez', async () => {
-    const comDup = (await card(2))
-    const semDup = (await card(0))
+    const withDuplicate = (await card(2))
+    const withoutDuplicate = (await card(0))
 
     // Um rodapé, nunca dois: os estados são exclusivos.
-    expect(comDup.findAll('.binder-card__foot')).toHaveLength(1)
-    expect(semDup.findAll('.binder-card__foot')).toHaveLength(1)
+    expect(withDuplicate.findAll('.binder-card__foot')).toHaveLength(1)
+    expect(withoutDuplicate.findAll('.binder-card__foot')).toHaveLength(1)
 
     // E cada um é o elemento certo — botão quando há o que moer, texto quando não.
-    expect(comDup.find('.binder-card__foot').element.tagName).toBe('BUTTON')
-    expect(semDup.find('.binder-card__foot').element.tagName).toBe('P')
+    expect(withDuplicate.find('.binder-card__foot').element.tagName).toBe('BUTTON')
+    expect(withoutDuplicate.find('.binder-card__foot').element.tagName).toBe('P')
   })
 
   /**
@@ -108,16 +108,16 @@ describe('o rodapé único da carta do binder', () => {
    * o link-camada removeu.
    */
   it('nunca aninha o botão dentro do link', async () => {
-    const comDup = await card(2)
+    const withDuplicate = await card(2)
 
-    expect(comDup.find('a').exists(), 'a carta continua navegando').toBe(true)
-    expect(comDup.findAll('a button'), 'botão aninhado no link').toHaveLength(0)
-    expect(comDup.findAll('button')).toHaveLength(1)
+    expect(withDuplicate.find('a').exists(), 'a carta continua navegando').toBe(true)
+    expect(withDuplicate.findAll('a button'), 'botão aninhado no link').toHaveLength(0)
+    expect(withDuplicate.findAll('button')).toHaveLength(1)
   })
 
   it('dá ao link o nome que substitui o conteúdo visual', async () => {
-    const semDup = await card(0, { copies: 1 })
-    const link = semDup.find('a')
+    const withoutDuplicate = await card(0, { copies: 1 })
+    const link = withoutDuplicate.find('a')
 
     // O link cobre a carta e não tem texto dentro: sem o rótulo ele seria
     // anunciado pelo destino cru.

@@ -104,9 +104,9 @@ describe('isCoreData — a união de golpes', () => {
   it('recusa catálogo sem Struggle', () => {
     // Sem ele, a primeira carta que fica sem PP derruba a batalha — e o arquivo
     // tem forma perfeita. É a mesma classe do `moveIds: []`.
-    const semStruggle = validCore().moves.filter(move => move.id !== STRUGGLE_MOVE_ID)
+    const withoutStruggle = validCore().moves.filter(move => move.id !== STRUGGLE_MOVE_ID)
 
-    expect(isCoreData({ ...validCore(), moves: semStruggle })).toBe(false)
+    expect(isCoreData({ ...validCore(), moves: withoutStruggle })).toBe(false)
   })
 
   it('aceita efeito secundário num golpe de dano, e a ausência dele', () => {
@@ -121,8 +121,8 @@ describe('isCoreData — a união de golpes', () => {
   it('recusa golpe de status sem condição', () => {
     // É o registro que o motor não sabe executar: um golpe que não tira HP e
     // não aplica nada gasta o turno do jogador e não faz coisa alguma.
-    const { ailment: _ailment, ...semCondicao } = statusMove()
-    expect(isCoreData({ ...validCore(), moves: [...validCore().moves, semCondicao] })).toBe(false)
+    const { ailment: _ailment, ...withoutAilment } = statusMove()
+    expect(isCoreData({ ...validCore(), moves: [...validCore().moves, withoutAilment] })).toBe(false)
   })
 
   it('recusa golpe de status com poder', () => {
