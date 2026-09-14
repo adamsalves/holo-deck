@@ -33,18 +33,18 @@ describe('paralisia', () => {
 
   it('rouba perto de um quarto dos turnos', () => {
     const rng = createRng(77)
-    let perdidos = 0
+    let lost = 0
     for (let i = 0; i < 10_000; i++) {
-      if (!checkImpediment({ kind: 'paralysis' }, rng).acts) perdidos += 1
+      if (!checkImpediment({ kind: 'paralysis' }, rng).acts) lost += 1
     }
 
-    expect(perdidos / 10_000).toBeGreaterThan(0.235)
-    expect(perdidos / 10_000).toBeLessThan(0.265)
+    expect(lost / 10_000).toBeGreaterThan(0.235)
+    expect(lost / 10_000).toBeLessThan(0.265)
   })
 
   it('não sai sozinha — quem paralisa fica paralisado', () => {
-    const depois = checkImpediment({ kind: 'paralysis' }, createRng(1)).condition
-    expect(depois).toEqual({ kind: 'paralysis' })
+    const after = checkImpediment({ kind: 'paralysis' }, createRng(1)).condition
+    expect(after).toEqual({ kind: 'paralysis' })
   })
 })
 
@@ -81,14 +81,14 @@ describe('queimadura', () => {
 describe('sono', () => {
   it('sorteia de 1 a 3 turnos na aplicação', () => {
     const rng = createRng(4)
-    const vistos = new Set<number>()
+    const seen = new Set<number>()
     for (let i = 0; i < 500; i++) {
       const condition = createCondition('sleep', rng)
       if (condition.kind !== 'sleep') throw new Error('sono deveria nascer com contador')
-      vistos.add(condition.turns)
+      seen.add(condition.turns)
     }
 
-    expect([...vistos].sort()).toEqual([SLEEP_MIN_TURNS, 2, SLEEP_MAX_TURNS])
+    expect([...seen].sort()).toEqual([SLEEP_MIN_TURNS, 2, SLEEP_MAX_TURNS])
   })
 
   it('custa exatamente os turnos sorteados, e só então acorda', () => {
@@ -96,15 +96,15 @@ describe('sono', () => {
     // perdidos, e o sono de 1 não custaria nada a ninguém.
     const rng = createRng(1)
     let condition: Condition | null = { kind: 'sleep', turns: 2 }
-    const agiu: boolean[] = []
+    const acted: boolean[] = []
 
-    for (let turno = 0; turno < 3; turno++) {
+    for (let turn = 0; turn < 3; turn++) {
       const gate = checkImpediment(condition, rng)
-      agiu.push(gate.acts)
+      acted.push(gate.acts)
       condition = gate.condition
     }
 
-    expect(agiu).toEqual([false, false, true])
+    expect(acted).toEqual([false, false, true])
     expect(condition).toBeNull()
   })
 
@@ -121,9 +121,9 @@ describe('sem condição', () => {
     // O consumo do fluxo precisa ser o mesmo entre a partida e o replay dela: um
     // Pokémon são não pode gastar um número que o outro caminho não gastaria.
     const rng = createRng(5)
-    const antes = rng.state()
+    const before = rng.state()
     expect(checkImpediment(null, rng).acts).toBe(true)
-    expect(rng.state()).toBe(antes)
+    expect(rng.state()).toBe(before)
   })
 })
 

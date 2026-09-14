@@ -256,8 +256,8 @@ describe('escrita', () => {
  */
 describe('o caminho voluntário de /settings', () => {
   it('lê o texto cru sem migrar nem validar', () => {
-    const armazenamento = fakeStorage({ [SAVE_KEY]: '{"schemaVersion":1,"lixo":true}' })
-    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+    const storage = fakeStorage({ [SAVE_KEY]: '{"schemaVersion":1,"lixo":true}' })
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
 
     // O ponto: um save que `load()` recusaria volta inteiro aqui. É ele que
     // precisa ser guardado antes de a importação escrever por cima.
@@ -267,36 +267,36 @@ describe('o caminho voluntário de /settings', () => {
   it('devolve nulo, e não explode, quando não há save ou o armazenamento recusa', () => {
     expect(new LocalStorageDriver(fakeStorage(), () => FROZEN).readRaw()).toBeNull()
 
-    const bloqueado = fakeStorage({ [SAVE_KEY]: '{}' })
-    bloqueado.failReads = true
+    const blocked = fakeStorage({ [SAVE_KEY]: '{}' })
+    blocked.failReads = true
 
-    expect(new LocalStorageDriver(bloqueado, () => FROZEN).readRaw()).toBeNull()
+    expect(new LocalStorageDriver(blocked, () => FROZEN).readRaw()).toBeNull()
   })
 
   it('arquiva a cópia sob a mesma chave que a recuperação usa', () => {
-    const armazenamento = fakeStorage({ [SAVE_KEY]: '{"meu":"save"}' })
-    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+    const storage = fakeStorage({ [SAVE_KEY]: '{"meu":"save"}' })
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
 
     driver.archive('{"meu":"save"}')
 
-    expect(armazenamento.data[backupKey(FROZEN)]).toBe('{"meu":"save"}')
+    expect(storage.data[backupKey(FROZEN)]).toBe('{"meu":"save"}')
   })
 
   it('poda o anel ao arquivar, como a recuperação já podava', () => {
     // O que este teste segura é a regra de que apagar de propósito **não** pode
     // encher a cota: quem clica em apagar duas vezes por dia não deixa uma cópia
     // por clique guardada para sempre.
-    const antigos = Object.fromEntries(
+    const stale = Object.fromEntries(
       Array.from({ length: MAX_BACKUPS + 2 }, (_, index) => [backupKey(index + 1), `velho ${index}`]),
     )
-    const armazenamento = fakeStorage({ ...antigos, [SAVE_KEY]: '{"novo":true}' })
-    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+    const storage = fakeStorage({ ...stale, [SAVE_KEY]: '{"novo":true}' })
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
 
     driver.archive('{"novo":true}')
 
-    const guardados = Object.keys(armazenamento.data).filter(key => key.startsWith(BACKUP_PREFIX))
-    expect(guardados).toHaveLength(MAX_BACKUPS)
-    expect(guardados).toContain(backupKey(FROZEN))
+    const kept = Object.keys(storage.data).filter(key => key.startsWith(BACKUP_PREFIX))
+    expect(kept).toHaveLength(MAX_BACKUPS)
+    expect(kept).toContain(backupKey(FROZEN))
   })
   /**
    * Listar e ler as cópias — o caminho de volta que a interface prometia e o
@@ -309,14 +309,14 @@ describe('o caminho voluntário de /settings', () => {
    * que este mesmo código acabou de escrever.
    */
   it('lista as cópias da mais nova para a mais velha', () => {
-    const armazenamento = fakeStorage({
+    const storage = fakeStorage({
       [backupKey(300)]: 'terceira',
       [backupKey(100)]: 'primeira',
       [backupKey(200)]: 'segunda',
       [SAVE_KEY]: '{"atual":true}',
       'outra:chave': 'nada a ver',
     })
-    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
 
     // A ordem é por instante e **numérica**: ordenar as chaves como texto
     // funcionaria por acidente de largura, e é o mesmo cuidado que a poda toma.
@@ -327,8 +327,8 @@ describe('o caminho voluntário de /settings', () => {
   })
 
   it('lê o texto de uma cópia, e devolve nulo se ela sumiu no meio', () => {
-    const armazenamento = fakeStorage({ [backupKey(100)]: '{"guardado":true}' })
-    const driver = new LocalStorageDriver(armazenamento, () => FROZEN)
+    const storage = fakeStorage({ [backupKey(100)]: '{"guardado":true}' })
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
 
     expect(driver.readBackup(backupKey(100))).toBe('{"guardado":true}')
     expect(driver.readBackup(backupKey(999))).toBeNull()
@@ -343,9 +343,9 @@ describe('o caminho voluntário de /settings', () => {
    * em vez de fingir que não há cópia alguma.
    */
   it('e a listagem sobrevive à leitura bloqueada, que é o que falha sozinho', () => {
-    const bloqueado = fakeStorage({ [backupKey(100)]: 'x' })
-    bloqueado.failReads = true
-    const driver = new LocalStorageDriver(bloqueado, () => FROZEN)
+    const blocked = fakeStorage({ [backupKey(100)]: 'x' })
+    blocked.failReads = true
+    const driver = new LocalStorageDriver(blocked, () => FROZEN)
 
     expect(driver.listBackups().map(backup => backup.at)).toEqual([100])
     expect(driver.readBackup(backupKey(100))).toBeNull()

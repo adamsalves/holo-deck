@@ -42,10 +42,10 @@ describe('rótulo da condição', () => {
   })
 
   it('não repete o item quando ele já é a cláusula principal', () => {
-    const frase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' })
+    const phrase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' })
 
-    expect(frase).toBe('Usar Sun Stone')
-    expect(frase.match(/Sun Stone/g)).toHaveLength(1)
+    expect(phrase).toBe('Usar Sun Stone')
+    expect(phrase.match(/Sun Stone/g)).toHaveLength(1)
   })
 
   it('acumula as ressalvas na ordem em que se lê a frase', () => {
@@ -70,20 +70,20 @@ describe('rótulo da condição', () => {
   it('produz frase para cada uma das arestas do dex', () => {
     expect(conditions.length).toBeGreaterThan(400)
 
-    const vazias = conditions.filter(via => describeEvolution(via).trim() === '')
-    expect(vazias, 'aresta sem rótulo é seta sem explicação na tela').toEqual([])
+    const empty = conditions.filter(via => describeEvolution(via).trim() === '')
+    expect(empty, 'aresta sem rótulo é seta sem explicação na tela').toEqual([])
 
-    const comSlug = conditions.filter(via => /[a-z]-[a-z]/.test(describeEvolution(via)))
-    expect(comSlug.map(via => describeEvolution(via)), 'slug cru vazando para a tela').toEqual([])
+    const withSlug = conditions.filter(via => /[a-z]-[a-z]/.test(describeEvolution(via)))
+    expect(withSlug.map(via => describeEvolution(via)), 'slug cru vazando para a tela').toEqual([])
   })
 
   it('não deixa nenhum gatilho cair no humanizador', () => {
     // Um gatilho fora da tabela vira `Three Critical Hits` — legível, em inglês,
     // e sinal de que a lista envelheceu em relação ao dex.
-    const semRotulo = [...new Set(conditions.map(via => via.trigger))]
+    const withoutLabel = [...new Set(conditions.map(via => via.trigger))]
       .filter(trigger => describeEvolution({ trigger }) === humanizeSlug(trigger) && trigger.includes('-'))
 
-    expect(semRotulo, 'gatilho sem rótulo em português').toEqual([])
+    expect(withoutLabel, 'gatilho sem rótulo em português').toEqual([])
   })
 })
 
@@ -110,8 +110,8 @@ describe('árvore em fileiras', () => {
   it('alcança toda espécie do dex por alguma cadeia', () => {
     // Cadeia é como o detalhe resolve a linha evolutiva. Uma espécie fora de
     // todas elas abriria a aba Evolução vazia, e são 1025 abas.
-    const nasCadeias = new Set(Object.values(chains).flatMap(flattenChain).map(node => node.speciesId))
-    const fora = species.filter(entry => !nasCadeias.has(entry.id))
+    const inChains = new Set(Object.values(chains).flatMap(flattenChain).map(node => node.speciesId))
+    const fora = species.filter(entry => !inChains.has(entry.id))
 
     expect(fora.map(entry => entry.slug)).toEqual([])
   })
@@ -133,12 +133,12 @@ describe('árvore em fileiras', () => {
 describe('aresta sem condição', () => {
   // `flattenChain` devolve `[raiz, ...descendentes]`, e a raiz não tem `via` por
   // definição — é o `slice(1)` que deixa só as arestas de verdade.
-  const semVia = Object.values(chains)
+  const withoutCondition = Object.values(chains)
     .flatMap(root => flattenChain(root).slice(1))
     .filter(node => node.via === undefined)
 
   it('é exatamente uma em todo o dex, e é phione → manaphy', () => {
-    expect(semVia.map(node => node.slug)).toEqual(['manaphy'])
+    expect(withoutCondition.map(node => node.slug)).toEqual(['manaphy'])
   })
 
   it('não some da árvore por não ter condição', () => {

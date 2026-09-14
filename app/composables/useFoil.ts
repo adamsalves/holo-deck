@@ -247,8 +247,8 @@ export function useFoil(
    * de cena e deixa `engaged` preso em `true`. Ao religar, a carta volta
    * inclinada na última leitura, e só um novo entra-e-sai do ponteiro a endireita.
    */
-  watch(allowed, (permitido) => {
-    if (!permitido) rest()
+  watch(allowed, (isAllowed) => {
+    if (!isAllowed) rest()
   })
 
   const enterTarget = computed(() => (allowed.value ? toValue(target) ?? null : null))

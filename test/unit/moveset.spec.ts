@@ -57,15 +57,15 @@ describe('selectBattleMoves', () => {
     // repetir, e deixar a vaga vazia seria punir a espécie duas vezes. É "não
     // repete enquanto houver tipo novo a usar".
     for (const species of readAllSpecies()) {
-      const disponiveis = resolveMoves(species, catalog).filter(move => move.damageClass !== 'status')
+      const available = resolveMoves(species, catalog).filter(move => move.damageClass !== 'status')
       const moves = selectBattleMoves(species.types, resolveMoves(species, catalog))
       // O golpe de status entra no recorte quando o moveset tem menos de 4:
       // Pyukumuku sai com Struggle e Toxic, e a cobertura em questão é a dos
       // golpes de dano.
-      const primeiros = moves.slice(0, 3).filter(move => move.damageClass !== 'status')
-      const esperado = Math.min(new Set(disponiveis.map(move => move.type)).size, primeiros.length)
+      const firstThree = moves.slice(0, 3).filter(move => move.damageClass !== 'status')
+      const expected = Math.min(new Set(available.map(move => move.type)).size, firstThree.length)
 
-      expect(new Set(primeiros.map(move => move.type)).size, species.slug).toBe(esperado)
+      expect(new Set(firstThree.map(move => move.type)).size, species.slug).toBe(expected)
     }
   })
 
@@ -75,10 +75,10 @@ describe('selectBattleMoves', () => {
     // corresponder ao botão que a prancha desenha.
     for (const species of readAllSpecies()) {
       const moves = selectBattleMoves(species.types, resolveMoves(species, catalog))
-      const posicao = moves.findIndex(move => move.damageClass === 'status')
-      if (posicao === -1) continue
+      const position = moves.findIndex(move => move.damageClass === 'status')
+      if (position === -1) continue
 
-      expect(posicao, species.slug).toBe(moves.length - 1)
+      expect(position, species.slug).toBe(moves.length - 1)
     }
   })
 
@@ -100,10 +100,10 @@ describe('selectBattleMoves', () => {
     // O replay depende disto tanto quanto do RNG: um moveset que mude de ordem
     // entre duas execuções muda o índice do slot que o log gravou.
     for (const species of readAllSpecies()) {
-      const uma = selectBattleMoves(species.types, resolveMoves(species, catalog))
-      const outra = selectBattleMoves(species.types, resolveMoves(species, catalog))
+      const one = selectBattleMoves(species.types, resolveMoves(species, catalog))
+      const another = selectBattleMoves(species.types, resolveMoves(species, catalog))
 
-      expect(outra.map(move => move.id), species.slug).toEqual(uma.map(move => move.id))
+      expect(another.map(move => move.id), species.slug).toEqual(one.map(move => move.id))
     }
   })
 
@@ -120,14 +120,14 @@ describe('selectBattleMoves', () => {
   })
 
   it('sem STAB disponível, o slot 1 é o mais forte no geral', () => {
-    const semStab = selectBattleMoves(['dragon'], resolveMoves(speciesBySlug(1, 'pikachu'), catalog))
-    const todos = resolveMoves(speciesBySlug(1, 'pikachu'), catalog)
+    const withoutStab = selectBattleMoves(['dragon'], resolveMoves(speciesBySlug(1, 'pikachu'), catalog))
+    const all = resolveMoves(speciesBySlug(1, 'pikachu'), catalog)
       .filter(move => move.damageClass !== 'status')
 
     // `todos` já veio sem golpe de status: o TS infere o predicado do `filter`
     // acima, e é por isso que `expectedPower` aceita os dois lados aqui.
-    const maisForte = [...todos].sort((a, b) => expectedPower(b) - expectedPower(a))[0]
-    expect(semStab[0]?.id).toBe(maisForte?.id)
+    const strongest = [...all].sort((a, b) => expectedPower(b) - expectedPower(a))[0]
+    expect(withoutStab[0]?.id).toBe(strongest?.id)
   })
 
   it('status ganha de prioridade no slot 4', () => {

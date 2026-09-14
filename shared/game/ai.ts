@@ -193,11 +193,11 @@ export function chooseAiAction(
     return { kind: 'move', slot: rng.pick([first, ...rest]).index }
   }
 
-  const best = attacks.reduce((melhor, candidato) =>
-    expectedTurnDamage(active, foe, candidato.move, matrix)
-    > expectedTurnDamage(active, foe, melhor.move, matrix)
-      ? candidato
-      : melhor)
+  const best = attacks.reduce((bestSoFar, candidate) =>
+    expectedTurnDamage(active, foe, candidate.move, matrix)
+    > expectedTurnDamage(active, foe, bestSoFar.move, matrix)
+      ? candidate
+      : bestSoFar)
 
   return { kind: 'move', slot: best.index }
 }

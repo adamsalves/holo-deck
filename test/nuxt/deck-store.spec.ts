@@ -202,10 +202,10 @@ describe('a travessia do save', () => {
     own(PIKACHU)
     const deck = useDeckStore()
 
-    const doSave = [PIKACHU, null, null, null, null, null]
-    deck.hydrate(doSave)
+    const fromSave = [PIKACHU, null, null, null, null, null]
+    deck.hydrate(fromSave)
 
-    expect(deck.slots).toEqual(doSave)
-    expect(deck.slots).not.toBe(doSave)
+    expect(deck.slots).toEqual(fromSave)
+    expect(deck.slots).not.toBe(fromSave)
   })
 })

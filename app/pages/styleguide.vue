@@ -27,31 +27,31 @@ import { RARITY_LABELS } from '~~/shared/types/game'
  */
 definePageMeta({ layout: false })
 
-const escada = inkLadder(theme)
+const ladder = inkLadder(theme)
 
 /** As superfícies, e a mais clara delas — que é contra quem o contraste decide. */
-const superficies = ['--bg', '--surface', '--surface-raised', '--surface-sunken', '--surface-cell']
-  .map(nome => ({ nome, valor: resolveToken(nome, theme) ?? '' }))
+const surfaces = ['--bg', '--surface', '--surface-raised', '--surface-sunken', '--surface-cell']
+  .map(name => ({ name, value: resolveToken(name, theme) ?? '' }))
 
-const piorFundo = superficies.reduce((pior, atual) =>
-  contrastRatio('#FFFFFF', atual.valor) < contrastRatio('#FFFFFF', pior.valor) ? atual : pior)
+const worstBackground = surfaces.reduce((worst, current) =>
+  contrastRatio('#FFFFFF', current.value) < contrastRatio('#FFFFFF', worst.value) ? current : worst)
 
-const papeis = [
-  { nome: '--text', minimo: AA_NORMAL },
-  { nome: '--text-body', minimo: AA_NORMAL },
-  { nome: '--text-muted', minimo: AA_NORMAL },
-  { nome: '--text-faint', minimo: AA_LARGE },
-].map(papel => ({
-  ...papel,
-  valor: resolveToken(papel.nome, theme) ?? '',
-  melhor: contrastRatio(resolveToken(papel.nome, theme) ?? '', resolveToken('--bg', theme) ?? ''),
-  pior: contrastRatio(resolveToken(papel.nome, theme) ?? '', piorFundo.valor),
+const roles = [
+  { name: '--text', minimum: AA_NORMAL },
+  { name: '--text-body', minimum: AA_NORMAL },
+  { name: '--text-muted', minimum: AA_NORMAL },
+  { name: '--text-faint', minimum: AA_LARGE },
+].map(role => ({
+  ...role,
+  value: resolveToken(role.name, theme) ?? '',
+  best: contrastRatio(resolveToken(role.name, theme) ?? '', resolveToken('--bg', theme) ?? ''),
+  worst: contrastRatio(resolveToken(role.name, theme) ?? '', worstBackground.value),
 }))
 
-const chanfros = ['card', 'tile', 'chip', 'control']
+const notches = ['card', 'tile', 'chip', 'control']
 
 /** Um tipo por carta de exemplo, para as seis raridades não saírem todas iguais. */
-const exemplos: { rarity: Rarity, name: string, dexNumber: number, types: readonly [TypeName] | readonly [TypeName, TypeName] }[] = [
+const samples: { rarity: Rarity, name: string, dexNumber: number, types: readonly [TypeName] | readonly [TypeName, TypeName] }[] = [
   { rarity: 'common', name: 'Rattata', dexNumber: 19, types: ['normal'] },
   { rarity: 'uncommon', name: 'Machoke', dexNumber: 67, types: ['fighting'] },
   { rarity: 'rare', name: 'Charizard', dexNumber: 6, types: ['fire', 'flying'] },
@@ -68,19 +68,19 @@ const exemplos: { rarity: Rarity, name: string, dexNumber: number, types: readon
  * tela de Ajustes da Fase 6 chama a mesma função. Fora do iOS o botão nem
  * aparece, porque não há nada a pedir.
  */
-const pedePermissao = ref(false)
-const inclinacaoLiberada = ref<boolean | null>(null)
+const needsPermission = ref(false)
+const tiltGranted = ref<boolean | null>(null)
 onMounted(() => {
-  pedePermissao.value = tiltNeedsPermission()
+  needsPermission.value = tiltNeedsPermission()
 })
 
-async function liberarInclinacao(): Promise<void> {
-  inclinacaoLiberada.value = await requestTiltPermission()
+async function grantTilt(): Promise<void> {
+  tiltGranted.value = await requestTiltPermission()
 }
 
-const resumoInclinacao = computed(() => {
-  if (inclinacaoLiberada.value === null) return ''
-  return inclinacaoLiberada.value ? 'liberado' : 'recusado'
+const tiltSummary = computed(() => {
+  if (tiltGranted.value === null) return ''
+  return tiltGranted.value ? 'liberado' : 'recusado'
 })
 </script>
 
@@ -98,19 +98,19 @@ const resumoInclinacao = computed(() => {
 
     <section class="flex flex-col gap-4">
       <h2 class="text-xl font-bold text-highlighted">
-        Escada <span class="numeric text-muted">ink</span>, {{ escada.length }} degraus
+        Escada <span class="numeric text-muted">ink</span>, {{ ladder.length }} degraus
       </h2>
       <div class="flex flex-wrap gap-2">
         <div
-          v-for="degrau in escada"
-          :key="degrau.step"
+          v-for="rung in ladder"
+          :key="rung.step"
           class="flex w-24 flex-col gap-1"
         >
           <div
             class="h-12 border border-default"
-            :style="{ background: degrau.value }"
+            :style="{ background: rung.value }"
           />
-          <span class="numeric text-[10px] text-muted">ink-{{ degrau.step }}</span>
+          <span class="numeric text-[10px] text-muted">ink-{{ rung.step }}</span>
         </div>
       </div>
     </section>
@@ -121,22 +121,22 @@ const resumoInclinacao = computed(() => {
       </h2>
       <p class="text-sm text-muted">
         As duas razões são o melhor e o pior caso: sobre <code class="numeric">--bg</code> e sobre
-        <code class="numeric">{{ piorFundo.nome }}</code>, a superfície mais clara do sistema. É a
+        <code class="numeric">{{ worstBackground.name }}</code>, a superfície mais clara do sistema. É a
         segunda que decide — nenhum texto de carta cai sobre o fundo da página.
       </p>
       <div class="flex flex-col gap-2">
         <p
-          v-for="papel in papeis"
-          :key="papel.nome"
+          v-for="role in roles"
+          :key="role.name"
           class="flex items-baseline gap-4"
-          :style="{ color: papel.valor }"
+          :style="{ color: role.value }"
         >
-          <span class="numeric w-32 text-xs">{{ papel.nome }}</span>
+          <span class="numeric w-32 text-xs">{{ role.name }}</span>
           <span class="flex-1">O rápido Ninetales salta sobre o Snorlax preguiçoso.</span>
           <span class="numeric w-32 text-right text-xs">
-            {{ papel.melhor.toFixed(2) }} / {{ papel.pior.toFixed(2) }}:1
+            {{ role.best.toFixed(2) }} / {{ role.worst.toFixed(2) }}:1
           </span>
-          <span class="numeric w-10 text-right text-xs">{{ papel.pior >= papel.minimo ? 'AA' : '✗' }}</span>
+          <span class="numeric w-10 text-right text-xs">{{ role.worst >= role.minimum ? 'AA' : '✗' }}</span>
         </p>
       </div>
     </section>
@@ -147,12 +147,12 @@ const resumoInclinacao = computed(() => {
       </h2>
       <div class="flex flex-wrap gap-3">
         <div
-          v-for="superficie in superficies"
-          :key="superficie.nome"
+          v-for="surface in surfaces"
+          :key="surface.name"
           class="flex h-20 w-40 items-end border border-default p-2"
-          :style="{ background: superficie.valor }"
+          :style="{ background: surface.value }"
         >
-          <span class="numeric text-[10px] text-muted">{{ superficie.nome }}</span>
+          <span class="numeric text-[10px] text-muted">{{ surface.name }}</span>
         </div>
       </div>
     </section>
@@ -163,12 +163,12 @@ const resumoInclinacao = computed(() => {
       </h2>
       <div class="flex flex-wrap items-end gap-4">
         <div
-          v-for="chanfro in chanfros"
-          :key="chanfro"
+          v-for="notch in notches"
+          :key="notch"
           class="flex h-20 w-32 items-center justify-center bg-elevated"
-          :class="`bevel-${chanfro}`"
+          :class="`bevel-${notch}`"
         >
-          <span class="numeric text-[10px] text-muted">{{ chanfro }}</span>
+          <span class="numeric text-[10px] text-muted">{{ notch }}</span>
         </div>
       </div>
     </section>
@@ -205,31 +205,31 @@ const resumoInclinacao = computed(() => {
       </p>
 
       <p
-        v-if="pedePermissao"
+        v-if="needsPermission"
         class="flex items-center gap-3 text-sm text-muted"
       >
         <button
           type="button"
           class="bevel-control bg-elevated px-3 py-2 text-xs font-bold text-default uppercase"
-          @click="liberarInclinacao"
+          @click="grantTilt"
         >
           Ativar inclinação
         </button>
-        <span>Este aparelho exige permissão para o giroscópio. {{ resumoInclinacao }}</span>
+        <span>Este aparelho exige permissão para o giroscópio. {{ tiltSummary }}</span>
       </p>
 
       <div class="flex flex-col gap-2">
         <span class="numeric text-xs text-muted">estáticas — como aparecem no grid</span>
         <div class="grid grid-cols-6 gap-3">
           <DexPokeCard
-            v-for="exemplo in exemplos"
-            :key="exemplo.rarity"
-            v-bind="exemplo"
+            v-for="sample in samples"
+            :key="sample.rarity"
+            v-bind="sample"
           >
             <template #art>
               <img
-                :src="`/sprites/${exemplo.dexNumber}.webp`"
-                :alt="exemplo.name"
+                :src="`/sprites/${sample.dexNumber}.webp`"
+                :alt="sample.name"
               >
             </template>
           </DexPokeCard>
@@ -240,15 +240,15 @@ const resumoInclinacao = computed(() => {
         <span class="numeric text-xs text-muted">interativas — foil e inclinação seguem o ponteiro</span>
         <div class="grid grid-cols-6 gap-3">
           <DexPokeCard
-            v-for="exemplo in exemplos"
-            :key="exemplo.rarity"
-            v-bind="exemplo"
+            v-for="sample in samples"
+            :key="sample.rarity"
+            v-bind="sample"
             interactive
           >
             <template #art>
               <img
-                :src="`/sprites/${exemplo.dexNumber}.webp`"
-                :alt="exemplo.name"
+                :src="`/sprites/${sample.dexNumber}.webp`"
+                :alt="sample.name"
               >
             </template>
           </DexPokeCard>

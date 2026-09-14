@@ -121,11 +121,11 @@ describe('portão do interruptor de movimento', () => {
     const unpaired = sources
       .map(({ file, media, toggle }) => ({
         file,
-        semMediaQuery: toggle.filter(selector => !media.includes(selector)),
-        semInterruptor: media.filter(selector => !toggle.includes(selector)),
+        withoutMediaQuery: toggle.filter(selector => !media.includes(selector)),
+        withoutToggle: media.filter(selector => !toggle.includes(selector)),
       }))
-      .filter(({ semMediaQuery, semInterruptor }) =>
-        semMediaQuery.length > 0 || semInterruptor.length > 0)
+      .filter(({ withoutMediaQuery, withoutToggle }) =>
+        withoutMediaQuery.length > 0 || withoutToggle.length > 0)
 
     expect(unpaired).toEqual([])
   })

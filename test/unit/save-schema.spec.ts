@@ -178,16 +178,16 @@ describe('o guarda', () => {
    * para isso, e o guarda é o único lugar que o vê.
    */
   it('aceita o dia do diário nulo ou em `AAAA-MM-DD`, e recusa o resto', () => {
-    const comDia = (dailyClaimed: unknown): unknown =>
+    const withDay = (dailyClaimed: unknown): unknown =>
       ({ ...valid, progress: { ...valid.progress, dailyClaimed } })
 
-    expect(isSaveData(comDia(null))).toBe(true)
-    expect(isSaveData(comDia('2026-09-05'))).toBe(true)
+    expect(isSaveData(withDay(null))).toBe(true)
+    expect(isSaveData(withDay('2026-09-05'))).toBe(true)
 
-    expect(isSaveData(comDia('ontem'))).toBe(false)
-    expect(isSaveData(comDia('2026-9-5'))).toBe(false)
-    expect(isSaveData(comDia(Date.parse('2026-09-05')))).toBe(false)
-    expect(isSaveData(comDia(undefined))).toBe(false)
+    expect(isSaveData(withDay('ontem'))).toBe(false)
+    expect(isSaveData(withDay('2026-9-5'))).toBe(false)
+    expect(isSaveData(withDay(Date.parse('2026-09-05')))).toBe(false)
+    expect(isSaveData(withDay(undefined))).toBe(false)
   })
 
   it('não põe teto na versão, que tem tratamento próprio', () => {
@@ -225,7 +225,7 @@ describe('a migração', () => {
    * do direito, e o único delta é o deck vazio mais a versão.
    */
   it('leva um save da Fase 5 até a versão corrente sem tocar no que já estava lá', () => {
-    const daFase5 = {
+    const fromPhase5 = {
       schemaVersion: 1,
       collection: {
         [speciesKey(25)]: { c: 3, s: 1 },
@@ -235,11 +235,11 @@ describe('a migração', () => {
       progress: { pity: 4, welcomeClaimed: 3 },
     }
 
-    const { data, recovered } = migrate(daFase5)
+    const { data, recovered } = migrate(fromPhase5)
 
     expect(recovered).toBeNull()
     expect(data).toEqual({
-      ...daFase5,
+      ...fromPhase5,
       schemaVersion: 4,
       deck: emptyDeck(),
       progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0, dailyClaimed: null },
@@ -263,7 +263,7 @@ describe('a migração', () => {
    * inserir um passo no meio em vez de no fim, é este teste que reprova.
    */
   it('leva um save da versão 2 até a corrente preservando deck e coleção', () => {
-    const daVersao2 = {
+    const fromVersion2 = {
       schemaVersion: 2,
       collection: { [speciesKey(25)]: { c: 3, s: 1 } },
       dust: 340,
@@ -271,11 +271,11 @@ describe('a migração', () => {
       progress: { pity: 4, welcomeClaimed: 3 },
     }
 
-    const { data, recovered } = migrate(daVersao2)
+    const { data, recovered } = migrate(fromVersion2)
 
     expect(recovered).toBeNull()
     expect(data).toEqual({
-      ...daVersao2,
+      ...fromVersion2,
       schemaVersion: 4,
       progress: { pity: 4, welcomeClaimed: 3, coins: 0, badges: 0, dailyClaimed: null },
       battle: null,
@@ -295,7 +295,7 @@ describe('a migração', () => {
    * meio em vez de no fim reprova aqui.
    */
   it('leva um save da versão 3 para a 4 abrindo o diário', () => {
-    const daVersao3 = {
+    const fromVersion3 = {
       schemaVersion: 3,
       collection: { [speciesKey(25)]: { c: 3, s: 1 } },
       dust: 340,
@@ -304,11 +304,11 @@ describe('a migração', () => {
       battle: null,
     }
 
-    const { data, recovered } = migrate(daVersao3)
+    const { data, recovered } = migrate(fromVersion3)
 
     expect(recovered).toBeNull()
     expect(data).toEqual({
-      ...daVersao3,
+      ...fromVersion3,
       schemaVersion: 4,
       progress: { pity: 4, welcomeClaimed: 3, coins: 1240, badges: 1, dailyClaimed: null },
     })

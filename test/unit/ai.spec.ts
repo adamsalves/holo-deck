@@ -54,8 +54,8 @@ describe('ruído por ginásio', () => {
 })
 
 describe('escolha do golpe', () => {
-  const lider = side(['machamp'])
-  const alvo = pokemon('snorlax')
+  const leader = side(['machamp'])
+  const target = pokemon('snorlax')
 
   function greedySlot(self: BattlePokemon, foe: BattlePokemon): number {
     let best = -1
@@ -72,11 +72,11 @@ describe('escolha do golpe', () => {
   }
 
   it('a faixa C sem ruído escolhe sempre o de maior dano esperado', () => {
-    const esperado = greedySlot(activeOf(lider), alvo)
+    const expected = greedySlot(activeOf(leader), target)
 
     for (let seed = 0; seed < 200; seed++) {
-      const action = chooseAiAction(9, lider, alvo, core.effectiveness, createRng(seed))
-      expect(action, `seed ${seed}`).toEqual({ kind: 'move', slot: esperado })
+      const action = chooseAiAction(9, leader, target, core.effectiveness, createRng(seed))
+      expect(action, `seed ${seed}`).toEqual({ kind: 'move', slot: expected })
     }
   })
 
@@ -84,22 +84,22 @@ describe('escolha do golpe', () => {
     // A medida direta é indireta de propósito: quando o ruído pega, ele sorteia
     // entre os quatro e às vezes cai no mesmo golpe do guloso. Com n golpes, a
     // fração de decisões *diferentes* é `p × (n−1)/n` — e é dela que a taxa sai.
-    const self = activeOf(lider)
-    const esperado = greedySlot(self, alvo)
-    const opcoes = self.slots.filter(slot => slot.move.damageClass !== 'status').length
-    expect(opcoes).toBeGreaterThan(1)
+    const self = activeOf(leader)
+    const expected = greedySlot(self, target)
+    const options = self.slots.filter(slot => slot.move.damageClass !== 'status').length
+    expect(options).toBeGreaterThan(1)
 
     const rng = createRng(31_337)
-    let diferentes = 0
-    const rodadas = 10_000
-    for (let i = 0; i < rodadas; i++) {
-      const action = chooseAiAction(1, lider, alvo, core.effectiveness, rng)
-      if (action.kind === 'move' && action.slot !== esperado) diferentes += 1
+    let different = 0
+    const rounds = 10_000
+    for (let i = 0; i < rounds; i++) {
+      const action = chooseAiAction(1, leader, target, core.effectiveness, rng)
+      if (action.kind === 'move' && action.slot !== expected) different += 1
     }
 
-    const taxa = (diferentes / rodadas) / ((opcoes - 1) / opcoes)
-    expect(taxa).toBeGreaterThan(0.37)
-    expect(taxa).toBeLessThan(0.43)
+    const rate = (different / rounds) / ((options - 1) / options)
+    expect(rate).toBeGreaterThan(0.37)
+    expect(rate).toBeLessThan(0.43)
   })
 })
 
@@ -108,58 +108,58 @@ describe('golpe de status', () => {
     // A escolha gulosa nunca o pegaria: dano esperado zero perde de qualquer
     // ataque. Sem esta regra, a vaga que o pipeline reserva no moveset seria
     // peso morto na mão dos nove líderes.
-    const lider = side(['pikachu'])
-    const statusSlot = activeOf(lider).slots.findIndex(slot => slot.move.damageClass === 'status')
+    const leader = side(['pikachu'])
+    const statusSlot = activeOf(leader).slots.findIndex(slot => slot.move.damageClass === 'status')
     expect(statusSlot).toBeGreaterThanOrEqual(0)
 
-    const limpo = pokemon('snorlax')
-    expect(chooseAiAction(9, lider, limpo, core.effectiveness, createRng(1)))
+    const healthy = pokemon('snorlax')
+    expect(chooseAiAction(9, leader, healthy, core.effectiveness, createRng(1)))
       .toEqual({ kind: 'move', slot: statusSlot })
 
-    const paralisado: BattlePokemon = { ...limpo, condition: { kind: 'paralysis' } }
-    const depois = chooseAiAction(9, lider, paralisado, core.effectiveness, createRng(1))
-    expect(depois.kind).toBe('move')
-    expect(depois).not.toEqual({ kind: 'move', slot: statusSlot })
+    const paralyzed: BattlePokemon = { ...healthy, condition: { kind: 'paralysis' } }
+    const after = chooseAiAction(9, leader, paralyzed, core.effectiveness, createRng(1))
+    expect(after.kind).toBe('move')
+    expect(after).not.toEqual({ kind: 'move', slot: statusSlot })
   })
 
   it('não insiste com o golpe sem PP', () => {
-    const lider = side(['pikachu'])
-    const statusSlot = activeOf(lider).slots.findIndex(slot => slot.move.damageClass === 'status')
-    const semPp: BattleSide = {
-      ...lider,
-      team: lider.team.map(atual => ({
-        ...atual,
-        slots: atual.slots.map((slot, index) => (index === statusSlot ? { ...slot, pp: 0 } : slot)),
+    const leader = side(['pikachu'])
+    const statusSlot = activeOf(leader).slots.findIndex(slot => slot.move.damageClass === 'status')
+    const withoutPp: BattleSide = {
+      ...leader,
+      team: leader.team.map(current => ({
+        ...current,
+        slots: current.slots.map((slot, index) => (index === statusSlot ? { ...slot, pp: 0 } : slot)),
       })),
     }
 
-    expect(chooseAiAction(9, semPp, pokemon('snorlax'), core.effectiveness, createRng(1)))
+    expect(chooseAiAction(9, withoutPp, pokemon('snorlax'), core.effectiveness, createRng(1)))
       .not.toEqual({ kind: 'move', slot: statusSlot })
   })
 })
 
 describe('poção', () => {
-  const machucado = (base: BattleSide): BattleSide => ({
+  const hurt = (base: BattleSide): BattleSide => ({
     ...base,
-    team: base.team.map((atual, index) =>
-      (index === base.active ? { ...atual, hp: Math.floor(atual.maxHp * 0.1) } : atual)),
+    team: base.team.map((current, index) =>
+      (index === base.active ? { ...current, hp: Math.floor(current.maxHp * 0.1) } : current)),
   })
 
   it('a faixa B gasta a poção com o ativo abaixo de 25%', () => {
-    const lider = machucado(side(['machamp']))
-    expect(chooseAiAction(4, lider, pokemon('snorlax'), core.effectiveness, createRng(1)))
+    const leader = hurt(side(['machamp']))
+    expect(chooseAiAction(4, leader, pokemon('snorlax'), core.effectiveness, createRng(1)))
       .toEqual({ kind: 'item' })
   })
 
   it('a faixa A não tem poção para gastar', () => {
-    const lider = machucado(side(['machamp']))
-    expect(chooseAiAction(1, lider, pokemon('snorlax'), core.effectiveness, createRng(1)).kind)
+    const leader = hurt(side(['machamp']))
+    expect(chooseAiAction(1, leader, pokemon('snorlax'), core.effectiveness, createRng(1)).kind)
       .toBe('move')
   })
 
   it('sem poção restante, volta a atacar', () => {
-    const lider = { ...machucado(side(['machamp'])), potionsLeft: 0 }
-    expect(chooseAiAction(4, lider, pokemon('snorlax'), core.effectiveness, createRng(1)).kind)
+    const leader = { ...hurt(side(['machamp'])), potionsLeft: 0 }
+    expect(chooseAiAction(4, leader, pokemon('snorlax'), core.effectiveness, createRng(1)).kind)
       .toBe('move')
   })
 })
@@ -167,10 +167,10 @@ describe('poção', () => {
 describe('troca', () => {
   it('a faixa C foge de uma matchup de ×2 contra', () => {
     // Onix é pedra/terra: um golpe de água bate ×4 nele.
-    const lider = side(['onix', 'machamp'])
+    const leader = side(['onix', 'machamp'])
     const foe = pokemon('blastoise')
 
-    const action = chooseAiAction(9, lider, foe, core.effectiveness, createRng(1))
+    const action = chooseAiAction(9, leader, foe, core.effectiveness, createRng(1))
     expect(action).toEqual({ kind: 'switch', index: 1 })
   })
 
@@ -179,32 +179,32 @@ describe('troca', () => {
     // não olhava a matchup de destino, então com o time todo ameaçado o líder
     // alternava entre dois Pokémon para sempre, sem nunca atacar — 113 trocas
     // por batalha no Ginásio 9 contra 3 nas faixas de baixo.
-    const lider = side(['onix', 'geodude'])
+    const leader = side(['onix', 'geodude'])
     const foe = pokemon('blastoise')
 
-    expect(chooseAiAction(9, lider, foe, core.effectiveness, createRng(1)).kind).toBe('move')
+    expect(chooseAiAction(9, leader, foe, core.effectiveness, createRng(1)).kind).toBe('move')
   })
 
   it('a faixa A aguenta o desaforo', () => {
-    const lider = side(['onix', 'machamp'])
-    expect(chooseAiAction(1, lider, pokemon('blastoise'), core.effectiveness, createRng(1)).kind)
+    const leader = side(['onix', 'machamp'])
+    expect(chooseAiAction(1, leader, pokemon('blastoise'), core.effectiveness, createRng(1)).kind)
       .toBe('move')
   })
 
   it('sem banco, não há para onde fugir', () => {
-    const lider = side(['onix'])
-    expect(chooseAiAction(9, lider, pokemon('blastoise'), core.effectiveness, createRng(1)).kind)
+    const leader = side(['onix'])
+    expect(chooseAiAction(9, leader, pokemon('blastoise'), core.effectiveness, createRng(1)).kind)
       .toBe('move')
   })
 
   it('a troca forçada escolhe quem bate mais forte, sem rolar dado', () => {
-    const lider: BattleSide = {
+    const leader: BattleSide = {
       ...side(['onix', 'magikarp', 'machamp']),
       active: 0,
-      team: side(['onix', 'magikarp', 'machamp']).team.map((atual, index) =>
-        (index === 0 ? { ...atual, hp: 0 } : atual)),
+      team: side(['onix', 'magikarp', 'machamp']).team.map((current, index) =>
+        (index === 0 ? { ...current, hp: 0 } : current)),
     }
 
-    expect(chooseAiSwitch(lider, pokemon('snorlax'), core.effectiveness)).toBe(2)
+    expect(chooseAiSwitch(leader, pokemon('snorlax'), core.effectiveness)).toBe(2)
   })
 })

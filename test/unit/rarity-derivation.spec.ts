@@ -104,21 +104,21 @@ describe('sobre o dex inteiro', () => {
    * estivesse errado.
    */
   it('produz pirâmide: cada faixa é menor que a anterior', () => {
-    const porFaixa = (['common', 'uncommon', 'rare', 'ultra'] satisfies Rarity[])
+    const byTier = (['common', 'uncommon', 'rare', 'ultra'] satisfies Rarity[])
       .map(rarity => species.filter(entry => rarityOf(entry) === rarity).length)
 
-    const decrescente = porFaixa.every((count, index) => {
-      const anterior = porFaixa[index - 1]
-      return anterior === undefined || count < anterior
+    const descending = byTier.every((count, index) => {
+      const previous = byTier[index - 1]
+      return previous === undefined || count < previous
     })
 
-    expect(decrescente, `contagens: ${porFaixa.join(' / ')}`).toBe(true)
+    expect(descending, `contagens: ${byTier.join(' / ')}`).toBe(true)
   })
 
   it('não deixa nenhum tier vazio', () => {
-    const vazios = RARITY_NAMES.filter(rarity => !species.some(entry => rarityOf(entry) === rarity))
+    const empty = RARITY_NAMES.filter(rarity => !species.some(entry => rarityOf(entry) === rarity))
 
-    expect(vazios, 'tier sem nenhuma espécie é tier que o jogador nunca vê').toEqual([])
+    expect(empty, 'tier sem nenhuma espécie é tier que o jogador nunca vê').toEqual([])
   })
 })
 
@@ -132,15 +132,15 @@ describe('sobre o dex inteiro', () => {
  */
 describe('tetos das barras', () => {
   it('nenhum stat passa do teto', () => {
-    const acima = species.filter(entry => entry.baseStats.some(stat => stat > MAX_BASE_STAT))
+    const above = species.filter(entry => entry.baseStats.some(stat => stat > MAX_BASE_STAT))
 
-    expect(acima.map(entry => entry.slug), `MAX_BASE_STAT (${MAX_BASE_STAT}) ficou abaixo do dex`).toEqual([])
+    expect(above.map(entry => entry.slug), `MAX_BASE_STAT (${MAX_BASE_STAT}) ficou abaixo do dex`).toEqual([])
   })
 
   it('nenhum BST passa do teto', () => {
-    const acima = species.filter(entry => baseStatTotal(entry.baseStats) > MAX_BASE_STAT_TOTAL)
+    const above = species.filter(entry => baseStatTotal(entry.baseStats) > MAX_BASE_STAT_TOTAL)
 
-    expect(acima.map(entry => entry.slug), `MAX_BASE_STAT_TOTAL (${MAX_BASE_STAT_TOTAL}) ficou abaixo do dex`).toEqual([])
+    expect(above.map(entry => entry.slug), `MAX_BASE_STAT_TOTAL (${MAX_BASE_STAT_TOTAL}) ficou abaixo do dex`).toEqual([])
   })
 
   it('os tetos são apertados — alguma espécie encosta em cada um', () => {

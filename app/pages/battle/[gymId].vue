@@ -366,12 +366,12 @@ const initiative = computed(() => {
   const foe = opponent.value
   if (mine === null || foe === null) return null
 
-  const meu = effectiveSpeed(mine.stats, mine.condition)
-  const dele = effectiveSpeed(foe.stats, foe.condition)
-  if (meu === dele) return `empate de Speed (${meu}) — o desempate é sorteado`
-  return meu > dele
-    ? `você ataca primeiro (SPD ${meu} > ${dele})`
-    : `${foe.displayName} ataca primeiro (SPD ${dele} > ${meu})`
+  const mineSpeed = effectiveSpeed(mine.stats, mine.condition)
+  const foeSpeed = effectiveSpeed(foe.stats, foe.condition)
+  if (mineSpeed === foeSpeed) return `empate de Speed (${mineSpeed}) — o desempate é sorteado`
+  return mineSpeed > foeSpeed
+    ? `você ataca primeiro (SPD ${mineSpeed} > ${foeSpeed})`
+    : `${foe.displayName} ataca primeiro (SPD ${foeSpeed} > ${mineSpeed})`
 })
 
 const bench = computed(() => (state.value === null ? [] : state.value.player.team))

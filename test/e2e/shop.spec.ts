@@ -84,9 +84,9 @@ test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
   await expect(page.locator('.packs__offer-meta').last()).toContainText('restam 250')
   await expect(page.locator('.packs__offer-meta').last()).toContainText('dá para 2')
 
-  const antes = await readSave(page)
-  expect(antes.progress.coins).toBe(400)
-  expect(copies(antes)).toBe(0)
+  const before = await readSave(page)
+  expect(before.progress.coins).toBe(400)
+  expect(copies(before)).toBe(0)
 
   await expect(async () => {
     await page.locator('.packs__buy--coin').click()
@@ -98,9 +98,9 @@ test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
   // As duas metades do que a ordem de escrita promete: o saldo caiu exatamente o
   // preço, e as dez cartas estão no save. Uma falha entre as duas daria cartas
   // de graça — nunca moedas cobradas por nada.
-  const depois = await readSave(page)
-  expect(depois.progress.coins).toBe(250)
-  expect(copies(depois)).toBe(10)
+  const after = await readSave(page)
+  expect(after.progress.coins).toBe(250)
+  expect(copies(after)).toBe(10)
 })
 
 test('sem saldo, o botão da loja fecha e diz quanto falta', async ({ page }) => {
@@ -126,11 +126,11 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
     await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
-  const depois = await readSave(page)
-  expect(copies(depois)).toBe(10)
+  const after = await readSave(page)
+  expect(copies(after)).toBe(10)
   // Grátis: o saldo não se mexeu, e o dia ficou marcado.
-  expect(depois.progress.coins).toBe(0)
-  expect(depois.progress.dailyClaimed).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  expect(after.progress.coins).toBe(0)
+  expect(after.progress.dailyClaimed).toMatch(/^\d{4}-\d{2}-\d{2}$/)
 
   /**
    * E é o dia **local** do aparelho, não o UTC.
@@ -141,13 +141,13 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
    * das 21h. O dia local é calculado no próprio navegador para o teste não
    * depender do fuso de quem roda a suíte.
    */
-  const hojeLocal = await page.evaluate(() => {
-    const agora = new Date()
-    const mes = String(agora.getMonth() + 1).padStart(2, '0')
-    const dia = String(agora.getDate()).padStart(2, '0')
-    return `${agora.getFullYear()}-${mes}-${dia}`
+  const localToday = await page.evaluate(() => {
+    const now = new Date()
+    const mes = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${now.getFullYear()}-${mes}-${day}`
   })
-  expect(depois.progress.dailyClaimed).toBe(hojeLocal)
+  expect(after.progress.dailyClaimed).toBe(localToday)
 
   // De volta à loja, o cartão do diário saiu e o contador tomou o lugar dele.
   await page.locator('.packs__skip--primary').click()
@@ -188,15 +188,15 @@ test('dois packs abertos em sequência não saem idênticos', async ({ page }) =
   }).toPass({ timeout: 15_000 })
 
   await expect(page.locator('.opener__slot')).toHaveCount(10)
-  const primeiro = await sprites()
+  const first = await sprites()
 
   // Sem pausa nenhuma: é o clique imediato que o defeito exige.
   await page.locator('.packs__skip--primary').click()
   await expect(page.locator('.opener__slot')).toHaveCount(10)
   const segundo = await sprites()
 
-  expect(primeiro).toHaveLength(10)
-  expect(segundo).not.toEqual(primeiro)
+  expect(first).toHaveLength(10)
+  expect(segundo).not.toEqual(first)
 })
 
 /**
@@ -271,9 +271,9 @@ test('apagar o save deixa a cópia de segurança para trás', async ({ page }) =
   expect(keys.filter(key => key.startsWith('holodeck:backup:'))).toHaveLength(1)
 
   // E o jogo recomeça do zero, sem moeda e sem carta.
-  const depois = await readSave(page)
-  expect(depois.progress.coins).toBe(0)
-  expect(copies(depois)).toBe(0)
+  const after = await readSave(page)
+  expect(after.progress.coins).toBe(0)
+  expect(copies(after)).toBe(0)
 })
 
 /**
@@ -284,11 +284,11 @@ test('apagar o save deixa a cópia de segurança para trás', async ({ page }) =
  * tinha e2e enquanto `importar` não tinha nada. Os três ramos de erro precisam
  * provar a mesma coisa: a mensagem certa **e o save intacto**.
  */
-async function escolherArquivo(page: Page, nome: string, conteudo: string): Promise<void> {
+async function chooseFile(page: Page, name: string, content: string): Promise<void> {
   await page.locator('.settings__file').setInputFiles({
-    name: nome,
+    name: name,
     mimeType: 'application/json',
-    buffer: Buffer.from(conteudo, 'utf8'),
+    buffer: Buffer.from(content, 'utf8'),
   })
 }
 
@@ -298,25 +298,25 @@ test('importar um arquivo ilegível não toca no save, e diz por quê', async ({
   await expect(page.locator('.settings__stat-value').first()).toBeVisible()
 
   // Ramo 1: não é JSON.
-  await escolherArquivo(page, 'quebrado.json', '{"collection":')
+  await chooseFile(page, 'quebrado.json', '{"collection":')
   await expect(page.locator('.settings__notice')).toContainText('não é um JSON válido')
   expect((await readSave(page)).progress.coins).toBe(500)
 
   // Ramo 2: JSON válido, forma errada — a migração não o reconhece.
-  await escolherArquivo(page, 'forma.json', '{"foo":"bar"}')
+  await chooseFile(page, 'forma.json', '{"foo":"bar"}')
   await expect(page.locator('.settings__notice')).toContainText('não pôde ser lido')
   expect((await readSave(page)).progress.coins).toBe(500)
 
   // Ramo 3: versão futura. Ela é **recusada**, e não adivinhada — a mensagem
   // diz que tem conserto, porque tem: é só atualizar o jogo.
-  await escolherArquivo(page, 'futuro.json', JSON.stringify({ schemaVersion: 99, collection: {} }))
+  await chooseFile(page, 'futuro.json', JSON.stringify({ schemaVersion: 99, collection: {} }))
   await expect(page.locator('.settings__notice')).toContainText('versão mais nova')
   expect((await readSave(page)).progress.coins).toBe(500)
 
   // E nenhum dos três deixou cópia de segurança para trás: nada foi
   // sobrescrito, então não havia o que guardar.
-  const chaves = await page.evaluate(() => Object.keys(window.localStorage))
-  expect(chaves.filter(key => key.startsWith('holodeck:backup:'))).toHaveLength(0)
+  const keys = await page.evaluate(() => Object.keys(window.localStorage))
+  expect(keys.filter(key => key.startsWith('holodeck:backup:'))).toHaveLength(0)
 })
 
 test('e o mesmo arquivo pode ser escolhido de novo depois de um erro', async ({ page }) => {
@@ -324,7 +324,7 @@ test('e o mesmo arquivo pode ser escolhido de novo depois de um erro', async ({ 
   await page.goto('/settings')
   await expect(page.locator('.settings__stat-value').first()).toBeVisible()
 
-  await escolherArquivo(page, 'igual.json', '{"collection":')
+  await chooseFile(page, 'igual.json', '{"collection":')
   await expect(page.locator('.settings__notice')).toContainText('não é um JSON válido')
 
   /**
@@ -335,7 +335,7 @@ test('e o mesmo arquivo pode ser escolhido de novo depois de um erro', async ({ 
    * cima e tenta outra vez. O segundo arquivo aqui é válido e tem nome igual,
    * que é o caso exato que ficava travado.
    */
-  await escolherArquivo(page, 'igual.json', JSON.stringify({
+  await chooseFile(page, 'igual.json', JSON.stringify({
     schemaVersion: 4,
     collection: { 25: { c: 2, s: 0 } },
     dust: 0,
@@ -353,7 +353,7 @@ test('importar guarda o save anterior, e dá para voltar por ele', async ({ page
   await page.goto('/settings')
   await expect(page.locator('.settings__stat-value').first()).toBeVisible()
 
-  await escolherArquivo(page, 'outro.json', JSON.stringify({
+  await chooseFile(page, 'outro.json', JSON.stringify({
     schemaVersion: 4,
     collection: { 25: { c: 1, s: 0 } },
     dust: 0,
@@ -372,9 +372,9 @@ test('importar guarda o save anterior, e dá para voltar por ele', async ({ page
    * única forma de alcançá-la era pelo DevTools. Restaurar guarda o save de
    * agora antes, então a operação é reversível nos dois sentidos.
    */
-  const restaurar = page.getByRole('button', { name: /^Restaurar a cópia de/ })
-  await expect(restaurar).toHaveCount(1)
-  await restaurar.click()
+  const restoreButton = page.getByRole('button', { name: /^Restaurar a cópia de/ })
+  await expect(restoreButton).toHaveCount(1)
+  await restoreButton.click()
 
   await expect(page.locator('.settings__notice')).toContainText('Cópia restaurada')
   expect((await readSave(page)).progress.coins).toBe(500)
@@ -391,8 +391,8 @@ test('e o arquivo grande demais é recusado antes de ser lido', async ({ page })
   // Dois megabytes de JSON válido. O save realista tem ~3 KB, e o pior caso
   // documentado 21 KB — o teto existe para a aba não morrer lendo o arquivo
   // inteiro para a memória antes de o `JSON.parse` ter chance de recusá-lo.
-  const gigante = `{"lixo":"${'x'.repeat(2_000_000)}"}`
-  await escolherArquivo(page, 'gigante.json', gigante)
+  const huge = `{"lixo":"${'x'.repeat(2_000_000)}"}`
+  await chooseFile(page, 'gigante.json', huge)
 
   await expect(page.locator('.settings__notice')).toContainText('grande demais')
   expect((await readSave(page)).progress.coins).toBe(500)

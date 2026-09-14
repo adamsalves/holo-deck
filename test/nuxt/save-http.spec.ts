@@ -86,7 +86,7 @@ describe('a leitura do servidor', () => {
   })
 
   it('corpo fora do contrato lança', async () => {
-    stubFetch(response(200, { data: { nada: true }, version: 1, updatedAt: 'agora' }))
+    stubFetch(response(200, { data: { nothing: true }, version: 1, updatedAt: 'agora' }))
 
     await expect(new HttpDriver().fetchRemote()).rejects.toThrow('fora do contrato')
   })

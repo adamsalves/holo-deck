@@ -15,9 +15,9 @@ const CARD = { left: 0, top: 0, width: 200, height: 280 }
 
 describe('leitura do ponteiro', () => {
   it('põe a origem onde o ponteiro está', () => {
-    const meio = readFoil(CARD, 100, 140)
-    expect(meio.x).toBeCloseTo(0.5)
-    expect(meio.y).toBeCloseTo(0.5)
+    const center = readFoil(CARD, 100, 140)
+    expect(center.x).toBeCloseTo(0.5)
+    expect(center.y).toBeCloseTo(0.5)
 
     const canto = readFoil(CARD, 200, 280)
     expect(canto.x).toBeCloseTo(1)
@@ -41,23 +41,23 @@ describe('leitura do ponteiro', () => {
   })
 
   it('gira a varredura acompanhando o lado em que o ponteiro está', () => {
-    const direita = readFoil(CARD, 200, 140).angle
-    const esquerda = readFoil(CARD, 0, 140).angle
+    const right = readFoil(CARD, 200, 140).angle
+    const left = readFoil(CARD, 0, 140).angle
 
-    expect(direita).toBeCloseTo(180)
-    expect(esquerda).toBeCloseTo(360)
+    expect(right).toBeCloseTo(180)
+    expect(left).toBeCloseTo(360)
   })
 
   it('inclina em eixos cruzados, e no teto', () => {
-    const direita = readFoil(CARD, 200, 140)
-    const baixo = readFoil(CARD, 100, 280)
+    const right = readFoil(CARD, 200, 140)
+    const bottom = readFoil(CARD, 100, 280)
 
     // Ir para a direita gira em torno de Y; ir para baixo gira em torno de X, com
     // sinal negativo — rotação positiva em X joga o topo para longe de quem olha.
-    expect(direita.tiltY).toBeCloseTo(FOIL_MAX_TILT)
-    expect(direita.tiltX).toBeCloseTo(0)
-    expect(baixo.tiltX).toBeCloseTo(-FOIL_MAX_TILT)
-    expect(baixo.tiltY).toBeCloseTo(0)
+    expect(right.tiltY).toBeCloseTo(FOIL_MAX_TILT)
+    expect(right.tiltX).toBeCloseTo(0)
+    expect(bottom.tiltX).toBeCloseTo(-FOIL_MAX_TILT)
+    expect(bottom.tiltY).toBeCloseTo(0)
   })
 
   it('não explode num retângulo sem área', () => {
@@ -76,11 +76,11 @@ describe('leitura do giroscópio', () => {
   })
 
   it('satura no curso útil, em vez de exigir virar o telefone', () => {
-    const noLimite = readFoilFromTilt(0, 20)
-    const bemAlem = readFoilFromTilt(0, 85)
+    const atLimit = readFoilFromTilt(0, 20)
+    const farBeyond = readFoilFromTilt(0, 85)
 
-    expect(noLimite.x).toBeCloseTo(1)
-    expect(bemAlem.x).toBeCloseTo(1)
+    expect(atLimit.x).toBeCloseTo(1)
+    expect(farBeyond.x).toBeCloseTo(1)
   })
 })
 
@@ -106,9 +106,9 @@ describe('variáveis entregues à carta', () => {
     // módulo por outro esquema, e `new URL(..., import.meta.url)` rejeita.
     // A raiz do Vitest é a do repositório.
     const { readFile } = await import('node:fs/promises')
-    const tema = await readFile(`${process.cwd()}/app/assets/css/main.css`, 'utf8')
+    const themeCss = await readFile(`${process.cwd()}/app/assets/css/main.css`, 'utf8')
 
-    const foil = /--foil:\s*conic-gradient\(\s*from var\(--foil-angle,\s*([\d.]+)deg\) at var\(--foil-x,\s*([\d.]+)%\) var\(--foil-y,\s*([\d.]+)%\)/.exec(tema)
+    const foil = /--foil:\s*conic-gradient\(\s*from var\(--foil-angle,\s*([\d.]+)deg\) at var\(--foil-x,\s*([\d.]+)%\) var\(--foil-y,\s*([\d.]+)%\)/.exec(themeCss)
 
     expect(foil, 'o token --foil mudou de forma; conferir o repouso junto').not.toBeNull()
     expect(Number(foil?.[1])).toBe(FOIL_REST.angle)
@@ -133,57 +133,57 @@ describe('variáveis entregues à carta', () => {
  * que recebe, e a afirmação de custo passa a ser medida onde ela falhava.
  */
 
-const desfazer: (() => void)[] = []
+const teardown: (() => void)[] = []
 
 afterEach(() => {
-  while (desfazer.length > 0) desfazer.pop()?.()
+  while (teardown.length > 0) teardown.pop()?.()
 })
 
-interface Bancada {
+interface Bench {
   /** Cada assinatura de media query que alguém abriu. */
-  readonly midia: string[]
+  readonly mediaQueries: string[]
 }
 
 /** Troca `window.matchMedia` por um duplo que responde e anota o que assinam. */
-function comMovimentoReduzido(reduzido: boolean): Bancada {
+function withReducedMotion(reduced: boolean): Bench {
   const original = window.matchMedia
-  const midia: string[] = []
+  const mediaQueries: string[] = []
 
-  const duplo = (query: string) => ({
-    matches: query.includes('prefers-reduced-motion: reduce') ? reduzido : !reduzido,
+  const matchMediaStub = (query: string) => ({
+    matches: query.includes('prefers-reduced-motion: reduce') ? reduced : !reduced,
     media: query,
     onchange: null,
-    addEventListener: () => { midia.push(query) },
+    addEventListener: () => { mediaQueries.push(query) },
     removeEventListener: () => {},
-    addListener: () => { midia.push(query) },
+    addListener: () => { mediaQueries.push(query) },
     removeListener: () => {},
     dispatchEvent: () => false,
   })
 
   // `defineProperty` em vez de atribuição direta: monta o duplo sem `as` e sem
   // ter de satisfazer as sobrecargas inteiras de `MediaQueryList`.
-  Object.defineProperty(window, 'matchMedia', { value: duplo, configurable: true })
-  desfazer.push(() => {
+  Object.defineProperty(window, 'matchMedia', { value: matchMediaStub, configurable: true })
+  teardown.push(() => {
     Object.defineProperty(window, 'matchMedia', { value: original, configurable: true })
   })
 
-  return { midia }
+  return { mediaQueries }
 }
 
 /** Um elemento que anota todo `addEventListener` que recebe. */
-function cartaEspiada(): { elemento: HTMLElement, eventos: string[] } {
-  const elemento = document.createElement('article')
-  const eventos: string[] = []
-  const original = elemento.addEventListener.bind(elemento)
+function spiedCard(): { element: HTMLElement, events: string[] } {
+  const element = document.createElement('article')
+  const events: string[] = []
+  const original = element.addEventListener.bind(element)
 
-  const espia = (tipo: string, ouvinte: EventListener, opcoes?: AddEventListenerOptions) => {
-    eventos.push(tipo)
-    original(tipo, ouvinte, opcoes)
+  const spy = (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
+    events.push(type)
+    original(type, listener, options)
   }
 
-  Object.defineProperty(elemento, 'addEventListener', { value: espia, configurable: true })
+  Object.defineProperty(element, 'addEventListener', { value: spy, configurable: true })
 
-  return { elemento, eventos }
+  return { element, events }
 }
 
 /**
@@ -194,60 +194,60 @@ function cartaEspiada(): { elemento: HTMLElement, eventos: string[] } {
  * chegava a `NaN` até o `style` da carta. `defineProperty` é a mesma técnica do
  * duplo de `matchMedia`: monta o evento sem `as` e sem `any`.
  */
-function eventoDeInclinacao(beta: number, gamma: number): Event {
-  const evento = new Event('deviceorientation')
-  Object.defineProperty(evento, 'beta', { value: beta, configurable: true })
-  Object.defineProperty(evento, 'gamma', { value: gamma, configurable: true })
-  return evento
+function tiltEvent(beta: number, gamma: number): Event {
+  const event = new Event('deviceorientation')
+  Object.defineProperty(event, 'beta', { value: beta, configurable: true })
+  Object.defineProperty(event, 'gamma', { value: gamma, configurable: true })
+  return event
 }
 
 /** Anota todo listener instalado na janela enquanto o teste roda. */
-function janelaEspiada(): string[] {
-  const eventos: string[] = []
+function spiedWindow(): string[] {
+  const events: string[] = []
   const original = window.addEventListener.bind(window)
 
-  const espia = (tipo: string, ouvinte: EventListener, opcoes?: AddEventListenerOptions) => {
-    eventos.push(tipo)
-    original(tipo, ouvinte, opcoes)
+  const spy = (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
+    events.push(type)
+    original(type, listener, options)
   }
 
-  Object.defineProperty(window, 'addEventListener', { value: espia, configurable: true })
-  desfazer.push(() => {
+  Object.defineProperty(window, 'addEventListener', { value: spy, configurable: true })
+  teardown.push(() => {
     Object.defineProperty(window, 'addEventListener', { value: original, configurable: true })
   })
 
-  return eventos
+  return events
 }
 
-function montar(elemento: HTMLElement, interativa: boolean): void {
-  const escopo = effectScope()
-  escopo.run(() => useFoil(ref(elemento), { enabled: () => interativa }))
-  desfazer.push(() => escopo.stop())
+function mount(element: HTMLElement, interactive: boolean): void {
+  const scope = effectScope()
+  scope.run(() => useFoil(ref(element), { enabled: () => interactive }))
+  teardown.push(() => scope.stop())
 }
 
 describe('quando o rastreio existe', () => {
   it('instala os gatilhos de entrada na carta interativa', () => {
-    comMovimentoReduzido(false)
-    const { elemento, eventos } = cartaEspiada()
+    withReducedMotion(false)
+    const { element, events } = spiedCard()
 
-    montar(elemento, true)
+    mount(element, true)
 
-    expect(eventos).toContain('pointerenter')
-    expect(eventos).toContain('focusin')
-    expect(eventos).toContain('pointerleave')
+    expect(events).toContain('pointerenter')
+    expect(events).toContain('focusin')
+    expect(events).toContain('pointerleave')
   })
 
   it('não instala nada na carta do grid', () => {
     // A regra do plano é sobre custo, e é esta linha que a mede: 1025 cartas
     // paradas somam zero listener, não 1025 baratos.
-    comMovimentoReduzido(false)
-    const janela = janelaEspiada()
-    const { elemento, eventos } = cartaEspiada()
+    withReducedMotion(false)
+    const windowEvents = spiedWindow()
+    const { element, events } = spiedCard()
 
-    montar(elemento, false)
+    mount(element, false)
 
-    expect(eventos).toEqual([])
-    expect(janela, 'carta do grid não escuta a janela').toEqual([])
+    expect(events).toEqual([])
+    expect(windowEvents, 'carta do grid não escuta a janela').toEqual([])
   })
 
   it('faz as cartas do grid dividirem uma assinatura de media query só', () => {
@@ -255,62 +255,62 @@ describe('quando o rastreio existe', () => {
     // `useMediaQuery` por baixo, e o VueUse não o memoiza — cada chamada abre um
     // `MediaQueryList` e assina `change` nele. Chamado direto, o grid pagaria
     // 1025 assinaturas, que são listeners de verdade e de objeto de janela.
-    const bancada = comMovimentoReduzido(false)
+    const bench = withReducedMotion(false)
 
-    for (let i = 0; i < 5; i++) montar(cartaEspiada().elemento, false)
+    for (let i = 0; i < 5; i++) mount(spiedCard().element, false)
 
-    expect(bancada.midia.length, 'uma assinatura por carta, e não uma para todas').toBeLessThanOrEqual(1)
+    expect(bench.mediaQueries.length, 'uma assinatura por carta, e não uma para todas').toBeLessThanOrEqual(1)
   })
 
   it('não instala nada sob prefers-reduced-motion, nem sendo interativa', () => {
-    comMovimentoReduzido(true)
-    const janela = janelaEspiada()
-    const { elemento, eventos } = cartaEspiada()
+    withReducedMotion(true)
+    const windowEvents = spiedWindow()
+    const { element, events } = spiedCard()
 
-    montar(elemento, true)
+    mount(element, true)
 
-    expect(eventos).toEqual([])
-    expect(janela).toEqual([])
+    expect(events).toEqual([])
+    expect(windowEvents).toEqual([])
   })
 
   it('deixa o foil no repouso sob reduced-motion — estático, não ausente', () => {
     // O canvas anota a regra por escrito: a raridade nunca é comunicada só por
     // brilho, e o foil vira gradiente estático em vez de sumir.
-    comMovimentoReduzido(true)
-    const { elemento } = cartaEspiada()
+    withReducedMotion(true)
+    const { element } = spiedCard()
 
-    const escopo = effectScope()
-    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: () => true }))
-    desfazer.push(() => escopo.stop())
+    const scope = effectScope()
+    const controls = scope.run(() => useFoil(ref(element), { enabled: () => true }))
+    teardown.push(() => scope.stop())
 
-    expect(controles?.active.value).toBe(false)
-    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+    expect(controls?.active.value).toBe(false)
+    expect(controls?.variables.value).toEqual(foilVariables(FOIL_REST))
   })
 
   it('volta ao repouso quando a permissão cai com a carta engajada', async () => {
     // Sem o `watch` sobre `allowed`, os listeners somem e `engaged` fica preso em
     // `true`: ao religar, a carta reaparece inclinada na última leitura e só um
     // novo entra-e-sai do ponteiro a endireita.
-    comMovimentoReduzido(false)
-    const { elemento } = cartaEspiada()
-    const ligado = ref(true)
+    withReducedMotion(false)
+    const { element } = spiedCard()
+    const isEnabled = ref(true)
 
-    const escopo = effectScope()
-    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: ligado }))
-    desfazer.push(() => escopo.stop())
+    const scope = effectScope()
+    const controls = scope.run(() => useFoil(ref(element), { enabled: isEnabled }))
+    teardown.push(() => scope.stop())
 
-    elemento.dispatchEvent(new Event('pointerenter'))
+    element.dispatchEvent(new Event('pointerenter'))
     await nextTick()
-    expect(controles?.active.value).toBe(true)
+    expect(controls?.active.value).toBe(true)
 
-    ligado.value = false
-    await nextTick()
-
-    ligado.value = true
+    isEnabled.value = false
     await nextTick()
 
-    expect(controles?.active.value, 'religou ainda engajada, sem ponteiro nenhum').toBe(false)
-    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+    isEnabled.value = true
+    await nextTick()
+
+    expect(controls?.active.value, 'religou ainda engajada, sem ponteiro nenhum').toBe(false)
+    expect(controls?.variables.value).toEqual(foilVariables(FOIL_REST))
   })
 })
 
@@ -319,65 +319,65 @@ describe('o giroscópio, para quem não tem ponteiro', () => {
     // Antes o listener só entrava com `active`, e `active` exigia
     // `pointerenter`/`focusin`. Num aparelho de toque isso é "enquanto o dedo
     // está encostado", ou seja: o sensor só servia a quem já tinha ponteiro.
-    comMovimentoReduzido(false)
-    const janela = janelaEspiada()
-    const { elemento } = cartaEspiada()
+    withReducedMotion(false)
+    const windowEvents = spiedWindow()
+    const { element } = spiedCard()
 
-    montar(elemento, true)
+    mount(element, true)
     await nextTick()
 
-    expect(janela).toContain('deviceorientation')
+    expect(windowEvents).toContain('deviceorientation')
   })
 
   it('cede a vez ao ponteiro quando ele chega', async () => {
-    comMovimentoReduzido(false)
-    const { elemento } = cartaEspiada()
+    withReducedMotion(false)
+    const { element } = spiedCard()
 
-    const escopo = effectScope()
-    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: () => true }))
-    desfazer.push(() => escopo.stop())
+    const scope = effectScope()
+    const controls = scope.run(() => useFoil(ref(element), { enabled: () => true }))
+    teardown.push(() => scope.stop())
 
-    window.dispatchEvent(eventoDeInclinacao(20, 20))
+    window.dispatchEvent(tiltEvent(20, 20))
     await nextTick()
 
     // O sensor sozinho já acende o rastreio — é o caso do telefone parado na mão.
-    expect(controles?.active.value).toBe(true)
-    expect(controles?.variables.value['--foil-x']).not.toBe('42.00%')
+    expect(controls?.active.value).toBe(true)
+    expect(controls?.variables.value['--foil-x']).not.toBe('42.00%')
 
-    elemento.dispatchEvent(new Event('pointerenter'))
+    element.dispatchEvent(new Event('pointerenter'))
     await nextTick()
 
     // E some do caminho assim que existe ponteiro: dois donos da mesma leitura
     // brigariam a cada quadro.
-    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+    expect(controls?.variables.value).toEqual(foilVariables(FOIL_REST))
   })
 
   it('ignora um evento sem leitura, em vez de escrever NaN na carta', async () => {
     // Um `deviceorientation` sem `beta`/`gamma` não estoura em lugar nenhum: ele
     // vira `--foil-x: NaN%` no `style`, o navegador descarta a variável e o foil
     // volta ao fallback — defeito que não aparece em log nem em review.
-    comMovimentoReduzido(false)
-    const { elemento } = cartaEspiada()
+    withReducedMotion(false)
+    const { element } = spiedCard()
 
-    const escopo = effectScope()
-    const controles = escopo.run(() => useFoil(ref(elemento), { enabled: () => true }))
-    desfazer.push(() => escopo.stop())
+    const scope = effectScope()
+    const controls = scope.run(() => useFoil(ref(element), { enabled: () => true }))
+    teardown.push(() => scope.stop())
 
     window.dispatchEvent(new Event('deviceorientation'))
     await nextTick()
 
-    expect(controles?.active.value).toBe(false)
-    expect(controles?.variables.value).toEqual(foilVariables(FOIL_REST))
+    expect(controls?.active.value).toBe(false)
+    expect(controls?.variables.value).toEqual(foilVariables(FOIL_REST))
   })
 
   it('não escuta a inclinação na carta do grid', async () => {
-    comMovimentoReduzido(false)
-    const janela = janelaEspiada()
-    const { elemento } = cartaEspiada()
+    withReducedMotion(false)
+    const windowEvents = spiedWindow()
+    const { element } = spiedCard()
 
-    montar(elemento, false)
+    mount(element, false)
     await nextTick()
 
-    expect(janela).not.toContain('deviceorientation')
+    expect(windowEvents).not.toContain('deviceorientation')
   })
 })

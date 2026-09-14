@@ -70,9 +70,9 @@ describe('dexVersionOf', () => {
     // O PP, e não o poder: `MoveEntry` é união discriminada e `power` só existe
     // no ramo de dano — espalhar um `power` sobre o golpe que calhar de ser o
     // primeiro não compila. PP muda o mesmo tanto para o hash.
-    const outro = { ...payloadOf(core), moves: [{ ...first, pp: first.pp + 1 }, ...rest] }
+    const other = { ...payloadOf(core), moves: [{ ...first, pp: first.pp + 1 }, ...rest] }
 
-    expect(dexVersionOf(outro, generations)).not.toBe(core.dexVersion)
+    expect(dexVersionOf(other, generations)).not.toBe(core.dexVersion)
   })
 
   /**
@@ -84,28 +84,28 @@ describe('dexVersionOf', () => {
    * reproduziria outro adversário, em silêncio, que é a issue #18 inteira.
    */
   it('muda quando uma geração muda, e é por isso que ela entra na conta', () => {
-    const [primeira, ...resto] = generations
-    if (primeira === undefined) throw new Error('dex sem gerações')
-    const [especie, ...demais] = primeira.species
-    if (especie === undefined) throw new Error('geração sem espécies')
+    const [first, ...rest] = generations
+    if (first === undefined) throw new Error('dex sem gerações')
+    const [firstSpecies, ...restSpecies] = first.species
+    if (firstSpecies === undefined) throw new Error('geração sem espécies')
 
-    const adulterada: GenerationData = {
-      ...primeira,
+    const tampered: GenerationData = {
+      ...first,
       // Um único base stat de uma única espécie: é tudo que separa um time de
       // ginásio do outro, porque a regra ordena os candidatos por BST.
-      species: [{ ...especie, baseStats: [1, 1, 1, 1, 1, 1] }, ...demais],
+      species: [{ ...firstSpecies, baseStats: [1, 1, 1, 1, 1, 1] }, ...restSpecies],
     }
 
-    expect(dexVersionOf(payloadOf(core), [adulterada, ...resto])).not.toBe(core.dexVersion)
+    expect(dexVersionOf(payloadOf(core), [tampered, ...rest])).not.toBe(core.dexVersion)
   })
 
   it('muda quando a matriz de efetividade muda', () => {
-    const matriz = core.effectiveness.map(row => [...row])
-    const [primeira] = matriz
-    if (primeira === undefined) throw new Error('matriz vazia')
-    primeira[0] = primeira[0] === 1 ? 2 : 1
+    const matrix = core.effectiveness.map(row => [...row])
+    const [first] = matrix
+    if (first === undefined) throw new Error('matriz vazia')
+    first[0] = first[0] === 1 ? 2 : 1
 
-    expect(dexVersionOf({ ...payloadOf(core), effectiveness: matriz }, generations))
+    expect(dexVersionOf({ ...payloadOf(core), effectiveness: matrix }, generations))
       .not.toBe(core.dexVersion)
   })
 })

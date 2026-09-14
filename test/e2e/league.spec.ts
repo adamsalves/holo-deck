@@ -280,7 +280,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   /** Um deploy que mexeu no dex, encenado no save: a forma continua válida —
    * `isDexVersion` cobra oito hex — e só o valor diverge, que é exatamente o que
    * `replayable` recusa. */
-  const forjarDexVersion = async (): Promise<void> => {
+  const forgeDexVersion = async (): Promise<void> => {
     await page.evaluate(() => {
       const raw = window.localStorage.getItem('holodeck:save')
       if (raw === null) throw new Error('sem save para editar')
@@ -294,7 +294,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
     })
   }
 
-  await forjarDexVersion()
+  await forgeDexVersion()
 
   // Com deck montado, o descarte cai no caminho de quem chega sem batalha: luta
   // nova, do turno 1. O que ele **não** pode ser é o campo montando para sempre.
@@ -314,7 +314,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   // trava o deck builder durante uma batalha. Aqui o descarte tem de encontrar a
   // conferência do deck, que o ramo de retomada não fazia.
   await playTurn(page)
-  await forjarDexVersion()
+  await forgeDexVersion()
   await page.evaluate(() => {
     const raw = window.localStorage.getItem('holodeck:save')
     if (raw === null) throw new Error('sem save para editar')

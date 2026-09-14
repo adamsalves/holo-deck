@@ -88,8 +88,8 @@ export const useDeckStore = defineStore('deck', () => {
   watch(
     () => collection.entries,
     () => {
-      const perdidas = team.value.filter(id => !collection.has(id))
-      for (const id of perdidas) remove(id)
+      const missing = team.value.filter(id => !collection.has(id))
+      for (const id of missing) remove(id)
     },
     { deep: true },
   )

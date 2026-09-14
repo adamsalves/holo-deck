@@ -38,10 +38,10 @@ describe('toBattleStats', () => {
     // A assimetria é dos jogos. Aplicar a mesma soma aos seis daria 55 de HP ao
     // Pikachu, e toda batalha acabaria em dois turnos.
     const stats = toBattleStats([100, 100, 100, 100, 100, 100])
-    const comum = Math.floor((2 * 100 + BATTLE_IV) * BATTLE_LEVEL / 100)
+    const common = Math.floor((2 * 100 + BATTLE_IV) * BATTLE_LEVEL / 100)
 
-    expect(stats.hp).toBe(comum + BATTLE_LEVEL + 10)
-    expect(stats.attack).toBe(comum + 5)
+    expect(stats.hp).toBe(common + BATTLE_LEVEL + 10)
+    expect(stats.attack).toBe(common + 5)
   })
 
   it('lê a tupla na ordem de STAT_NAMES, e não em outra', () => {

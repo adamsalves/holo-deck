@@ -54,7 +54,7 @@ function gym(number: number): GymId {
 const DECK = ['charizard', 'blastoise', 'venusaur', 'snorlax', 'gengar', 'alakazam'].map(speciesId)
 /** Um Magikarp sozinho contra o nono ginásio. Existe para a derrota ser fato,
  * e não sorte de seed. */
-const DECK_PERDEDOR = [speciesId('magikarp')]
+const LOSING_DECK = [speciesId('magikarp')]
 
 /** A ação óbvia: trocar quando o motor exige, e o primeiro golpe com PP quando
  * não. Ela não joga bem — joga **determinístico**, que é o que o teste precisa. */
@@ -121,21 +121,21 @@ describe('retomar', () => {
     original.start(gym(3), DECK, 77, context)
     for (let turn = 0; turn < 4; turn += 1) original.act(nextAction(original), context)
 
-    const gravado = original.snapshot()
-    const antes = JSON.stringify(original.state)
+    const saved = original.snapshot()
+    const before = JSON.stringify(original.state)
 
     // Uma store nova, como no boot: hidrata cru, sem dex, e só depois retoma.
     setActivePinia(createPinia())
-    const depois = useBattleStore()
-    depois.hydrate(gravado)
+    const after = useBattleStore()
+    after.hydrate(saved)
 
-    expect(depois.hasSaved).toBe(true)
-    expect(depois.state).toBeNull()
+    expect(after.hasSaved).toBe(true)
+    expect(after.state).toBeNull()
 
-    const retomado = depois.resume(context)
+    const resumed = after.resume(context)
 
-    expect(retomado).not.toBeNull()
-    expect(JSON.stringify(depois.state)).toBe(antes)
+    expect(resumed).not.toBeNull()
+    expect(JSON.stringify(after.state)).toBe(before)
   })
 
   it('sem batalha salva não há o que retomar', () => {
@@ -156,31 +156,31 @@ describe('retomar', () => {
     battle.start(gym(1), DECK, 2024, context)
     battle.act({ kind: 'move', slot: 0 }, context)
 
-    const gravado = battle.snapshot()
-    if (gravado === null) throw new Error('a batalha não foi gravada')
+    const saved = battle.snapshot()
+    if (saved === null) throw new Error('a batalha não foi gravada')
 
     setActivePinia(createPinia())
-    const depois = useBattleStore()
-    depois.hydrate({ ...gravado, dexVersion: 'deadbeef' })
+    const after = useBattleStore()
+    after.hydrate({ ...saved, dexVersion: 'deadbeef' })
 
-    expect(depois.resume(context)).toBeNull()
-    expect(depois.hasSaved).toBe(false)
-    expect(depois.state).toBeNull()
+    expect(after.resume(context)).toBeNull()
+    expect(after.hasSaved).toBe(false)
+    expect(after.state).toBeNull()
   })
 
   it('descarta a batalha de outra versão do motor pela mesma regra', () => {
     const battle = useBattleStore()
     battle.start(gym(1), DECK, 2024, context)
 
-    const gravado = battle.snapshot()
-    if (gravado === null) throw new Error('a batalha não foi gravada')
+    const saved = battle.snapshot()
+    if (saved === null) throw new Error('a batalha não foi gravada')
 
     setActivePinia(createPinia())
-    const depois = useBattleStore()
-    depois.hydrate({ ...gravado, engineVersion: gravado.engineVersion - 1 })
+    const after = useBattleStore()
+    after.hydrate({ ...saved, engineVersion: saved.engineVersion - 1 })
 
-    expect(depois.resume(context)).toBeNull()
-    expect(depois.hasSaved).toBe(false)
+    expect(after.resume(context)).toBeNull()
+    expect(after.hasSaved).toBe(false)
   })
 
   /**
@@ -198,21 +198,21 @@ describe('retomar', () => {
     const battle = useBattleStore()
     battle.start(gym(1), DECK, 2024, context)
 
-    const gravado = battle.snapshot()
-    if (gravado === null) throw new Error('a batalha não foi gravada')
+    const saved = battle.snapshot()
+    if (saved === null) throw new Error('a batalha não foi gravada')
 
     // Duas poções numa luta que tem uma. Motor e dex conferem, `isBattleLog`
     // aceita — é `usePotion` quem recusa, e só executando.
-    const adulterado = { ...gravado, actions: [{ kind: 'item' }, { kind: 'item' }] } as const
+    const tampered = { ...saved, actions: [{ kind: 'item' }, { kind: 'item' }] } as const
 
     setActivePinia(createPinia())
-    const depois = useBattleStore()
-    depois.hydrate(adulterado)
+    const after = useBattleStore()
+    after.hydrate(tampered)
 
-    expect(() => depois.resume(context)).not.toThrow()
-    expect(depois.resume(context)).toBeNull()
-    expect(depois.hasSaved).toBe(false)
-    expect(depois.state).toBeNull()
+    expect(() => after.resume(context)).not.toThrow()
+    expect(after.resume(context)).toBeNull()
+    expect(after.hasSaved).toBe(false)
+    expect(after.state).toBeNull()
   })
 
   /** Descartado é descartado: a store fica pronta para uma luta nova, e é isso
@@ -221,17 +221,17 @@ describe('retomar', () => {
     const battle = useBattleStore()
     battle.start(gym(1), DECK, 2024, context)
 
-    const gravado = battle.snapshot()
-    if (gravado === null) throw new Error('a batalha não foi gravada')
+    const saved = battle.snapshot()
+    if (saved === null) throw new Error('a batalha não foi gravada')
 
     setActivePinia(createPinia())
-    const depois = useBattleStore()
-    depois.hydrate({ ...gravado, dexVersion: 'deadbeef' })
-    expect(depois.resume(context)).toBeNull()
+    const after = useBattleStore()
+    after.hydrate({ ...saved, dexVersion: 'deadbeef' })
+    expect(after.resume(context)).toBeNull()
 
-    depois.start(gym(1), DECK, 99, context)
-    expect(depois.ongoing).toBe(true)
-    expect(depois.snapshot()?.seed).toBe(99)
+    after.start(gym(1), DECK, 99, context)
+    expect(after.ongoing).toBe(true)
+    expect(after.snapshot()?.seed).toBe(99)
   })
 })
 
@@ -245,9 +245,9 @@ describe('o fim da luta', () => {
 
     expect(battle.state?.outcome).toBe('won')
 
-    const esperado = rewardFor({ gym: gym(1), rematch: false, flawless: battle.flawless })
-    expect(battle.reward).toEqual(esperado)
-    expect(progress.coins).toBe(esperado.total)
+    const expected = rewardFor({ gym: gym(1), rematch: false, flawless: battle.flawless })
+    expect(battle.reward).toEqual(expected)
+    expect(progress.coins).toBe(expected.total)
     expect(progress.badges).toBe(1)
 
     // O log some e o estado fica: é o estado que a tela de resultado desenha.
@@ -266,7 +266,7 @@ describe('o fim da luta', () => {
 
     battle.start(gym(1), DECK, 2024, context)
     playToEnd(battle)
-    const estreia = progress.coins
+    const debutCoins = progress.coins
 
     battle.start(gym(1), DECK, 909, context)
     playToEnd(battle)
@@ -274,7 +274,7 @@ describe('o fim da luta', () => {
     expect(battle.state?.outcome).toBe('won')
     expect(battle.reward?.earned).toBe(Math.floor(300 * 0.25))
     expect(progress.badges).toBe(1)
-    expect(progress.coins).toBe(estreia + (battle.reward?.total ?? 0))
+    expect(progress.coins).toBe(debutCoins + (battle.reward?.total ?? 0))
   })
 
   /**
@@ -285,7 +285,7 @@ describe('o fim da luta', () => {
     const progress = useProgressStore()
     const battle = useBattleStore()
 
-    battle.start(gym(9), DECK_PERDEDOR, 5, context)
+    battle.start(gym(9), LOSING_DECK, 5, context)
     playToEnd(battle)
 
     expect(battle.state?.outcome).toBe('lost')
@@ -301,11 +301,11 @@ describe('o fim da luta', () => {
 
     battle.start(gym(1), DECK, 2024, context)
     playToEnd(battle)
-    const pago = progress.coins
+    const paidCoins = progress.coins
 
     battle.act({ kind: 'move', slot: 0 }, context)
 
-    expect(progress.coins).toBe(pago)
+    expect(progress.coins).toBe(paidCoins)
     expect(progress.badges).toBe(1)
   })
 })

@@ -69,7 +69,7 @@ describe('o corpo que sobe para o servidor', () => {
    * passa a medir a forma em vez do campo extra, e a recusa vira acidente.
    */
   it('recusa campo que o save não tem, inclusive no progresso', () => {
-    const extra = { ...forSync(emptySave()), loja: { moedas: 9999 } }
+    const extra = { ...forSync(emptySave()), shop: { coins: 9999 } }
     const extraProgress = {
       ...forSync(emptySave()),
       progress: { ...emptySave().progress, admin: true },
