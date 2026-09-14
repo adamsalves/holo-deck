@@ -18,7 +18,13 @@
  * `<main>`, e aninhar dois seria marcação inválida. O `tabindex="-1"` existe
  * porque um contêiner sem ele não recebe foco por âncora, e o salto ficaria
  * visual sem mover o cursor do leitor de tela.
+ *
+ * O texto do link é traduzido: ele é o **primeiro** conteúdo anunciado em toda
+ * tela, e num documento `lang="en-US"` um "Pular para o conteúdo" fixo seria o
+ * sintetizador lendo português com voz inglesa — o dano que o `nuxt.config.ts`
+ * cita para justificar o `lang` correto, do lado do texto em vez do atributo.
  */
+const { t } = useI18n()
 </script>
 
 <template>
@@ -27,7 +33,7 @@
       class="shell__skip"
       href="#conteudo"
     >
-      Pular para o conteúdo
+      {{ t('a11y.skipToContent') }}
     </a>
 
     <AppNav />

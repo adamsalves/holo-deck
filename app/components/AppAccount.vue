@@ -8,6 +8,9 @@ import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
 // `NAV_ACCOUNT.label` é chave de i18n desde a Fase 8, não texto.
 const { t } = useI18n()
 
+/** O `/login` do idioma da vez — ver o docblock de `localePath` em `AppNav`. */
+const localePath = useLocalePath()
+
 /**
  * O canto da conta — o avatar de 32px que a prancha desenha à direita da barra.
  *
@@ -42,7 +45,7 @@ async function leave(): Promise<void> {
 /** As iniciais, para quem não tem foto no provedor. */
 const initials = computed(() => initialsOf(account.value?.name ?? ''))
 
-const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
+const atLogin = computed(() => route.path === localePath(NAV_ACCOUNT.to))
 </script>
 
 <template>
@@ -55,7 +58,7 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
     <template v-if="account === null">
       <NuxtLink
         v-slot="{ href, navigate }"
-        :to="NAV_ACCOUNT.to"
+        :to="localePath(NAV_ACCOUNT.to)"
         custom
       >
         <a
@@ -82,7 +85,7 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
         <img
           v-if="account.image !== null"
           :src="account.image"
-          :alt="`Conta de ${account.name}`"
+          :alt="t('account.avatarAlt', { name: account.name })"
           width="30"
           height="30"
         >
@@ -90,7 +93,7 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
           v-else
           aria-hidden="true"
         >{{ initials }}</span>
-        <span class="sr-only">Conectada como {{ account.name }}</span>
+        <span class="sr-only">{{ t('account.signedInAs', { name: account.name }) }}</span>
       </span>
 
       <button
@@ -99,7 +102,7 @@ const atLogin = computed(() => route.path === NAV_ACCOUNT.to)
         :disabled="signingOut"
         @click="leave()"
       >
-        SAIR
+        {{ t('account.signOut') }}
       </button>
     </template>
   </div>

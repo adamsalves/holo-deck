@@ -16,6 +16,8 @@ import { authClient } from '~/utils/auth-client'
  * domínio próprio.
  */
 
+const localePath = useLocalePath()
+
 const signingIn = ref(false)
 const failed = ref(false)
 
@@ -25,8 +27,12 @@ async function signIn(): Promise<void> {
 
   // `callbackURL` volta para a raiz e não para `/login`: o Hub é onde o jogador
   // estava indo, e cair de novo na tela de entrar depois de entrar é o tipo de
-  // beco que o review da Fase 6 achou na batalha.
-  const { error } = await authClient.signIn.social({ provider: 'github', callbackURL: '/' })
+  // beco que o review da Fase 6 achou na batalha. `localePath` porque a raiz do
+  // inglês é `/en`: sem ele, entrar de `/en/login` devolvia o Hub em português.
+  const { error } = await authClient.signIn.social({
+    provider: 'github',
+    callbackURL: localePath('/'),
+  })
 
   // Só chega aqui se o redirecionamento não aconteceu — o caminho feliz sai da
   // página. Sem este ramo, uma falha deixaria o botão girando para sempre.
