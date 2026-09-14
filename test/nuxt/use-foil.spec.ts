@@ -139,13 +139,13 @@ afterEach(() => {
   while (teardown.length > 0) teardown.pop()?.()
 })
 
-interface Bench {
+interface Harness {
   /** Cada assinatura de media query que alguém abriu. */
   readonly mediaQueries: string[]
 }
 
 /** Troca `window.matchMedia` por um duplo que responde e anota o que assinam. */
-function withReducedMotion(reduced: boolean): Bench {
+function withReducedMotion(reduced: boolean): Harness {
   const original = window.matchMedia
   const mediaQueries: string[] = []
 
@@ -255,11 +255,11 @@ describe('quando o rastreio existe', () => {
     // `useMediaQuery` por baixo, e o VueUse não o memoiza — cada chamada abre um
     // `MediaQueryList` e assina `change` nele. Chamado direto, o grid pagaria
     // 1025 assinaturas, que são listeners de verdade e de objeto de janela.
-    const bench = withReducedMotion(false)
+    const harness = withReducedMotion(false)
 
     for (let i = 0; i < 5; i++) mount(spiedCard().element, false)
 
-    expect(bench.mediaQueries.length, 'uma assinatura por carta, e não uma para todas').toBeLessThanOrEqual(1)
+    expect(harness.mediaQueries.length, 'uma assinatura por carta, e não uma para todas').toBeLessThanOrEqual(1)
   })
 
   it('não instala nada sob prefers-reduced-motion, nem sendo interativa', () => {

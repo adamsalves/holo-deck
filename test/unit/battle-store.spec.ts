@@ -266,7 +266,7 @@ describe('o fim da luta', () => {
 
     battle.start(gym(1), DECK, 2024, context)
     playToEnd(battle)
-    const debutCoins = progress.coins
+    const firstWinCoins = progress.coins
 
     battle.start(gym(1), DECK, 909, context)
     playToEnd(battle)
@@ -274,7 +274,7 @@ describe('o fim da luta', () => {
     expect(battle.state?.outcome).toBe('won')
     expect(battle.reward?.earned).toBe(Math.floor(300 * 0.25))
     expect(progress.badges).toBe(1)
-    expect(progress.coins).toBe(debutCoins + (battle.reward?.total ?? 0))
+    expect(progress.coins).toBe(firstWinCoins + (battle.reward?.total ?? 0))
   })
 
   /**

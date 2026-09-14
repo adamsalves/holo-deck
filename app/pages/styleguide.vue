@@ -48,7 +48,7 @@ const roles = [
   worst: contrastRatio(resolveToken(role.name, theme) ?? '', worstBackground.value),
 }))
 
-const notches = ['card', 'tile', 'chip', 'control']
+const bevels = ['card', 'tile', 'chip', 'control']
 
 /** Um tipo por carta de exemplo, para as seis raridades não saírem todas iguais. */
 const samples: { rarity: Rarity, name: string, dexNumber: number, types: readonly [TypeName] | readonly [TypeName, TypeName] }[] = [
@@ -74,7 +74,7 @@ onMounted(() => {
   needsPermission.value = tiltNeedsPermission()
 })
 
-async function grantTilt(): Promise<void> {
+async function requestTilt(): Promise<void> {
   tiltGranted.value = await requestTiltPermission()
 }
 
@@ -163,12 +163,12 @@ const tiltSummary = computed(() => {
       </h2>
       <div class="flex flex-wrap items-end gap-4">
         <div
-          v-for="notch in notches"
-          :key="notch"
+          v-for="bevel in bevels"
+          :key="bevel"
           class="flex h-20 w-32 items-center justify-center bg-elevated"
-          :class="`bevel-${notch}`"
+          :class="`bevel-${bevel}`"
         >
-          <span class="numeric text-[10px] text-muted">{{ notch }}</span>
+          <span class="numeric text-[10px] text-muted">{{ bevel }}</span>
         </div>
       </div>
     </section>
@@ -211,7 +211,7 @@ const tiltSummary = computed(() => {
         <button
           type="button"
           class="bevel-control bg-elevated px-3 py-2 text-xs font-bold text-default uppercase"
-          @click="grantTilt"
+          @click="requestTilt"
         >
           Ativar inclinação
         </button>

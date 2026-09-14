@@ -186,15 +186,15 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
     // `Array.isArray` devolve `any[]`, e `any` é o que o lint deste repositório
     // recusa na fronteira: a lista é relida como `unknown[]` e cada degrau
     // estreita de verdade.
-    const scaled: unknown[] = deck
-    const firstPickLabel = scaled.find(slot => typeof slot === 'number')
-    if (typeof firstPickLabel !== 'number') throw new Error(`${target} não chegou ao deck`)
+    const deckSlots: unknown[] = deck
+    const firstDeckCardId = deckSlots.find(slot => typeof slot === 'number')
+    if (typeof firstDeckCardId !== 'number') throw new Error(`${target} não chegou ao deck`)
 
-    Object.assign(collection, { [String(firstPickLabel)]: undefined })
+    Object.assign(collection, { [String(firstDeckCardId)]: undefined })
     localStorage.setItem('holodeck:save', JSON.stringify({
       ...save,
       collection: Object.fromEntries(
-        Object.entries(collection).filter(([id]) => id !== String(firstPickLabel)),
+        Object.entries(collection).filter(([id]) => id !== String(firstDeckCardId)),
       ),
     }))
   }, name)

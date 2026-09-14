@@ -92,11 +92,11 @@ describe('vitória imaculada', () => {
    * repetição de volta ao preço da estreia, que é justamente o que a taxa de
    * revanche existe para impedir.
    */
-  it('acompanha a revanche em vez de inflá-la de volta à estreia', () => {
-    const revanche = rewardFor({ gym: gym(1), rematch: true, flawless: true })
+  it('acompanha a rematchReward em vez de inflá-la de volta à estreia', () => {
+    const rematchReward = rewardFor({ gym: gym(1), rematch: true, flawless: true })
 
-    expect(revanche).toEqual({ base: 300, earned: 75, flawless: 18, total: 93 })
-    expect(revanche.total).toBeLessThan(gymReward(gym(1)))
+    expect(rematchReward).toEqual({ base: 300, earned: 75, flawless: 18, total: 93 })
+    expect(rematchReward.total).toBeLessThan(gymReward(gym(1)))
   })
 
   it('não paga nada quando alguém caiu', () => {
