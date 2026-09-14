@@ -502,7 +502,7 @@ describe('regras do turno', () => {
     expect(healed.player.potionsLeft).toBe(0)
 
     // A segunda tentativa, num estado em que o ativo ainda está de pé.
-    const dePe: typeof healed = {
+    const standing: typeof healed = {
       ...healed,
       expecting: 'action',
       player: {
@@ -511,7 +511,7 @@ describe('regras do turno', () => {
           (index === healed.player.active ? { ...pokemon, hp: pokemon.maxHp } : pokemon)),
       },
     }
-    expect(() => applyAction(dePe, { kind: 'item' }, context)).toThrow(/já usada/)
+    expect(() => applyAction(standing, { kind: 'item' }, context)).toThrow(/já usada/)
   })
 
   it('gasta PP a cada golpe, e o slot zerado cai em Struggle', () => {

@@ -3496,6 +3496,13 @@
   dependencies:
     undici-types "~8.3.0"
 
+"@types/nspell@^2.1.6":
+  version "2.1.6"
+  resolved "https://registry.yarnpkg.com/@types/nspell/-/nspell-2.1.6.tgz#a2e1fe5369924c9229ebd94105258b32a342a600"
+  integrity sha512-PnWYqrBZhkKAreX2kIZDJcBeigZJzXC8VmSuNiXeILUNreczBZHLxGEv/pRT+zL8rsXLxT5bRbiIF9wuh6cGgg==
+  dependencies:
+    "@types/node" "*"
+
 "@types/pg@^8.15.5":
   version "8.23.1"
   resolved "https://registry.yarnpkg.com/@types/pg/-/pg-8.23.1.tgz#7e712ce02cf44ad100862127f10f52e9c6b9d227"
@@ -5113,6 +5120,11 @@ devframe@^0.9.2:
     pathe "^2.0.3"
     ufo "^1.6.4"
 
+dictionary-en@4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/dictionary-en/-/dictionary-en-4.0.0.tgz#13bcf3ded331d5a2c5bfc5191c98e0aff881405b"
+  integrity sha512-3NHnE1uq33ZE/CIwaZ6gqxa4BnglHnxeAcTM0GJ7cmtRGcvX9InMK/IqLtYcUMFCUpUNgybH+DzkqdgAo3F1zg==
+
 diff@^8.0.4:
   version "8.0.4"
   resolved "https://registry.yarnpkg.com/diff/-/diff-8.0.4.tgz#4f5baf3188b9b2431117b962eb20ba330fadf696"
@@ -6387,6 +6399,11 @@ is-arrayish@^0.2.1:
   resolved "https://registry.yarnpkg.com/is-arrayish/-/is-arrayish-0.2.1.tgz#77c99840527aa8ecb1a8ba697b80645a7a926a9d"
   integrity sha512-zz06S8t0ozoDXMG+ube26zeCTNXcKIPJZJi8hBrF4idCLms4CG9QtK7qBl1boi5ODzFpjswb5JPmHCbMpjaYzg==
 
+is-buffer@^2.0.0:
+  version "2.0.5"
+  resolved "https://registry.yarnpkg.com/is-buffer/-/is-buffer-2.0.5.tgz#ebc252e400d22ff8d77fa09888821a24a658c191"
+  integrity sha512-i2R6zNFDwgEHJyQUtJEk0XFi1i0dPFn/oqjK3/vPCcDeJvW5NQ83V8QbicfF1SupOaB0h8ntgBC2YiE7dfyctQ==
+
 is-builtin-module@^5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/is-builtin-module/-/is-builtin-module-5.0.0.tgz#19df4b9c7451149b68176b0e06d18646db6308dd"
@@ -7348,6 +7365,13 @@ npm-run-path@^6.0.0:
   dependencies:
     path-key "^4.0.0"
     unicorn-magic "^0.3.0"
+
+nspell@2.1.5:
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/nspell/-/nspell-2.1.5.tgz#85d51ef71499da72d899f261d7399ea2fc607633"
+  integrity sha512-PSStyugKMiD9mHmqI/CR5xXrSIGejUXPlo88FBRq5Og1kO5QwQ5Ilu8D8O5I/SHpoS+mibpw6uKA8rd3vXd2Sg==
+  dependencies:
+    is-buffer "^2.0.0"
 
 nth-check@^2.1.1:
   version "2.1.1"
