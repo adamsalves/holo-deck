@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
+import { defaultLocale, localeCodes, localeUrl } from '../support/locales'
 import { navLabel, skipInvite } from './support'
 
 /**
@@ -238,19 +239,62 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
  * `/pokedex/kanto` o sublinhado de *Pokédex* aparecia e quem navega por leitor
  * de tela não recebia indicação nenhuma de seção atual. As duas coisas saem do
  * mesmo booleano agora, e este teste é o que impede elas de divergirem de novo.
+ *
+ * **Ele itera os locales, e a versão de um idioma só deixou o defeito voltar.**
+ * Com `prefix_except_default`, `route.path` em inglês é `/en/collection` e o
+ * `to` do link é `/collection`: nenhum dos dois ramos de `isCurrent` casava, e
+ * **toda** rota `/en/…` saía sem seção marcada — medido no `.output`, zero
+ * `aria-current` contra um no português. O portão rodava no único idioma em que
+ * o código quebrado funcionava, que é o mesmo modo de falhar da Fase 3.
  */
-test('a barra marca a seção atual, e só uma', async ({ page }) => {
-  await page.goto('/pokedex/1')
+test('a barra marca a seção atual, e só uma, em todo idioma', async ({ page }) => {
+  const locales = localeCodes()
 
-  const atual = page.locator('.nav__link[aria-current="page"]')
-  await expect(atual).toHaveCount(1)
-  await expect(atual).toHaveText(navLabel('nav.pokedex'))
+  // O outro lado: com um locale só, o laço abaixo não mede idioma nenhum.
+  expect(locales.length).toBeGreaterThan(1)
 
-  // A raiz é o caso em que a marca e *Base* apontam para o mesmo lugar: só o
-  // link da seção carrega `aria-current`, e a marca não.
-  await page.goto('/')
-  await expect(page.locator('[aria-current="page"]')).toHaveCount(1)
-  await expect(page.locator('[aria-current="page"]')).toHaveText(navLabel('nav.base'))
+  for (const locale of locales) {
+    await page.goto(localeUrl('/pokedex/1', locale))
+
+    const current = page.locator('.nav__link[aria-current="page"]')
+    await expect(current, `seção atual em ${locale}`).toHaveCount(1)
+    await expect(current).toHaveText(navLabel('nav.pokedex', locale))
+
+    // A raiz é o caso em que a marca e *Base* apontam para o mesmo lugar: só o
+    // link da seção carrega `aria-current`, e a marca não.
+    await page.goto(localeUrl('/', locale))
+    await expect(page.locator('[aria-current="page"]')).toHaveCount(1)
+    await expect(page.locator('[aria-current="page"]')).toHaveText(navLabel('nav.base', locale))
+  }
+})
+
+/**
+ * Sair do idioma tem de ser escolha do jogador, nunca consequência de clicar.
+ *
+ * `NuxtLink` com caminho literal **não** é localizado pelo módulo — quem faz
+ * isso é `localePath`. Sem ele, a barra de `/en/collection` saía com
+ * `href="/deck"`: o jogador clicava em *Deck*, a interface inteira virava
+ * português, e não havia caminho de volta sem editar a URL à mão. As 1.052
+ * páginas de `/en` existiam no build e não existiam para quem joga, que é o
+ * defeito que o `nav-gate` e o `AppAccount` desta base já pagaram duas vezes.
+ *
+ * Os destinos vêm de `nav-links`, não de uma lista escrita aqui: um destino novo
+ * entra nesta varredura por existir.
+ */
+test('a barra não tira o jogador do idioma em que ele está', async ({ page }) => {
+  const prefixed = localeCodes().filter(code => code !== defaultLocale())
+
+  // O outro lado: sem locale prefixado, o laço abaixo não visita nada.
+  expect(prefixed.length).toBeGreaterThan(0)
+
+  for (const locale of prefixed) {
+    for (const link of [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]) {
+      await page.goto(localeUrl('/collection', locale))
+      await page.getByRole('link', { name: navLabel(link.label, locale), exact: true }).click()
+
+      await expect(page, `${link.to} em ${locale}`).toHaveURL(new RegExp(`/${locale}(/|$)`))
+    }
+  }
 })
 
 /**
