@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TypeName } from '~~/shared/types/dex'
-import { TYPE_LABELS } from '~~/shared/types/game'
+import { typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * A etiqueta de tipo — o primeiro consumidor da variável de escopo.
@@ -10,7 +12,7 @@ import { TYPE_LABELS } from '~~/shared/types/game'
  * mesmo mecanismo que o brilho atrás da arte e o preenchimento de barra vão usar,
  * e a razão de nenhum deles precisar de 18 regras próprias.
  *
- * O texto sai de `TYPE_LABELS` e não do próprio `type` pelo mesmo motivo que o da
+ * O texto sai de `t(typeKey(type))` e não do próprio `type` pelo mesmo motivo que o da
  * raridade: o identificador é em inglês, o documento é `lang="pt-BR"`, e é a
  * etiqueta que o jogador lê.
  */
@@ -21,7 +23,7 @@ defineProps<{ type: TypeName }>()
   <span
     :data-type="type"
     class="type-badge"
-  >{{ TYPE_LABELS[type] }}</span>
+  >{{ t(typeKey(type)) }}</span>
 </template>
 
 <style scoped>

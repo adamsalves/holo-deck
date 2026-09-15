@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { SaveData } from '../../shared/save/schema.ts'
 import { isSaveData } from '../../shared/save/schema.ts'
+import { RARITY_NAMES, rarityKey } from '../../shared/types/game.ts'
+import { label, localeCodes, localeUrl } from '../support/locales.ts'
 import { skipInvite } from './support'
 
 /**
@@ -225,6 +227,63 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
   // O passo 5 da ordem do turno **corrige a prancha**, que escreve "no zero o
   // golpe fica inselecionável". O motor cai em Struggle por slot.
   await expect(rules).toContainText('vira Struggle')
+})
+
+/**
+ * The same ladder, read off the screen instead of off the disk.
+ *
+ * `test/unit/i18n-gate.spec.ts` asserts that every rarity has a label in every
+ * locale, and it does that by reading `i18n/locales/*.json` — which stays true of
+ * a page that renders none of them, or that renders the key. A disk gate does
+ * not reach the screen, so this walks the same list the gate derives and asks
+ * the browser for each word, in each language. It is the pair of the number test
+ * above, one layer further in: that one proves the page shows what the modules
+ * calculate, this one that it shows it in the language of the URL.
+ *
+ * `/rules` and not the binder because it is the only screen that renders the
+ * whole ladder server-side with no save behind it — the binder, the deck and the
+ * packs keep theirs inside `<ClientOnly>`.
+ *
+ * **Scoped to one line per tier, and asserted whole.** The first version searched
+ * the page's entire `innerText` for each label, and five of its twelve assertions
+ * could not fail: `comum` is a substring of `incomum` and `common` of `uncommon`,
+ * and the page's own Portuguese prose — which `/en/rules` still renders — writes
+ * `raro` three times and `ultra` twice. That is the exact failure `rules-gate`
+ * documents two files over, where `1025` contains `10`, and it went unnoticed
+ * here because a substring search over a whole page is weaker than the count this
+ * repository already refuses to accept. `[data-panel="rarity"]` holds one line
+ * per tier and nothing else.
+ *
+ * It asserts what is on the page and never what is absent: the page's own prose
+ * is Portuguese in both languages until the PR that translates `/rules`, so a
+ * `not.toContainText` here would be measuring that PR instead of this one.
+ */
+test('the rarity vocabulary reaches the screen in the language of the URL', async ({ page }) => {
+  const codes = localeCodes()
+
+  // The other side of the loop: with one locale it would prove nothing, and with
+  // none it would not run at all.
+  expect(codes.length).toBeGreaterThan(1)
+
+  for (const code of codes) {
+    await page.goto(localeUrl('/rules', code))
+
+    const ladder = page.locator('[data-panel="rarity"]')
+    await expect(ladder).toBeVisible()
+
+    // The other side of the scope: a renamed panel, a dropped line or a tier that
+    // stops rendering would leave the loop below asserting over nothing.
+    await expect(ladder.locator('.rules__key--rarity')).toHaveCount(RARITY_NAMES.length)
+
+    for (const rarity of RARITY_NAMES) {
+      // Uppercased on the right because the ladder is small caps on the page and
+      // the locale writes the label in sentence case.
+      await expect(
+        ladder.locator(`[data-rarity="${rarity}"] .rules__key--rarity`),
+        `${rarity} em ${code}`,
+      ).toHaveText(label(rarityKey(rarity), code).toUpperCase())
+    }
+  }
 })
 
 test('o interruptor de animação atravessa o reload', async ({ page }) => {

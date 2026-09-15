@@ -3,7 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { isPityTier } from '~~/shared/game/packs'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
-import { RARITY_LABELS } from '~~/shared/types/game'
+import { rarityKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * A tira de dez, virando carta a carta — a prancha *Abertura de pack*.
@@ -107,8 +109,8 @@ const delays = computed(() => {
 function labelOf(card: PackCard, entry: SearchEntry | null): string {
   const name = entry?.displayName ?? `#${card.speciesId}`
   return card.isShiny
-    ? `${name}, ${RARITY_LABELS[card.rarity]}, shiny`
-    : `${name}, ${RARITY_LABELS[card.rarity]}`
+    ? `${name}, ${t(rarityKey(card.rarity))}, shiny`
+    : `${name}, ${t(rarityKey(card.rarity))}`
 }
 </script>
 
@@ -165,7 +167,7 @@ function labelOf(card: PackCard, entry: SearchEntry | null): string {
 
             <template #footer>
               <p class="numeric opener__rarity">
-                {{ card.isShiny ? 'SHINY' : RARITY_LABELS[card.rarity].toUpperCase() }}
+                {{ card.isShiny ? 'SHINY' : t(rarityKey(card.rarity)).toUpperCase() }}
               </p>
             </template>
           </DexPokeCard>

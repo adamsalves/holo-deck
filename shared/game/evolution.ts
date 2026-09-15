@@ -1,6 +1,21 @@
-import type { EvolutionCondition, EvolutionNode } from '../types/dex.ts'
+import type { EvolutionCondition, EvolutionNode, TypeName } from '../types/dex.ts'
 import { isTypeName } from '../types/dex.ts'
-import { TYPE_LABELS } from '../types/game.ts'
+
+/**
+ * How a caller turns a type id into the word the player reads.
+ *
+ * The label used to be read straight from `TYPE_LABELS`, which is gone: the game
+ * speaks two languages now and `shared/` cannot call `t()` without dragging the
+ * i18n runtime across the purity boundary. So the sentence is still built here
+ * and the two type-shaped holes in it are filled by whoever is rendering — the
+ * same inversion the label maps themselves went through.
+ *
+ * Required rather than optional-with-a-default on purpose. A default would have
+ * to be `humanizeSlug`, and `Electric` reads close enough to right that a caller
+ * that forgot to pass a resolver would ship a half-translated sentence nobody
+ * notices.
+ */
+export type TypeLabelOf = (type: TypeName) => string
 
 /**
  * A condição de uma aresta de evolução, escrita para o jogador ler.
@@ -82,8 +97,8 @@ export function humanizeSlug(slug: string): string {
  * nível 16* é uma lista. As ressalvas entram todas, porque cada uma delas é a
  * diferença entre a espécie evoluir e não evoluir.
  */
-export function describeEvolution(via: EvolutionCondition): string {
-  const clauses = [mainClause(via), ...qualifiers(via)]
+export function describeEvolution(via: EvolutionCondition, typeLabelOf: TypeLabelOf): string {
+  const clauses = [mainClause(via), ...qualifiers(via, typeLabelOf)]
   return clauses.filter(clause => clause !== '').join(', ')
 }
 
@@ -108,7 +123,7 @@ function mainClause(via: EvolutionCondition): string {
   return trigger
 }
 
-function qualifiers(via: EvolutionCondition): string[] {
+function qualifiers(via: EvolutionCondition, typeLabelOf: TypeLabelOf): string[] {
   const parts: string[] = []
 
   // `heldItem` no `use-item` seria o mesmo item duas vezes; nos outros gatilhos
@@ -129,11 +144,13 @@ function qualifiers(via: EvolutionCondition): string[] {
   if (via.knownMove !== undefined && via.trigger !== 'use-move') {
     parts.push(`sabendo ${humanizeSlug(via.knownMove)}`)
   }
-  if (via.knownMoveType !== undefined) parts.push(`sabendo um golpe do tipo ${typeLabel(via.knownMoveType)}`)
+  if (via.knownMoveType !== undefined) {
+    parts.push(`sabendo um golpe do tipo ${typeLabel(via.knownMoveType, typeLabelOf)}`)
+  }
 
   if (via.tradeSpecies !== undefined) parts.push(`por ${humanizeSlug(via.tradeSpecies)}`)
   if (via.partySpecies !== undefined) parts.push(`com ${humanizeSlug(via.partySpecies)} na equipe`)
-  if (via.partyType !== undefined) parts.push(`com um ${typeLabel(via.partyType)} na equipe`)
+  if (via.partyType !== undefined) parts.push(`com um ${typeLabel(via.partyType, typeLabelOf)} na equipe`)
 
   if (via.gender !== undefined) parts.push(GENDER_LABELS[via.gender] ?? `gênero ${via.gender}`)
   if (via.relativePhysicalStats !== undefined) {
@@ -148,9 +165,16 @@ function qualifiers(via: EvolutionCondition): string[] {
   return parts
 }
 
-/** O tipo em português quando é um dos 18; o slug cru quando a API inventar. */
-function typeLabel(name: string): string {
-  return isTypeName(name) ? TYPE_LABELS[name] : humanizeSlug(name)
+/**
+ * The caller's word for one of the 18 types; the humanized slug when the API
+ * invents a nineteenth.
+ *
+ * The fallback is what keeps `TypeLabelOf` narrow: a resolver typed on `TypeName`
+ * cannot be handed `stellar`, and a key built from it would reach the screen as
+ * `type.stellar`.
+ */
+function typeLabel(name: string, typeLabelOf: TypeLabelOf): string {
+  return isTypeName(name) ? typeLabelOf(name) : humanizeSlug(name)
 }
 
 /**

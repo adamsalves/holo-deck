@@ -4,7 +4,9 @@ import { multiplierLabel } from '~~/shared/game/typechart'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { BattleStats } from '~~/shared/game/stats'
 import type { SearchEntry } from '~~/shared/types/dex'
-import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
+import { rarityKey, typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * Um dos seis slots — a mesma carta do sistema, com o rodapé que o deck precisa.
@@ -59,8 +61,8 @@ const card = computed(() => {
       label: [
         entry.displayName,
         `slot ${props.index + 1}`,
-        entry.types.map(type => TYPE_LABELS[type]).join(' e '),
-        RARITY_LABELS[rarity],
+        entry.types.map(type => t(typeKey(type))).join(' e '),
+        t(rarityKey(rarity)),
       ].join(', '),
     },
   }

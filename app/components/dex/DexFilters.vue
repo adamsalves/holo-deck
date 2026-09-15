@@ -3,7 +3,9 @@ import type { TypeName } from '~~/shared/types/dex'
 import type { OwnershipFilter, Rarity } from '~~/shared/types/game'
 import { computed } from 'vue'
 import { TYPE_NAMES } from '~~/shared/types/dex'
-import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
+import { rarityKey, RARITY_NAMES } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * A linha de filtros da prancha *Pokédex*.
@@ -136,7 +138,7 @@ function clear() {
       :aria-pressed="rarities.includes(rarity)"
       @click="toggleRarity(rarity)"
     >
-      {{ RARITY_LABELS[rarity] }}
+      {{ t(rarityKey(rarity)) }}
     </button>
   </div>
 </template>

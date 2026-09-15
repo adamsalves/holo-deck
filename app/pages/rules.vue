@@ -47,7 +47,9 @@ import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import type { AilmentName, TypeName } from '~~/shared/types/dex'
 import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { AILMENT_LABELS, RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
+import { AILMENT_LABELS, rarityKey, RARITY_NAMES } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * `/rules` — a referência, e a única tela do jogo cujo contrato é **não conter
@@ -97,7 +99,7 @@ const rarityBands = computed(() => {
       ? `BST < ${ceiling}`
       : ceiling === undefined ? `> ${floor - 1}` : `${floor} – ${ceiling - 1}`
 
-    return { tier, label: RARITY_LABELS[tier], range }
+    return { tier, label: t(rarityKey(tier)), range }
   })
 })
 
@@ -105,7 +107,7 @@ const rarityBands = computed(() => {
 const rarityMarks = computed(() =>
   (['legendary', 'mythic'] as const).map(tier => ({
     tier,
-    label: RARITY_LABELS[tier],
+    label: t(rarityKey(tier)),
     source: tier === 'legendary' ? 'is_legendary' : 'is_mythical',
   })))
 
@@ -123,14 +125,14 @@ const forgeRows = computed(() => {
   for (const tier of RARITY_NAMES) {
     const previous = rows.at(-1)
     if (previous !== undefined && DUST_PER_DUPLICATE[previous.tier] === DUST_PER_DUPLICATE[tier]) {
-      previous.label = `${previous.label} / ${RARITY_LABELS[tier]}`
+      previous.label = `${previous.label} / ${t(rarityKey(tier))}`
       previous.key = `${previous.key}+${tier}`
       continue
     }
 
     rows.push({
       key: tier,
-      label: RARITY_LABELS[tier],
+      label: t(rarityKey(tier)),
       tier,
       dust: DUST_PER_DUPLICATE[tier],
       cost: FORGE_COST[tier],
@@ -293,7 +295,13 @@ useSeoMeta({
 
     <div class="rules__row rules__row--thirds">
       <!-- RARIDADE -->
-      <section class="rules__panel">
+      <!-- `data-panel` is the e2e's hook: the forge table below carries the same
+           `data-rarity` and `.rules__key--rarity`, so without it a locator for a
+           tier matches two lines with different text. -->
+      <section
+        class="rules__panel"
+        data-panel="rarity"
+      >
         <h2 class="rules__panel-title">
           Raridade
         </h2>

@@ -5,7 +5,9 @@ import { useProgressStore } from '~~/app/stores/progress'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT } from '~~/shared/types/brand'
-import { TYPE_LABELS } from '~~/shared/types/game'
+import { typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * A Liga — a prancha *Liga*.
@@ -111,7 +113,7 @@ const next = computed(() => view.next.value)
               {{ next.leader.name }}
             </h2>
             <p class="numeric league__next-meta">
-              Ginásio {{ next.leader.gym }} · {{ TYPE_LABELS[next.leader.type] }}
+              Ginásio {{ next.leader.gym }} · {{ t(typeKey(next.leader.type)) }}
             </p>
 
             <dl class="numeric league__facts">

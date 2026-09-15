@@ -14,8 +14,10 @@ import { PACK_SIZE, RARE_PLUS_SLOTS } from '~~/shared/game/packs'
 import { countdownLabel } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
-import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
+import { rarityKey, typeKey } from '~~/shared/types/game'
 import { multiplierLabel } from '~~/shared/game/typechart'
+
+const { t } = useI18n()
 
 /**
  * A base do jogador — a prancha *Hub*, agora inteira.
@@ -95,7 +97,7 @@ const advantage = computed(() => {
   if (strong === null) return null
 
   const leaderType = league.next.value.leader.type
-  return `${strong.entry.displayName} contra ${TYPE_LABELS[leaderType]} `
+  return `${strong.entry.displayName} contra ${t(typeKey(leaderType))} `
     + multiplierLabel(strong.multiplier)
 })
 
@@ -113,9 +115,9 @@ const percent = computed(() => (collection.ratio.value * 100).toFixed(1).replace
 /** Os quatro números do cabeçalho da prancha: três tiers e o brilho, que não é
  * tier nenhum — shiny rola sobre qualquer raridade e conta à parte. */
 const tiers = computed(() => [
-  { label: RARITY_LABELS.uncommon, value: collection.ownedByRarity.value.uncommon },
-  { label: RARITY_LABELS.rare, value: collection.ownedByRarity.value.rare },
-  { label: RARITY_LABELS.ultra, value: collection.ownedByRarity.value.ultra },
+  { label: t(rarityKey('uncommon')), value: collection.ownedByRarity.value.uncommon },
+  { label: t(rarityKey('rare')), value: collection.ownedByRarity.value.rare },
+  { label: t(rarityKey('ultra')), value: collection.ownedByRarity.value.ultra },
   { label: 'Shiny', value: owned.shinyCount },
 ])
 
@@ -294,7 +296,7 @@ onMounted(() => {
                   {{ league.next.value.leader.name }}
                 </h2>
                 <p class="numeric hub__panel-meta">
-                  {{ TYPE_LABELS[league.next.value.leader.type] }}
+                  {{ t(typeKey(league.next.value.leader.type)) }}
                 </p>
               </div>
 

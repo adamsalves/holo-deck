@@ -5,9 +5,11 @@ import { gameNumber, progressLabel } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { RARITY_LABELS, RARITY_NAMES } from '~~/shared/types/game'
+import { rarityKey, RARITY_NAMES } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useCollection } from '~/composables/useCollection'
+
+const { t } = useI18n()
 
 /**
  * O binder — a prancha *Coleção e forja*.
@@ -131,7 +133,7 @@ useSeoMeta({
                 {{ collection.ownedByRarity.value[tier] }}
               </dd>
               <dt class="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">
-                {{ RARITY_LABELS[tier] }}
+                {{ t(rarityKey(tier)) }}
               </dt>
             </div>
             <div class="text-right">
@@ -198,7 +200,7 @@ useSeoMeta({
             :aria-pressed="rarityFilter === tier"
             @click="rarityFilter = rarityFilter === tier ? null : tier"
           >
-            {{ RARITY_LABELS[tier] }}
+            {{ t(rarityKey(tier)) }}
           </button>
         </div>
 
@@ -300,7 +302,7 @@ useSeoMeta({
                   class="numeric text-[9px] font-extrabold"
                   :data-rarity="rarityFrom(entry)"
                   style="color: var(--rarity-label)"
-                >{{ RARITY_LABELS[rarityFrom(entry)].toUpperCase() }}</span>
+                >{{ t(rarityKey(rarityFrom(entry))).toUpperCase() }}</span>
               </button>
             </li>
           </ul>
@@ -326,7 +328,7 @@ useSeoMeta({
                 :data-rarity="targetRarity"
                 style="color: var(--rarity-label)"
               >
-                {{ RARITY_LABELS[targetRarity].toUpperCase() }}
+                {{ t(rarityKey(targetRarity)).toUpperCase() }}
               </p>
               <p class="numeric mt-1.5 text-[11px] text-muted">
                 custa <strong class="collection__cost">{{ gameNumber(targetCost) }}</strong> pó
@@ -391,7 +393,11 @@ useSeoMeta({
               scope="row"
               style="color: var(--rarity-label)"
             >
-              {{ tier === 'legendary' ? 'Lend. / mít.' : RARITY_LABELS[tier] }}
+              <!-- Lendário e mítico dividem uma linha na forja e a coluna não
+                   comporta os dois nomes por extenso, então a abreviação é chave
+                   própria em vez de composição: `Lend. / mít.` não é
+                   `Lendário` cortado, e `Leg. / myth.` não corta no mesmo lugar. -->
+              {{ tier === 'legendary' ? t('rarity.legendaryMythicShort') : t(rarityKey(tier)) }}
             </th>
             <td class="numeric">
               {{ gameNumber(dustFor(tier)) }}

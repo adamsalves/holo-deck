@@ -4,6 +4,21 @@ import { computed } from 'vue'
 import { describeEvolution, toStages } from '~~/shared/game/evolution'
 import { baseStatTotal } from '~~/shared/game/rarity'
 import { dexNumber } from '~~/shared/dex/regions'
+import { typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
+
+/**
+ * The type name inside an evolution condition — *sabendo um golpe do tipo
+ * Elétrico*.
+ *
+ * `describeEvolution` builds the sentence and asks for this: the frame lives in
+ * `shared/`, which has no `t()`, so the screen supplies the two words that have
+ * a translation.
+ */
+function typeLabelOf(type: TypeName): string {
+  return t(typeKey(type))
+}
 
 /**
  * A linha evolutiva, resolvida do JSON local — zero requisições, que é a
@@ -87,7 +102,7 @@ function nameOf(node: EvolutionNode): string {
               <span
                 v-if="node.via"
                 class="numeric chain__condition"
-              >{{ describeEvolution(node.via) }}</span>
+              >{{ describeEvolution(node.via, typeLabelOf) }}</span>
             </NuxtLink>
           </li>
         </ul>

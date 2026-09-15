@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GymView } from '~/composables/useLeague'
-import { generationLabel, REGION_LABELS, TYPE_LABELS } from '~~/shared/types/game'
+import { generationLabel, REGION_LABELS, typeKey } from '~~/shared/types/game'
 import { gameNumber } from '~~/shared/game/progress'
 import { aceOf } from '~~/shared/game/gyms'
+
+const { t } = useI18n()
 
 /**
  * Uma das nove cartas da trilha — a prancha *Liga*, nos três estados.
@@ -165,7 +167,7 @@ const label = computed(() => {
           {{ leader.name }}
         </p>
         <p class="numeric gym__region">
-          {{ REGION_LABELS[leader.region] }} · {{ TYPE_LABELS[leader.type] }}
+          {{ REGION_LABELS[leader.region] }} · {{ t(typeKey(leader.type)) }}
         </p>
       </div>
     </div>

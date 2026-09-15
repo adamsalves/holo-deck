@@ -1,6 +1,9 @@
+import type { TypeName } from '~~/shared/types/dex'
 import { describe, expect, it } from 'vitest'
 import { describeEvolution, flattenChain, humanizeSlug, toStages } from '~~/shared/game/evolution'
+import { typeKey } from '~~/shared/types/game'
 import { readAllSpecies, readChains } from '../support/generated-dex'
+import { defaultLocale, label } from '../support/locales'
 
 /**
  * O rótulo da aresta de evolução, medido contra as 483 condições reais.
@@ -12,6 +15,20 @@ import { readAllSpecies, readChains } from '../support/generated-dex'
  * "troca segurando Metal Coat" em "troca".
  */
 
+/**
+ * The type resolver `describeEvolution` asks its caller for, reading the same
+ * file the screen reads.
+ *
+ * The default locale and not `'pt-BR'` written out: the sentence frames around
+ * this word are Portuguese literals inside `shared/game/evolution.ts`, so the
+ * language this spec asserts **is** the default one. The day that stops being
+ * true, the frames have to move too, and this line is one of the things that
+ * should break.
+ */
+function typeLabelOf(type: TypeName): string {
+  return label(typeKey(type), defaultLocale())
+}
+
 const chains = readChains()
 const species = readAllSpecies()
 
@@ -21,28 +38,28 @@ const conditions = Object.values(chains)
 
 describe('rótulo da condição', () => {
   it('escreve o nível, que é a condição de 348 das 483 arestas', () => {
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 16 })).toBe('Nível 16')
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 16 }, typeLabelOf)).toBe('Nível 16')
   })
 
   it('reproduz os dois rótulos que a prancha Detalhe desenha', () => {
     const charizard = chains[Object.keys(chains).find(id => chains[id]?.slug === 'charmander') ?? '']
     const charmeleon = charizard?.evolvesTo[0]
 
-    expect(charmeleon?.via && describeEvolution(charmeleon.via)).toBe('Nível 16')
-    expect(charmeleon?.evolvesTo[0]?.via && describeEvolution(charmeleon.evolvesTo[0].via)).toBe('Nível 36')
+    expect(charmeleon?.via && describeEvolution(charmeleon.via, typeLabelOf)).toBe('Nível 16')
+    expect(charmeleon?.evolvesTo[0]?.via && describeEvolution(charmeleon.evolvesTo[0].via, typeLabelOf)).toBe('Nível 36')
   })
 
   it('não promete um número quando a subida de nível não tem um', () => {
-    expect(describeEvolution({ trigger: 'level-up', minHappiness: 160 })).toBe('Subir de nível, felicidade 160')
+    expect(describeEvolution({ trigger: 'level-up', minHappiness: 160 }, typeLabelOf)).toBe('Subir de nível, felicidade 160')
   })
 
   it('põe o nome próprio como a PokeAPI o entrega, só humanizado', () => {
     expect(humanizeSlug('fire-stone')).toBe('Fire Stone')
-    expect(describeEvolution({ trigger: 'use-item', item: 'water-stone' })).toBe('Usar Water Stone')
+    expect(describeEvolution({ trigger: 'use-item', item: 'water-stone' }, typeLabelOf)).toBe('Usar Water Stone')
   })
 
   it('não repete o item quando ele já é a cláusula principal', () => {
-    const phrase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' })
+    const phrase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' }, typeLabelOf)
 
     expect(phrase).toBe('Usar Sun Stone')
     expect(phrase.match(/Sun Stone/g)).toHaveLength(1)
@@ -51,13 +68,13 @@ describe('rótulo da condição', () => {
   it('acumula as ressalvas na ordem em que se lê a frase', () => {
     // A vírgula separa toda ressalva, sem exceção por gatilho: uma regra de
     // pontuação por caso daria frases que só um `switch` explica.
-    expect(describeEvolution({ trigger: 'trade', heldItem: 'metal-coat' })).toBe('Troca, segurando Metal Coat')
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 25, timeOfDay: 'night' })).toBe('Nível 25, de noite')
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 30, gender: 1 })).toBe('Nível 30, fêmea')
+    expect(describeEvolution({ trigger: 'trade', heldItem: 'metal-coat' }, typeLabelOf)).toBe('Troca, segurando Metal Coat')
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 25, timeOfDay: 'night' }, typeLabelOf)).toBe('Nível 25, de noite')
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 30, gender: 1 }, typeLabelOf)).toBe('Nível 30, fêmea')
   })
 
   it('traduz o tipo da ressalva, que é vocabulário do jogo e não nome próprio', () => {
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 1, knownMoveType: 'fairy' }))
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 1, knownMoveType: 'fairy' }, typeLabelOf))
       .toBe('Nível 1, sabendo um golpe do tipo Fada')
   })
 
@@ -70,18 +87,18 @@ describe('rótulo da condição', () => {
   it('produz frase para cada uma das arestas do dex', () => {
     expect(conditions.length).toBeGreaterThan(400)
 
-    const empty = conditions.filter(via => describeEvolution(via).trim() === '')
+    const empty = conditions.filter(via => describeEvolution(via, typeLabelOf).trim() === '')
     expect(empty, 'aresta sem rótulo é seta sem explicação na tela').toEqual([])
 
-    const withSlug = conditions.filter(via => /[a-z]-[a-z]/.test(describeEvolution(via)))
-    expect(withSlug.map(via => describeEvolution(via)), 'slug cru vazando para a tela').toEqual([])
+    const withSlug = conditions.filter(via => /[a-z]-[a-z]/.test(describeEvolution(via, typeLabelOf)))
+    expect(withSlug.map(via => describeEvolution(via, typeLabelOf)), 'slug cru vazando para a tela').toEqual([])
   })
 
   it('não deixa nenhum gatilho cair no humanizador', () => {
     // Um gatilho fora da tabela vira `Three Critical Hits` — legível, em inglês,
     // e sinal de que a lista envelheceu em relação ao dex.
     const withoutLabel = [...new Set(conditions.map(via => via.trigger))]
-      .filter(trigger => describeEvolution({ trigger }) === humanizeSlug(trigger) && trigger.includes('-'))
+      .filter(trigger => describeEvolution({ trigger }, typeLabelOf) === humanizeSlug(trigger) && trigger.includes('-'))
 
     expect(withoutLabel, 'gatilho sem rótulo em português').toEqual([])
   })

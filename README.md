@@ -286,8 +286,39 @@ Está em aberto — ver *Em aberto, para quem escrever a fase*.
 
 **Texto em português.** Os identificadores são em inglês e o documento é
 `lang="pt-BR"` — um `{{ rarity }}` cru põe COMMON na carta e faz o leitor de tela
-ler o enum no meio de uma frase em português. `RARITY_LABELS` e `TYPE_LABELS`, em
-`shared/types/game.ts`, são o que o jogador lê.
+ler o enum no meio de uma frase em português. Desde a Fase 8 o vocabulário do
+jogo mora em `i18n/locales/`: `rarityKey()` e `typeKey()`, em
+[`shared/types/game.ts`](shared/types/game.ts), devolvem **a chave**
+(`rarity.common`, `type.electric`), e quem chama `t()` é sempre a tela —
+`shared/` não fala idioma nenhum, e a chave não é texto.
+
+**O vocabulário que `shared/` ainda carrega.** A
+[issue #38](https://github.com/adamsalves/holo-deck/issues/38) lista seis mapas.
+A medição achou **dez** produtores de texto de tela, e é a lista de dez que vale:
+
+| produtor | o que escreve | quando sai |
+| --- | --- | --- |
+| `rarityKey` / `typeKey` | `Comum`, `Elétrico` | **entregue** |
+| `REGION_LABELS` | `Kanto` — nome próprio, igual nos dois idiomas | fica |
+| `HABITAT_LABELS` | `Caverna`, `Ermo` | PR do Detalhe |
+| `AILMENT_LABELS` | `paralisia` | PR da batalha |
+| `CONDITION_LABELS` (`shared/game/status.ts`) | `PAR`, `QUE`, `ENV`, `SON` | PR da batalha |
+| `generationLabel` | `Geração IV` | PR do Detalhe |
+| `shared/game/evolution.ts` | ~40 condições (`Subir de nível`, `de dia`) | PR do Detalhe |
+| `gameNumber` / `gamePercent` (`shared/game/progress.ts`) | `1.600`, `0,4%` | PR do Detalhe |
+
+Os dois últimos são os que a issue não via, e são de outra classe: eles não
+escrevem palavra nenhuma — escrevem **número com o separador de `pt-BR` fixo**,
+por `toLocaleString('pt-BR')`. Em `/en` a tabela de forja já sai `1.600` e o
+shiny `0,4%`, que um leitor de inglês lê como 1,6 e 0,4. O erro não é de idioma,
+é de **valor lido errado**, e é justamente por isso que uma varredura por palavra
+não o encontra. O docblock de `gameNumber` justifica o locale fixo dizendo que o
+número está no meio de uma frase em português — a premissa deixou de valer no dia
+em que existiu uma frase em inglês.
+
+Consequência para o plano: o portão de "`shared/` sem texto de tela" **não pode
+fechar verde antes do PR do Detalhe**, que é quem leva os últimos. Escrito antes,
+ele nasceria vermelho — e portão que nasce vermelho é o que a própria issue recusa.
 
 **Número** usa o utilitário `numeric`, que traz `JetBrains Mono` e
 `tabular-nums` juntos. Separados, o modo de errar é escrever metade — e aí um HP
@@ -456,6 +487,55 @@ O canvas só desenha o cartão em `Disponível agora`. Sumir com ele deixaria um
 buraco na grade de duas colunas do Hub, então ele fica com o contador regressivo
 e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situação.
 
+### Meio traduzido, enquanto a Fase 8 roda
+
+A Fase 8 leva o jogo para dois idiomas em oito PRs, uma fatia vertical por PR.
+Entre o primeiro e o último, `/en` mostra telas **meio traduzidas** — e isso é
+estado conhecido e datado, não defeito solto. Em inglês hoje: a barra global, o
+painel de conta, o pular-para-o-conteúdo e o **vocabulário do jogo** (as 6
+raridades e os 18 tipos).
+
+O que ainda sai em português dentro de `/en`, com o PR que o leva:
+
+| onde | o que se lê em `/en` | leva |
+| --- | --- | --- |
+| condição de evolução | *sabendo um golpe do tipo **Electric*** — moldura pt-BR com o substantivo já traduzido | PR do Detalhe |
+| `/rules` | a página inteira, menos a escada de raridade | PR 4 |
+| `aria-label` de carta, slot e grid | `número 25`, `uma cópia`, `não capturado` | PRs 2 e 4 |
+| Hub, `/packs`, `/collection`, `/deck` | a prosa das quatro telas | PR 2 |
+| `/league`, `/battle/N` | prosa e narração do turno | PR 3 |
+| número | `1.600`, `0,4%` — separador de `pt-BR` fixo | PR do Detalhe |
+
+A ordem é deliberada: o vocabulário é **transversal** — 26 pontos de uso
+espalhados por telas de três PRs diferentes —, então ele vai antes das telas. Uma
+tela traduzida com `Comum` e `Elétrico` dentro seria pior que uma tela inteira em
+português, porque o defeito passa despercebido.
+
+**A frase de evolução é a que mais chama atenção**, e o desenho a escolheu de
+olhos abertos: `describeEvolution` monta a moldura em `shared/`, que não tem
+`t()`, e **recebe** o resolvedor de tipo em parâmetro obrigatório. O parâmetro é
+obrigatório porque o padrão teria de ser `humanizeSlug`, e `Electric` lê perto o
+bastante do certo para uma frase meio traduzida passar batida. A moldura só sai
+do português quando as ~40 condições virarem chave, no PR do Detalhe.
+
+### `/en` não é pré-renderizada por inteiro
+
+O build fecha **1.061 páginas, 9 delas em `/en`** — e as 1.052 restantes são
+exatamente o build anterior à i18n. `/en/pokemon/*` (1.025) e `/en/pokedex/N` (9)
+**não existem no pré-render**: o rastreador do Nitro não chega nelas, porque nada
+em `/en` linka para lá.
+
+A consequência está num docblock que deixou de valer. O `nuxt.config.ts` afirma
+que "toda rota válida é pré-renderizada, então a função só é alcançada por URL
+inválida — que é justamente quando `useDex()` precisa ler o índice para responder
+404". Para a árvore `/en/pokemon/*` isso é falso: ela é servida pela função, que
+lê o índice a cada requisição. Funciona — é o que `yarn check:vercel-bundle`
+garante estar no pacote — e custa mais do que o docblock promete.
+
+Fica registrado e **em aberto**: ou as rotas entram em `nitro.prerender.routes`,
+ou o docblock passa a dizer o que é verdade. A decisão cabe ao PR 4, que é quem
+leva o `hreflang` e o seletor de idioma.
+
 ### Segurado até a fase que cria o dado
 
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
@@ -477,9 +557,10 @@ progresso que ninguém pode mover.
   tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
   de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
   *Ainda não* ficou com três coisas, e as três são da Fase 8.
-- **Sem a peça que os sustenta:** o seletor de **idioma** (não há i18n), o
-  interruptor de **som** (não há áudio) e *baixar tudo para offline* (não há PWA).
-  Os três estão na prancha *Ajustes*, e nenhum dos três tem o que ligar.
+- **Sem a peça que os sustenta:** o seletor de **idioma** (o i18n chegou na Fase
+  8; o seletor é do PR 4 dela), o interruptor de **som** (não há áudio) e *baixar
+  tudo para offline* (o PWA é o PR 5 da Fase 8). Os três estão na prancha
+  *Ajustes*.
 - ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
   constante de `useDeck` virou `progress.nextGym`, que foi exatamente a troca de
   uma linha que o comentário dela prometia.
@@ -1039,8 +1120,8 @@ trouxe a metade que dependia de conta**: o painel da conta com e-mail e estado d
 sync, *Restaurar versão anterior* e *Excluir conta e save do servidor* — e o
 título passa a dizer de quem é a tela (*Sua conta e seu save* com sessão, *Seu
 save e este aparelho* sem). Ficam segurados só os três que não têm a peça que os
-sustenta: idioma (não há i18n), som (não há áudio) e *baixar tudo para offline*
-(não há PWA). **Eles aparecem nomeados na própria tela**, num painel
+sustenta: idioma (o i18n chegou na Fase 8 e o seletor é o PR 4 dela), som (não há
+áudio) e *baixar tudo para offline* (o PWA é o PR 5 da Fase 8). **Eles aparecem nomeados na própria tela**, num painel
 *Ainda não*, em vez de virarem controles cinzas: um botão desligado promete uma
 coisa que o jogo não faz.
 

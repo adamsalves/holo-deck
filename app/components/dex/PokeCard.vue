@@ -2,8 +2,10 @@
 import type { TypeName } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
 import { computed, useTemplateRef } from 'vue'
-import { hasFoil, RARITY_LABELS } from '~~/shared/types/game'
+import { hasFoil, rarityKey } from '~~/shared/types/game'
 import { useFoil } from '~/composables/useFoil'
+
+const { t } = useI18n()
 
 /**
  * A carta — a superfície que carrega a assinatura do sistema.
@@ -138,7 +140,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
              `PokeCard` sozinho não resolve — o grid dá o nome acessível ao link
              que envolve a carta, com número, tipos e raridade na mesma frase. -->
         <slot name="footer">
-          <span class="poke-card__rarity numeric">{{ RARITY_LABELS[rarity] }}</span>
+          <span class="poke-card__rarity numeric">{{ t(rarityKey(rarity)) }}</span>
         </slot>
       </div>
 

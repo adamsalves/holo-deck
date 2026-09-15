@@ -3,10 +3,12 @@ import type { SpeciesEntry } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { flattenChain } from '~~/shared/game/evolution'
 import { rarityOf } from '~~/shared/game/rarity'
-import { HABITAT_LABELS, RARITY_LABELS } from '~~/shared/types/game'
+import { HABITAT_LABELS, rarityKey } from '~~/shared/types/game'
 import { artworkUrl } from '~~/shared/dex/artwork'
 import { dexNumber, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
+
+const { t } = useI18n()
 
 /**
  * A página de uma espécie — a prancha *Detalhe*.
@@ -261,7 +263,7 @@ useSeoMeta({
             class="numeric hero__rarity"
             :data-rarity="rarity"
           >
-            {{ RARITY_LABELS[rarity].toUpperCase() }}
+            {{ t(rarityKey(rarity)).toUpperCase() }}
           </dd>
         </div>
       </dl>

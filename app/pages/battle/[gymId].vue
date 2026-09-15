@@ -11,7 +11,7 @@ import { battleSpriteUrl } from '~~/shared/dex/artwork'
 import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
-import { AILMENT_LABELS, REGION_LABELS, TYPE_LABELS } from '~~/shared/types/game'
+import { AILMENT_LABELS, REGION_LABELS, typeKey } from '~~/shared/types/game'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
@@ -20,6 +20,8 @@ import { loadBattleContext } from '~/composables/useBattleContext'
 import { useInvite } from '~/composables/useInvite'
 import type { NarratedTurn } from '~~/app/utils/battle-narration'
 import { narrate } from '~~/app/utils/battle-narration'
+
+const { t } = useI18n()
 
 /**
  * A batalha — a prancha *Batalha*.
@@ -328,7 +330,7 @@ const reading = computed(() => {
   // A conta aberta, tipo a tipo — é a linha de baixo da prancha, e é ela que
   // ensina de onde o número saiu, inclusive quando ele é zero.
   const detail = foe.types
-    .map(type => `${TYPE_LABELS[move.type]} → ${TYPE_LABELS[type]} `
+    .map(type => `${t(typeKey(move.type))} → ${t(typeKey(type))} `
       + multiplierLabel(effectivenessAgainst(ctx.matrix, move.type, [type])))
     .join(' · ')
 
@@ -477,7 +479,7 @@ function fallbackSprite(event: Event, id: number): void {
             <span class="numeric battle__gym">Ginásio {{ gym }} / {{ GYM_COUNT }}</span>
             <span class="battle__leader">{{ leader.name }}</span>
             <span class="numeric battle__region">
-              {{ REGION_LABELS[leader.region] }} · {{ TYPE_LABELS[leader.type] }}
+              {{ REGION_LABELS[leader.region] }} · {{ t(typeKey(leader.type)) }}
             </span>
           </div>
           <div class="numeric battle__meta">

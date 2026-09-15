@@ -13,7 +13,8 @@ import { multiplierLabel } from '~~/shared/game/typechart'
  * Mora em `app/` e não em `shared/` porque é **texto que o jogador lê**: o motor
  * fala em `{ kind: 'hit', side, moveId, damage }`, e traduzir isso para
  * português é trabalho de interface, não de regra. É a mesma fronteira que
- * mantém `TYPE_LABELS` fora de `dex.ts`.
+ * mantém o vocabulário de tipo fora de `dex.ts` — hoje `typeKey`, que devolve a
+ * chave e deixa o `t()` para quem renderiza.
  *
  * **Os nomes saem dos índices, não do estado final.** Quem age num turno é o
  * ativo *daquele momento*, e o motor resolve troca antes de golpe e ainda troca
