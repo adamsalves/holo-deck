@@ -18,6 +18,7 @@ import { rarityKey, typeKey } from '~~/shared/types/game'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * A base do jogador — a prancha *Hub*, agora inteira.
@@ -97,8 +98,11 @@ const advantage = computed(() => {
   if (strong === null) return null
 
   const leaderType = league.next.value.leader.type
-  return `${strong.entry.displayName} contra ${t(typeKey(leaderType))} `
-    + multiplierLabel(strong.multiplier)
+  return t('hub.advantage', {
+    card: strong.entry.displayName,
+    type: t(typeKey(leaderType)),
+    multiplier: multiplierLabel(strong.multiplier),
+  })
 })
 
 /**
@@ -118,7 +122,7 @@ const tiers = computed(() => [
   { label: t(rarityKey('uncommon')), value: collection.ownedByRarity.value.uncommon },
   { label: t(rarityKey('rare')), value: collection.ownedByRarity.value.rare },
   { label: t(rarityKey('ultra')), value: collection.ownedByRarity.value.ultra },
-  { label: 'Shiny', value: owned.shinyCount },
+  { label: t('hub.shiny'), value: owned.shinyCount },
 ])
 
 /**
@@ -173,10 +177,10 @@ onMounted(() => {
             >
             <div>
               <p class="hub__eyebrow hub__eyebrow--warm">
-                Batalha em andamento
+                {{ t('hub.resume.eyebrow') }}
               </p>
               <p class="hub__resume-title">
-                Ginásio {{ resumable.gym }} · {{ resumable.leader.name }}
+                {{ t('hub.resume.title', { gym: resumable.gym, leader: resumable.leader.name }) }}
               </p>
             </div>
           </div>
@@ -199,7 +203,7 @@ onMounted(() => {
               </div>
             </div>
             <p class="numeric hub__resume-meta">
-              turno {{ resumable.turn }} · seu banco {{ resumable.standing }} de pé
+              {{ t('hub.resume.meta', { turn: resumable.turn, standing: resumable.standing }) }}
             </p>
           </div>
 
@@ -209,13 +213,13 @@ onMounted(() => {
               class="numeric hub__give-up"
               @click="battle.discard()"
             >
-              DESISTIR
+              {{ t('hub.resume.giveUp') }}
             </button>
             <NuxtLink
-              :to="`/battle/${resumable.gym}`"
+              :to="localePath(`/battle/${resumable.gym}`)"
               class="hub__button hub__button--warm bevel-control"
             >
-              RETOMAR
+              {{ t('hub.resume.resume') }}
             </NuxtLink>
           </div>
         </section>
@@ -243,13 +247,13 @@ onMounted(() => {
                   class="hub__eyebrow"
                   :class="dailyReady ? 'hub__eyebrow--daily' : ''"
                 >
-                  {{ dailyReady ? 'Disponível agora' : 'Já saiu hoje' }}
+                  {{ dailyReady ? t('hub.daily.ready') : t('hub.daily.done') }}
                 </p>
                 <h2 class="hub__panel-title">
-                  Pack diário
+                  {{ t('hub.daily.title') }}
                 </h2>
                 <p class="numeric hub__panel-meta">
-                  {{ PACK_SIZE }} cartas · {{ RARE_PLUS_SLOTS }} raro ou acima garantido
+                  {{ t('hub.daily.meta', { size: PACK_SIZE, guaranteed: RARE_PLUS_SLOTS }) }}
                 </p>
               </div>
             </div>
@@ -257,26 +261,33 @@ onMounted(() => {
             <div class="hub__panel-foot hub__panel-foot--daily">
               <NuxtLink
                 v-if="dailyReady"
-                to="/packs?open=daily"
+                :to="localePath('/packs?open=daily')"
                 class="hub__button hub__button--daily bevel-control"
               >
-                ABRIR
+                {{ t('hub.daily.open') }}
               </NuxtLink>
               <NuxtLink
                 v-else
-                to="/packs"
+                :to="localePath('/packs')"
                 class="hub__button bevel-control"
               >
-                IR À LOJA
+                {{ t('hub.daily.toShop') }}
               </NuxtLink>
 
               <p class="numeric hub__daily-meta">
                 <template v-if="dailyReady">
-                  grátis, um por dia
+                  {{ t('hub.daily.free') }}
                 </template>
-                <template v-else>
-                  próximo em <b>{{ untilDaily }}</b>
-                </template>
+                <i18n-t
+                  v-else
+                  keypath="hub.daily.nextIn"
+                  scope="global"
+                  tag="span"
+                >
+                  <template #time>
+                    <b>{{ untilDaily }}</b>
+                  </template>
+                </i18n-t>
               </p>
             </div>
           </section>
@@ -289,8 +300,8 @@ onMounted(() => {
             <div class="hub__panel-head">
               <div>
                 <p class="hub__eyebrow hub__eyebrow--type">
-                  {{ progress.leagueComplete ? 'Revanche' : 'Próximo desafio' }}
-                  · Ginásio {{ league.next.value.leader.gym }} de {{ GYM_COUNT }}
+                  {{ progress.leagueComplete ? t('hub.next.rematch') : t('hub.next.challenge') }}
+                  · {{ t('hub.next.gym', { gym: league.next.value.leader.gym, total: GYM_COUNT }) }}
                 </p>
                 <h2 class="hub__panel-title">
                   {{ league.next.value.leader.name }}
@@ -309,7 +320,7 @@ onMounted(() => {
             </div>
 
             <p class="numeric hub__label">
-              Time do líder
+              {{ t('hub.next.team') }}
             </p>
             <div class="hub__team">
               <div
@@ -331,21 +342,28 @@ onMounted(() => {
             <div class="hub__panel-foot">
               <NuxtLink
                 v-if="league.deckReady.value"
-                :to="`/battle/${league.next.value.leader.gym}`"
+                :to="localePath(`/battle/${league.next.value.leader.gym}`)"
                 class="hub__button hub__button--type bevel-control"
               >
-                DESAFIAR
+                {{ t('hub.next.fight') }}
               </NuxtLink>
               <NuxtLink
                 v-else
-                to="/deck"
+                :to="localePath('/deck')"
                 class="hub__button bevel-control"
               >
-                MONTAR O DECK
+                {{ t('hub.next.buildDeck') }}
               </NuxtLink>
-              <p class="numeric hub__reward">
-                recompensa <b>+{{ gameNumber(league.next.value.reward.total) }}</b> moedas
-              </p>
+              <i18n-t
+                class="numeric hub__reward"
+                keypath="hub.next.reward"
+                scope="global"
+                tag="p"
+              >
+                <template #coins>
+                  <b>+{{ gameNumber(league.next.value.reward.total) }}</b>
+                </template>
+              </i18n-t>
             </div>
           </section>
 
@@ -355,12 +373,12 @@ onMounted(() => {
             <div class="hub__panel-head">
               <div>
                 <p class="hub__eyebrow">
-                  Sua coleção
+                  {{ t('hub.collection.eyebrow') }}
                 </p>
                 <p class="numeric hub__count">
                   <b>{{ gameNumber(owned.ownedCount) }}</b>
                   <span>/ {{ gameNumber(collection.total.value) }}</span>
-                  <em>{{ percent }}% do dex</em>
+                  <em>{{ t('hub.collection.ofDex', { percent }) }}</em>
                 </p>
               </div>
 

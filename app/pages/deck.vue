@@ -37,7 +37,7 @@ const collection = useCollectionStore()
 const deck = useDeckStore()
 const view = await useDeck()
 
-useHead({ title: 'Deck' })
+useHead({ title: () => t('deck.seo.title') })
 
 const query = ref('')
 const strongOnly = ref(false)
@@ -111,16 +111,25 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
         <header class="mb-7 flex items-end justify-between gap-4">
           <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-              Montagem de deck
+              {{ t('deck.eyebrow') }}
             </p>
             <h1 class="mt-2 text-[40px] font-bold leading-none tracking-tight text-highlighted">
-              Seu time
+              {{ t('deck.title') }}
             </h1>
           </div>
-          <p class="numeric text-[13px] text-muted">
-            <span class="text-[22px] font-extrabold text-highlighted">{{ deck.filled }}</span>
-            / {{ DECK_SIZE }} slots
-          </p>
+          <i18n-t
+            class="numeric text-[13px] text-muted"
+            keypath="deck.slotsCount"
+            scope="global"
+            tag="p"
+          >
+            <template #filled>
+              <span class="text-[22px] font-extrabold text-highlighted">{{ deck.filled }}</span>
+            </template>
+            <template #total>
+              {{ DECK_SIZE }}
+            </template>
+          </i18n-t>
         </header>
 
         <ul class="deck__slots">
@@ -141,16 +150,25 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
         <section class="deck__coverage">
           <header class="mb-4 flex items-center justify-between gap-3">
-            <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-              Cobertura contra
-              <span class="text-highlighted">{{ view.leader.value.name }} · {{ t(typeKey(view.leader.value.type)) }}</span>
-            </h2>
+            <i18n-t
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted"
+              keypath="deck.coverage.title"
+              scope="global"
+              tag="h2"
+            >
+              <template #leader>
+                <span class="text-highlighted">{{ view.leader.value.name }} · {{ t(typeKey(view.leader.value.type)) }}</span>
+              </template>
+            </i18n-t>
             <p
               v-if="view.coverage.value.incoming.length > 0"
               class="numeric deck__advice"
             >
-              {{ view.coverage.value.incoming.length }}
-              {{ view.coverage.value.incoming.length === 1 ? 'AJUSTE RECOMENDADO' : 'AJUSTES RECOMENDADOS' }}
+              {{ t(
+                'deck.coverage.advice',
+                { count: view.coverage.value.incoming.length },
+                view.coverage.value.incoming.length,
+              ) }}
             </p>
           </header>
 
@@ -158,8 +176,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
             v-if="deck.filled === 0"
             class="text-[13px] leading-relaxed text-muted"
           >
-            Escale uma carta para ler a cobertura do time contra
-            {{ view.leader.value.name }}.
+            {{ t('deck.coverage.empty', { leader: view.leader.value.name }) }}
           </p>
 
           <div
@@ -168,7 +185,9 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           >
             <div>
               <p class="numeric mb-3 text-[11px] text-muted">
-                SEU DANO CONTRA {{ t(typeKey(view.leader.value.type)).toUpperCase() }}
+                {{ t('deck.coverage.outgoing', {
+                  type: t(typeKey(view.leader.value.type)).toUpperCase(),
+                }) }}
               </p>
               <ul class="flex flex-col gap-2">
                 <li
@@ -201,14 +220,13 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
             <div>
               <p class="numeric mb-3 text-[11px] text-muted">
-                DANO QUE VOCÊ RECEBE
+                {{ t('deck.coverage.incoming') }}
               </p>
               <p
                 v-if="view.coverage.value.incoming.length === 0"
                 class="text-[13px] leading-relaxed text-muted"
               >
-                Nenhuma carta do time apanha mais que o normal de
-                {{ t(typeKey(view.leader.value.type)) }}.
+                {{ t('deck.coverage.safe', { type: t(typeKey(view.leader.value.type)) }) }}
               </p>
               <ul
                 v-else
@@ -230,13 +248,12 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
                     {{ view.slots.value.find(slot => slot.entry?.id === risk.id)?.entry?.displayName }}
                   </span>
                   <span class="numeric ml-auto text-[10px] font-extrabold text-[var(--deficit)]">
-                    leva {{ multiplierLabel(risk.multiplier) }}
+                    {{ t('deck.coverage.takes', { multiplier: multiplierLabel(risk.multiplier) }) }}
                   </span>
                 </li>
               </ul>
               <p class="numeric mt-3 text-[11px] leading-relaxed text-muted">
-                Leitura calculada na mesma matriz 18×18 que o motor de batalha usa —
-                a tela não tem regra própria.
+                {{ t('deck.coverage.source') }}
               </p>
             </div>
           </div>
@@ -244,7 +261,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
         <template #fallback>
           <p class="text-sm text-muted">
-            Carregando seu deck…
+            {{ t('deck.loading') }}
           </p>
         </template>
       </ClientOnly>
@@ -254,17 +271,17 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
       <ClientOnly>
         <div class="mb-4 flex items-center justify-between gap-3">
           <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-            Sua coleção
+            {{ t('deck.collection.title') }}
           </p>
           <span class="numeric text-[11px] text-muted">{{ collection.ownedCount }}</span>
         </div>
 
         <label class="deck__search">
-          <span class="sr-only">Filtrar por nome ou tipo</span>
+          <span class="sr-only">{{ t('deck.collection.filterLabel') }}</span>
           <input
             v-model="query"
             type="search"
-            placeholder="Filtrar por nome ou tipo"
+            :placeholder="t('deck.collection.filterLabel')"
           >
         </label>
 
@@ -275,7 +292,9 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
             :aria-pressed="strongOnly"
             @click="strongOnly = true"
           >
-            FORTE VS {{ t(typeKey(view.leader.value.type)).toUpperCase() }}
+            {{ t('deck.collection.strong', {
+              type: t(typeKey(view.leader.value.type)).toUpperCase(),
+            }) }}
           </button>
           <button
             type="button"
@@ -283,7 +302,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
             :aria-pressed="!strongOnly"
             @click="strongOnly = false"
           >
-            TODAS
+            {{ t('deck.collection.all') }}
           </button>
         </div>
 
@@ -292,8 +311,8 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           class="text-[13px] leading-relaxed text-muted"
         >
           {{ collection.ownedCount === 0
-            ? 'Sua coleção está vazia. Abra um pack para começar.'
-            : 'Nenhuma carta combina com esse filtro.' }}
+            ? t('deck.collection.empty')
+            : t('deck.collection.noMatch') }}
         </p>
 
         <ul
@@ -309,7 +328,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               class="deck__pick bevel-tile"
               draggable="true"
               :disabled="firstEmpty < 0"
-              :aria-label="`Escalar ${entry.displayName}`"
+              :aria-label="t('deck.collection.pickLabel', { name: entry.displayName })"
               @click="pick(entry)"
               @dragstart="event => onDragStart(event, entry)"
             >
@@ -336,13 +355,12 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
         </ul>
 
         <p class="numeric mt-4 text-[11px] leading-relaxed text-muted">
-          Clique para escalar, ou arraste para um slot.
-          Cartas já no deck saem da lista.
+          {{ t('deck.collection.hint') }}
         </p>
 
         <template #fallback>
           <p class="text-sm text-muted">
-            Carregando sua coleção…
+            {{ t('deck.collection.loading') }}
           </p>
         </template>
       </ClientOnly>

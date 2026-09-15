@@ -48,5 +48,197 @@
     "dragon": "Dragon",
     "dark": "Dark",
     "fairy": "Fairy"
+  },
+  "hub": {
+    "advantage": "{card} vs {type} {multiplier}",
+    "shiny": "Shiny",
+    "resume": {
+      "eyebrow": "Battle in progress",
+      "title": "Gym {gym} · {leader}",
+      "meta": "turn {turn} · your bench {standing} standing",
+      "giveUp": "GIVE UP",
+      "resume": "RESUME"
+    },
+    "daily": {
+      "ready": "Available now",
+      "done": "Already opened today",
+      "title": "Daily pack",
+      "meta": "{size} cards · {guaranteed} rare or above guaranteed",
+      "open": "OPEN",
+      "toShop": "GO TO SHOP",
+      "free": "free, one a day",
+      "nextIn": "next in {time}"
+    },
+    "next": {
+      "rematch": "Rematch",
+      "challenge": "Next challenge",
+      "gym": "Gym {gym} of {total}",
+      "team": "Leader's team",
+      "fight": "CHALLENGE",
+      "buildDeck": "BUILD THE DECK",
+      "reward": "reward {coins} coins"
+    },
+    "collection": {
+      "eyebrow": "Your collection",
+      "ofDex": "{percent}% of the dex"
+    }
+  },
+  "packs": {
+    "open": "OPEN",
+    "loading": "Loading…",
+    "timer": "The daily pack is gone for today — next in {time}.",
+    "seo": {
+      "title": "Packs — Holo Deck",
+      "description": "Ten cards: six commons, three uncommons and one rare or above. Shiny at 1 in 256, and a guaranteed ultra every ten dry packs."
+    },
+    "shop": {
+      "eyebrow": "Shop",
+      "title": "Packs",
+      "rng": "Every opening comes out of a seeded RNG.",
+      "testable": "The distribution is testable, not promised."
+    },
+    "welcome": {
+      "eyebrow": "Welcome · {number} of {total}",
+      "title": "Starter pack",
+      "note": "{count} free so the deck has a choice.",
+      "openLabel": "Open starter pack"
+    },
+    "daily": {
+      "eyebrow": "Available now",
+      "title": "Daily pack",
+      "note": "Free, one a day. Leaves the shop once opened.",
+      "openLabel": "Open daily pack"
+    },
+    "store": {
+      "eyebrow": "Always in stock",
+      "title": "Holo Pack",
+      "note": "The same rates as the daily. No cap on how many.",
+      "buyLabel": "Buy a Holo Pack for {coins} coins",
+      "price": "{coins} coins",
+      "left": "{coins} left · enough for {packs}",
+      "missing": "{coins} coins short"
+    },
+    "rates": {
+      "title": "Rates",
+      "source": "read from shared/game/packs.ts — the shop has no numbers of its own",
+      "commons": "commons",
+      "uncommons": "uncommons",
+      "rarePlus": "rare+",
+      "slotRolls": "How the rare+ slot rolls",
+      "shinyChip": "SHINY 1/{odds}",
+      "shinyNote": "Rolls on any card, of any tier — {chance} per pack, or one every {packs}."
+    },
+    "pity": {
+      "title": "Pity",
+      "note": "packs without ultra or above",
+      "tier": "ultra or above",
+      "rule": "On the tenth, the rare+ slot turns into {tier} guaranteed, and the count resets. {left} to go."
+    },
+    "foot": {
+      "before": "before",
+      "order": "On opening: the cards are credited {before} the coins are debited. A failure in between gives cards away instead of stealing coins."
+    },
+    "again": {
+      "welcome": "OPEN THE NEXT",
+      "store": "BUY ANOTHER · {coins}"
+    },
+    "opening": {
+      "eyebrow": "Opening sequence",
+      "title": "Open pack",
+      "aside": "{size} cards · {commons} commons, {uncommons} uncommons, {rarePlus} rare+",
+      "pity": "pity: {threshold} packs without ultra guarantees one — {left} to go",
+      "revealed": "{revealed} / {total} revealed",
+      "skip": "SKIP ANIMATION",
+      "toCollection": "VIEW BINDER",
+      "backToShop": "BACK TO SHOP",
+      "pityHit": "Pity fired: {threshold} packs without ultra guaranteed this one."
+    },
+    "card": {
+      "label": "{name}, {rarity}",
+      "shinyLabel": "{name}, {rarity}, shiny",
+      "shinyBadge": "SHINY"
+    }
+  },
+  "collection": {
+    "eyebrow": "Your collection",
+    "title": "Binder",
+    "shiny": "Shiny",
+    "regionProgress": "Progress in {region}",
+    "noMatch": "No card in your collection matches these filters.",
+    "loading": "Loading your collection…",
+    "dust": "Dust",
+    "dustTotal": "banked",
+    "dustNote": "A duplicate turns into dust. Dust buys the card you pick — it is what closes the long tail of the 1025.",
+    "seo": {
+      "title": "Binder — Holo Deck",
+      "description": "Your binder: cards caught by region and by rarity, duplicates turned to dust, and the forge that closes the long tail of the 1025."
+    },
+    "filters": {
+      "owned": "Owned",
+      "duplicates": "Duplicates",
+      "shiny": "Shiny"
+    },
+    "empty": {
+      "text": "No cards yet. The three welcome packs are waiting at {link}.",
+      "link": "open a pack"
+    },
+    "forge": {
+      "title": "Forge",
+      "searchLabel": "Search a species to forge",
+      "searchPlaceholder": "Search a species…",
+      "cost": "costs {dust} dust",
+      "missing": "{dust} DUST SHORT",
+      "action": "FORGE"
+    },
+    "table": {
+      "title": "Table",
+      "tier": "Tier",
+      "forge": "Forge",
+      "ratio": "A 4× ratio all the way up: four duplicates of a tier pay for one chosen card of that tier."
+    },
+    "card": {
+      "number": "number {number}",
+      "copies": "one copy | {count} copies",
+      "shiny": "shiny",
+      "shinyBadge": "SHINY",
+      "scrap": "{count} dup · {dust}",
+      "dustAmount": "{dust} dust",
+      "scrapLabel": "Turn {count} duplicate of {name} into {dust} dust | Turn {count} duplicates of {name} into {dust} dust"
+    }
+  },
+  "deck": {
+    "eyebrow": "Deck building",
+    "title": "Your team",
+    "slotsCount": "{filled} / {total} slots",
+    "loading": "Loading your deck…",
+    "seo": {
+      "title": "Deck"
+    },
+    "coverage": {
+      "title": "Coverage against {leader}",
+      "advice": "{count} FIX RECOMMENDED | {count} FIXES RECOMMENDED",
+      "empty": "Field a card to read the team's coverage against {leader}.",
+      "outgoing": "YOUR DAMAGE AGAINST {type}",
+      "incoming": "DAMAGE YOU TAKE",
+      "safe": "No card on the team takes more than normal from {type}.",
+      "takes": "takes {multiplier}",
+      "source": "Read from the same 18×18 matrix the battle engine uses — the screen has no rule of its own."
+    },
+    "collection": {
+      "title": "Your collection",
+      "filterLabel": "Filter by name or type",
+      "strong": "STRONG VS {type}",
+      "all": "ALL",
+      "empty": "Your collection is empty. Open a pack to start.",
+      "noMatch": "No card matches this filter.",
+      "pickLabel": "Field {name}",
+      "hint": "Click to field, or drag onto a slot. Cards already in the deck leave the list.",
+      "loading": "Loading your collection…"
+    },
+    "slot": {
+      "takes": "TAKES {multiplier}",
+      "hint": "DRAG{break}A CARD",
+      "removeLabel": "Remove {name} from slot {slot}"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { defaultLocale, label, message, messagePattern } from '../support/locales'
 import { openWelcomePack } from './support'
 
 /**
@@ -20,12 +21,17 @@ test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ 
   await openWelcomePack(page)
   await page.goto('/deck')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Seu time' })).toBeVisible()
+  await expect(page.getByRole('heading', {
+    level: 1,
+    name: label('deck.title', defaultLocale()),
+  })).toBeVisible()
 
   // Os seis slots existem antes de qualquer carta, e o contador começa em zero.
   const slots = page.locator('.deck-slot')
   await expect(slots).toHaveCount(6)
-  await expect(page.getByText('/ 6 slots')).toBeVisible()
+  await expect(page.getByText(
+    messagePattern('deck.slotsCount', defaultLocale(), { total: 6 }),
+  )).toBeVisible()
   await expect(page.locator('.deck-slot--empty')).toHaveCount(6)
 
   // A coluna da direita traz o que o pack deu. `expect.poll` porque ela entra
@@ -109,7 +115,9 @@ test('a faixa de alerta divide o pé da carta com os stats, sem cobri-los', asyn
 
   const warningBand = page.locator('.deck-slot__warning').first()
   await expect(warningBand).toBeVisible()
-  await expect(warningBand).toHaveText('LEVA ×2')
+  await expect(warningBand).toHaveText(
+    message('deck.slot.takes', defaultLocale(), { multiplier: '×2' }),
+  )
 
   const stats = page.locator('.deck-slot__foot').first()
   await expect(stats).toHaveText(/HP \d+/)
@@ -131,16 +139,20 @@ test('a leitura de cobertura só aparece com carta, e nomeia o líder', async ({
 
   // O primeiro ginásio é o de Brock, do tipo pedra — enquanto a Liga não existe,
   // todo jogador tem zero insígnias e o próximo ginásio é o primeiro.
-  await expect(page.getByText('Brock · Pedra')).toBeVisible()
+  await expect(page.getByText(`Brock · ${label('type.rock', defaultLocale())}`)).toBeVisible()
 
   // Sem carta não há leitura: um painel de barras zeradas desenharia uma
   // cobertura que ninguém pode mover.
-  await expect(page.getByText(/Escale uma carta para ler a cobertura/)).toBeVisible()
+  await expect(page.getByText(
+    messagePattern('deck.coverage.empty', defaultLocale(), { leader: 'Brock' }),
+  )).toBeVisible()
 
   await expect.poll(() => page.locator('.deck__pick').count()).toBeGreaterThan(5)
   await page.locator('.deck__pick').first().click()
 
-  await expect(page.getByText('SEU DANO CONTRA PEDRA')).toBeVisible()
+  await expect(page.getByText(message('deck.coverage.outgoing', defaultLocale(), {
+    type: label('type.rock', defaultLocale()).toUpperCase(),
+  }))).toBeVisible()
   await expect(page.locator('.deck__line').first()).toBeVisible()
 })
 
@@ -204,5 +216,7 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
   // observador, que acorda um tick tarde demais para o boot.
   await page.goto('/deck')
   await expect(page.locator('.deck-slot--empty')).toHaveCount(6)
-  await expect(page.getByText('/ 6 slots')).toBeVisible()
+  await expect(page.getByText(
+    messagePattern('deck.slotsCount', defaultLocale(), { total: 6 }),
+  )).toBeVisible()
 })
