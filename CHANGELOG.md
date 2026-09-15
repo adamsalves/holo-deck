@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0](https://github.com/adamsalves/holo-deck/compare/v0.8.0...v0.9.0) (2026-09-15)
+
+
+### Features
+
+* a raridade e o tipo do jogo falam os dois idiomas ([9294bce](https://github.com/adamsalves/holo-deck/commit/9294bce2b8b300b160b83751688b2f7b836933f1))
+* a raridade e o tipo do jogo falam os dois idiomas ([d5b3733](https://github.com/adamsalves/holo-deck/commit/d5b3733e6b413ecc28d6e9dc5f5ab0a6e3f1a347))
+* o jogo fala pt-BR e inglês, com os rótulos da barra vindos do locale ([1d350b2](https://github.com/adamsalves/holo-deck/commit/1d350b28db74a3160a38957e238d9629a40a6678))
+* o jogo fala pt-BR e inglês, com os rótulos da barra vindos do locale ([97d25c5](https://github.com/adamsalves/holo-deck/commit/97d25c593a65d45830cd95c102c8fa7e1fbc7e4d))
+
+
+### Bug Fixes
+
+* a barra leva o jogador junto quando ele está em inglês ([242c5d5](https://github.com/adamsalves/holo-deck/commit/242c5d55a27c4619f10cfc5930dbad8291860012))
+* a tabela de forja do binder fala os dois idiomas ([836e48c](https://github.com/adamsalves/holo-deck/commit/836e48c4c29d2495371d319548176451d6b7edc5))
+* o cliente do Postgres e o better-auth passam a nascer na primeira chamada ([cce4250](https://github.com/adamsalves/holo-deck/commit/cce4250ee6d887329f0a20c4749c85f74b1e639e))
+
 ## [0.8.0](https://github.com/adamsalves/holo-deck/compare/v0.7.0...v0.8.0) (2026-09-12)
 
 
