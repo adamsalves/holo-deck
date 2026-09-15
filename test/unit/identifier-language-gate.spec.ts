@@ -41,7 +41,10 @@ const DEX_NAMES = new Set([
 
 /**
  * The platform's own vocabulary. Not English, not ours, not negotiable —
- * these are spelled by the runtime, the DOM or a wire format.
+ * these are spelled by the runtime, the DOM, a wire format or the language
+ * itself: `namespace` is a TypeScript keyword before it is anything else, and it
+ * is also what `@nuxtjs/i18n` calls the prefix of a message key. It is here and
+ * not in `DOMAIN` because this project did not coin it.
  */
 const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'css', 'ctx', 'cwd',

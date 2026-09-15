@@ -82,7 +82,42 @@ function repeated(values: readonly string[]): string[] {
 }
 
 /**
- * Toda chave citada literalmente em `app/`, varrida do disco.
+ * Where a literal key can live.
+ *
+ * It was `app/` alone, which is true today and stops being true the first time a
+ * key is asked for outside it — a `server/` response, an `error.vue`, a
+ * `defineI18nRoute`. A key there would not be seen by the scan, would not enter
+ * `USED_KEYS`, and would be reported as an orphan: the gate would fail naming
+ * the locale instead of the file that reads it, which is the worst way for a
+ * gate to be right.
+ *
+ * `shared/` is deliberately absent — it must not call `t()` at all, and
+ * `test/unit/shared-purity.spec.ts` is what says so. The test below asserts the
+ * other side of this list, so an area that starts calling `t()` fails here
+ * instead of being silently skipped.
+ */
+const KEY_AREAS: readonly string[] = ['app', 'server']
+
+/** The literal-key expression, shared by the scan and by the test that guards its reach. */
+const LITERAL_KEY = /(?<![A-Za-z0-9_])\$?t\(\s*(['"])([\w]+(?:\.[\w]+)+)\1/g
+
+/** Every key spelled out inside `KEY_AREAS`, swept from disk. */
+function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
+  return roots.flatMap((root) => {
+    const files = walkFiles(join(REPO_ROOT, root), skip, hasExtension(['.vue', '.ts']))
+
+    return files.flatMap((relativePath) => {
+      const source = stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))
+
+      return [...source.matchAll(LITERAL_KEY)]
+        .map(match => match[2])
+        .filter((key): key is string => key !== undefined)
+    })
+  })
+}
+
+/**
+ * Toda chave citada literalmente em `KEY_AREAS`, varrida do disco.
  *
  * O comentário é apagado antes da varredura (`stripComments`): chave que só
  * aparece num docblock **não** é uso, e contá-la deixaria uma tradução morta
@@ -93,19 +128,7 @@ function repeated(values: readonly string[]): string[] {
  * — e cai na asserção de órfã como falha ruidosa, que é o lado certo de errar.
  */
 function literalKeys(): string[] {
-  const files = walkFiles(
-    join(REPO_ROOT, 'app'),
-    new Set(['node_modules']),
-    hasExtension(['.vue', '.ts']),
-  )
-
-  return files.flatMap((relativePath) => {
-    const source = stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))
-
-    return [...source.matchAll(/(?<![A-Za-z0-9_])\$?t\(\s*(['"])([\w]+(?:\.[\w]+)+)\1/g)]
-      .map(match => match[2])
-      .filter((key): key is string => key !== undefined)
-  })
+  return keysIn(KEY_AREAS, new Set(['node_modules']))
 }
 
 /**
@@ -186,7 +209,7 @@ describe('as chaves e quem as usa', () => {
    * `VOCABULARY_KEYS` short, the missing ids would never be asked of any locale,
    * and both assertions above would pass over a vocabulary nobody checked.
    */
-  it('deriva uma chave por raridade e uma por tipo', () => {
+  it('derives one key per rarity and one per type', () => {
     expect(VOCABULARY_KEYS.length).toBe(RARITY_NAMES.length + TYPE_NAMES.length)
     expect(new Set(VOCABULARY_KEYS).size).toBe(VOCABULARY_KEYS.length)
   })
@@ -220,6 +243,21 @@ describe('as chaves e quem as usa', () => {
   it('mantém toda chave da barra no namespace `nav`', () => {
     expect(NAV_KEYS.filter(key => !key.startsWith('nav.'))).toEqual([])
   })
+
+  /**
+   * The other side of `KEY_AREAS`.
+   *
+   * An area that starts asking for a key without being on the list gets every
+   * one of its keys reported as an orphan, and the message names the locale
+   * instead of the file that reads it. Walking everything the scan skips — and
+   * asserting nothing out there calls `t()` — is what turns that from a silent
+   * miss into a failure that points at the right place.
+   */
+  it('lets no literal key live outside the scanned areas', () => {
+    const outside = keysIn(['.'], new Set(['node_modules', ...KEY_AREAS]))
+
+    expect([...new Set(outside)].sort(), 'chave literal fora de `KEY_AREAS`').toEqual([])
+  })
 })
 
 /**
@@ -232,12 +270,12 @@ describe('as chaves e quem as usa', () => {
  * creates: the English file is new, and a new file is exactly where an
  * untranslated paste hides.
  */
-describe('o vocabulário do jogo', () => {
+describe('the game vocabulary', () => {
   /**
    * Two rungs reading *Raro* are one rung on screen, and the filter chips of the
    * binder would select different things behind the same word.
    */
-  it('não repete rótulo dentro de um idioma', () => {
+  it('repeats no label inside one language', () => {
     for (const [name] of LOCALES) {
       for (const namespace of ['rarity', 'type']) {
         const labels = VOCABULARY
@@ -255,7 +293,7 @@ describe('o vocabulário do jogo', () => {
    * identifier copied into the value. Only the default locale can be asked —
    * in English the label **is** the identifier, capitalized.
    */
-  it('não deixa o identificador vazar como rótulo no idioma padrão', () => {
+  it('lets no identifier leak through as a label in the default locale', () => {
     const code = defaultLocale()
     const leaked = VOCABULARY
       .filter(([id, key]) => label(key, code).toLowerCase() === id)
@@ -269,7 +307,7 @@ describe('o vocabulário do jogo', () => {
    * And the inverse, which is what a second locale makes possible: a file copied
    * instead of translated has every label identical to the default one.
    */
-  it('traduz de verdade fora do idioma padrão', () => {
+  it('really translates outside the default locale', () => {
     const code = defaultLocale()
 
     for (const [name] of LOCALES.filter(([locale]) => locale !== code)) {

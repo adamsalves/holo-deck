@@ -84,15 +84,36 @@ export function leafEntries(value: unknown, prefix = ''): [string, unknown][] {
  * barra sumiu quando o que faltou foi tradução.
  */
 export function label(key: string, code: string): string {
-  const found = leafEntries(readLocale(code)).find(([leaf]) => leaf === key)
-  if (found === undefined) throw new Error(`sem chave \`${key}\` no locale ${code}`)
+  const leaves = leavesOf(code)
 
-  const [, value] = found
+  if (!leaves.has(key)) throw new Error(`sem chave \`${key}\` no locale ${code}`)
+
+  const value = leaves.get(key)
   if (typeof value !== 'string') {
     throw new Error(`a chave \`${key}\` do locale ${code} não é texto: ${typeof value}`)
   }
 
   return value
+}
+
+/**
+ * The leaves of one locale, parsed once per run.
+ *
+ * `label()` is called once per key, and the e2e asks for 24 of them in each
+ * language — without this, that is 48 reads and 48 parses of the same two files.
+ * It caches the **parse**, never the question: every call still looks the key up
+ * in what the file actually says, and a key that is missing still throws.
+ */
+const LEAVES = new Map<string, Map<string, unknown>>()
+
+function leavesOf(code: string): Map<string, unknown> {
+  const cached = LEAVES.get(code)
+  if (cached !== undefined) return cached
+
+  const leaves = new Map(leafEntries(readLocale(code)))
+  LEAVES.set(code, leaves)
+
+  return leaves
 }
 
 /**

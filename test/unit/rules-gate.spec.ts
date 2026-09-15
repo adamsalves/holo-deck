@@ -201,13 +201,13 @@ const SMALLEST_SCANNED = 10
  * busca por substring reprovaria a página por causa do tamanho do dex. Com
  * borda, só `10` sozinho é `10`.
  *
- * **A borda é de palavra, não de dígito, e a diferença custou um verde falso.**
- * Enquanto ela excluía apenas `[\d.,]`, um número dentro de um **identificador**
- * passava por literal: `useI18n` contém `18`, e a linha `const { t } =
- * useI18n()` — acrescentada a esta página no PR do vocabulário da Fase 8 — foi
- * acusada de escrever `TYPE_COUNT` à mão. O portão estava certo sobre o que
- * procura e errado sobre onde um número pode estar escondido; `\w` fecha os dois
- * lados de uma vez, porque ele já contém `\d`.
+ * **The border is a word border, not a digit border, and the difference cost a
+ * false green.** While it excluded only `[\d.,]`, a number inside an
+ * **identifier** passed for a literal: `useI18n` contains `18`, and the line
+ * `const { t } = useI18n()` — added to this page by the Phase 8 vocabulary PR —
+ * got the page accused of writing `TYPE_COUNT` by hand. The gate was right about
+ * what it looks for and wrong about where a number can hide; `\w` closes both
+ * sides at once, because it already contains `\d`.
  */
 function writtenLiteral(value: number): RegExp {
   return new RegExp(`(?<![\\w.,])${value}(?![\\w.,])`)
@@ -217,6 +217,25 @@ describe('portão de `/rules`', () => {
   it('a página existe e tem conteúdo para varrer', () => {
     expect(scanned.length).toBeGreaterThan(2000)
     expect(scanned).toContain('<template>')
+  })
+
+  /**
+   * The border of `writtenLiteral`, measured on both sides.
+   *
+   * Two lines of regex that had no test until the green they broke. The
+   * paragraph above it now explains why the border is a word border; this is
+   * what **executes** that claim, in the shape `shared-purity.spec.ts` uses for
+   * `stripComments`: the defect reintroduced, and a good input next to it, so
+   * that a border which rejected everything could not pass for healthy either.
+   */
+  it('reads a number inside an identifier as part of the name, not as a literal', () => {
+    expect(writtenLiteral(18).test('const { t } = useI18n()')).toBe(false)
+    expect(writtenLiteral(18).test('são 18 tipos')).toBe(true)
+
+    // The case the digit border already covered, and that the word border must
+    // not lose on the way: `1025` contains `10`.
+    expect(writtenLiteral(10).test('as 1025 espécies')).toBe(false)
+    expect(writtenLiteral(10).test('10 packs por dia')).toBe(true)
   })
 
   /**
