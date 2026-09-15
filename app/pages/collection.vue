@@ -393,7 +393,11 @@ useSeoMeta({
               scope="row"
               style="color: var(--rarity-label)"
             >
-              {{ tier === 'legendary' ? 'Lend. / mít.' : t(rarityKey(tier)) }}
+              <!-- Lendário e mítico dividem uma linha na forja e a coluna não
+                   comporta os dois nomes por extenso, então a abreviação é chave
+                   própria em vez de composição: `Lend. / mít.` não é
+                   `Lendário` cortado, e `Leg. / myth.` não corta no mesmo lugar. -->
+              {{ tier === 'legendary' ? t('rarity.legendaryMythicShort') : t(rarityKey(tier)) }}
             </th>
             <td class="numeric">
               {{ gameNumber(dustFor(tier)) }}

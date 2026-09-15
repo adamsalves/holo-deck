@@ -26,7 +26,8 @@
     "rare": "Rare",
     "ultra": "Ultra",
     "legendary": "Legendary",
-    "mythic": "Mythic"
+    "mythic": "Mythic",
+    "legendaryMythicShort": "Leg. / myth."
   },
   "type": {
     "normal": "Normal",
