@@ -200,9 +200,17 @@ const SMALLEST_SCANNED = 10
  * As bordas cobrem o caso que mais assusta na leitura: `1025` contém `10`, e uma
  * busca por substring reprovaria a página por causa do tamanho do dex. Com
  * borda, só `10` sozinho é `10`.
+ *
+ * **A borda é de palavra, não de dígito, e a diferença custou um verde falso.**
+ * Enquanto ela excluía apenas `[\d.,]`, um número dentro de um **identificador**
+ * passava por literal: `useI18n` contém `18`, e a linha `const { t } =
+ * useI18n()` — acrescentada a esta página no PR do vocabulário da Fase 8 — foi
+ * acusada de escrever `TYPE_COUNT` à mão. O portão estava certo sobre o que
+ * procura e errado sobre onde um número pode estar escondido; `\w` fecha os dois
+ * lados de uma vez, porque ele já contém `\d`.
  */
 function writtenLiteral(value: number): RegExp {
-  return new RegExp(`(?<![\\d.,])${value}(?![\\d.,])`)
+  return new RegExp(`(?<![\\w.,])${value}(?![\\w.,])`)
 }
 
 describe('portão de `/rules`', () => {
