@@ -140,3 +140,90 @@ export function localeUrl(path: string, code: string): string {
 
   return path === '/' ? `/${code}` : `/${code}${path}`
 }
+
+/**
+ * One translated message with its placeholders filled — the string the screen
+ * actually renders.
+ *
+ * `label()` returns the message as the translator wrote it, `{count} cópias` and
+ * all, and a test that asserted against that would be asserting against a
+ * template nobody ever sees. This fills the same placeholders vue-i18n fills, so
+ * a suite can ask for a sentence in either language without a copy of it living
+ * in the test file.
+ *
+ * **A placeholder with no value throws.** Returning it unfilled would let an
+ * assertion pass by matching a literal `{count}` on a screen that renders a
+ * number — the failure would then be invisible, which is the one thing a
+ * measurement may not be.
+ *
+ * `plural` picks the branch of a `one | other` message, by the same rule
+ * vue-i18n uses: exactly 1 takes the first form. Asking for a plural message
+ * without it throws rather than returning both halves joined by a pipe.
+ */
+export function message(
+  key: string,
+  code: string,
+  values: Readonly<Record<string, string | number>> = {},
+  plural?: number,
+): string {
+  const raw = label(key, code)
+  const forms = raw.split('|').map(form => form.trim())
+  const chosen = forms.length === 1
+    ? raw
+    : pluralForm(key, code, forms, plural)
+
+  return chosen.replaceAll(/\{(\w+)\}/g, (_, name: string) => {
+    const value = values[name]
+    if (value === undefined) {
+      throw new Error(`sem valor para \`{${name}}\` em \`${key}\` (${code})`)
+    }
+
+    return String(value)
+  })
+}
+
+function pluralForm(key: string, code: string, forms: string[], plural?: number): string {
+  if (plural === undefined) {
+    throw new Error(`\`${key}\` (${code}) tem plural: passe a contagem`)
+  }
+
+  const chosen = plural === 1 ? forms[0] : forms[forms.length - 1]
+  if (chosen === undefined) throw new Error(`\`${key}\` (${code}) ficou sem forma plural`)
+
+  return chosen
+}
+
+/**
+ * The same message as a pattern, with the placeholders left out standing for
+ * anything.
+ *
+ * It exists for the assertions that can only know part of what is on screen: the
+ * opener counts `{revealed}` up from zero while the cards flip, so the suite
+ * waits for *… / 10 reveladas* and cannot name the first number without racing
+ * the animation. Everything around the gap is escaped, so the pattern still
+ * fails when the sentence around it changes — which is the whole point of
+ * reading it from the locale instead of typing it here.
+ */
+export function messagePattern(
+  key: string,
+  code: string,
+  values: Readonly<Record<string, string | number>> = {},
+  plural?: number,
+): RegExp {
+  const raw = label(key, code)
+  const forms = raw.split('|').map(form => form.trim())
+  const chosen = forms.length === 1 ? raw : pluralForm(key, code, forms, plural)
+
+  const pattern = chosen
+    .split(/(\{\w+\})/)
+    .map((part) => {
+      const name = /^\{(\w+)\}$/.exec(part)?.[1]
+      if (name === undefined) return part.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+      const value = values[name]
+      return value === undefined ? '.+' : String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    })
+    .join('')
+
+  return new RegExp(pattern)
+}
