@@ -25,7 +25,7 @@ const props = defineProps<{
  * `SpD` (defesa especial) e `SPD` (velocidade) diferiam só por caixa, em linhas
  * vizinhas — e para um leitor de tela elas são a mesma sequência de letras.
  * `VEL` desfaz a colisão à vista, e o nome por extenso resolve as seis de uma
- * vez: num projeto que trocou `{{ rarity }}` cru por `RARITY_LABELS` para não
+ * vez: num projeto que trocou `{{ rarity }}` cru por rótulo traduzido para não
  * ler enum em inglês no meio de uma frase em português, seis siglas mudas
  * destoam.
  */

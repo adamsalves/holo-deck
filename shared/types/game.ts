@@ -63,8 +63,9 @@ export function isRarity(value: string): value is Rarity {
  * the id and the **address** of the text: a key is not screen text, and the
  * `shared/` boundary is intact as long as the consumer is the one calling `t()`.
  *
- * Built by a function instead of spelled out at each of the fourteen call sites
- * so the namespace has one owner. `test/unit/i18n-gate.spec.ts` derives the keys
+ * Built by a function instead of spelled out at each of the twenty-four call
+ * sites so the namespace has one owner. Counted, not estimated — the first
+ * version of this line said fourteen. `test/unit/i18n-gate.spec.ts` derives the keys
  * it expects by mapping `RARITY_NAMES` through this very function, which is what
  * makes a new rung without a translation fail loudly.
  *
@@ -134,14 +135,18 @@ export function generationLabel(generation: number): string {
 }
 
 /**
- * Os 9 habitats em português. Mesma razão que `TYPE_LABELS`, e o mesmo caso: o
+ * Os 9 habitats em português. Mesma razão que `typeKey`, e o mesmo caso: o
  * painel *Sobre* põe o habitat em `--accent`, o que faz dele o valor mais
  * destacado de um documento `lang="pt-BR"` — `ROUGH TERRAIN` ali é exatamente o
  * `FLYING` que o canvas trocou por `VOADOR`.
  *
  * `rare` não é "raro" no sentido da escada de raridade: na PokeAPI é o habitat
  * dos que não moram em lugar nenhum comum, e "incomum" mediria a mesma coisa que
- * `RARITY_LABELS.uncommon`. "Ermo" nomeia o lugar, que é o que a coluna diz.
+ * `rarity.uncommon`. "Ermo" nomeia o lugar, que é o que a coluna diz.
+ *
+ * **Ainda é `Record` e ainda é só português.** Habitat é um dos produtores de
+ * texto que a issue #38 lista e que este PR não leva; ele sai daqui no PR do
+ * Detalhe, junto de `generationLabel` e das condições de evolução.
  */
 export const HABITAT_LABELS: Record<Habitat, string> = {
   'cave': 'Caverna',
@@ -164,7 +169,7 @@ export const HABITAT_LABELS: Record<Habitat, string> = {
  * São dois papéis e dois tamanhos, e derivar um do outro daria `PAR` truncado ou
  * `paralisia` estourando a etiqueta.
  *
- * Mora aqui e não em `status.ts` pelo mesmo motivo de `TYPE_LABELS`: `dex.ts`
+ * Mora aqui e não em `status.ts` pelo mesmo motivo de `typeKey`: `dex.ts`
  * guarda o que vem da PokeAPI e `status.ts` guarda a regra; o texto que o
  * jogador lê é coisa que este módulo inventa.
  */

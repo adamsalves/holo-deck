@@ -12,7 +12,7 @@ const { t } = useI18n()
  * mesmo mecanismo que o brilho atrás da arte e o preenchimento de barra vão usar,
  * e a razão de nenhum deles precisar de 18 regras próprias.
  *
- * O texto sai de `TYPE_LABELS` e não do próprio `type` pelo mesmo motivo que o da
+ * O texto sai de `t(typeKey(type))` e não do próprio `type` pelo mesmo motivo que o da
  * raridade: o identificador é em inglês, o documento é `lang="pt-BR"`, e é a
  * etiqueta que o jogador lê.
  */
