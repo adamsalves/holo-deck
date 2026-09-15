@@ -21,13 +21,15 @@ import {
 import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
-import { RARITY_LABELS, rarityRank } from '~~/shared/types/game'
+import { rarityKey, rarityRank } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from '~/composables/useDex'
 import { useGameClock } from '~/composables/useGameClock'
 import { useReduceMotion } from '~/composables/useMotion'
 import { useInvite } from '~/composables/useInvite'
+
+const { t } = useI18n()
 
 /**
  * A loja e a abertura — as pranchas *Loja* e *Abertura de pack*, nessa ordem.
@@ -242,7 +244,7 @@ const again = computed(() => {
 const rarePlusOdds = computed(() =>
   RARE_PLUS_TIERS.map(tier => ({
     tier,
-    label: RARITY_LABELS[tier],
+    label: t(rarityKey(tier)),
     share: RARE_PLUS_WEIGHTS[tier],
   })))
 

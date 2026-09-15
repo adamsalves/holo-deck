@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TYPE_NAMES } from '~~/shared/types/dex'
-import { FOIL_FROM_RARITY, hasFoil, isRarity, RARITY_COUNT, RARITY_LABELS, RARITY_NAMES, rarityRank, TYPE_LABELS } from '~~/shared/types/game'
+import { FOIL_FROM_RARITY, hasFoil, isRarity, RARITY_COUNT, RARITY_NAMES, rarityRank } from '~~/shared/types/game'
 
 describe('escada de raridade', () => {
   it('tem os seis níveis, do mais comum ao mais raro', () => {
@@ -48,29 +47,15 @@ describe('foil', () => {
 })
 
 /**
- * O texto que o jogador lê.
+ * The labels themselves moved to `test/unit/i18n-gate.spec.ts` in Phase 8.
  *
- * `Record` completo já faz o compilador cobrar a cobertura — um nível novo não
- * compila sem rótulo. O que ele **não** cobra é o conteúdo: um rótulo vazio, ou
- * o identificador em inglês copiado para o valor, passa limpo pelo tipo. Foi
- * assim que a carta saiu escrevendo COMMON num documento `lang="pt-BR"`.
+ * They were asserted here while `RARITY_LABELS` and `TYPE_LABELS` were complete
+ * `Record`s in `shared/`: the compiler charged for coverage and this file
+ * charged for content — no empty label, no English id copied into the value,
+ * which is how the card once shipped COMMON inside a `lang="pt-BR"` document.
+ *
+ * The vocabulary is JSON now, one file per locale, and `shared/` keeps only the
+ * ids. Asserting it from here would mean reading a locale to check an export
+ * that no longer exists; the gate that already reads every locale is the one
+ * place where the same questions can be asked of **both** languages at once.
  */
-describe('rótulos em português', () => {
-  it('dá um rótulo não vazio a cada raridade e a cada tipo', () => {
-    expect(RARITY_NAMES.filter(r => RARITY_LABELS[r].trim() === ''), 'raridades sem rótulo').toEqual([])
-    expect(TYPE_NAMES.filter(t => TYPE_LABELS[t].trim() === ''), 'tipos sem rótulo').toEqual([])
-  })
-
-  it('não deixa o identificador em inglês vazar como rótulo', () => {
-    // `ultra` é o único que é a mesma palavra nos dois idiomas.
-    const same = RARITY_NAMES.filter(r => RARITY_LABELS[r].toLowerCase() === r && r !== 'ultra')
-    expect(same, 'raridade com o identificador no lugar do rótulo').toEqual([])
-
-    expect(TYPE_NAMES.filter(t => TYPE_LABELS[t].toLowerCase() === t && t !== 'normal'), 'tipo com o identificador no lugar do rótulo').toEqual([])
-  })
-
-  it('não repete rótulo — dois nomes iguais são um nome só na tela', () => {
-    expect(new Set(RARITY_NAMES.map(r => RARITY_LABELS[r])).size).toBe(RARITY_COUNT)
-    expect(new Set(TYPE_NAMES.map(t => TYPE_LABELS[t])).size).toBe(TYPE_NAMES.length)
-  })
-})

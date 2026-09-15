@@ -2,7 +2,9 @@
 import type { SpeciesEntry } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { rarityOf } from '~~/shared/game/rarity'
-import { RARITY_LABELS, TYPE_LABELS } from '~~/shared/types/game'
+import { rarityKey, typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * Uma espécie no grid da Pokédex — a carta do sistema, com o rodapé que esta
@@ -34,7 +36,7 @@ const props = withDefaults(defineProps<{
 
 const rarity = computed(() => rarityOf(props.species))
 
-const typeLabels = computed(() => props.species.types.map(type => TYPE_LABELS[type]))
+const typeLabels = computed(() => props.species.types.map(type => t(typeKey(type))))
 
 /**
  * A frase que o leitor de tela ouve. O link cobre a carta e não tem texto dentro,
@@ -45,7 +47,7 @@ const label = computed(() => [
   props.species.displayName,
   `número ${props.species.id}`,
   typeLabels.value.join(' e '),
-  RARITY_LABELS[rarity.value],
+  t(rarityKey(rarity.value)),
   ...(props.owned === false ? ['não capturado'] : []),
   ...(props.shiny ? ['shiny'] : []),
 ].join(', '))

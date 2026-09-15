@@ -56,24 +56,25 @@ export function isRarity(value: string): value is Rarity {
 }
 
 /**
- * O texto que o jogador lê, e a razão de ele não ser o próprio identificador.
+ * The locale key of a rarity label — `rarity.common`, never `Comum`.
  *
- * O documento é `lang="pt-BR"` e os identificadores do repositório são em inglês
- * — as duas coisas são decisões firmes e incompatíveis num `{{ rarity }}` cru,
- * que põe COMMON na carta e faz o leitor de tela ler o enum em inglês no meio de
- * uma frase em português.
+ * The label itself left `shared/` in Phase 8. The game speaks two languages and
+ * a `Record<Rarity, string>` can only hold one of them, so what stays here is
+ * the id and the **address** of the text: a key is not screen text, and the
+ * `shared/` boundary is intact as long as the consumer is the one calling `t()`.
  *
- * São `Record` completo, e não `Partial`, de propósito: um nível novo na escada
- * não compila até ganhar rótulo. É a mesma amarração que o portão de tema faz
- * entre `TYPE_NAMES` e as cores, só que aqui o compilador dá conta sozinho.
+ * Built by a function instead of spelled out at each of the fourteen call sites
+ * so the namespace has one owner. `test/unit/i18n-gate.spec.ts` derives the keys
+ * it expects by mapping `RARITY_NAMES` through this very function, which is what
+ * makes a new rung without a translation fail loudly.
+ *
+ * **This trades a compiler guarantee for a gate, and the trade is deliberate.**
+ * The complete `Record` meant a new rung did not compile until it had a label;
+ * JSON has no types, so a missing key would otherwise reach the screen as the
+ * literal `rarity.mythic`. The gate is what carries that weight now.
  */
-export const RARITY_LABELS: Record<Rarity, string> = {
-  common: 'Comum',
-  uncommon: 'Incomum',
-  rare: 'Raro',
-  ultra: 'Ultra',
-  legendary: 'Lendário',
-  mythic: 'Mítico',
+export function rarityKey(rarity: Rarity): string {
+  return `rarity.${rarity}`
 }
 
 /**
@@ -133,11 +134,6 @@ export function generationLabel(generation: number): string {
 }
 
 /**
- * Os 18 tipos em português. Mesma razão que `RARITY_LABELS`, e mora aqui e não
- * em `dex.ts` porque a PokeAPI não entrega isto: `dex.ts` é o contrato do que
- * vem de fora, e o nome que o jogador lê é coisa que este jogo inventa.
- */
-/**
  * Os 9 habitats em português. Mesma razão que `TYPE_LABELS`, e o mesmo caso: o
  * painel *Sobre* põe o habitat em `--accent`, o que faz dele o valor mais
  * destacado de um documento `lang="pt-BR"` — `ROUGH TERRAIN` ali é exatamente o
@@ -179,25 +175,21 @@ export const AILMENT_LABELS: Record<AilmentName, string> = {
   sleep: 'sono',
 }
 
-export const TYPE_LABELS: Record<TypeName, string> = {
-  normal: 'Normal',
-  fighting: 'Lutador',
-  flying: 'Voador',
-  poison: 'Venenoso',
-  ground: 'Terrestre',
-  rock: 'Pedra',
-  bug: 'Inseto',
-  ghost: 'Fantasma',
-  steel: 'Aço',
-  fire: 'Fogo',
-  water: 'Água',
-  grass: 'Planta',
-  electric: 'Elétrico',
-  psychic: 'Psíquico',
-  ice: 'Gelo',
-  dragon: 'Dragão',
-  dark: 'Sombrio',
-  fairy: 'Fada',
+/**
+ * The locale key of a type label — `type.electric`, never `Elétrico`.
+ *
+ * Same move as `rarityKey`, and it still lives here rather than in `dex.ts` for
+ * the reason the old label had: `dex.ts` is the contract for what the PokeAPI
+ * sends, and the name the player reads is something this game invents. What
+ * changed is that the game now invents it twice, one per locale.
+ *
+ * `TypeName` and not `string`: an unknown type from the API would build a key
+ * nothing translates, and the screen would read `type.stellar`. Callers holding
+ * a raw slug — `shared/game/evolution.ts` is the one — resolve it through
+ * `isTypeName` first and keep their own fallback.
+ */
+export function typeKey(type: TypeName): string {
+  return `type.${type}`
 }
 
 /**

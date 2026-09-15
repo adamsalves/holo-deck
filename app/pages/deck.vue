@@ -3,11 +3,13 @@ import { computed, ref } from 'vue'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { multiplierLabel } from '~~/shared/game/typechart'
 import type { SearchEntry } from '~~/shared/types/dex'
-import { TYPE_LABELS } from '~~/shared/types/game'
+import { typeKey } from '~~/shared/types/game'
 import { isSpeciesId } from '~~/shared/types/brand'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useDeck } from '~/composables/useDeck'
+
+const { t } = useI18n()
 
 /**
  * O deck builder — a prancha *Deck*.
@@ -63,7 +65,7 @@ const visible = computed(() => {
     if (term.length === 0) return true
 
     return entry.displayName.toLowerCase().includes(term)
-      || entry.types.some(type => TYPE_LABELS[type].toLowerCase().includes(term))
+      || entry.types.some(type => t(typeKey(type)).toLowerCase().includes(term))
   })
 })
 
@@ -141,7 +143,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           <header class="mb-4 flex items-center justify-between gap-3">
             <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
               Cobertura contra
-              <span class="text-highlighted">{{ view.leader.value.name }} · {{ TYPE_LABELS[view.leader.value.type] }}</span>
+              <span class="text-highlighted">{{ view.leader.value.name }} · {{ t(typeKey(view.leader.value.type)) }}</span>
             </h2>
             <p
               v-if="view.coverage.value.incoming.length > 0"
@@ -166,7 +168,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           >
             <div>
               <p class="numeric mb-3 text-[11px] text-muted">
-                SEU DANO CONTRA {{ TYPE_LABELS[view.leader.value.type].toUpperCase() }}
+                SEU DANO CONTRA {{ t(typeKey(view.leader.value.type)).toUpperCase() }}
               </p>
               <ul class="flex flex-col gap-2">
                 <li
@@ -182,7 +184,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
                   <span
                     class="numeric text-[11px]"
                     :data-level="line.multiplier > 1 ? 'good' : line.multiplier < 1 ? 'bad' : 'flat'"
-                  >{{ TYPE_LABELS[line.type] }}</span>
+                  >{{ t(typeKey(line.type)) }}</span>
                   <span
                     class="deck__bar"
                     :data-level="line.multiplier > 1 ? 'good' : line.multiplier < 1 ? 'bad' : 'flat'"
@@ -206,7 +208,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
                 class="text-[13px] leading-relaxed text-muted"
               >
                 Nenhuma carta do time apanha mais que o normal de
-                {{ TYPE_LABELS[view.leader.value.type] }}.
+                {{ t(typeKey(view.leader.value.type)) }}.
               </p>
               <ul
                 v-else
@@ -273,7 +275,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
             :aria-pressed="strongOnly"
             @click="strongOnly = true"
           >
-            FORTE VS {{ TYPE_LABELS[view.leader.value.type].toUpperCase() }}
+            FORTE VS {{ t(typeKey(view.leader.value.type)).toUpperCase() }}
           </button>
           <button
             type="button"

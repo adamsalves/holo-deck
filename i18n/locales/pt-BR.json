@@ -19,5 +19,33 @@
   },
   "a11y": {
     "skipToContent": "Pular para o conteúdo"
+  },
+  "rarity": {
+    "common": "Comum",
+    "uncommon": "Incomum",
+    "rare": "Raro",
+    "ultra": "Ultra",
+    "legendary": "Lendário",
+    "mythic": "Mítico"
+  },
+  "type": {
+    "normal": "Normal",
+    "fighting": "Lutador",
+    "flying": "Voador",
+    "poison": "Venenoso",
+    "ground": "Terrestre",
+    "rock": "Pedra",
+    "bug": "Inseto",
+    "ghost": "Fantasma",
+    "steel": "Aço",
+    "fire": "Fogo",
+    "water": "Água",
+    "grass": "Planta",
+    "electric": "Elétrico",
+    "psychic": "Psíquico",
+    "ice": "Gelo",
+    "dragon": "Dragão",
+    "dark": "Sombrio",
+    "fairy": "Fada"
   }
 }

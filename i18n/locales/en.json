@@ -19,5 +19,33 @@
   },
   "a11y": {
     "skipToContent": "Skip to content"
+  },
+  "rarity": {
+    "common": "Common",
+    "uncommon": "Uncommon",
+    "rare": "Rare",
+    "ultra": "Ultra",
+    "legendary": "Legendary",
+    "mythic": "Mythic"
+  },
+  "type": {
+    "normal": "Normal",
+    "fighting": "Fighting",
+    "flying": "Flying",
+    "poison": "Poison",
+    "ground": "Ground",
+    "rock": "Rock",
+    "bug": "Bug",
+    "ghost": "Ghost",
+    "steel": "Steel",
+    "fire": "Fire",
+    "water": "Water",
+    "grass": "Grass",
+    "electric": "Electric",
+    "psychic": "Psychic",
+    "ice": "Ice",
+    "dragon": "Dragon",
+    "dark": "Dark",
+    "fairy": "Fairy"
   }
 }

@@ -7,7 +7,9 @@ import { AA_LARGE, AA_NORMAL, contrastRatio } from '~~/shared/color/contrast'
 import { inkLadder, resolveToken } from '~~/shared/color/tokens'
 import { TYPE_NAMES } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { RARITY_LABELS } from '~~/shared/types/game'
+import { rarityKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * O espelho do sistema — a prancha *Tokens* do canvas, em código.
@@ -200,7 +202,7 @@ const tiltSummary = computed(() => {
         As seis raridades
       </h2>
       <p class="text-sm text-muted">
-        O foil começa em <strong class="text-default">{{ RARITY_LABELS.rare.toLowerCase() }}</strong>.
+        O foil começa em <strong class="text-default">{{ t(rarityKey('rare')).toLowerCase() }}</strong>.
         As duas primeiras cartas não têm camada de brilho nenhuma. Passe o ponteiro sobre a fileira de baixo.
       </p>
 

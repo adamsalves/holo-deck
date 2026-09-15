@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TypeName } from '~~/shared/types/dex'
-import { TYPE_LABELS } from '~~/shared/types/game'
+import { typeKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * A etiqueta de tipo — o primeiro consumidor da variável de escopo.
@@ -21,7 +23,7 @@ defineProps<{ type: TypeName }>()
   <span
     :data-type="type"
     class="type-badge"
-  >{{ TYPE_LABELS[type] }}</span>
+  >{{ t(typeKey(type)) }}</span>
 </template>
 
 <style scoped>

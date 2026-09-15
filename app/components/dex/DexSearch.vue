@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { TYPE_LABELS } from '~~/shared/types/game'
+import { typeKey } from '~~/shared/types/game'
 import { dexNumber } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
+
+const { t } = useI18n()
 
 /**
  * A busca global — `Cmd/Ctrl+K` em qualquer tela da Pokédex.
@@ -53,7 +55,7 @@ const groups = computed(() => [{
   label: 'Espécies',
   items: (index.value ?? []).map(entry => ({
     label: entry.displayName,
-    suffix: `${dexNumber(entry.id)} · ${entry.types.map(type => TYPE_LABELS[type]).join(' · ')}`,
+    suffix: `${dexNumber(entry.id)} · ${entry.types.map(type => t(typeKey(type))).join(' · ')}`,
     to: `/pokemon/${entry.slug}`,
     avatar: { src: `/sprites/${entry.id}.webp`, loading: 'lazy' as const },
   })),

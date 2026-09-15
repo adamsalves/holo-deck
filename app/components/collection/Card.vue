@@ -4,7 +4,9 @@ import { dustFor } from '~~/shared/game/dust'
 import { gameNumber } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
-import { RARITY_LABELS } from '~~/shared/types/game'
+import { rarityKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * Uma carta do binder — a mesma carta do sistema, com o rodapé que a coleção
@@ -52,7 +54,7 @@ const isShiny = computed(() => props.shinies > 0)
 const label = computed(() => [
   props.entry.displayName,
   `número ${props.entry.id}`,
-  RARITY_LABELS[rarity.value],
+  t(rarityKey(rarity.value)),
   props.copies === 1 ? 'uma cópia' : `${props.copies} cópias`,
   ...(isShiny.value ? ['shiny'] : []),
 ].join(', '))
@@ -99,7 +101,7 @@ const label = computed(() => [
           class="numeric binder-card__foot binder-card__rarity"
           :data-rarity="rarity"
         >
-          {{ isShiny ? 'SHINY' : RARITY_LABELS[rarity].toUpperCase() }}
+          {{ isShiny ? 'SHINY' : t(rarityKey(rarity)).toUpperCase() }}
         </p>
       </template>
     </DexPokeCard>
