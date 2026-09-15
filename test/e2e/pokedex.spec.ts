@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test'
+import { TYPE_NAMES } from '../../shared/types/dex.ts'
+import { typeKey } from '../../shared/types/game.ts'
+import { label, localeCodes, localeUrl } from '../support/locales.ts'
 
 /**
  * O que só o navegador prova.
@@ -112,6 +115,47 @@ test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre ele
   // A chip Todos limpa os dois grupos.
   await counter.click()
   await expect(counter).toHaveText(/151$/)
+})
+
+/**
+ * The 18 types, read off the screen instead of off the disk.
+ *
+ * The pair of the rarity test in `test/e2e/shop.spec.ts`, and the half that was
+ * missing: `test/unit/i18n-gate.spec.ts` folds every vocabulary key into
+ * `USED_KEYS` unconditionally — it has to, because `t(typeKey(x))` is not a
+ * literal any scan can see — so a screen that renders `typeKey(type)` instead of
+ * `t(typeKey(type))` keeps the whole gate green while `type.electric` sits on
+ * the card. Only the browser can tell the difference, and only in both languages.
+ *
+ * `/pokedex/1` and not the species page because the filter row iterates
+ * `TYPE_NAMES` itself (`app/components/dex/DexFilters.vue`), so this walks the
+ * same list the component renders — all 18 on one server-rendered page, instead
+ * of the one or two a species happens to carry.
+ *
+ * Scoped to `.filters` and asserted with `toHaveText`, not `toContainText` on the
+ * page: the grid below renders the same badges, and `Fire` is a substring of
+ * `Firefox` the same way `comum` is one of `incomum`.
+ */
+test('the type vocabulary reaches the screen in the language of the URL', async ({ page }) => {
+  const codes = localeCodes()
+
+  // The other side of the loop: with one locale it would prove nothing, and with
+  // none it would not run at all.
+  expect(codes.length).toBeGreaterThan(1)
+
+  for (const code of codes) {
+    await page.goto(localeUrl('/pokedex/1', code))
+
+    const filters = page.locator('.filters')
+    await expect(filters).toBeVisible()
+
+    for (const type of TYPE_NAMES) {
+      await expect(
+        filters.locator(`.type-badge[data-type="${type}"]`),
+        `${type} em ${code}`,
+      ).toHaveText(label(typeKey(type), code))
+    }
+  }
 })
 
 test('a busca abre por atalho, filtra e navega', async ({ page }) => {

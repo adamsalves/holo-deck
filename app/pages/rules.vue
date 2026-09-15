@@ -295,7 +295,13 @@ useSeoMeta({
 
     <div class="rules__row rules__row--thirds">
       <!-- RARIDADE -->
-      <section class="rules__panel">
+      <!-- `data-panel` is the e2e's hook: the forge table below carries the same
+           `data-rarity` and `.rules__key--rarity`, so without it a locator for a
+           tier matches two lines with different text. -->
+      <section
+        class="rules__panel"
+        data-panel="rarity"
+      >
         <h2 class="rules__panel-title">
           Raridade
         </h2>
