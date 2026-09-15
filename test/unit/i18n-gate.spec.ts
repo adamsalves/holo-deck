@@ -101,6 +101,18 @@ const KEY_AREAS: readonly string[] = ['app', 'server']
 /** The literal-key expression, shared by the scan and by the test that guards its reach. */
 const LITERAL_KEY = /(?<![A-Za-z0-9_])\$?t\(\s*(['"])([\w]+(?:\.[\w]+)+)\1/g
 
+/**
+ * The other way a screen spells a key: `<i18n-t keypath="…">`.
+ *
+ * It arrived with the sentences that carry markup inside them — *recompensa
+ * **+500** moedas* — where `t()` cannot go, because the bold is an element and
+ * not a character. Without this expression those keys are asked for by nobody as
+ * far as the scan can tell, and the orphan assertion **deletes the translation
+ * of a sentence that is on screen**. The failure would name the locale, not the
+ * component, which is the worst way for a gate to be right.
+ */
+const KEYPATH = /\bkeypath="([\w]+(?:\.[\w]+)+)"/g
+
 /** Every key spelled out inside `KEY_AREAS`, swept from disk. */
 function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
   return roots.flatMap((root) => {
@@ -109,9 +121,10 @@ function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
     return files.flatMap((relativePath) => {
       const source = stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))
 
-      return [...source.matchAll(LITERAL_KEY)]
-        .map(match => match[2])
-        .filter((key): key is string => key !== undefined)
+      return [
+        ...[...source.matchAll(LITERAL_KEY)].map(match => match[2]),
+        ...[...source.matchAll(KEYPATH)].map(match => match[1]),
+      ].filter((key): key is string => key !== undefined)
     })
   })
 }

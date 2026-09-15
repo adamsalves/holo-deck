@@ -10,6 +10,7 @@ import { useCollectionStore } from '~~/app/stores/collection'
 import { useCollection } from '~/composables/useCollection'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * O binder — a prancha *Coleção e forja*.
@@ -92,8 +93,8 @@ function forgeTarget(): void {
 }
 
 useSeoMeta({
-  title: 'Coleção — Holo Deck',
-  description: 'Seu binder: cartas capturadas por região e por raridade, duplicatas em pó e a forja que fecha a cauda longa das 1025.',
+  title: () => t('collection.seo.title'),
+  description: () => t('collection.seo.description'),
 })
 </script>
 
@@ -104,11 +105,11 @@ useSeoMeta({
         <header class="mb-7 flex flex-wrap items-end justify-between gap-6">
           <div>
             <p class="numeric text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-              Sua coleção
+              {{ t('collection.eyebrow') }}
             </p>
             <div class="mt-2 flex items-baseline gap-3">
               <h1 class="text-4xl font-bold tracking-tight text-highlighted">
-                Binder
+                {{ t('collection.title') }}
               </h1>
               <span class="numeric text-[15px] text-muted">
                 {{ progressLabel(store.ownedCount, collection.total.value) }}
@@ -141,7 +142,7 @@ useSeoMeta({
                 {{ store.shinyCount }}
               </dd>
               <dt class="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">
-                Shiny
+                {{ t('collection.shiny') }}
               </dt>
             </div>
           </dl>
@@ -165,7 +166,7 @@ useSeoMeta({
             <CollectionProgressBar
               :owned="region.owned"
               :total="region.speciesCount"
-              :label="`Progresso em ${region.label}`"
+              :label="t('collection.regionProgress', { region: region.label })"
             />
           </li>
         </ul>
@@ -173,9 +174,9 @@ useSeoMeta({
         <div class="collection__filters">
           <button
             v-for="option in ([
-              { key: 'owned', label: 'Possuídas', count: store.ownedCount },
-              { key: 'duplicates', label: 'Duplicadas', count: duplicateCount },
-              { key: 'shiny', label: 'Shiny', count: store.shinyCount },
+              { key: 'owned', label: t('collection.filters.owned'), count: store.ownedCount },
+              { key: 'duplicates', label: t('collection.filters.duplicates'), count: duplicateCount },
+              { key: 'shiny', label: t('collection.filters.shiny'), count: store.shinyCount },
             ] as const)"
             :key="option.key"
             type="button"
@@ -204,24 +205,28 @@ useSeoMeta({
           </button>
         </div>
 
-        <p
+        <i18n-t
           v-if="store.ownedCount === 0"
           class="collection__empty"
+          keypath="collection.empty.text"
+          scope="global"
+          tag="p"
         >
-          Nenhuma carta ainda. Os três packs de boas-vindas estão esperando em
-          <NuxtLink
-            to="/packs"
-            class="collection__link"
-          >
-            abrir pack
-          </NuxtLink>.
-        </p>
+          <template #link>
+            <NuxtLink
+              :to="localePath('/packs')"
+              class="collection__link"
+            >
+              {{ t('collection.empty.link') }}
+            </NuxtLink>
+          </template>
+        </i18n-t>
 
         <p
           v-else-if="visible.length === 0"
           class="collection__empty"
         >
-          Nenhuma carta da sua coleção combina com esses filtros.
+          {{ t('collection.noMatch') }}
         </p>
 
         <ul
@@ -244,7 +249,7 @@ useSeoMeta({
 
         <template #fallback>
           <p class="collection__empty">
-            Carregando sua coleção…
+            {{ t('collection.loading') }}
           </p>
         </template>
       </ClientOnly>
@@ -253,34 +258,33 @@ useSeoMeta({
     <aside class="collection__forge">
       <ClientOnly>
         <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-          Pó
+          {{ t('collection.dust') }}
         </p>
         <p class="mt-3 flex items-baseline gap-2">
           <span class="numeric text-[38px] font-extrabold leading-none text-highlighted">
             {{ gameNumber(store.dust) }}
           </span>
-          <span class="numeric text-xs text-muted">acumulado</span>
+          <span class="numeric text-xs text-muted">{{ t('collection.dustTotal') }}</span>
         </p>
         <p class="numeric mt-2 text-[11px] leading-relaxed text-toned">
-          Duplicata vira pó. Pó compra a carta que você escolher — é o que fecha a
-          cauda longa das 1025.
+          {{ t('collection.dustNote') }}
         </p>
 
         <section class="collection__panel">
           <p class="collection__panel-title">
-            Forjar
+            {{ t('collection.forge.title') }}
           </p>
 
           <label
             class="sr-only"
             for="forge-search"
-          >Buscar espécie para forjar</label>
+          >{{ t('collection.forge.searchLabel') }}</label>
           <input
             id="forge-search"
             v-model="query"
             type="search"
             class="collection__search"
-            placeholder="Buscar espécie…"
+            :placeholder="t('collection.forge.searchPlaceholder')"
             autocomplete="off"
           >
 
@@ -330,9 +334,16 @@ useSeoMeta({
               >
                 {{ t(rarityKey(targetRarity)).toUpperCase() }}
               </p>
-              <p class="numeric mt-1.5 text-[11px] text-muted">
-                custa <strong class="collection__cost">{{ gameNumber(targetCost) }}</strong> pó
-              </p>
+              <i18n-t
+                class="numeric mt-1.5 text-[11px] text-muted"
+                keypath="collection.forge.cost"
+                scope="global"
+                tag="p"
+              >
+                <template #dust>
+                  <strong class="collection__cost">{{ gameNumber(targetCost) }}</strong>
+                </template>
+              </i18n-t>
             </div>
           </div>
 
@@ -343,13 +354,15 @@ useSeoMeta({
             :disabled="missing > 0"
             @click="forgeTarget()"
           >
-            {{ missing > 0 ? `FALTAM ${gameNumber(missing)} PÓ` : 'FORJAR' }}
+            {{ missing > 0
+              ? t('collection.forge.missing', { dust: gameNumber(missing) })
+              : t('collection.forge.action') }}
           </button>
         </section>
 
         <template #fallback>
           <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-            Pó
+            {{ t('collection.dust') }}
           </p>
         </template>
       </ClientOnly>
@@ -358,7 +371,7 @@ useSeoMeta({
            `shared/game/dust.ts`. Fica fora do `ClientOnly` porque é exatamente o
            tipo de conteúdo que vale estar no HTML servido. -->
       <p class="mt-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-        Tabela
+        {{ t('collection.table.title') }}
       </p>
       <table class="collection__table">
         <thead>
@@ -367,19 +380,19 @@ useSeoMeta({
               class="numeric"
               scope="col"
             >
-              Tier
+              {{ t('collection.table.tier') }}
             </th>
             <th
               class="numeric"
               scope="col"
             >
-              Pó
+              {{ t('collection.dust') }}
             </th>
             <th
               class="numeric"
               scope="col"
             >
-              Forja
+              {{ t('collection.table.forge') }}
             </th>
           </tr>
         </thead>
@@ -409,8 +422,7 @@ useSeoMeta({
         </tbody>
       </table>
       <p class="numeric mt-3 text-[11px] leading-relaxed text-toned">
-        Razão 4× em toda a escala: quatro duplicatas de um tier pagam uma carta
-        escolhida daquele tier.
+        {{ t('collection.table.ratio') }}
       </p>
     </aside>
   </main>

@@ -53,10 +53,10 @@ const isShiny = computed(() => props.shinies > 0)
 
 const label = computed(() => [
   props.entry.displayName,
-  `número ${props.entry.id}`,
+  t('collection.card.number', { number: props.entry.id }),
   t(rarityKey(rarity.value)),
-  props.copies === 1 ? 'uma cópia' : `${props.copies} cópias`,
-  ...(isShiny.value ? ['shiny'] : []),
+  t('collection.card.copies', { count: props.copies }, props.copies),
+  ...(isShiny.value ? [t('collection.card.shiny')] : []),
 ].join(', '))
 </script>
 
@@ -90,10 +90,25 @@ const label = computed(() => [
           v-if="duplicates > 0"
           type="button"
           class="numeric binder-card__foot binder-card__scrap"
-          :aria-label="`Transformar ${duplicates} duplicata${duplicates > 1 ? 's' : ''} de ${entry.displayName} em ${gameNumber(dustValue)} de pó`"
+          :aria-label="t(
+            'collection.card.scrapLabel',
+            { count: duplicates, name: entry.displayName, dust: gameNumber(dustValue) },
+            duplicates,
+          )"
           @click="$emit('scrap')"
         >
-          {{ duplicates }} dup · <strong>{{ gameNumber(dustValue) }} pó</strong>
+          <i18n-t
+            keypath="collection.card.scrap"
+            scope="global"
+            tag="span"
+          >
+            <template #count>
+              {{ duplicates }}
+            </template>
+            <template #dust>
+              <strong>{{ t('collection.card.dustAmount', { dust: gameNumber(dustValue) }) }}</strong>
+            </template>
+          </i18n-t>
         </button>
 
         <p
@@ -101,7 +116,7 @@ const label = computed(() => [
           class="numeric binder-card__foot binder-card__rarity"
           :data-rarity="rarity"
         >
-          {{ isShiny ? 'SHINY' : t(rarityKey(rarity)).toUpperCase() }}
+          {{ isShiny ? t('collection.card.shinyBadge') : t(rarityKey(rarity)).toUpperCase() }}
         </p>
       </template>
     </DexPokeCard>

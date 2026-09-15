@@ -164,7 +164,7 @@ function onDrop(event: DragEvent): void {
           v-if="incoming > 1"
           class="numeric deck-slot__warning"
         >
-          LEVA {{ multiplierLabel(incoming) }}
+          {{ t('deck.slot.takes', { multiplier: multiplierLabel(incoming) }) }}
         </p>
       </template>
     </DexPokeCard>
@@ -189,9 +189,16 @@ function onDrop(event: DragEvent): void {
           stroke-linecap="round"
         />
       </svg>
-      <p class="numeric deck-slot__hint">
-        ARRASTE<br>UMA CARTA
-      </p>
+      <i18n-t
+        class="numeric deck-slot__hint"
+        keypath="deck.slot.hint"
+        scope="global"
+        tag="p"
+      >
+        <template #break>
+          <br>
+        </template>
+      </i18n-t>
     </div>
 
     <!-- Tirar do deck. Fora do link e acima dele, que é o degrau que a `PokeCard`
@@ -200,7 +207,7 @@ function onDrop(event: DragEvent): void {
       v-if="card"
       type="button"
       class="deck-slot__remove"
-      :aria-label="`Tirar ${card.entry.displayName} do slot ${index + 1}`"
+      :aria-label="t('deck.slot.removeLabel', { name: card.entry.displayName, slot: index + 1 })"
       @click="emit('remove')"
     >
       <svg

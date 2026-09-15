@@ -48,5 +48,197 @@
     "dragon": "Dragão",
     "dark": "Sombrio",
     "fairy": "Fada"
+  },
+  "hub": {
+    "advantage": "{card} contra {type} {multiplier}",
+    "shiny": "Shiny",
+    "resume": {
+      "eyebrow": "Batalha em andamento",
+      "title": "Ginásio {gym} · {leader}",
+      "meta": "turno {turn} · seu banco {standing} de pé",
+      "giveUp": "DESISTIR",
+      "resume": "RETOMAR"
+    },
+    "daily": {
+      "ready": "Disponível agora",
+      "done": "Já saiu hoje",
+      "title": "Pack diário",
+      "meta": "{size} cartas · {guaranteed} raro ou acima garantido",
+      "open": "ABRIR",
+      "toShop": "IR À LOJA",
+      "free": "grátis, um por dia",
+      "nextIn": "próximo em {time}"
+    },
+    "next": {
+      "rematch": "Revanche",
+      "challenge": "Próximo desafio",
+      "gym": "Ginásio {gym} de {total}",
+      "team": "Time do líder",
+      "fight": "DESAFIAR",
+      "buildDeck": "MONTAR O DECK",
+      "reward": "recompensa {coins} moedas"
+    },
+    "collection": {
+      "eyebrow": "Sua coleção",
+      "ofDex": "{percent}% do dex"
+    }
+  },
+  "packs": {
+    "open": "ABRIR",
+    "loading": "Carregando…",
+    "timer": "O pack diário já saiu hoje — próximo em {time}.",
+    "seo": {
+      "title": "Packs — Holo Deck",
+      "description": "Dez cartas: seis comuns, três incomuns e uma rara ou acima. Shiny a 1 em 256, e um ultra garantido a cada dez packs secos."
+    },
+    "shop": {
+      "eyebrow": "Loja",
+      "title": "Packs",
+      "rng": "Toda abertura sai de um RNG com seed.",
+      "testable": "A distribuição é testável, não prometida."
+    },
+    "welcome": {
+      "eyebrow": "Boas-vindas · {number} de {total}",
+      "title": "Pack de estreia",
+      "note": "{count} de graça para o deck ter escolha.",
+      "openLabel": "Abrir pack de estreia"
+    },
+    "daily": {
+      "eyebrow": "Disponível agora",
+      "title": "Pack diário",
+      "note": "Grátis, um por dia. Some da loja depois de aberto.",
+      "openLabel": "Abrir pack diário"
+    },
+    "store": {
+      "eyebrow": "Sempre em estoque",
+      "title": "Pack Holo",
+      "note": "As mesmas taxas do diário. Sem limite de quantidade.",
+      "buyLabel": "Comprar Pack Holo por {coins} moedas",
+      "price": "{coins} moedas",
+      "left": "restam {coins} · dá para {packs}",
+      "missing": "faltam {coins} moedas"
+    },
+    "rates": {
+      "title": "Taxas",
+      "source": "lidas de shared/game/packs.ts — a loja não tem número próprio",
+      "commons": "comuns",
+      "uncommons": "incomuns",
+      "rarePlus": "raro+",
+      "slotRolls": "O slot raro+ rola assim",
+      "shinyChip": "SHINY 1/{odds}",
+      "shinyNote": "Rola sobre qualquer carta, de qualquer tier — {chance} por pack, ou um a cada {packs}."
+    },
+    "pity": {
+      "title": "Garantia",
+      "note": "packs sem ultra ou acima",
+      "tier": "ultra ou acima",
+      "rule": "No décimo, o slot raro+ vira {tier} garantido, e a contagem zera. Faltam {left}."
+    },
+    "foot": {
+      "before": "antes",
+      "order": "Ao abrir: as cartas são creditadas {before} de as moedas serem debitadas. Uma falha no meio dá cartas de graça em vez de roubar moedas."
+    },
+    "again": {
+      "welcome": "ABRIR O PRÓXIMO",
+      "store": "COMPRAR OUTRO · {coins}"
+    },
+    "opening": {
+      "eyebrow": "Sequência de abertura",
+      "title": "Abrir pack",
+      "aside": "{size} cartas · {commons} comuns, {uncommons} incomuns, {rarePlus} raro+",
+      "pity": "pity: {threshold} packs sem ultra garante um ultra — faltam {left}",
+      "revealed": "{revealed} / {total} reveladas",
+      "skip": "PULAR ANIMAÇÃO",
+      "toCollection": "VER COLEÇÃO",
+      "backToShop": "VOLTAR À LOJA",
+      "pityHit": "A rede disparou: {threshold} packs sem ultra garantiram este."
+    },
+    "card": {
+      "label": "{name}, {rarity}",
+      "shinyLabel": "{name}, {rarity}, shiny",
+      "shinyBadge": "SHINY"
+    }
+  },
+  "collection": {
+    "eyebrow": "Sua coleção",
+    "title": "Binder",
+    "shiny": "Shiny",
+    "regionProgress": "Progresso em {region}",
+    "noMatch": "Nenhuma carta da sua coleção combina com esses filtros.",
+    "loading": "Carregando sua coleção…",
+    "dust": "Pó",
+    "dustTotal": "acumulado",
+    "dustNote": "Duplicata vira pó. Pó compra a carta que você escolher — é o que fecha a cauda longa das 1025.",
+    "seo": {
+      "title": "Coleção — Holo Deck",
+      "description": "Seu binder: cartas capturadas por região e por raridade, duplicatas em pó e a forja que fecha a cauda longa das 1025."
+    },
+    "filters": {
+      "owned": "Possuídas",
+      "duplicates": "Duplicadas",
+      "shiny": "Shiny"
+    },
+    "empty": {
+      "text": "Nenhuma carta ainda. Os três packs de boas-vindas estão esperando em {link}.",
+      "link": "abrir pack"
+    },
+    "forge": {
+      "title": "Forjar",
+      "searchLabel": "Buscar espécie para forjar",
+      "searchPlaceholder": "Buscar espécie…",
+      "cost": "custa {dust} pó",
+      "missing": "FALTAM {dust} PÓ",
+      "action": "FORJAR"
+    },
+    "table": {
+      "title": "Tabela",
+      "tier": "Tier",
+      "forge": "Forja",
+      "ratio": "Razão 4× em toda a escala: quatro duplicatas de um tier pagam uma carta escolhida daquele tier."
+    },
+    "card": {
+      "number": "número {number}",
+      "copies": "uma cópia | {count} cópias",
+      "shiny": "shiny",
+      "shinyBadge": "SHINY",
+      "scrap": "{count} dup · {dust}",
+      "dustAmount": "{dust} pó",
+      "scrapLabel": "Transformar {count} duplicata de {name} em {dust} de pó | Transformar {count} duplicatas de {name} em {dust} de pó"
+    }
+  },
+  "deck": {
+    "eyebrow": "Montagem de deck",
+    "title": "Seu time",
+    "slotsCount": "{filled} / {total} slots",
+    "loading": "Carregando seu deck…",
+    "seo": {
+      "title": "Deck"
+    },
+    "coverage": {
+      "title": "Cobertura contra {leader}",
+      "advice": "{count} AJUSTE RECOMENDADO | {count} AJUSTES RECOMENDADOS",
+      "empty": "Escale uma carta para ler a cobertura do time contra {leader}.",
+      "outgoing": "SEU DANO CONTRA {type}",
+      "incoming": "DANO QUE VOCÊ RECEBE",
+      "safe": "Nenhuma carta do time apanha mais que o normal de {type}.",
+      "takes": "leva {multiplier}",
+      "source": "Leitura calculada na mesma matriz 18×18 que o motor de batalha usa — a tela não tem regra própria."
+    },
+    "collection": {
+      "title": "Sua coleção",
+      "filterLabel": "Filtrar por nome ou tipo",
+      "strong": "FORTE VS {type}",
+      "all": "TODAS",
+      "empty": "Sua coleção está vazia. Abra um pack para começar.",
+      "noMatch": "Nenhuma carta combina com esse filtro.",
+      "pickLabel": "Escalar {name}",
+      "hint": "Clique para escalar, ou arraste para um slot. Cartas já no deck saem da lista.",
+      "loading": "Carregando sua coleção…"
+    },
+    "slot": {
+      "takes": "LEVA {multiplier}",
+      "hint": "ARRASTE{break}UMA CARTA",
+      "removeLabel": "Tirar {name} do slot {slot}"
+    }
   }
 }

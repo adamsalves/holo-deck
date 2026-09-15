@@ -108,9 +108,11 @@ const delays = computed(() => {
 
 function labelOf(card: PackCard, entry: SearchEntry | null): string {
   const name = entry?.displayName ?? `#${card.speciesId}`
+  const rarity = t(rarityKey(card.rarity))
+
   return card.isShiny
-    ? `${name}, ${t(rarityKey(card.rarity))}, shiny`
-    : `${name}, ${t(rarityKey(card.rarity))}`
+    ? t('packs.card.shinyLabel', { name, rarity })
+    : t('packs.card.label', { name, rarity })
 }
 </script>
 
@@ -167,7 +169,7 @@ function labelOf(card: PackCard, entry: SearchEntry | null): string {
 
             <template #footer>
               <p class="numeric opener__rarity">
-                {{ card.isShiny ? 'SHINY' : t(rarityKey(card.rarity)).toUpperCase() }}
+                {{ card.isShiny ? t('packs.card.shinyBadge') : t(rarityKey(card.rarity)).toUpperCase() }}
               </p>
             </template>
           </DexPokeCard>
