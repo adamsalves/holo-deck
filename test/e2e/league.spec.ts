@@ -440,7 +440,7 @@ test('the league and the battle speak the language of the URL, from link to log'
 
     await expect(
       page.getByRole('heading', { level: 1, name: label('league.title', locale) }),
-      `/league em ${locale} não traduziu o título`,
+      `/league in ${locale} did not translate the heading`,
     ).toBeVisible()
     await expect(page.locator('.gym')).toHaveCount(9)
 
@@ -453,18 +453,18 @@ test('the league and the battle speak the language of the URL, from link to log'
     // source. Here it is the rendered `href` that answers.
     expect(
       leagueLinks.filter(href => href.includes('/battle/')).length,
-      `/league em ${locale} não desenhou link de ginásio`,
+      `/league in ${locale} drew no gym link at all`,
     ).toBeGreaterThan(0)
     expect(
       strayLinks(leagueLinks, locale, prefixed),
-      `/league em ${locale} devolve o jogador a outro idioma`,
+      `/league in ${locale} sends the player back to another language`,
     ).toEqual([])
 
     await page.goto(localeUrl('/battle/1', locale))
 
     await expect(
       page.getByText(message('battle.bar.gym', locale, { gym: 1, total: 9 })),
-      `/battle/1 em ${locale} não traduziu o cabeçalho`,
+      `/battle/1 in ${locale} did not translate the header`,
     ).toBeVisible()
 
     // The log is page state, so it starts empty in whatever language the URL
@@ -476,7 +476,7 @@ test('the league and the battle speak the language of the URL, from link to log'
     const log = (await page.locator('.battle__log').innerText()).replaceAll(/\s+/g, ' ')
     const spoken = logPatterns(locale).filter(({ pattern }) => pattern.test(log))
 
-    expect(spoken.length, `o log de ${locale} não casa com frase nenhuma do locale`)
+    expect(spoken.length, `the ${locale} log matches no sentence from its own locale`)
       .toBeGreaterThan(0)
 
     // And nothing from the other language got in. Messages that read the same in
@@ -490,12 +490,12 @@ test('the league and the battle speak the language of the URL, from link to log'
       // The other side, and it is the same one the two assertions above take: if
       // dropping the identical messages empties the list, what follows compares
       // nothing and passes on a page narrating in the wrong language.
-      expect(candidates.length, `não sobrou frase que distinga ${locale} de ${other}`)
+      expect(candidates.length, `no sentence left that tells ${locale} apart from ${other}`)
         .toBeGreaterThan(0)
 
       expect(
         candidates.filter(({ pattern }) => pattern.test(log)).map(({ key }) => key),
-        `o log de ${locale} narrou em ${other}`,
+        `the ${locale} log narrated in ${other}`,
       ).toEqual([])
     }
 
@@ -505,7 +505,7 @@ test('the league and the battle speak the language of the URL, from link to log'
 
     expect(
       strayLinks(battleLinks, locale, prefixed),
-      `/battle/1 em ${locale} devolve o jogador a outro idioma`,
+      `/battle/1 in ${locale} sends the player back to another language`,
     ).toEqual([])
   }
 })

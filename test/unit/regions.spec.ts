@@ -100,7 +100,7 @@ describe('toRegions', () => {
     }
   })
 
-  it('rotula toda região com o vocabulário, nunca com o slug', () => {
+  it('labels every region from the vocabulary, never from the slug', () => {
     expect(regions.filter(region => region.label === region.slug)).toEqual([])
 
     // `generationLabel` left the structure so the prerendered payload carries no
