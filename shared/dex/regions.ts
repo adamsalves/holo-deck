@@ -2,15 +2,17 @@ import type { GenerationMeta } from '../types/dex.ts'
 import { isRegionName, REGION_LABELS } from '../types/game.ts'
 
 /**
- * Uma região como a tela a lê: o nome próprio e a faixa de dex que ela ocupa.
+ * A region as the screen reads it: the proper name and the stretch of dex it
+ * occupies.
  *
- * **`generationLabel` saiu daqui, e a razão é o pré-render.** O índice da
- * Pokédex carrega estas nove regiões por `useAsyncData('pokedex-regions')`, uma
- * chave sem locale dentro — se a estrutura carregasse *Geração IV* pronta,
- * `/pokedex` e `/en/pokedex` dividiriam o mesmo payload e um dos dois sairia na
- * língua do outro. É o defeito que o PR 1 desta fase consertou no `league-teams`,
- * e o que o impede de voltar é a estrutura não carregar texto traduzido: ela traz
- * `generation`, e a tela compõe `t('generation.label')`.
+ * **`generationLabel` left this structure, and the reason is the prerender.**
+ * The Pokédex index loads these nine regions through
+ * `useAsyncData('pokedex-regions')`, a key with no locale inside it — had the
+ * structure carried a finished *Geração IV*, `/pokedex` and `/en/pokedex` would
+ * share one payload and one of them would come out in the other's language. It
+ * is the defect the first PR of this phase fixed in `league-teams`, and what
+ * keeps it from coming back is the structure carrying no translated text: it
+ * brings `generation`, and the screen composes `t('generation.label')`.
  *
  * A faixa não vem do dex — ela é **derivada** somando as contagens anteriores, e
  * é isso que a torna barata: o índice de regiões mostra `#0001–0151` sem abrir

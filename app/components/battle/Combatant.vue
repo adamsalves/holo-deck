@@ -5,6 +5,8 @@ import { effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
 import { conditionKey } from '~~/shared/types/game'
 import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
 
+const { t } = useI18n()
+
 /**
  * O painel de quem está em campo — a prancha *Batalha*, nos dois lados.
  *
@@ -13,8 +15,6 @@ import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
  * não o conteúdo, e duplicá-lo seria a chance de as duas barras divergirem em
  * como leem o mesmo HP.
  */
-const { t } = useI18n()
-
 const props = defineProps<{
   pokemon: BattlePokemon
   /** O do jogador ganha a moldura do próprio tipo, como no canvas. */

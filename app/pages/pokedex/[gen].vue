@@ -148,11 +148,18 @@ const filtered = computed(() => species.value.filter((entry) => {
   return byType && byRarity && byOwnership
 }))
 
+// The numeral goes in raw here, and `t('generation.label')` stays in the header.
+// This page is not translated yet — it leaves with the Detail PR — so the word
+// from the locale would build *As 151 espécies de Kanto, da Generation I* inside
+// `/en`: half a sentence in each language, in the `<meta description>` a search
+// engine and a link preview read. Half-translated screens are the known state of
+// this phase; half-translated **sentences** are not, and this one goes away when
+// the page itself is translated.
 useSeoMeta({
   title: () => `${region.value?.label ?? 'Pokédex'} — Pokédex — Holo Deck`,
   description: () => region.value === null
     ? 'Pokédex do Holo Deck.'
-    : `As ${region.value.speciesCount} espécies de ${region.value.label}, da ${t('generation.label', { numeral: generationNumeral(region.value.generation) })}, com tipos, stats e evolução.`,
+    : `As ${region.value.speciesCount} espécies de ${region.value.label}, da geração ${generationNumeral(region.value.generation)}, com tipos, stats e evolução.`,
 })
 </script>
 

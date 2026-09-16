@@ -103,8 +103,8 @@ describe('toRegions', () => {
   it('rotula toda região com o vocabulário, nunca com o slug', () => {
     expect(regions.filter(region => region.label === region.slug)).toEqual([])
 
-    // `generationLabel` saiu da estrutura para o payload pré-renderizado não
-    // carregar texto traduzido; o que sobrou para a tela compor é o número.
+    // `generationLabel` left the structure so the prerendered payload carries no
+    // translated text; what stayed for the screen to compose is the number.
     expect(regions.map(region => region.generation))
       .toEqual(generations.map(meta => meta.generation))
   })

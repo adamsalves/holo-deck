@@ -71,8 +71,9 @@ const KEY = {
  * The name a move falls back to when the dex does not carry its id.
  *
  * Outside `NARRATION_KEYS` because it belongs to no single kind — every event
- * that names a move can reach it — and the `Record` is keyed by kind. Exported
- * so the gate can union it in with the rest.
+ * that names a move can reach it — and the `Record` is keyed by kind. It reaches
+ * the gates through `NARRATION_KEY_LIST`, which is what keeps an address of this
+ * shape from being remembered in one list and forgotten in the other.
  */
 export const UNKNOWN_MOVE_KEY = 'battle.log.unknownMove'
 
@@ -102,6 +103,22 @@ export const NARRATION_KEYS: Record<BattleEvent['kind'], readonly string[]> = {
   'faint': [KEY.faint],
   'outcome': [KEY.outcome('won'), KEY.outcome('lost')],
 }
+
+/**
+ * Every key the log can print, flat — the one list both gates read.
+ *
+ * It exists because the union was being spelled twice: `i18n-gate.spec.ts` and
+ * `battle-narration.spec.ts` each flattened `NARRATION_KEYS` and each had to
+ * remember `UNKNOWN_MOVE_KEY` on its own, because that one lives outside the
+ * `Record`. A second address of that shape — and the docblock above admits
+ * there can be one — would land in whichever list its author happened to be
+ * looking at, and the gate reading the other one would report the translation
+ * as an orphan and have it deleted. One source, two readers.
+ */
+export const NARRATION_KEY_LIST: readonly string[] = [
+  ...Object.values(NARRATION_KEYS).flat(),
+  UNKNOWN_MOVE_KEY,
+]
 
 /**
  * Narra um turno inteiro.

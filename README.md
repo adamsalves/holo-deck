@@ -301,11 +301,18 @@ A medição achou **dez** produtores de texto de tela, e é a lista de dez que v
 | `rarityKey` / `typeKey` | `Comum`, `Elétrico` | **entregue** |
 | `REGION_LABELS` | `Kanto` — nome próprio, igual nos dois idiomas | fica |
 | `HABITAT_LABELS` | `Caverna`, `Ermo` | PR do Detalhe |
-| `AILMENT_LABELS` | `paralisia` | PR da batalha |
-| `CONDITION_LABELS` (`shared/game/status.ts`) | `PAR`, `QUE`, `ENV`, `SON` | PR da batalha |
-| `generationLabel` | `Geração IV` | PR do Detalhe |
+| `AILMENT_LABELS` → `ailmentKey` | `paralisia` | **entregue** |
+| `CONDITION_LABELS` → `conditionKey` | `PAR`, `QUE`, `ENV`, `SON` | **entregue** |
+| `generationLabel` → `generationNumeral` | `Geração IV` | **entregue** |
 | `shared/game/evolution.ts` | ~40 condições (`Subir de nível`, `de dia`) | PR do Detalhe |
 | `gameNumber` / `gamePercent` (`shared/game/progress.ts`) | `1.600`, `0,4%` | PR do Detalhe |
+
+As três primeiras `entregue` saíram no PR das telas de batalha, e as duas do
+meio pela mesma troca: a função devolve o **endereço** e quem resolve o `t()` é a
+tela. `generationLabel` foi a exceção — dele sobrou só o algarismo, porque a
+estrutura de regiões viaja num payload de pré-render sem locale dentro e não pode
+carregar a palavra. `CONDITION_LABELS` mudou de arquivo junto: `status.ts` guarda
+a regra, `game.ts` guarda o texto que o jogo inventa.
 
 Os dois últimos são os que a issue não via, e são de outra classe: eles não
 escrevem palavra nenhuma — escrevem **número com o separador de `pt-BR` fixo**,
@@ -1226,6 +1233,15 @@ e também `keypath="…"`, que é como `<i18n-t>` carrega a chave: sem a segunda
 expressão, as frases com markup dentro seriam acusadas de órfãs e a asserção
 mandaria **apagar a tradução de uma frase que está na tela**.
 
+**O que a varredura não vê, ele importa da fonte.** Chave montada em runtime —
+`` t(`ailment.${kind}`) `` — não existe em texto nenhum, então as famílias
+derivadas de tupla (`ailment`, `condition`, `affected`, `move.class`,
+`effectiveness`) entram pelas próprias funções que as telas chamam, e as 24 do
+log de turno por `NARRATION_KEY_LIST`, que
+[`app/utils/battle-narration.ts`](app/utils/battle-narration.ts) publica. É uma
+lista só, lida pelos dois portões: escrita duas vezes, bastava um esquecimento de
+um lado para o outro acusar a tradução de órfã e mandar apagá-la.
+
 [`test/unit/locale-link-gate.spec.ts`](test/unit/locale-link-gate.spec.ts) pergunta
 a outra coisa — *como o link foi escrito*. `NuxtLink` com caminho literal **não é
 localizado pelo módulo**: de dentro de `/en`, `to="/deck"` devolve o jogador ao
@@ -1235,10 +1251,23 @@ literal — `` :to="`/battle/${gym}`" `` — não existe em lista nenhuma, e enu
 quem **sai**: link novo é infrator por omissão, e a lista de exceções esvazia com
 a issue #37.
 
-As duas metades: `test/e2e/collection.spec.ts` abre as quatro telas em `/en` e
-cobra o prefixo de todo `href` interno **e o idioma do corpo da tela** — sem a
-segunda, uma chave traduzida para nada chegaria ao jogador sem asserção no
-caminho.
+As duas metades, hoje em dois arquivos: `test/e2e/collection.spec.ts` abre as
+quatro telas em `/en` e `test/e2e/league.spec.ts` abre a Liga e a batalha, e os
+dois cobram o prefixo de todo `href` interno **e o idioma do corpo da tela** —
+sem a segunda, uma chave traduzida para nada chegaria ao jogador sem asserção no
+caminho. O da Liga é o que mede o **log de turno**: o registro tem de casar com
+frase do idioma da URL e com nenhuma do outro, descontadas as mensagens que os
+dois idiomas escrevem igual.
+
+E há um terceiro portão unitário, do lado do narrador:
+[`test/unit/battle-narration.spec.ts`](test/unit/battle-narration.spec.ts) roda
+`narrate()` nos dois idiomas contra todo `kind` de evento, compara o conjunto de
+chaves pedidas com o publicado, e lê a própria fonte para garantir que nenhuma
+frase ficou escrita dentro da função. Esse último **enumera quem sai**: todo
+literal do arquivo é texto de tela até algo derivado da fonte o perdoar. A
+primeira versão perguntava o contrário — *isto parece frase?*, por acento ou
+espaço interno — e respondia que não para `CRIT`, `MISS`, `STAB`, que é
+exatamente o vocabulário que um log em inglês produz.
 
 O que nenhum dos dois alcança é **literal que nunca virou chave** — um
 `<p>Carregando…</p>` digitado no template. Foi medido, não suposto: plantado em
@@ -1260,10 +1289,10 @@ parágrafo argumenta.
 
 E a paridade entre os locales ganhou as duas asserções que faltavam, em
 `test/unit/i18n-gate.spec.ts`: **toda** chave tem de diferir entre os idiomas ou
-estar nomeada em `IDENTICAL_LABELS` (são 22 hoje, quase todas vocabulário do
+estar nomeada em `IDENTICAL_LABELS` (são 27 hoje, quase todas vocabulário do
 jogo), e toda mensagem tem de pedir os mesmos `{placeholder}` e o mesmo número de
-formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves podiam ser
-coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,
+formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves de então podiam
+ser coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,
 porque ela descarta o que é igual nos dois idiomas, e rótulo não traduzido é
 exatamente o que fica igual.
 

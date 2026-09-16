@@ -396,8 +396,9 @@ function play(action: BattleAction): void {
   // `AccountInvite`.
   if (state.value?.outcome === 'won') invite.offer()
 
-  // O log guarda frase pronta, não evento: trocar de idioma leva para outra URL,
-  // a página remonta e o histórico nasce vazio no idioma novo — nunca meio a meio.
+  // The log keeps finished sentences, not events: switching language means
+  // another URL, the page remounts, and the history starts empty in the new
+  // language — never half of it in each.
   const turn = narrate(before, battle.events, ctx.moves, t)
   if (turn.lines.length > 0) history.value = [...history.value, turn].slice(-LOG_LINES)
   focused.value = 0

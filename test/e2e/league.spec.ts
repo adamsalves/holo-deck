@@ -30,15 +30,15 @@ import { openWelcomePack } from './support'
  */
 
 /**
- * O idioma em que a suíte foi escrita, e de onde ela lê cada frase.
+ * The language this suite was written in, and where it reads every sentence from.
  *
- * As asserções deixaram de repetir o texto à mão: `TURNO 01` escrito aqui
- * envelhece ao lado do locale, e quando a tradução muda o teste reprova dizendo
- * que a tela sumiu, não que a frase mudou.
+ * The assertions stopped repeating the text by hand: a `TURNO 01` spelled here
+ * ages next to the locale, and when the translation changes the test fails
+ * saying the screen is gone rather than that the sentence moved.
  */
 const PT = defaultLocale()
 
-/** `TURNO 01` — o rótulo do locale mais o número que a tela zera à esquerda. */
+/** `TURNO 01` — the label from the locale plus the number the screen pads. */
 function atTurn(turn: number): string {
   return `${label('battle.bar.turn', PT)} ${String(turn).padStart(2, '0')}`
 }
@@ -426,7 +426,7 @@ function strayLinks(hrefs: string[], locale: string, prefixed: string[]): string
   return hrefs.filter(href => href !== `/${locale}` && !href.startsWith(`/${locale}/`)).sort()
 }
 
-test('a Liga e a batalha falam o idioma da URL, do link ao log', async ({ page }) => {
+test('the league and the battle speak the language of the URL, from link to log', async ({ page }) => {
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
 
   // The other side: with a single locale on disk the loop below proves nothing.
@@ -483,11 +483,18 @@ test('a Liga e a batalha falam o idioma da URL, do link ao log', async ({ page }
     // both are dropped: matching one would prove nothing, and demanding it stay
     // out would fail on a screen that is right.
     for (const other of localeCodes().filter(code => code !== locale)) {
+      const candidates = logPatterns(other).filter(
+        ({ key }) => label(key, other) !== label(key, locale),
+      )
+
+      // The other side, and it is the same one the two assertions above take: if
+      // dropping the identical messages empties the list, what follows compares
+      // nothing and passes on a page narrating in the wrong language.
+      expect(candidates.length, `não sobrou frase que distinga ${locale} de ${other}`)
+        .toBeGreaterThan(0)
+
       expect(
-        logPatterns(other)
-          .filter(({ key }) => label(key, other) !== label(key, locale))
-          .filter(({ pattern }) => pattern.test(log))
-          .map(({ key }) => key),
+        candidates.filter(({ pattern }) => pattern.test(log)).map(({ key }) => key),
         `o log de ${locale} narrou em ${other}`,
       ).toEqual([])
     }

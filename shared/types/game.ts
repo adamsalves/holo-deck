@@ -118,16 +118,18 @@ export const REGION_LABELS: Record<RegionName, string> = {
 }
 
 /**
- * O algarismo de `Geração IV`, que é como a prancha *Pokédex* escreve o
- * sobretítulo da região.
+ * The numeral of `Generation IV`, which is how the *Pokédex* board writes the
+ * overline of a region.
  *
- * O dex traz `Generation IV` em `displayName`, vindo da PokeAPI — em inglês, num
- * documento `lang="pt-BR"`. A palavra virou a chave `generation.label`, e o que
- * sobrou aqui é o algarismo: ele é o mesmo nos dois idiomas, e mandá-lo para o
- * locale obrigaria a escrever nove traduções idênticas em cada arquivo novo.
+ * The dex carries `Generation IV` in `displayName`, straight from the PokeAPI —
+ * English, inside a `lang="pt-BR"` document. The word became the `generation.label`
+ * key, and what stayed here is the numeral: it reads the same in both languages,
+ * and sending it to the locale would mean writing nine identical translations
+ * into every new file.
  *
- * O algarismo sai da lista, e não de um conversor: são nove valores fixos, e um
- * conversor genérico seria mais código para cobrir 991 números que não existem.
+ * The numeral comes from a list and not from a converter: there are nine fixed
+ * values, and a general converter would be more code to cover 991 numbers that
+ * do not exist.
  */
 const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
 
@@ -147,7 +149,7 @@ export function generationNumeral(generation: number): string {
  *
  * **Ainda é `Record` e ainda é só português.** Habitat é um dos produtores de
  * texto que a issue #38 lista e que este PR não leva; ele sai daqui no PR do
- * Detalhe, junto de `generationLabel` e das condições de evolução.
+ * Detalhe, junto das condições de evolução.
  */
 export const HABITAT_LABELS: Record<Habitat, string> = {
   'cave': 'Caverna',
@@ -162,21 +164,20 @@ export const HABITAT_LABELS: Record<Habitat, string> = {
 }
 
 /**
- * As quatro condições em português, por extenso.
+ * The locale key of a condition spelled out — `ailment.burn`, never *queimadura*.
  *
- * `CONDITION_LABELS`, em `shared/game/status.ts`, é a versão de três letras que
- * cabe na etiqueta da carta em campo (`PAR`); esta é a que a carta de golpe
- * escreve por extenso — `STATUS · paralisia · ACC 90`, como a prancha *Batalha*.
- * São dois papéis e dois tamanhos, e derivar um do outro daria `PAR` truncado ou
- * `paralisia` estourando a etiqueta.
+ * The first of three namespaces over the same four ids, and this is the one the
+ * move card writes in full: `STATUS · paralisia · ACC 90`, as the *Battle* board
+ * draws it. `conditionKey` below is the three-letter badge and `affectedKey` the
+ * note; deriving any of them from another would truncate one or overflow another.
  *
- * Mora aqui e não em `status.ts` pelo mesmo motivo de `typeKey`: `dex.ts`
- * guarda o que vem da PokeAPI e `status.ts` guarda a regra; o texto que o
- * jogador lê é coisa que este módulo inventa.
- *
- * Hoje ele devolve o **endereço** — `ailment.burn`, nunca *queimadura* —, e
- * quem resolve o `t()` é o consumidor. É o que mantém `shared/` sem texto de
- * tela com a fronteira do `shared-purity` intacta.
+ * It lives here and not in `status.ts` for the same reason as `typeKey`: `dex.ts`
+ * holds what comes from the PokeAPI and `status.ts` holds the rule, while the
+ * text the player reads is something this module invents. What it hands over is
+ * the **address**, and the `t()` belongs to whoever renders it — which is what
+ * keeps `shared/` free of screen text. The gate on that boundary is the
+ * `KEY_AREAS` of `test/unit/i18n-gate.spec.ts`, which fails a literal `t()` key
+ * outside `app/` and `server/`; `shared-purity` measures other things.
  */
 export function ailmentKey(ailment: AilmentName): string {
   return `ailment.${ailment}`
@@ -234,7 +235,14 @@ export function affectedKey(ailment: AilmentName): string {
  */
 export const EFFECTIVENESS_MULTIPLIERS = [0, 0.25, 0.5, 1, 2, 4] as const
 
-const EFFECTIVENESS_NAMES: Record<number, string> = {
+/**
+ * Keyed by the tuple and not by `number`, so a seventh multiplier does not
+ * compile until it is named. With `Record<number, string>` it compiled fine and
+ * fell out as `effectiveness.neutral` — a wrong word on screen instead of a
+ * failed build, and the only thing that would have caught it is the duplicate
+ * assertion in `i18n-gate`, by accident.
+ */
+const EFFECTIVENESS_NAMES: Record<typeof EFFECTIVENESS_MULTIPLIERS[number], string> = {
   0: 'none',
   0.25: 'barely',
   0.5: 'weak',
@@ -244,7 +252,11 @@ const EFFECTIVENESS_NAMES: Record<number, string> = {
 }
 
 export function effectivenessKey(multiplier: number): string {
-  return `effectiveness.${EFFECTIVENESS_NAMES[multiplier] ?? 'neutral'}`
+  // Same move as `isAilmentName`: the tuple only indexes with its own literals,
+  // and `find` narrows a plain `number` into one without a single cast.
+  const known = EFFECTIVENESS_MULTIPLIERS.find(value => value === multiplier)
+
+  return `effectiveness.${known === undefined ? 'neutral' : EFFECTIVENESS_NAMES[known]}`
 }
 
 /**

@@ -9,7 +9,7 @@ import type { BattleContext, BattleEvent, BattleState } from '~~/shared/game/bat
 import type { Condition } from '~~/shared/game/status'
 import { startBattle } from '~~/shared/game/engine'
 import type { Translate } from '~~/app/utils/battle-narration'
-import { NARRATION_KEYS, narrate, UNKNOWN_MOVE_KEY } from '~~/app/utils/battle-narration'
+import { NARRATION_KEY_LIST, NARRATION_KEYS, narrate, UNKNOWN_MOVE_KEY } from '~~/app/utils/battle-narration'
 import { readAllSpecies, readCore, readGeneration } from '../support/generated-dex'
 import { localeCodes, message } from '../support/locales'
 import { REPO_ROOT, stripComments } from '../support/source-tree'
@@ -180,11 +180,65 @@ const SAMPLES: Record<BattleEvent['kind'], readonly Sample[]> = {
   ],
 }
 
-/** Every key the narrator publishes, flattened — the list `i18n-gate` unions in. */
-const PUBLISHED: readonly string[] = [
-  ...Object.values(NARRATION_KEYS).flat(),
-  UNKNOWN_MOVE_KEY,
-]
+/** Every key the narrator publishes, flattened — read from the module, not rebuilt here. */
+const PUBLISHED: readonly string[] = NARRATION_KEY_LIST
+
+/** The dot segments of every published address — `log`, `blocked`, `burn`, `won`, `generic`. */
+const ADDRESS_SEGMENTS = new Set<string>(PUBLISHED.flatMap(key => key.split('.')))
+
+/**
+ * The words that name a shape rather than say something, read off live objects.
+ *
+ * `player` and `opponent` are sides of a real battle state, `kind` and `side`
+ * are properties of the events the samples carry, and the ten event kinds come
+ * from the narrator's own `Record` — which is where `no-effect` comes from, the
+ * one kind that is not a segment of any address. None of it is written down
+ * here, so the day the engine renames a field this list follows instead of
+ * forgiving a word that no longer exists.
+ */
+const STRUCTURE_WORDS = new Set<string>([
+  ...Object.keys(STATE),
+  ...Object.keys(NARRATION_KEYS),
+  ...Object.values(SAMPLES).flat().flatMap(
+    sample => sample.events.flatMap(event => Object.keys(event)),
+  ),
+  ...CONDITIONS.flatMap(condition => Object.keys(condition)),
+])
+
+/**
+ * A template that builds a published address — `` `battle.log.blocked.${kind}` ``.
+ *
+ * Measured by the part before the interpolation, which has to be the namespace
+ * of an address the narrator publishes. A template whose prefix names nothing
+ * published is not an address; it is a sentence with a name dropped into it,
+ * which is precisely what this gate is here to catch.
+ */
+function buildsAnAddress(value: string): boolean {
+  const open = value.indexOf('${')
+  if (open <= 0) return false
+
+  return PUBLISHED.some(key => key.startsWith(value.slice(0, open)))
+}
+
+/**
+ * Why a literal is allowed to sit in the narrator — the list of who **leaves**.
+ *
+ * Everything the scan finds is screen text until one of these forgives it, and
+ * each of them is derived: the addresses and their segments come from the
+ * published list, the structure words off live objects, the module specifiers
+ * from their own prefix. The last clause is a rule and not a list — a literal of
+ * one character, or of nothing but whitespace, carries no language, which is
+ * what the `—` of a missing name and the space that joins a hit are.
+ */
+function forgiven(value: string): boolean {
+  return value.startsWith('~~/')
+    || PUBLISHED.includes(value)
+    || buildsAnAddress(value)
+    || ADDRESS_SEGMENTS.has(value)
+    || STRUCTURE_WORDS.has(value)
+    || value.trim() === ''
+    || [...value].length === 1
+}
 
 /**
  * A translator that answers from the locale on disk and writes down what it was
@@ -333,24 +387,36 @@ describe('the turn log', () => {
    * source, so this reads it — the same rule the `shared/` gate will carry, run
    * early on the one file in `app/` that writes prose instead of markup.
    *
-   * Key addresses (`battle.log.faint`) are literals too, and stay legal: they
-   * carry no accent and no space between words, which is exactly what tells a
-   * key from a sentence.
+   * **It enumerates what leaves, never what enters.** The first version asked
+   * *does this literal look like a sentence?* — an accent, or a space between
+   * two words — and answered no for `CRIT`, `MISS`, `STAB`, which is the exact
+   * vocabulary an English battle log produces. It was measured, not supposed:
+   * a `parts.push('CRIT')` next to the translated ones left this green, and the
+   * assertion above green with it, because nothing had been removed from the
+   * published list. Here every literal the file carries is screen text until
+   * `forgiven()` accounts for it, so the word nobody anticipated fails.
    */
   it('keeps no screen text inside the narrator', () => {
     const source = stripComments(
       readFileSync(join(REPO_ROOT, 'app/utils/battle-narration.ts'), 'utf8'),
     )
 
-    // Each expression refuses a newline, which is not a detail: `[^']{2,}` pairs
+    // Each expression refuses a newline, which is not a detail: `[^']+` pairs
     // the quote of `side === 'player'` with the next quote three lines down and
     // hands back the code in between as a sentence. The gate then fails on good
     // input, which is the way a gate gets switched off.
-    const sentences = [...source.matchAll(/'([^'\n]{2,})'|"([^"\n]{2,})"|`([^`\n]{2,})`/g)]
+    const literals = [...source.matchAll(/'([^'\n]+)'|"([^"\n]+)"|`([^`\n]+)`/g)]
       .map(match => match[1] ?? match[2] ?? match[3] ?? '')
-      .filter(value => /[áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ]/.test(value) || /\S\s+\S/.test(value))
-      .filter(value => !value.startsWith('~~/'))
 
-    expect(sentences, 'the narrator still writes text the locale should own').toEqual([])
+    // The other side, and it is the half a scanning gate always forgets: a regex
+    // that stops matching forgives the whole file, and `[] === []` reads exactly
+    // like a narrator that writes no prose.
+    expect(literals, 'the scan reads no literal at all').not.toEqual([])
+    expect(literals, 'the scan stopped seeing the addresses it reads').toContain(UNKNOWN_MOVE_KEY)
+
+    expect(
+      literals.filter(value => !forgiven(value)),
+      'the narrator still writes text the locale should own',
+    ).toEqual([])
   })
 })

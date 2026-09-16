@@ -49,8 +49,8 @@ const shown = computed(() => {
  * it — the translator sees the sentence the screen reader will say.
  */
 const label = computed(() => {
-  // Duas chamadas e não uma com a chave escolhida dentro: `i18n-gate` só vê a
-  // chave que vem colada no `t(`, e uma chave que ele não vê é acusada de órfã.
+  // Two calls and not one with the key chosen inside it: `i18n-gate` only sees
+  // the key spelled against the `t(`, and a key it cannot see is called an orphan.
   const values = { leader: leader.value.name, gym: leader.value.gym }
 
   return props.view.status === 'won'

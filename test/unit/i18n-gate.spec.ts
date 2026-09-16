@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
-import { NARRATION_KEYS, UNKNOWN_MOVE_KEY } from '~~/app/utils/battle-narration'
+import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
 import {
   affectedKey,
   ailmentKey,
@@ -99,11 +99,14 @@ const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
  * the function asks for. Here it is only unioned in: without it the whole
  * `battle.log` namespace reads as orphaned and the orphan assertion deletes the
  * translation of every line the log prints.
+ *
+ * **Read from the module, and no longer flattened here.** Both gates used to
+ * spell the same union, and both had to remember `UNKNOWN_MOVE_KEY` — the one
+ * address that lives outside the `Record` because it belongs to no event kind.
+ * Two copies of a list whose whole job is to be complete is the drift this file
+ * warns about one paragraph above.
  */
-const NARRATION_KEYS_USED: readonly string[] = [
-  ...Object.values(NARRATION_KEYS).flat(),
-  UNKNOWN_MOVE_KEY,
-]
+const NARRATION_KEYS_USED: readonly string[] = NARRATION_KEY_LIST
 
 /**
  * The words that really are the same in both languages.
@@ -150,6 +153,10 @@ const IDENTICAL_LABELS: readonly string[] = [
   'deck.seo.title',
   'deck.slotsCount',
   'hub.shiny',
+  'league.next.teamSize',
+  'move.class.status',
+  'move.detail.damage',
+  'move.detail.status',
   'nav.base',
   'nav.deck',
   'nav.packs',
@@ -160,10 +167,6 @@ const IDENTICAL_LABELS: readonly string[] = [
   'packs.rates.shinyChip',
   'packs.seo.title',
   'packs.shop.title',
-  'league.next.teamSize',
-  'move.class.status',
-  'move.detail.damage',
-  'move.detail.status',
   'rarity.ultra',
   'type.normal',
 ]
