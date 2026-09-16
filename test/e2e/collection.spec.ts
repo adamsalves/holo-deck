@@ -66,7 +66,9 @@ test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reloa
     level: 1,
     name: label('packs.shop.title', defaultLocale()),
   })).toBeVisible()
-  await expect(page.getByText('Boas-vindas · 1 de 3')).toBeVisible()
+  await expect(page.getByText(
+    message('packs.welcome.eyebrow', defaultLocale(), { number: 1, total: 3 }),
+  )).toBeVisible()
 
   // O clique só vale depois da hidratação — antes dela o botão é marcação. Mesmo
   // `toPass` que a suíte da Pokédex usa pelas abas.
@@ -343,11 +345,20 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
  *
  * **And it demands the language of the text, not only of the link.** Without
  * that, `/en` had both halves of the measurement for the *link* and only the
- * disk half for the *sentence*: a literal `<p>Carregando…</p>` added tomorrow
- * would escape all three gates at once — `i18n-gate` cannot see it because it is
- * not a key, this test could not see it because it is not an `href`, and the
- * link gate cannot see it because it is not a link. That was the exact gap this
- * PR exists to close, reopened and green.
+ * disk half for the *sentence*: a key translated into nothing, or a screen
+ * wired to the wrong one, reached the player with no assertion in its way.
+ *
+ * **What it still does not reach is a literal that was never a key**, and an
+ * earlier version of this docblock claimed the opposite. Measured, not argued:
+ * `<p class="packs__eyebrow">Aguarde um instante, estamos carregando</p>` was
+ * planted in `packs.vue`, and `/packs` passed every assertion below. It cannot
+ * be otherwise — the sweep's list is built from the locale files, and a sentence
+ * that is in no locale file cannot be in it. `defaultOnlyLabels` says this in
+ * its own docblock, and that is the half that was right.
+ *
+ * What does guard it is a **template-text gate on disk**, which does not exist
+ * yet. Until it does, this is the boundary, written where the next person will
+ * look for it rather than in a claim that reads as covered.
  *
  * Each screen's key is picked from inside the panel the screen already waits
  * for, and the test **refuses a key whose two languages are identical**: a label
@@ -378,9 +389,18 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
   for (const locale of prefixed) {
     const leaked = defaultOnlyLabels(locale)
 
-    // The other side: with no label that differs between the languages, the
-    // `filter` below would return `[]` for lack of anything to look for.
-    expect(leaked.length, `nada difere entre ${defaultLocale()} e ${locale}`).toBeGreaterThan(50)
+    // The other side, derived instead of arbitrary. The floor was `> 50` against
+    // 108 labels, so 57 could leave the list before the assertion moved — and
+    // leaving the list is what an untranslated label **does**, since
+    // `defaultOnlyLabels` drops whatever is identical in both languages. Now the
+    // list has to carry the default label of every key this test will look for
+    // on screen: without it, the sweep could not catch that screen's regression.
+    expect(leaked, `nada difere entre ${defaultLocale()} e ${locale}`).not.toEqual([])
+    expect(
+      screens.map(({ speaks }) => label(speaks, defaultLocale()))
+        .filter(text => !leaked.includes(text)),
+      `estes rótulos saíram da varredura de ${locale}`,
+    ).toEqual([])
 
     for (const { path, ready, speaks } of screens) {
       await page.goto(localeUrl(path, locale))
@@ -407,7 +427,7 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
       // enters the measurement by being translated differently.
       //
       // **Case-insensitive, and that was measured, not assumed.** `innerText`
-      // returns the text as the CSS draws it, and this theme carries 47
+      // returns the text as the CSS draws it, and this theme carries 36
       // `text-transform: uppercase` declarations across 20 files of `app/`: with
       // `Montagem de deck` planted on the screen by hand, the case-sensitive
       // sweep looked for that while the page said `MONTAGEM DE DECK` — defect on
@@ -427,7 +447,16 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
         links => links.map(link => link.getAttribute('href') ?? ''),
       )
 
-      expect(hrefs.length, `${path} em ${locale} não tem link nenhum`).toBeGreaterThan(5)
+      // Derived too: `> 5` was a hand-written floor against 12 real links. The
+      // global bar reaches six destinations on every screen, and those are what
+      // this demands — a new destination enters the measurement by existing in
+      // `nav-links`, the same inversion the disk gate applies.
+      expect(
+        [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]
+          .map(link => localeUrl(link.to, locale))
+          .filter(href => !hrefs.includes(href)),
+        `${path} em ${locale} perdeu destinos da barra`,
+      ).toEqual([])
       expect(
         hrefs.filter(href => !href.startsWith(`/${locale}/`) && href !== `/${locale}`).sort(),
         `${path} em ${locale} devolve o jogador ao idioma padrão`,
