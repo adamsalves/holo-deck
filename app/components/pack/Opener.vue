@@ -108,11 +108,13 @@ const delays = computed(() => {
 
 function labelOf(card: PackCard, entry: SearchEntry | null): string {
   const name = entry?.displayName ?? `#${card.speciesId}`
-  const rarity = t(rarityKey(card.rarity))
+  // `rarityLabel` and not `rarity`: next to `card.rarity`, which is the id, one
+  // name for both things is how the next reader picks up the wrong one.
+  const rarityLabel = t(rarityKey(card.rarity))
 
   return card.isShiny
-    ? t('packs.card.shinyLabel', { name, rarity })
-    : t('packs.card.label', { name, rarity })
+    ? t('packs.card.shinyLabel', { name, rarity: rarityLabel })
+    : t('packs.card.label', { name, rarity: rarityLabel })
 }
 </script>
 

@@ -49,7 +49,7 @@ const DEX_NAMES = new Set([
  */
 const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'css', 'ctx', 'cwd',
-  'env', 'href', 'hrefs', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
+  'env', 'href', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
   'namespace', 'nav', 'ok', 'onchange', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint', 'url',
 ]
 
@@ -80,8 +80,8 @@ const DOMAIN = [
  * dictionary for one word costs more than this line does.
  */
 const DERIVATIONS = [
-  'backoff', 'cond', 'debounce', 'focusables', 'overscan', 'paralysed', 'pre', 'replayable',
-  'responder', 'resumable', 'virtualize', 'virtualizer',
+  'backoff', 'cond', 'debounce', 'focusables', 'hrefs', 'overscan', 'paralysed', 'pre',
+  'replayable', 'responder', 'resumable', 'virtualize', 'virtualizer',
 ]
 
 const BY_HAND = [...PLATFORM, ...TOOLING, ...DOMAIN, ...DERIVATIONS]

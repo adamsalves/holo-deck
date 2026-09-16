@@ -189,6 +189,18 @@ function onDrop(event: DragEvent): void {
           stroke-linecap="round"
         />
       </svg>
+      <!--
+        The line break travels **inside** the key, as a `{break}` slot, because
+        this is one sentence that happens to wrap: the translator sees *ARRASTE
+        UMA CARTA* whole and decides where it folds, which in en is a different
+        place than in pt-BR.
+
+        `packs.vue` stacks its asides the other way — two keys with a `<br>`
+        between them in the template — and that is the same rule, not a second
+        one: those are two independent sentences that happen to sit on two lines,
+        and one of them carries its own `<span>`. Merging them would hand the
+        translator a single string for two thoughts.
+      -->
       <i18n-t
         class="numeric deck-slot__hint"
         keypath="deck.slot.hint"
