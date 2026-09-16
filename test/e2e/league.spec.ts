@@ -1,7 +1,16 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { MOVES_IN_BATTLE } from '../../shared/types/dex.ts'
-import { defaultLocale, label, message } from '../support/locales'
+import {
+  defaultLocale,
+  label,
+  leafEntries,
+  localeCodes,
+  localeUrl,
+  message,
+  messagePattern,
+  readLocale,
+} from '../support/locales'
 import { openWelcomePack } from './support'
 
 /**
@@ -19,6 +28,20 @@ import { openWelcomePack } from './support'
  * Roda contra `yarn preview`, que é onde a batalha mora só no cliente e o HTML
  * servido não sabe nada dela.
  */
+
+/**
+ * O idioma em que a suíte foi escrita, e de onde ela lê cada frase.
+ *
+ * As asserções deixaram de repetir o texto à mão: `TURNO 01` escrito aqui
+ * envelhece ao lado do locale, e quando a tradução muda o teste reprova dizendo
+ * que a tela sumiu, não que a frase mudou.
+ */
+const PT = defaultLocale()
+
+/** `TURNO 01` — o rótulo do locale mais o número que a tela zera à esquerda. */
+function atTurn(turn: number): string {
+  return `${label('battle.bar.turn', PT)} ${String(turn).padStart(2, '0')}`
+}
 
 /** Escala as seis primeiras cartas que o pack deu. */
 async function fillDeck(page: Page): Promise<void> {
@@ -49,7 +72,9 @@ async function playTurn(page: Page): Promise<void> {
 test('a Liga abre no primeiro ginásio e mantém os outros fechados', async ({ page }) => {
   await page.goto('/league')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'A Liga' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { level: 1, name: label('league.title', PT) }),
+  ).toBeVisible()
 
   // Nove cartas, e o desbloqueio sequencial visível: uma atual, oito trancadas.
   await expect(page.locator('.gym')).toHaveCount(9)
@@ -60,11 +85,14 @@ test('a Liga abre no primeiro ginásio e mantém os outros fechados', async ({ p
   // O painel do próximo traz o prêmio da estreia — `200 + 100 × 1` —, e a carta
   // do ginásio estampa o mesmo número no botão. Os dois vêm de `rewardPreview`.
   await expect(page.locator('.league__prize')).toHaveText('+300')
-  await expect(page.locator('.gym--current .gym__challenge')).toHaveText('DESAFIAR · +300')
+  await expect(page.locator('.gym--current .gym__challenge'))
+    .toHaveText(message('league.gym.challenge', PT, { coins: '300' }))
 
   // Sem deck não há desafio: a tela oferece o que falta em vez de um botão que
   // levaria a uma batalha que o motor recusa.
-  await expect(page.getByRole('link', { name: /MONTE UM DECK/ })).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: messagePattern('league.next.buildDeck', PT) }),
+  ).toBeVisible()
 })
 
 test('um ginásio trancado recusa pela URL, e não só pelo botão', async ({ page }) => {
@@ -72,8 +100,12 @@ test('um ginásio trancado recusa pela URL, e não só pelo botão', async ({ pa
   // no primeiro minuto de jogo seria o caminho mais curto para pular a campanha.
   await page.goto('/battle/9')
 
-  await expect(page.getByRole('heading', { name: 'Ginásio fechado' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'IR PARA A LIGA' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: label('battle.standing.lockedTitle', PT) }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: label('battle.standing.lockedAction', PT) }),
+  ).toBeVisible()
 })
 
 test('a batalha começa, sobrevive ao reload e termina', async ({ page }) => {
@@ -81,10 +113,13 @@ test('a batalha começa, sobrevive ao reload e termina', async ({ page }) => {
   await fillDeck(page)
 
   await page.goto('/league')
-  await page.getByRole('link', { name: 'DESAFIAR', exact: true }).click()
+  await page.getByRole('link', {
+    name: label('league.next.challengeAction', PT),
+    exact: true,
+  }).click()
 
   // O campo montou: dois painéis de combatente, os golpes e o cabeçalho.
-  await expect(page.getByText('Ginásio 1 / 9')).toBeVisible()
+  await expect(page.getByText(message('battle.bar.gym', PT, { gym: 1, total: 9 }))).toBeVisible()
   await expect(page.locator('.combatant')).toHaveCount(2)
 
   // **De um a quatro golpes, e não quatro.** O deck sai das seis primeiras cartas
@@ -94,10 +129,10 @@ test('a batalha começa, sobrevive ao reload e termina', async ({ page }) => {
   const moves = page.locator('.move')
   await expect.poll(() => moves.count()).toBeGreaterThan(0)
   expect(await moves.count()).toBeLessThanOrEqual(MOVES_IN_BATTLE)
-  await expect(page.getByText('TURNO 01')).toBeVisible()
+  await expect(page.getByText(atTurn(1))).toBeVisible()
 
   await playTurn(page)
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   /**
    * **A checagem que a fase inteira sustenta.**
@@ -108,15 +143,15 @@ test('a batalha começa, sobrevive ao reload e termina', async ({ page }) => {
    * motor com a mesma seed. Qualquer elo quebrado devolve o turno 1.
    */
   await page.reload()
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   // E o Hub mostra a faixa de retomar, que é a superfície que o plano pede.
   await page.goto('/')
   await expect(page.locator('.hub__resume')).toBeVisible()
-  await expect(page.getByText('Batalha em andamento')).toBeVisible()
+  await expect(page.getByText(label('hub.resume.eyebrow', PT))).toBeVisible()
 
-  await page.getByRole('link', { name: 'RETOMAR' }).click()
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await page.getByRole('link', { name: label('hub.resume.resume', PT) }).click()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   // Até o fim. O limite é folgado: uma luta de ginásio 1 fecha em bem menos, e
   // um laço sem teto esconderia uma batalha que não termina — o defeito que o
@@ -138,7 +173,7 @@ test('a vitória paga, dá insígnia e abre o ginásio seguinte', async ({ page 
 
   // Direto pela URL: o ginásio 1 está aberto para todo mundo.
   await page.goto('/battle/1')
-  await expect(page.getByText('TURNO 01')).toBeVisible()
+  await expect(page.getByText(atTurn(1))).toBeVisible()
 
   const result = page.locator('.battle__result')
   for (let turn = 0; turn < 200 && !(await result.isVisible()); turn += 1) {
@@ -151,12 +186,12 @@ test('a vitória paga, dá insígnia e abre o ginásio seguinte', async ({ page 
    * o teste ramifica em vez de exigir a vitória: o que ele afirma é que o
    * resultado é coerente com o que ficou no save, nos dois casos.
    */
-  const won = await page.getByRole('heading', { name: 'Vitória' }).isVisible()
+  const won = await page.getByRole('heading', { name: label('battle.result.won', PT) }).isVisible()
 
   await page.goto('/league')
   if (won) {
     await expect(page.locator('.gym--won')).toHaveCount(1)
-    await expect(page.getByText('REVANCHE +75')).toBeVisible()
+    await expect(page.getByText(message('league.gym.rematch', PT, { coins: 75 }))).toBeVisible()
     // A insígnia moveu o próximo ginásio, e com ele a leitura de cobertura.
     await expect(page.locator('.gym--current')).toHaveCount(1)
     await expect(page.locator('.gym--locked')).toHaveCount(7)
@@ -230,7 +265,7 @@ test('começar outro ginásio com uma batalha aberta pede confirmação', async 
 
   await page.goto('/battle/1')
   await playTurn(page)
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   // A insígnia do primeiro abre o segundo. O resto do save fica como estava.
   await page.evaluate(() => {
@@ -246,18 +281,25 @@ test('começar outro ginásio com uma batalha aberta pede confirmação', async 
   })
 
   await page.goto('/battle/2')
-  await expect(page.getByRole('heading', { name: 'Você já está lutando' })).toBeVisible()
-  await expect(page.getByText(/Ginásio 1 · Brock, com 1 jogada feita/)).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: label('battle.standing.busyTitle', PT) }),
+  ).toBeVisible()
+  await expect(page.getByText(messagePattern(
+    'battle.standing.busyNote',
+    PT,
+    { gym: 1, leader: 'Brock', count: 1 },
+    1,
+  ))).toBeVisible()
 
   // Retomar aquela devolve o mesmo turno: nada foi perdido no caminho.
-  await page.getByRole('link', { name: 'RETOMAR AQUELA' }).click()
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await page.getByRole('link', { name: label('battle.standing.busyResume', PT) }).click()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   // E desistir explicitamente começa a nova, do turno 1.
   await page.goto('/battle/2')
-  await page.getByRole('button', { name: 'DESISTIR E COMEÇAR ESTA' }).click()
-  await expect(page.getByText('Ginásio 2 / 9')).toBeVisible()
-  await expect(page.getByText('TURNO 01')).toBeVisible()
+  await page.getByRole('button', { name: label('battle.standing.busyDrop', PT) }).click()
+  await expect(page.getByText(message('battle.bar.gym', PT, { gym: 2, total: 9 }))).toBeVisible()
+  await expect(page.getByText(atTurn(1))).toBeVisible()
 })
 
 /**
@@ -284,7 +326,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
 
   await page.goto('/battle/1')
   await playTurn(page)
-  await expect(page.getByText('TURNO 02')).toBeVisible()
+  await expect(page.getByText(atTurn(2))).toBeVisible()
 
   /** Um deploy que mexeu no dex, encenado no save: a forma continua válida —
    * `isDexVersion` cobra oito hex — e só o valor diverge, que é exatamente o que
@@ -308,7 +350,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   // Com deck montado, o descarte cai no caminho de quem chega sem batalha: luta
   // nova, do turno 1. O que ele **não** pode ser é o campo montando para sempre.
   await page.goto('/battle/1')
-  await expect(page.getByText('TURNO 01')).toBeVisible()
+  await expect(page.getByText(atTurn(1))).toBeVisible()
 
   // De um a quatro golpes, pelo sorteio que o teste do começo de batalha já
   // registra: o deck sai das seis primeiras cartas de um pack, e com uma espécie
@@ -317,7 +359,7 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   const moves = page.locator('.move')
   await expect.poll(() => moves.count()).toBeGreaterThan(0)
   expect(await moves.count()).toBeLessThanOrEqual(MOVES_IN_BATTLE)
-  await expect(page.getByText('Montando o campo…')).toHaveCount(0)
+  await expect(page.getByText(label('battle.standing.loading', PT))).toHaveCount(0)
 
   // A outra metade: o deck pode ter esvaziado desde que o log foi gravado — nada
   // trava o deck builder durante uma batalha. Aqui o descarte tem de encontrar a
@@ -336,6 +378,127 @@ test('a batalha de outro dex é descartada sem deixar a tela montando o campo', 
   })
 
   await page.goto('/battle/1')
-  await expect(page.getByRole('heading', { name: 'Sem time' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'MONTAR O DECK' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: label('battle.standing.noDeckTitle', PT) }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: label('battle.standing.noDeckAction', PT) }),
+  ).toBeVisible()
+})
+
+/**
+ * The League and the battle inside `/en`, which no gate on disk can reach.
+ *
+ * The disk gates read what is written: that every `NuxtLink` goes through
+ * `localePath`, and that every key the screens ask for is translated. What they
+ * cannot see is the page — and the defect of PR 1 of this phase went through
+ * exactly there, with nothing in the suite visiting `/en`.
+ *
+ * The turn log is the reason this test plays a turn instead of just reading the
+ * header. Its sentences are the only screen text in the game built by a plain
+ * function, and the patterns below come from the locale files rather than from
+ * this file: a message that changes wording stays measured, and one that is
+ * translated wrong is what fails.
+ *
+ * **Both languages, and the default one first.** A sweep that only visited `/en`
+ * would pass just as happily against a page stuck in English, and a gate that
+ * cannot tell the two apart is not measuring the language — it is measuring that
+ * some text exists.
+ */
+
+/** Every sentence the log can print in one language, as a pattern. */
+function logPatterns(code: string): { key: string, pattern: RegExp }[] {
+  return leafEntries(readLocale(code))
+    .filter(([key, value]) => (
+      key.startsWith('battle.log.') && key !== 'battle.log.title' && typeof value === 'string'
+    ))
+    .map(([key]) => ({ key, pattern: messagePattern(key, code) }))
+}
+
+/** The links that would take the player out of the language they are reading. */
+function strayLinks(hrefs: string[], locale: string, prefixed: string[]): string[] {
+  if (locale === defaultLocale()) {
+    return hrefs.filter(
+      href => prefixed.some(code => href === `/${code}` || href.startsWith(`/${code}/`)),
+    ).sort()
+  }
+
+  return hrefs.filter(href => href !== `/${locale}` && !href.startsWith(`/${locale}/`)).sort()
+}
+
+test('a Liga e a batalha falam o idioma da URL, do link ao log', async ({ page }) => {
+  const prefixed = localeCodes().filter(code => code !== defaultLocale())
+
+  // The other side: with a single locale on disk the loop below proves nothing.
+  expect(prefixed.length).toBeGreaterThan(0)
+
+  await openWelcomePack(page)
+  await fillDeck(page)
+
+  for (const locale of [defaultLocale(), ...prefixed]) {
+    await page.goto(localeUrl('/league', locale))
+
+    await expect(
+      page.getByRole('heading', { level: 1, name: label('league.title', locale) }),
+      `/league em ${locale} não traduziu o título`,
+    ).toBeVisible()
+    await expect(page.locator('.gym')).toHaveCount(9)
+
+    const leagueLinks = await page.locator('a[href^="/"]').evaluateAll(
+      links => links.map(link => link.getAttribute('href') ?? ''),
+    )
+
+    // The gym cards build their destination in a template literal, which is the
+    // shape no list of links can see — and the reason the disk gate had to read
+    // source. Here it is the rendered `href` that answers.
+    expect(
+      leagueLinks.filter(href => href.includes('/battle/')).length,
+      `/league em ${locale} não desenhou link de ginásio`,
+    ).toBeGreaterThan(0)
+    expect(
+      strayLinks(leagueLinks, locale, prefixed),
+      `/league em ${locale} devolve o jogador a outro idioma`,
+    ).toEqual([])
+
+    await page.goto(localeUrl('/battle/1', locale))
+
+    await expect(
+      page.getByText(message('battle.bar.gym', locale, { gym: 1, total: 9 })),
+      `/battle/1 em ${locale} não traduziu o cabeçalho`,
+    ).toBeVisible()
+
+    // The log is page state, so it starts empty in whatever language the URL
+    // says — and a turn is what puts a narrated sentence in it.
+    await expect(page.locator('.battle__log-empty')).toBeVisible()
+    await playTurn(page)
+    await expect(page.locator('.battle__log-empty')).toHaveCount(0)
+
+    const log = (await page.locator('.battle__log').innerText()).replaceAll(/\s+/g, ' ')
+    const spoken = logPatterns(locale).filter(({ pattern }) => pattern.test(log))
+
+    expect(spoken.length, `o log de ${locale} não casa com frase nenhuma do locale`)
+      .toBeGreaterThan(0)
+
+    // And nothing from the other language got in. Messages that read the same in
+    // both are dropped: matching one would prove nothing, and demanding it stay
+    // out would fail on a screen that is right.
+    for (const other of localeCodes().filter(code => code !== locale)) {
+      expect(
+        logPatterns(other)
+          .filter(({ key }) => label(key, other) !== label(key, locale))
+          .filter(({ pattern }) => pattern.test(log))
+          .map(({ key }) => key),
+        `o log de ${locale} narrou em ${other}`,
+      ).toEqual([])
+    }
+
+    const battleLinks = await page.locator('a[href^="/"]').evaluateAll(
+      links => links.map(link => link.getAttribute('href') ?? ''),
+    )
+
+    expect(
+      strayLinks(battleLinks, locale, prefixed),
+      `/battle/1 em ${locale} devolve o jogador a outro idioma`,
+    ).toEqual([])
+  }
 })
