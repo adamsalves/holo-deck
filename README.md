@@ -1237,15 +1237,35 @@ a issue #37.
 
 As duas metades: `test/e2e/collection.spec.ts` abre as quatro telas em `/en` e
 cobra o prefixo de todo `href` interno **e o idioma do corpo da tela** — sem a
-segunda, um literal em português acrescentado amanhã escaparia dos três portões
-ao mesmo tempo.
+segunda, uma chave traduzida para nada chegaria ao jogador sem asserção no
+caminho.
+
+O que nenhum dos dois alcança é **literal que nunca virou chave** — um
+`<p>Carregando…</p>` digitado no template. Foi medido, não suposto: plantado em
+`packs.vue`, a tela passou em todas as asserções. A lista da varredura é montada
+dos arquivos de locale, e frase que não está em locale nenhum não pode estar
+nela. Fechar isso pede um portão de texto de template no disco, que ainda não
+existe; até lá a fronteira está escrita nos dois docblocks, e não numa frase que
+soa coberta.
 
 A regra que os dois pagaram: **conjunto, nunca contagem.** A primeira versão do
-portão de link afirmava `links.length > 20` contra 29 links reais, e nove podiam
+portão de link afirmava `links.length > 20` contra 29 links reais, e oito podiam
 sumir antes de a asserção tremer — o que importa, porque é *sumindo* que aquele
-leitor falha: um `>` dentro de atributo (20 deles em `app/` — 18 comparações como
+leitor falha: um `>` dentro de atributo (21 deles em `app/` — 19 comparações como
 `v-if="count > 0"`, e duas arrow functions) truncava a tag, o `to=` caía fora da
-captura, e o link deixava de existir para a varredura em vez de reprová-la.
+captura, e o link deixava de existir para a varredura em vez de reprová-la. Esse
+21 foi 20 por um dia, porque a primeira contagem usou `grep` por linha e perdeu
+justamente um atributo espalhado por quatro linhas — a forma sobre a qual o
+parágrafo argumenta.
+
+E a paridade entre os locales ganhou as duas asserções que faltavam, em
+`test/unit/i18n-gate.spec.ts`: **toda** chave tem de diferir entre os idiomas ou
+estar nomeada em `IDENTICAL_LABELS` (são 22 hoje, quase todas vocabulário do
+jogo), e toda mensagem tem de pedir os mesmos `{placeholder}` e o mesmo número de
+formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves podiam ser
+coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,
+porque ela descarta o que é igual nos dois idiomas, e rótulo não traduzido é
+exatamente o que fica igual.
 
 O que sustenta as duas metades é o leitor de locale, e ele tem portão próprio:
 [`test/unit/locale-message.spec.ts`](test/unit/locale-message.spec.ts) roda o
