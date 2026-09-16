@@ -1,7 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
-import { defaultLocale, localeCodes, localeUrl } from '../support/locales'
-import { navLabel, skipInvite } from './support'
+import {
+  defaultLocale,
+  defaultOnlyLabels,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+} from '../support/locales'
+import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
 
 /**
  * O ciclo da Fase 5, num navegador de verdade.
@@ -16,6 +23,24 @@ import { navLabel, skipInvite } from './support'
  * Roda contra `yarn preview` — o build pré-renderizado, que é onde a coleção
  * mora só no cliente e o HTML servido não sabe nada dela.
  */
+
+/**
+ * Six species, which is what the Hub asks for before it writes *DESAFIAR*.
+ *
+ * They are spelled out rather than opened from packs because a pack draws at
+ * random, and a test about links should not depend on what came out of one.
+ *
+ * **Not any six, and the earlier note here said otherwise.** The challenge door
+ * only looks at the deck being full — that part was right — but the Hub also
+ * calls `invite.offer()` when the profile owns an ultra or above, and the invite
+ * is a `role="dialog" aria-modal="true"` over the whole screen. These six are
+ * all common but for Snorlax, which is rare, so the dialog stays shut *by
+ * accident*: swap one for a legendary — exactly what "any six do" invited — and
+ * the test fails for a reason that has nothing to do with links. The
+ * `skipInvite` below is what makes the choice not matter, and it is the house
+ * pattern for it.
+ */
+const READY_DECK = [1, 4, 7, 25, 133, 143]
 
 /**
  * **Não há `beforeEach` limpando o save, e isso é decisão.** O Playwright já dá
@@ -37,14 +62,19 @@ test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reloa
 
   // A loja abre em `Packs`, e o cartão de estreia é o primeiro da fileira. O
   // título vira `Abrir pack` só depois do clique, que é a outra metade da tela.
-  await expect(page.getByRole('heading', { level: 1, name: 'Packs' })).toBeVisible()
-  await expect(page.getByText('Boas-vindas · 1 de 3')).toBeVisible()
+  await expect(page.getByRole('heading', {
+    level: 1,
+    name: label('packs.shop.title', defaultLocale()),
+  })).toBeVisible()
+  await expect(page.getByText(
+    message('packs.welcome.eyebrow', defaultLocale(), { number: 1, total: 3 }),
+  )).toBeVisible()
 
   // O clique só vale depois da hidratação — antes dela o botão é marcação. Mesmo
   // `toPass` que a suíte da Pokédex usa pelas abas.
   await expect(async () => {
     await page.locator('.packs__buy--gift').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   // Dez cartas, e a composição do pack: seis comuns, três incomuns, uma raro+.
@@ -56,23 +86,26 @@ test('os três packs de boas-vindas enchem o binder, e o save sobrevive ao reloa
   // A tira termina em `10 / 10`, e não em `11 / 10`: o contador do opener é por
   // pack, e a instância do componente atravessa as três aberturas sem desmontar.
   const counter = page.getByText(/\d+ \/ 10 reveladas/)
-  await expect(counter).toHaveText('10 / 10 reveladas')
+  await expect(counter).toHaveText(message('packs.opening.revealed', defaultLocale(), { revealed: 10, total: 10 }))
 
   // Os dois packs restantes. A asserção do contador se repete aqui de propósito:
   // é no **segundo** pack que a contagem continuava de onde parou, e um laço que
   // só conte cartas veria dez das duas vezes sem notar `20 / 10` no cabeçalho.
   for (let pack = 2; pack <= 3; pack += 1) {
-    await page.getByRole('button', { name: 'ABRIR O PRÓXIMO' }).click()
+    await page.getByRole('button', { name: label('packs.again.welcome', defaultLocale()) }).click()
     await expect(cards).toHaveCount(10)
-    await expect(counter).toHaveText('10 / 10 reveladas')
+    await expect(counter).toHaveText(message('packs.opening.revealed', defaultLocale(), { revealed: 10, total: 10 }))
   }
 
   // Acabaram: o botão some e o baralho fica desabilitado.
-  await expect(page.getByRole('button', { name: 'ABRIR O PRÓXIMO' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: label('packs.again.welcome', defaultLocale()) })).toHaveCount(0)
 
   await page.goto('/collection')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Binder' })).toBeVisible()
+  await expect(page.getByRole('heading', {
+    level: 1,
+    name: label('collection.title', defaultLocale()),
+  })).toBeVisible()
   await expect(page.getByText('/ 1025')).toBeVisible()
 
   // Uma barra por região. `toHaveCount` e não `count()`: o binder inteiro é
@@ -106,7 +139,7 @@ test('a Pokédex conta o que o binder tem, e o filtro de posse separa os dois la
 
   await expect(async () => {
     await page.locator('.packs__buy--gift').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   await page.goto('/pokedex/1')
@@ -298,6 +331,173 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
 })
 
 /**
+ * And the screens, which is the half that was missing — and the one the defect
+ * walked through.
+ *
+ * The gate in `test/unit/locale-link-gate.spec.ts` reads the source and demands
+ * `localePath` of every link; **disk does not reach the screen**. That gap is
+ * exactly the one PR 1 paid for: nothing in the suite visited `/en`, and the bar
+ * shipped `href="/deck"` on every English route with no check going red.
+ *
+ * It names no link: it sweeps **every** internal `href` on the page and demands
+ * the prefix. A new link enters this measurement by existing, which is the same
+ * inversion the disk gate applies from the other side.
+ *
+ * **And it demands the language of the text, not only of the link.** Without
+ * that, `/en` had both halves of the measurement for the *link* and only the
+ * disk half for the *sentence*: a key translated into nothing, or a screen
+ * wired to the wrong one, reached the player with no assertion in its way.
+ *
+ * **What it still does not reach is a literal that was never a key**, and an
+ * earlier version of this docblock claimed the opposite. Measured, not argued:
+ * `<p class="packs__eyebrow">Aguarde um instante, estamos carregando</p>` was
+ * planted in `packs.vue`, and `/packs` passed every assertion below. It cannot
+ * be otherwise — the sweep's list is built from the locale files, and a sentence
+ * that is in no locale file cannot be in it. `defaultOnlyLabels` says this in
+ * its own docblock, and that is the half that was right.
+ *
+ * What does guard it is a **template-text gate on disk**, which does not exist
+ * yet. Until it does, this is the boundary, written where the next person will
+ * look for it rather than in a claim that reads as covered.
+ *
+ * Each screen's key is picked from inside the panel the screen already waits
+ * for, and the test **refuses a key whose two languages are identical**: a label
+ * that does not change between locales would pass without measuring anything,
+ * which is how a language assertion dies without saying so.
+ *
+ * The profile is new on purpose. With cards, the binder draws the grid's
+ * `PokeCard`, and their `to` is one of the links issue #37 still owes — the
+ * assertion would go red over a defect this PR did not set out to fix, and the
+ * gate's exception list is what records it.
+ */
+test('from inside `/en`, the screens keep the locale in links and in text', async ({ page }) => {
+  const prefixed = localeCodes().filter(code => code !== defaultLocale())
+
+  // The other side: with no prefixed locale, the loop below visits nothing.
+  expect(prefixed.length).toBeGreaterThan(0)
+
+  // `speaks` lives inside the panel `ready` waits for, and not in some corner
+  // of the screen: a key picked outside it would measure the bar, which PR 1
+  // already fixed, and would call the screen translated when only the frame is.
+  const screens = [
+    { path: '/', ready: '.hub__panel', speaks: 'hub.next.challenge' },
+    { path: '/packs', ready: '.packs__offer', speaks: 'packs.shop.rng' },
+    { path: '/collection', ready: '.collection__empty', speaks: 'collection.eyebrow' },
+    { path: '/deck', ready: '.deck-slot', speaks: 'deck.eyebrow' },
+  ]
+
+  for (const locale of prefixed) {
+    const leaked = defaultOnlyLabels(locale)
+
+    // The other side, derived instead of arbitrary. The floor was `> 50` against
+    // 108 labels, so 57 could leave the list before the assertion moved — and
+    // leaving the list is what an untranslated label **does**, since
+    // `defaultOnlyLabels` drops whatever is identical in both languages. Now the
+    // list has to carry the default label of every key this test will look for
+    // on screen: without it, the sweep could not catch that screen's regression.
+    expect(leaked, `nada difere entre ${defaultLocale()} e ${locale}`).not.toEqual([])
+    expect(
+      screens.map(({ speaks }) => label(speaks, defaultLocale()))
+        .filter(text => !leaked.includes(text)),
+      `estes rótulos saíram da varredura de ${locale}`,
+    ).toEqual([])
+
+    for (const { path, ready, speaks } of screens) {
+      await page.goto(localeUrl(path, locale))
+
+      // Everything these screens show lives inside `ClientOnly`: before
+      // hydration the page has the bar and nothing else, and the sweep would
+      // measure only the links the previous PR already fixed.
+      await expect(page.locator(ready).first()).toBeVisible()
+
+      // The other side of the language assertion: a label identical in both
+      // locales would pass in `/en` without proving any translation.
+      expect(
+        label(speaks, locale),
+        `\`${speaks}\` é igual nos dois idiomas e não mede tradução`,
+      ).not.toBe(label(speaks, defaultLocale()))
+
+      await expect(
+        page.getByText(label(speaks, locale)).first(),
+        `${path} em ${locale} desenha o corpo da tela em português`,
+      ).toBeVisible()
+
+      // And no label of the default locale leaked into this screen. The list
+      // comes from the two locale files and is never written here: a new label
+      // enters the measurement by being translated differently.
+      //
+      // **Case-insensitive, and that was measured, not assumed.** `innerText`
+      // returns the text as the CSS draws it, and this theme carries 36
+      // `text-transform: uppercase` declarations across 20 files of `app/`: with
+      // `Montagem de deck` planted on the screen by hand, the case-sensitive
+      // sweep looked for that while the page said `MONTAGEM DE DECK` — defect on
+      // screen, assertion green. `textContent` would return the text without the
+      // transform, but it drags along the content of `<script>`, where the Nuxt
+      // payload carries labels in both languages.
+      const body = (await page.locator('body').innerText())
+        .replaceAll(/\s+/g, ' ')
+        .toLowerCase()
+
+      expect(
+        leaked.filter(text => body.includes(text.toLowerCase())),
+        `${path} em ${locale} mostra rótulo em ${defaultLocale()}`,
+      ).toEqual([])
+
+      const hrefs = await page.locator('a[href^="/"]').evaluateAll(
+        links => links.map(link => link.getAttribute('href') ?? ''),
+      )
+
+      // Derived too: `> 5` was a hand-written floor against 12 real links. The
+      // global bar reaches six destinations on every screen, and those are what
+      // this demands — a new destination enters the measurement by existing in
+      // `nav-links`, the same inversion the disk gate applies.
+      expect(
+        [...NAV_LINKS, NAV_RULES, NAV_SETTINGS]
+          .map(link => localeUrl(link.to, locale))
+          .filter(href => !hrefs.includes(href)),
+        `${path} em ${locale} perdeu destinos da barra`,
+      ).toEqual([])
+      expect(
+        hrefs.filter(href => !href.startsWith(`/${locale}/`) && href !== `/${locale}`).sort(),
+        `${path} em ${locale} devolve o jogador ao idioma padrão`,
+      ).toEqual([])
+    }
+  }
+})
+
+/**
+ * The destination built in a template literal, which is the shape no list sees.
+ *
+ * `` :to="`/battle/${gym}`" `` appears neither in `NAV_DESTINATIONS` nor in a
+ * search for `to="/…"`, and it is the shape the Hub uses for both doors into a
+ * battle. The test above only reaches it with a full deck — without six cards
+ * the Hub writes *MONTAR O DECK* — so it gets a seeded save and an assertion
+ * that **names** the link: a sweep that failed to find the door would pass in
+ * silence.
+ */
+test('the Hub battle link, built in a template literal, carries the locale', async ({ page }) => {
+  const prefixed = localeCodes().filter(code => code !== defaultLocale())
+  expect(prefixed.length).toBeGreaterThan(0)
+
+  for (const locale of prefixed) {
+    // The invite gets out of the way before the save: with an ultra or a
+    // legendary in the profile, the Hub opens the modal dialog on top and the
+    // battle link becomes unreachable. See `READY_DECK`, which does not trigger
+    // it today — and should not depend on that.
+    await skipInvite(page)
+    await seedLocalSave(page, saveWith({
+      collection: Object.fromEntries(READY_DECK.map(id => [id, { c: 1, s: 0 }])),
+      deck: READY_DECK,
+    }))
+    await page.goto(localeUrl('/', locale))
+
+    const challenge = page.getByRole('link', { name: label('hub.next.fight', locale) })
+    await expect(challenge).toBeVisible()
+    await expect(challenge).toHaveAttribute('href', new RegExp(`^/${locale}/battle/\\d+$`))
+  }
+})
+
+/**
  * O link de pular navegação, que é a primeira parada de tabulação de toda tela.
  *
  * A barra põe nove elementos focáveis antes do conteúdo; sem ele, quem navega
@@ -353,7 +553,7 @@ test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', asy
 
   await expect(async () => {
     await page.locator('.packs__buy--gift').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   await page.goto('/collection')

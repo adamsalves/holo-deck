@@ -30,6 +30,7 @@ import { useReduceMotion } from '~/composables/useMotion'
 import { useInvite } from '~/composables/useInvite'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * A loja e a abertura — as pranchas *Loja* e *Abertura de pack*, nessa ordem.
@@ -228,8 +229,10 @@ const again = computed(() => {
   const from = source.value
   if (from === null || !canOpen(from)) return null
 
-  if (from === 'welcome') return { from, label: 'ABRIR O PRÓXIMO' }
-  if (from === 'store') return { from, label: `COMPRAR OUTRO · ${gameNumber(PACK_PRICE)}` }
+  if (from === 'welcome') return { from, label: t('packs.again.welcome') }
+  if (from === 'store') {
+    return { from, label: t('packs.again.store', { coins: gameNumber(PACK_PRICE) }) }
+  }
 
   return null
 })
@@ -260,8 +263,8 @@ const shinyPerPack = computed(() => 1 - (1 - SHINY_ODDS) ** PACK_SIZE)
 const packsPerShiny = computed(() => Math.round(1 / shinyPerPack.value))
 
 useSeoMeta({
-  title: 'Packs — Holo Deck',
-  description: 'Dez cartas: seis comuns, três incomuns e uma rara ou acima. Shiny a 1 em 256, e um ultra garantido a cada dez packs secos.',
+  title: () => t('packs.seo.title'),
+  description: () => t('packs.seo.description'),
 })
 </script>
 
@@ -273,16 +276,16 @@ useSeoMeta({
         <header class="packs__header">
           <div>
             <p class="packs__eyebrow">
-              Loja
+              {{ t('packs.shop.eyebrow') }}
             </p>
             <h1 class="packs__title">
-              Packs
+              {{ t('packs.shop.title') }}
             </h1>
           </div>
 
           <p class="numeric packs__aside">
-            Toda abertura sai de um RNG com seed.<br>
-            A distribuição é testável, não prometida.
+            {{ t('packs.shop.rng') }}<br>
+            {{ t('packs.shop.testable') }}
           </p>
         </header>
 
@@ -300,13 +303,16 @@ useSeoMeta({
 
             <div class="packs__offer-body">
               <p class="packs__eyebrow packs__eyebrow--gift">
-                Boas-vindas · {{ progress.welcomeClaimed + 1 }} de {{ WELCOME_PACKS }}
+                {{ t('packs.welcome.eyebrow', {
+                  number: progress.welcomeClaimed + 1,
+                  total: WELCOME_PACKS,
+                }) }}
               </p>
               <h2 class="packs__offer-title">
-                Pack de estreia
+                {{ t('packs.welcome.title') }}
               </h2>
               <p class="packs__offer-note">
-                {{ progress.welcomeRemaining }} de graça para o deck ter escolha.
+                {{ t('packs.welcome.note', { count: progress.welcomeRemaining }) }}
               </p>
 
               <div class="packs__offer-foot">
@@ -316,11 +322,11 @@ useSeoMeta({
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--gift bevel-control"
-                  aria-label="Abrir pack de estreia"
+                  :aria-label="t('packs.welcome.openLabel')"
                   :disabled="!canOpen('welcome')"
                   @click="open('welcome')"
                 >
-                  ABRIR
+                  {{ t('packs.open') }}
                 </button>
               </div>
             </div>
@@ -337,24 +343,24 @@ useSeoMeta({
 
             <div class="packs__offer-body">
               <p class="packs__eyebrow packs__eyebrow--daily">
-                Disponível agora
+                {{ t('packs.daily.eyebrow') }}
               </p>
               <h2 class="packs__offer-title">
-                Pack diário
+                {{ t('packs.daily.title') }}
               </h2>
               <p class="packs__offer-note">
-                Grátis, um por dia. Some da loja depois de aberto.
+                {{ t('packs.daily.note') }}
               </p>
 
               <div class="packs__offer-foot">
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--daily bevel-control"
-                  aria-label="Abrir pack diário"
+                  :aria-label="t('packs.daily.openLabel')"
                   :disabled="!canOpen('daily')"
                   @click="open('daily')"
                 >
-                  ABRIR
+                  {{ t('packs.open') }}
                 </button>
               </div>
             </div>
@@ -368,60 +374,72 @@ useSeoMeta({
 
             <div class="packs__offer-body">
               <p class="packs__eyebrow">
-                Sempre em estoque
+                {{ t('packs.store.eyebrow') }}
               </p>
               <h2 class="packs__offer-title">
-                Pack Holo
+                {{ t('packs.store.title') }}
               </h2>
               <p class="packs__offer-note">
-                As mesmas taxas do diário. Sem limite de quantidade.
+                {{ t('packs.store.note') }}
               </p>
 
               <div class="packs__offer-foot">
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--coin bevel-control"
-                  :aria-label="`Comprar Pack Holo por ${gameNumber(PACK_PRICE)} moedas`"
+                  :aria-label="t('packs.store.buyLabel', { coins: gameNumber(PACK_PRICE) })"
                   :disabled="!canOpen('store')"
                   @click="open('store')"
                 >
-                  {{ gameNumber(PACK_PRICE) }} moedas
+                  {{ t('packs.store.price', { coins: gameNumber(PACK_PRICE) }) }}
                 </button>
 
-                <p
+                <i18n-t
                   v-if="progress.canBuyPack"
                   class="numeric packs__offer-meta"
+                  keypath="packs.store.left"
+                  scope="global"
+                  tag="p"
                 >
-                  restam <b>{{ gameNumber(progress.coins - PACK_PRICE) }}</b>
-                  · dá para {{ progress.affordablePacks }}
-                </p>
+                  <template #coins>
+                    <b>{{ gameNumber(progress.coins - PACK_PRICE) }}</b>
+                  </template>
+                  <template #packs>
+                    {{ progress.affordablePacks }}
+                  </template>
+                </i18n-t>
                 <p
                   v-else
                   class="numeric packs__offer-meta packs__offer-meta--deficit"
                 >
-                  faltam {{ gameNumber(progress.missingCoins) }} moedas
+                  {{ t('packs.store.missing', { coins: gameNumber(progress.missingCoins) }) }}
                 </p>
               </div>
             </div>
           </article>
         </section>
 
-        <p
+        <i18n-t
           v-if="!dailyReady"
           class="numeric packs__timer"
+          keypath="packs.timer"
+          scope="global"
+          tag="p"
         >
-          O pack diário já saiu hoje — próximo em <b>{{ untilDaily }}</b>.
-        </p>
+          <template #time>
+            <b>{{ untilDaily }}</b>
+          </template>
+        </i18n-t>
 
         <section class="packs__rates">
           <!-- TAXAS -->
           <div class="packs__panel">
             <div class="packs__panel-head">
               <p class="packs__eyebrow">
-                Taxas
+                {{ t('packs.rates.title') }}
               </p>
               <p class="numeric packs__panel-source">
-                lidas de shared/game/packs.ts — a loja não tem número próprio
+                {{ t('packs.rates.source') }}
               </p>
             </div>
 
@@ -432,7 +450,7 @@ useSeoMeta({
                 :style="{ flexGrow: COMMON_SLOTS }"
               >
                 <b class="numeric">{{ COMMON_SLOTS }}</b>
-                <span class="numeric">comuns</span>
+                <span class="numeric">{{ t('packs.rates.commons') }}</span>
               </div>
               <div
                 class="packs__slot bevel-tile"
@@ -440,7 +458,7 @@ useSeoMeta({
                 :style="{ flexGrow: UNCOMMON_SLOTS }"
               >
                 <b class="numeric">{{ UNCOMMON_SLOTS }}</b>
-                <span class="numeric">incomuns</span>
+                <span class="numeric">{{ t('packs.rates.uncommons') }}</span>
               </div>
               <div
                 class="packs__slot bevel-tile"
@@ -448,12 +466,12 @@ useSeoMeta({
                 :style="{ flexGrow: RARE_PLUS_SLOTS * 2 }"
               >
                 <b class="numeric">{{ RARE_PLUS_SLOTS }}</b>
-                <span class="numeric">raro+</span>
+                <span class="numeric">{{ t('packs.rates.rarePlus') }}</span>
               </div>
             </div>
 
             <p class="numeric packs__label">
-              O slot raro+ rola assim
+              {{ t('packs.rates.slotRolls') }}
             </p>
             <dl class="packs__odds">
               <div
@@ -479,11 +497,13 @@ useSeoMeta({
 
             <p class="packs__shiny">
               <span class="numeric packs__shiny-chip">
-                SHINY 1/{{ 1 / SHINY_ODDS }}
+                {{ t('packs.rates.shinyChip', { odds: 1 / SHINY_ODDS }) }}
               </span>
               <span class="numeric packs__shiny-note">
-                Rola sobre qualquer carta, de qualquer tier — {{ gamePercent(shinyPerPack) }}
-                por pack, ou um a cada {{ packsPerShiny }}.
+                {{ t('packs.rates.shinyNote', {
+                  chance: gamePercent(shinyPerPack),
+                  packs: packsPerShiny,
+                }) }}
               </span>
             </p>
           </div>
@@ -491,7 +511,7 @@ useSeoMeta({
           <!-- PITY -->
           <div class="packs__panel">
             <p class="packs__eyebrow">
-              Garantia
+              {{ t('packs.pity.title') }}
             </p>
 
             <p class="numeric packs__pity-count">
@@ -499,7 +519,7 @@ useSeoMeta({
               <span>/ {{ PITY_THRESHOLD }}</span>
             </p>
             <p class="packs__offer-note">
-              packs sem ultra ou acima
+              {{ t('packs.pity.note') }}
             </p>
 
             <div class="packs__pity-track">
@@ -511,17 +531,32 @@ useSeoMeta({
               />
             </div>
 
-            <p class="packs__offer-note">
-              No décimo, o slot raro+ vira <b>ultra ou acima</b> garantido, e a
-              contagem zera. Faltam {{ progress.untilPity }}.
-            </p>
+            <i18n-t
+              class="packs__offer-note"
+              keypath="packs.pity.rule"
+              scope="global"
+              tag="p"
+            >
+              <template #tier>
+                <b>{{ t('packs.pity.tier') }}</b>
+              </template>
+              <template #left>
+                {{ progress.untilPity }}
+              </template>
+            </i18n-t>
           </div>
         </section>
 
-        <p class="numeric packs__foot">
-          Ao abrir: as cartas são creditadas <b>antes</b> de as moedas serem
-          debitadas. Uma falha no meio dá cartas de graça em vez de roubar moedas.
-        </p>
+        <i18n-t
+          class="numeric packs__foot"
+          keypath="packs.foot.order"
+          scope="global"
+          tag="p"
+        >
+          <template #before>
+            <b>{{ t('packs.foot.before') }}</b>
+          </template>
+        </i18n-t>
       </template>
 
       <!-- ABERTURA -->
@@ -530,17 +565,17 @@ useSeoMeta({
           <div>
             <div class="packs__eyebrow-row">
               <p class="packs__eyebrow">
-                Sequência de abertura
+                {{ t('packs.opening.eyebrow') }}
               </p>
               <span
                 v-if="welcomeNumber !== null"
                 class="numeric packs__badge"
               >
-                Boas-vindas · {{ welcomeNumber }} de {{ WELCOME_PACKS }}
+                {{ t('packs.welcome.eyebrow', { number: welcomeNumber, total: WELCOME_PACKS }) }}
               </span>
             </div>
             <h1 class="packs__title">
-              Abrir pack
+              {{ t('packs.opening.title') }}
             </h1>
           </div>
 
@@ -548,11 +583,17 @@ useSeoMeta({
                É a decisão do plano de ensinar no ponto de decisão em vez de num
                tutorial, e os números saem de `shared/game/packs.ts`. -->
           <p class="numeric packs__aside">
-            {{ PACK_SIZE }} cartas · {{ COMMON_SLOTS }} comuns, {{ UNCOMMON_SLOTS }} incomuns,
-            {{ RARE_PLUS_SLOTS }} raro+<br>
+            {{ t('packs.opening.aside', {
+              size: PACK_SIZE,
+              commons: COMMON_SLOTS,
+              uncommons: UNCOMMON_SLOTS,
+              rarePlus: RARE_PLUS_SLOTS,
+            }) }}<br>
             <span class="packs__aside-strong">
-              pity: {{ PITY_THRESHOLD }} packs sem ultra garante um ultra —
-              faltam {{ progress.untilPity }}
+              {{ t('packs.opening.pity', {
+                threshold: PITY_THRESHOLD,
+                left: progress.untilPity,
+              }) }}
             </span>
           </p>
         </header>
@@ -560,7 +601,7 @@ useSeoMeta({
         <section class="packs__revealed">
           <div class="packs__progress">
             <p class="numeric packs__label">
-              {{ revealed }} / {{ opened.length }} reveladas
+              {{ t('packs.opening.revealed', { revealed, total: opened.length }) }}
             </p>
             <div class="packs__progress-actions">
               <button
@@ -569,13 +610,13 @@ useSeoMeta({
                 class="numeric packs__skip"
                 @click="skip()"
               >
-                PULAR ANIMAÇÃO
+                {{ t('packs.opening.skip') }}
               </button>
               <NuxtLink
-                to="/collection"
+                :to="localePath('/collection')"
                 class="numeric packs__skip"
               >
-                VER COLEÇÃO
+                {{ t('packs.opening.toCollection') }}
               </NuxtLink>
               <button
                 v-if="again"
@@ -591,7 +632,7 @@ useSeoMeta({
                 :class="{ 'packs__skip--primary': again === null }"
                 @click="backToShop()"
               >
-                VOLTAR À LOJA
+                {{ t('packs.opening.backToShop') }}
               </button>
             </div>
           </div>
@@ -600,7 +641,7 @@ useSeoMeta({
             v-if="forcedByPity"
             class="numeric packs__pity-hit"
           >
-            A rede disparou: {{ PITY_THRESHOLD }} packs sem ultra garantiram este.
+            {{ t('packs.opening.pityHit', { threshold: PITY_THRESHOLD }) }}
           </p>
 
           <PackOpener
@@ -614,7 +655,7 @@ useSeoMeta({
 
       <template #fallback>
         <p class="packs__loading">
-          Carregando…
+          {{ t('packs.loading') }}
         </p>
       </template>
     </ClientOnly>

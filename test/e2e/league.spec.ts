@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { MOVES_IN_BATTLE } from '../../shared/types/dex.ts'
+import { defaultLocale, label, message } from '../support/locales'
 import { openWelcomePack } from './support'
 
 /**
@@ -193,7 +194,15 @@ test('o Hub conta a coleção, o saldo e o próximo ginásio', async ({ page }) 
 
   // As nove regiões, e o painel do próximo ginásio com o prêmio da estreia.
   await expect(page.locator('.hub__regions [role="progressbar"]')).toHaveCount(9)
-  await expect(page.getByText('Próximo desafio · Ginásio 1 de 9')).toBeVisible()
+  // Composed the way the Hub composes it: two keys and the `·` that lives in
+  // the template between them. Written out by hand, this assertion would fail
+  // with "element not found" the day the sentence changed — which is the
+  // failure `label()`'s throw exists to prevent.
+  const nextChallenge = [
+    label('hub.next.challenge', defaultLocale()),
+    message('hub.next.gym', defaultLocale(), { gym: 1, total: 9 }),
+  ].join(' · ')
+  await expect(page.getByText(nextChallenge)).toBeVisible()
   await expect(page.locator('.hub__reward')).toContainText('+300')
 
   // Sem batalha aberta a faixa de retomar não existe — ela não é uma casca vazia.

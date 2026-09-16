@@ -140,3 +140,153 @@ export function localeUrl(path: string, code: string): string {
 
   return path === '/' ? `/${code}` : `/${code}${path}`
 }
+
+/**
+ * The labels that would betray the default locale if they showed up in another.
+ *
+ * A message whose two translations are **identical** — `Shiny`, `Tier`, `Binder`
+ * — proves nothing by being on screen, so it is dropped: keeping it would make
+ * the sweep fail on a correctly translated page, and a gate that cries on good
+ * input gets switched off. What is left is every label that really does differ,
+ * and any one of them appearing inside `/en` means a sentence came out in the
+ * wrong language.
+ *
+ * Interpolated and plural messages are dropped too, for the honest reason: they
+ * never reach the DOM as written, so matching them literally would measure
+ * nothing. The gap that leaves is a literal nobody ever translated — a
+ * `Carregando…` typed straight into a template. This cannot see it, and neither
+ * can `i18n-gate`; that one wants a template-text gate of its own.
+ */
+export function defaultOnlyLabels(other: string): string[] {
+  const base = new Map(leafEntries(readLocale(defaultLocale())))
+
+  return [...base.entries()]
+    .filter(([key, value]) => {
+      if (typeof value !== 'string') return false
+      if (value.includes('{') || value.includes('|')) return false
+
+      const translated = leafEntries(readLocale(other)).find(([name]) => name === key)?.[1]
+
+      return typeof translated === 'string' && translated !== value
+    })
+    .map(([, value]) => String(value))
+}
+
+/**
+ * One translated message with its placeholders filled — the string the screen
+ * actually renders.
+ *
+ * `label()` returns the message as the translator wrote it, `{count} cópias` and
+ * all, and a test that asserted against that would be asserting against a
+ * template nobody ever sees. This fills the same placeholders vue-i18n fills, so
+ * a suite can ask for a sentence in either language without a copy of it living
+ * in the test file.
+ *
+ * **A placeholder with no value throws.** Returning it unfilled would let an
+ * assertion pass by matching a literal `{count}` on a screen that renders a
+ * number — the failure would then be invisible, which is the one thing a
+ * measurement may not be.
+ *
+ * `plural` picks the branch of a `one | other` message, by the same rule
+ * vue-i18n uses: exactly 1 takes the first form. Asking for a plural message
+ * without it throws rather than returning both halves joined by a pipe.
+ */
+export function message(
+  key: string,
+  code: string,
+  values: Readonly<Record<string, string | number>> = {},
+  plural?: number,
+): string {
+  const raw = label(key, code)
+  const forms = raw.split('|').map(form => form.trim())
+  const chosen = forms.length === 1
+    ? raw
+    : pluralForm(key, code, forms, plural)
+
+  return chosen.replaceAll(/\{(\w+)\}/g, (_, name: string) => {
+    const value = values[name]
+    if (value === undefined) {
+      throw new Error(`sem valor para \`{${name}}\` em \`${key}\` (${code})`)
+    }
+
+    return String(value)
+  })
+}
+
+/**
+ * Two forms is the rule this helper reproduces, and the only one it may claim.
+ *
+ * It is a reimplementation of somebody else's code, which is the shape a test
+ * helper is least allowed to get wrong — so it was read against the source.
+ * `@intlify/core-base` (`pluralDefault`) picks `choice === 1 ? 0 : 1` for two
+ * forms, zero included: **`0` takes the plural form** in pt-BR and in en, and
+ * the line below agrees. With three it switches to `Math.min(choice, 2)`, and
+ * the two stop agreeing at the most ordinary count there is: vue-i18n renders
+ * `forms[1]` for `count === 1`, this would hand back `forms[0]`.
+ *
+ * Nothing in the locales has three forms today. The day someone writes
+ * `nenhuma cópia | uma cópia | {count} cópias` — natural in both languages —
+ * the e2e would go red naming the screen while the defect sat here. So it stops
+ * instead, and says where to look.
+ *
+ * It also diverges on a negative count, where vue-i18n takes `Math.abs`. No
+ * count in this game is negative, and a guard for it would be a rule about
+ * nothing.
+ *
+ * Exported for `test/unit/locale-message.spec.ts`, which drives it against the
+ * real `vue-i18n` instead of restating the rule — a reimplementation nobody
+ * checks against the original is the false confidence the repository keeps
+ * paying for.
+ */
+export function pluralForm(key: string, code: string, forms: string[], plural?: number): string {
+  if (plural === undefined) {
+    throw new Error(`\`${key}\` (${code}) tem plural: passe a contagem`)
+  }
+
+  if (forms.length > 2) {
+    throw new Error(
+      `\`${key}\` (${code}) tem ${forms.length} formas de plural, e este helper só reproduz `
+      + 'a regra do vue-i18n para duas — ver o docblock de `pluralForm`',
+    )
+  }
+
+  const chosen = plural === 1 ? forms[0] : forms[forms.length - 1]
+  if (chosen === undefined) throw new Error(`\`${key}\` (${code}) ficou sem forma plural`)
+
+  return chosen
+}
+
+/**
+ * The same message as a pattern, with the placeholders left out standing for
+ * anything.
+ *
+ * It exists for the assertions that can only know part of what is on screen: the
+ * opener counts `{revealed}` up from zero while the cards flip, so the suite
+ * waits for *… / 10 reveladas* and cannot name the first number without racing
+ * the animation. Everything around the gap is escaped, so the pattern still
+ * fails when the sentence around it changes — which is the whole point of
+ * reading it from the locale instead of typing it here.
+ */
+export function messagePattern(
+  key: string,
+  code: string,
+  values: Readonly<Record<string, string | number>> = {},
+  plural?: number,
+): RegExp {
+  const raw = label(key, code)
+  const forms = raw.split('|').map(form => form.trim())
+  const chosen = forms.length === 1 ? raw : pluralForm(key, code, forms, plural)
+
+  const pattern = chosen
+    .split(/(\{\w+\})/)
+    .map((part) => {
+      const name = /^\{(\w+)\}$/.exec(part)?.[1]
+      if (name === undefined) return part.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+      const value = values[name]
+      return value === undefined ? '.+' : String(value).replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    })
+    .join('')
+
+  return new RegExp(pattern)
+}

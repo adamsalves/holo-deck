@@ -1217,6 +1217,63 @@ não alcança — o link que existe no dado e não chega à tela — é
 `test/e2e/collection.spec.ts`, que **itera sobre os mesmos destinos** e clica em
 cada um.
 
+### Os dois portões de idioma
+
+[`test/unit/i18n-gate.spec.ts`](test/unit/i18n-gate.spec.ts) cobra que os locales
+combinem chave por chave e que nenhuma chave fique órfã dos dois lados — rótulo
+pedido que ninguém traduziu, e tradução que tela nenhuma pede. Ele varre `t('…')`
+e também `keypath="…"`, que é como `<i18n-t>` carrega a chave: sem a segunda
+expressão, as frases com markup dentro seriam acusadas de órfãs e a asserção
+mandaria **apagar a tradução de uma frase que está na tela**.
+
+[`test/unit/locale-link-gate.spec.ts`](test/unit/locale-link-gate.spec.ts) pergunta
+a outra coisa — *como o link foi escrito*. `NuxtLink` com caminho literal **não é
+localizado pelo módulo**: de dentro de `/en`, `to="/deck"` devolve o jogador ao
+português sem caminho de volta. Quem localiza é `localePath()` ou
+`<NuxtLinkLocale>`. Ele lê a fonte, ao contrário do `nav-gate`, porque um template
+literal — `` :to="`/battle/${gym}`" `` — não existe em lista nenhuma, e enumera
+quem **sai**: link novo é infrator por omissão, e a lista de exceções esvazia com
+a issue #37.
+
+As duas metades: `test/e2e/collection.spec.ts` abre as quatro telas em `/en` e
+cobra o prefixo de todo `href` interno **e o idioma do corpo da tela** — sem a
+segunda, uma chave traduzida para nada chegaria ao jogador sem asserção no
+caminho.
+
+O que nenhum dos dois alcança é **literal que nunca virou chave** — um
+`<p>Carregando…</p>` digitado no template. Foi medido, não suposto: plantado em
+`packs.vue`, a tela passou em todas as asserções. A lista da varredura é montada
+dos arquivos de locale, e frase que não está em locale nenhum não pode estar
+nela. Fechar isso pede um portão de texto de template no disco, que ainda não
+existe; até lá a fronteira está escrita nos dois docblocks, e não numa frase que
+soa coberta.
+
+A regra que os dois pagaram: **conjunto, nunca contagem.** A primeira versão do
+portão de link afirmava `links.length > 20` contra 29 links reais, e oito podiam
+sumir antes de a asserção tremer — o que importa, porque é *sumindo* que aquele
+leitor falha: um `>` dentro de atributo (21 deles em `app/` — 19 comparações como
+`v-if="count > 0"`, e duas arrow functions) truncava a tag, o `to=` caía fora da
+captura, e o link deixava de existir para a varredura em vez de reprová-la. Esse
+21 foi 20 por um dia, porque a primeira contagem usou `grep` por linha e perdeu
+justamente um atributo espalhado por quatro linhas — a forma sobre a qual o
+parágrafo argumenta.
+
+E a paridade entre os locales ganhou as duas asserções que faltavam, em
+`test/unit/i18n-gate.spec.ts`: **toda** chave tem de diferir entre os idiomas ou
+estar nomeada em `IDENTICAL_LABELS` (são 22 hoje, quase todas vocabulário do
+jogo), e toda mensagem tem de pedir os mesmos `{placeholder}` e o mesmo número de
+formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves podiam ser
+coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,
+porque ela descarta o que é igual nos dois idiomas, e rótulo não traduzido é
+exatamente o que fica igual.
+
+O que sustenta as duas metades é o leitor de locale, e ele tem portão próprio:
+[`test/unit/locale-message.spec.ts`](test/unit/locale-message.spec.ts) roda o
+`pluralForm` contra o `vue-i18n` de verdade, mensagem por mensagem, em vez de
+reafirmar a regra. É reimplementação de código alheio dentro da infraestrutura de
+~40 asserções de e2e — e uma cópia que deriva reprova nomeando a tela, não a si
+mesma.
+
 ### A seção atual, e um mecanismo que nunca existiu
 
 O sublinhado do destino atual saía de `router-link-active`, com um comentário

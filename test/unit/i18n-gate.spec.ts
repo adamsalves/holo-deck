@@ -73,6 +73,53 @@ const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
  */
 const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal']
 
+/**
+ * Every message that really is the same in both languages.
+ *
+ * Written out because it is the **exception**, and compared as a whole set in
+ * both directions, so it cannot rot in the forgiving direction: a key that starts
+ * differing fails here too and has to leave the list. What is in it is the game's
+ * own vocabulary, borrowed untranslated by the pt-BR community — *Shiny*,
+ * *Binder*, *Deck*, *Packs*, *Tier*, *Base*, *Pokédex*, *Ultra*, *Normal* — plus
+ * the five messages that are nothing but placeholders and punctuation.
+ */
+const IDENTICAL_LABELS: readonly string[] = [
+  'collection.card.scrap',
+  'collection.card.shiny',
+  'collection.card.shinyBadge',
+  'collection.filters.shiny',
+  'collection.shiny',
+  'collection.table.tier',
+  'collection.title',
+  'deck.seo.title',
+  'deck.slotsCount',
+  'hub.shiny',
+  'nav.base',
+  'nav.deck',
+  'nav.packs',
+  'nav.pokedex',
+  'packs.card.label',
+  'packs.card.shinyBadge',
+  'packs.card.shinyLabel',
+  'packs.rates.shinyChip',
+  'packs.seo.title',
+  'packs.shop.title',
+  'rarity.ultra',
+  'type.normal',
+]
+
+/** The `{placeholder}` names a message asks for, in the order the file spells them. */
+function placeholdersOf(value: unknown): string[] {
+  if (typeof value !== 'string') return []
+
+  return [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1] ?? '').sort()
+}
+
+/** How many `|`-separated forms a message carries — 1 for everything but a plural. */
+function pluralFormsOf(value: unknown): number {
+  return typeof value === 'string' ? value.split('|').length : 0
+}
+
 /** The labels that appear more than once, named — an empty list is the pass. */
 function repeated(values: readonly string[]): string[] {
   const counted = new Map<string, number>()
@@ -101,6 +148,18 @@ const KEY_AREAS: readonly string[] = ['app', 'server']
 /** The literal-key expression, shared by the scan and by the test that guards its reach. */
 const LITERAL_KEY = /(?<![A-Za-z0-9_])\$?t\(\s*(['"])([\w]+(?:\.[\w]+)+)\1/g
 
+/**
+ * The other way a screen spells a key: `<i18n-t keypath="…">`.
+ *
+ * It arrived with the sentences that carry markup inside them — *recompensa
+ * **+500** moedas* — where `t()` cannot go, because the bold is an element and
+ * not a character. Without this expression those keys are asked for by nobody as
+ * far as the scan can tell, and the orphan assertion **deletes the translation
+ * of a sentence that is on screen**. The failure would name the locale, not the
+ * component, which is the worst way for a gate to be right.
+ */
+const KEYPATH = /\bkeypath="([\w]+(?:\.[\w]+)+)"/g
+
 /** Every key spelled out inside `KEY_AREAS`, swept from disk. */
 function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
   return roots.flatMap((root) => {
@@ -109,9 +168,10 @@ function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
     return files.flatMap((relativePath) => {
       const source = stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))
 
-      return [...source.matchAll(LITERAL_KEY)]
-        .map(match => match[2])
-        .filter((key): key is string => key !== undefined)
+      return [
+        ...[...source.matchAll(LITERAL_KEY)].map(match => match[2]),
+        ...[...source.matchAll(KEYPATH)].map(match => match[1]),
+      ].filter((key): key is string => key !== undefined)
     })
   })
 }
@@ -173,6 +233,90 @@ describe('paridade entre os locales', () => {
       const keys = leafEntries(locale).map(([key]) => key).sort()
 
       expect(keys, `o locale ${name} divergiu de ${reference[0]}`).toEqual(expected)
+    }
+  })
+
+  /**
+   * A file pasted instead of translated, which key parity reads as a match.
+   *
+   * This asks of **every** key what `the game vocabulary` used to ask of 24: the
+   * two languages must differ, or the key must be named in `IDENTICAL_LABELS`.
+   * Both directions, so an exception that starts differing fails too.
+   *
+   * It is the half no other gate reaches, and that was measured rather than
+   * assumed. Key parity compares names, not values. `locale-message` measures the
+   * helper. And the e2e sweep is built from `defaultOnlyLabels`, which **drops**
+   * the identical ones on purpose — so a label left in pt-BR inside `en.json`
+   * erases itself from that measurement instead of failing it. Before this
+   * assertion, 152 of the 174 keys could be pasted untranslated with every other
+   * check green.
+   */
+  it('translates every key outside the default locale, or names the exception', () => {
+    const code = defaultLocale()
+    const expected = [...IDENTICAL_LABELS].sort()
+
+    // The other side: an exception list longer than the file it forgives would
+    // mean the sweep below has nothing left to measure.
+    expect(expected.length).toBeLessThan(leafEntries(readLocale(code)).length / 2)
+
+    for (const [name, locale] of LOCALES.filter(([locale]) => locale !== code)) {
+      const identical = leafEntries(locale)
+        .filter(([key, value]) => value === label(key, code))
+        .map(([key]) => key)
+        .sort()
+
+      // Two differences rather than one `toEqual` of the whole set: both
+      // directions are still asserted, and the failure **names the key** instead
+      // of printing two truncated arrays for someone to diff by eye.
+      expect(
+        identical.filter(key => !expected.includes(key)),
+        `o locale ${name} não traduziu estas chaves`,
+      ).toEqual([])
+
+      expect(
+        expected.filter(key => !identical.includes(key)),
+        `estas chaves já diferem em ${name} e podem sair de \`IDENTICAL_LABELS\``,
+      ).toEqual([])
+    }
+  })
+
+  /**
+   * And the same message asks for the same values in every language.
+   *
+   * A translation that drops a `{placeholder}` renders the sentence without the
+   * number, and nothing else sees it: key parity has the key on both sides, the
+   * empty-label assertion has a non-empty string, and the e2e sweep **excludes**
+   * interpolated messages because they never reach the DOM as written. The Hub
+   * would draw a reward with no amount in it.
+   *
+   * Plural forms travel with the placeholders for the same reason, one step
+   * earlier: a message that is `one | other` in pt-BR and a single form in en
+   * makes `t(key, values, count)` return the wrong string in one language only.
+   */
+  it('asks for the same placeholders, and the same plural forms, in every locale', () => {
+    const code = defaultLocale()
+    const reference = leafEntries(readLocale(code))
+
+    // The other side: with no interpolated message in the reference, the two
+    // comparisons below would run over nothing and look healthy for it.
+    expect(reference.filter(([, value]) => placeholdersOf(value).length > 0).length)
+      .toBeGreaterThan(0)
+    expect(reference.filter(([, value]) => pluralFormsOf(value) > 1).length).toBeGreaterThan(0)
+
+    for (const [name, locale] of LOCALES.filter(([locale]) => locale !== code)) {
+      const entries = new Map(leafEntries(locale))
+
+      for (const [key, value] of reference) {
+        expect(
+          placeholdersOf(entries.get(key)),
+          `\`${key}\` pede valores diferentes em ${name}`,
+        ).toEqual(placeholdersOf(value))
+
+        expect(
+          pluralFormsOf(entries.get(key)),
+          `\`${key}\` tem outro número de formas plurais em ${name}`,
+        ).toBe(pluralFormsOf(value))
+      }
     }
   })
 
@@ -304,19 +448,10 @@ describe('the game vocabulary', () => {
   })
 
   /**
-   * And the inverse, which is what a second locale makes possible: a file copied
-   * instead of translated has every label identical to the default one.
+   * The inverse — a file pasted instead of translated — used to live here, asking
+   * it of these 24 keys. It moved to `paridade entre os locales` and now asks it
+   * of all 174: `rarity.*` and `type.*` are leaves of the locale files like any
+   * other, so nothing was narrowed by the move. Leaving a second, weaker copy
+   * behind would only have given someone two answers to the same question.
    */
-  it('really translates outside the default locale', () => {
-    const code = defaultLocale()
-
-    for (const [name] of LOCALES.filter(([locale]) => locale !== code)) {
-      const identical = VOCABULARY
-        .map(([, key]) => key)
-        .filter(key => label(key, name) === label(key, code))
-        .sort()
-
-      expect(identical, `o locale ${name} não traduziu estas chaves`).toEqual([...SHARED_WORDS].sort())
-    }
-  })
 })

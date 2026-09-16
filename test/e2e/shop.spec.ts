@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test'
 import type { SaveData } from '../../shared/save/schema.ts'
 import { isSaveData } from '../../shared/save/schema.ts'
 import { RARITY_NAMES, rarityKey } from '../../shared/types/game.ts'
-import { label, localeCodes, localeUrl } from '../support/locales.ts'
-import { skipInvite } from './support'
+import { defaultLocale, label, localeCodes, localeUrl, message, messagePattern } from '../support/locales.ts'
+import { openingProgress, skipInvite } from './support'
 
 /**
  * A loja, as regras e os ajustes num navegador de verdade.
@@ -73,18 +73,23 @@ test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
   await skipInvite(page)
   await page.goto('/packs')
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Packs' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: label('packs.shop.title', defaultLocale()) })).toBeVisible()
 
   // Os três cartões escrevem `ABRIR` ou um preço, e o rótulo visível não
   // distingue um do outro para quem não vê a fileira. Aqui só há dois — as
   // boas-vindas já foram no save plantado.
-  await expect(page.getByRole('button', { name: 'Abrir pack diário' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Comprar Pack Holo por 150 moedas' })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: label('packs.daily.openLabel', defaultLocale()),
+  })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: message('packs.store.buyLabel', defaultLocale(), { coins: '150' }),
+  })).toBeVisible()
 
   // O cartão da loja diz o que sobra e quantos cabem, e os dois saem da mesma
   // divisão — a prancha escreve `restam 1.090 · dá para 8` com outro saldo.
-  await expect(page.locator('.packs__offer-meta').last()).toContainText('restam 250')
-  await expect(page.locator('.packs__offer-meta').last()).toContainText('dá para 2')
+  await expect(page.locator('.packs__offer-meta').last()).toContainText(
+    message('packs.store.left', defaultLocale(), { coins: '250', packs: 2 }),
+  )
 
   const before = await readSave(page)
   expect(before.progress.coins).toBe(400)
@@ -92,7 +97,7 @@ test('comprar um pack debita 150 e credita dez cartas', async ({ page }) => {
 
   await expect(async () => {
     await page.locator('.packs__buy--coin').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   await expect(page.locator('.opener__slot')).toHaveCount(10)
@@ -110,7 +115,9 @@ test('sem saldo, o botão da loja fecha e diz quanto falta', async ({ page }) =>
   await page.goto('/packs')
 
   await expect(page.locator('.packs__buy--coin')).toBeDisabled()
-  await expect(page.locator('.packs__offer-meta').last()).toHaveText('faltam 60 moedas')
+  await expect(page.locator('.packs__offer-meta').last()).toHaveText(
+    message('packs.store.missing', defaultLocale(), { coins: '60' }),
+  )
 })
 
 test('o pack diário sai de graça, some da loja e volta a contar', async ({ page }) => {
@@ -125,7 +132,7 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
 
   await expect(async () => {
     await page.locator('.packs__buy--daily').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   const after = await readSave(page)
@@ -154,7 +161,9 @@ test('o pack diário sai de graça, some da loja e volta a contar', async ({ pag
   // De volta à loja, o cartão do diário saiu e o contador tomou o lugar dele.
   await page.locator('.packs__skip--primary').click()
   await expect(page.locator('.packs__offer')).toHaveCount(1)
-  await expect(page.locator('.packs__timer')).toContainText('próximo em')
+  await expect(page.locator('.packs__timer')).toHaveText(
+    messagePattern('packs.timer', defaultLocale()),
+  )
 })
 
 /**
@@ -186,7 +195,7 @@ test('dois packs abertos em sequência não saem idênticos', async ({ page }) =
 
   await expect(async () => {
     await page.locator('.packs__buy--gift').click()
-    await expect(page.getByText('/ 10 reveladas')).toBeVisible({ timeout: 1000 })
+    await expect(page.getByText(openingProgress())).toBeVisible({ timeout: 1000 })
   }).toPass({ timeout: 15_000 })
 
   await expect(page.locator('.opener__slot')).toHaveCount(10)
