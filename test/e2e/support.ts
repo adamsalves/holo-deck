@@ -41,6 +41,19 @@ export function navLabel(key: string, locale: string = defaultLocale()): string 
  */
 
 /**
+ * The opener's progress line, as a pattern — *… / 10 reveladas*.
+ *
+ * A pattern and not a string because the left number counts up while the cards
+ * flip, and all seven callers wait for the opener to exist rather than for a
+ * particular card to have turned. The right number comes from `PACK_SIZE` for the
+ * same reason `saveWith` reads `SCHEMA_VERSION`: the day the pack changes size,
+ * the suites follow the rule instead of the nine literal `10`s this replaced.
+ */
+export function openingProgress(): RegExp {
+  return messagePattern('packs.opening.revealed', defaultLocale(), { total: PACK_SIZE })
+}
+
+/**
  * Abre um pack de boas-vindas, que é como qualquer jogador chega ao deck.
  *
  * O `toPass` é a espera pela hidratação: antes dela o botão é marcação, e o
@@ -51,19 +64,6 @@ export function navLabel(key: string, locale: string = defaultLocale()): string 
  * diário também está de pé, e um `getByRole` por nome pegaria o primeiro que
  * casasse.
  */
-/**
- * The opener's progress line, as a pattern — *… / 10 reveladas*.
- *
- * A pattern and not a string because the left number counts up while the cards
- * flip, and the five callers all wait for the opener to exist rather than for a
- * particular card to have turned. The right one comes from `PACK_SIZE` for the
- * same reason `saveWith` reads `SCHEMA_VERSION`: the day the pack changes size,
- * the suites follow the rule instead of a `10` typed five times.
- */
-export function openingProgress(): RegExp {
-  return messagePattern('packs.opening.revealed', defaultLocale(), { total: PACK_SIZE })
-}
-
 export async function openWelcomePack(page: Page): Promise<void> {
   await skipInvite(page)
   await page.goto('/packs')

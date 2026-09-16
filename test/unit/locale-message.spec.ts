@@ -44,6 +44,9 @@ function pluralKeys(code: string): string[] {
 /** Placeholders the plural messages need, by name, so every branch can render. */
 const VALUES = { count: 0, name: 'Bulbasaur', dust: 1600 }
 
+/** The counts that separate the two plural rules, `0` first. */
+const COUNTS: readonly number[] = [0, 1, 2, 5]
+
 /**
  * The same message, rendered by the library the player's screen uses.
  *
@@ -71,15 +74,34 @@ describe('locale message helper', () => {
    * rules: `0` (where a hand-written `=== 1` is most likely to get it backwards),
    * `1`, and two plurals. Built from the locale files, never listed here — a
    * fourth plural message is measured by being written.
+   *
+   * **And the completeness check is a set, which it was not.** It read
+   * `expect(checked.length).toBe(localeCodes().length * 3 * 4)`, where the `3`
+   * was a hand-written count of plural keys — the list the `CLAUDE.md` forbids,
+   * contradicting the paragraph right above it. It failed a **fourth plural
+   * message written correctly in both locales** with `expected 32 to be 24`, and
+   * a gate that reprimands good input is a gate someone switches off.
+   *
+   * The pairs come from the default locale and are demanded of every locale, so
+   * the set cannot shrink to fit the defect: derived per locale, a message that
+   * stopped being plural in `en` would simply leave both sides of the comparison
+   * and pass. That a locale must keep the same plural forms as the default is one
+   * rule with one owner — `i18n-gate`, which names the key — and this file does
+   * not keep a second, weaker copy of it.
    */
   it('picks the same plural branch vue-i18n picks, message by message', () => {
     const checked: string[] = []
+    const expected = localeCodes().flatMap(
+      code => pluralKeys(defaultLocale()).flatMap(
+        key => COUNTS.map(count => `${code} ${key} ${count}`),
+      ),
+    )
 
     for (const code of localeCodes()) {
-      for (const key of pluralKeys(code)) {
+      for (const key of pluralKeys(defaultLocale())) {
         const raw = label(key, code)
 
-        for (const count of [0, 1, 2, 5]) {
+        for (const count of COUNTS) {
           expect(
             message(key, code, { ...VALUES, count }, count),
             `${key} (${code}) com count=${count}`,
@@ -92,7 +114,8 @@ describe('locale message helper', () => {
 
     // `[] === []` passes: a locale that stopped yielding plural messages would
     // leave the loop above comparing nothing and looking healthy for it.
-    expect(checked.length).toBe(localeCodes().length * 3 * 4)
+    expect(expected).not.toEqual([])
+    expect(checked.sort()).toEqual([...expected].sort())
   })
 
   /**

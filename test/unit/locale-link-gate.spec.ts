@@ -46,8 +46,8 @@ const LINK_AREA = 'app'
  * The opening tag of a link, with its attributes.
  *
  * **Quoted values are consumed whole, and that is load-bearing.** A plain
- * `[^>]*?` stops at the first `>` — including one inside an attribute value. 20
- * attributes under `app/` carry one: 18 as a comparison, `v-if="count > 0"`
+ * `[^>]*?` stops at the first `>` — including one inside an attribute value. 21
+ * attributes under `app/` carry one: 19 as a comparison, `v-if="count > 0"`
  * being the most common conditional here, and two as an arrow function
  * (`@drop="id => onDrop(…)"`), which truncates the tag just the same. A
  * truncated tag loses its `to=`, and a link with no destination is dropped by
@@ -56,8 +56,15 @@ const LINK_AREA = 'app'
  * it, one broken link plus a `v-if` on the same tag left every assertion in this
  * file green with the defect on screen.
  *
- * The first version bet on a count to notice, and a count could not: there were
- * nine links of slack under the floor. The other side is a set now — see
+ * That count was first written as 20, from a line-based `grep`. The one it
+ * missed is a `:class="{…}"` spread over four lines in
+ * `app/pages/battle/[gymId].vue` — a multi-line attribute, which is exactly the
+ * shape this paragraph is about. Counted with `stripComments` over the file, not
+ * line by line.
+ *
+ * The first version bet on a count to notice, and a count could not: `> 20`
+ * against 29 links let eight vanish in silence — the ninth is what would have
+ * tripped it. The other side is a set now — see
  * `it('reads every link tag on disk, and none of them truncated')`.
  *
  * **What it does not reach**, and should not be widened to: `<a href>`,
@@ -65,6 +72,13 @@ const LINK_AREA = 'app'
  * `ULink`, `UCard`), which render a `NuxtLink` underneath and would never be
  * spelled with this tag name. None of the four exists under `app/` today —
  * measured, not assumed — and each needs its own reader the day it does.
+ *
+ * There is a fifth, and it is not hypothetical: `window.location.assign`, in
+ * `app/composables/useAccount.ts`. It navigates without a tag at all, and it is
+ * already localized — with `$localePath('/')`, because **it was this very defect
+ * once**, as its own comment records. A blind-spot list that omits the shape
+ * that has already produced the defect is the half of the rule that fails
+ * silently: this reader cannot see the next composable that assigns a raw path.
  */
 const LINK_TAG = /<(NuxtLink|NuxtLinkLocale)\b((?:"[^"]*"|'[^']*'|[^>])*?)\/?>/g
 
