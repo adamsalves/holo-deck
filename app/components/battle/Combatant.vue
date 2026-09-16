@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { BattlePokemon } from '~~/shared/game/battle'
-import { CONDITION_LABELS, effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
+import { effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
+import { conditionKey } from '~~/shared/types/game'
 import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
 
 /**
@@ -12,6 +13,8 @@ import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
  * não o conteúdo, e duplicá-lo seria a chance de as duas barras divergirem em
  * como leem o mesmo HP.
  */
+const { t } = useI18n()
+
 const props = defineProps<{
   pokemon: BattlePokemon
   /** O do jogador ganha a moldura do próprio tipo, como no canvas. */
@@ -72,7 +75,7 @@ const standout = computed(() => {
         <span
           v-if="pokemon.condition"
           class="numeric combatant__condition"
-        >{{ CONDITION_LABELS[pokemon.condition.kind] }}</span>
+        >{{ t(conditionKey(pokemon.condition.kind)) }}</span>
         <DexTypeBadge
           v-for="type in pokemon.types"
           :key="type"

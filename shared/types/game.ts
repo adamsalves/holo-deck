@@ -1,5 +1,5 @@
 import type { SpeciesId } from './brand.ts'
-import type { AilmentName, Habitat, TypeName } from './dex.ts'
+import type { AilmentName, DamageClass, Habitat, TypeName } from './dex.ts'
 
 /**
  * Tipos do jogo — o que a Pokédex não conhece.
@@ -118,20 +118,21 @@ export const REGION_LABELS: Record<RegionName, string> = {
 }
 
 /**
- * `Geração IV`, que é como a prancha *Pokédex* escreve o sobretítulo da região.
+ * O algarismo de `Geração IV`, que é como a prancha *Pokédex* escreve o
+ * sobretítulo da região.
  *
  * O dex traz `Generation IV` em `displayName`, vindo da PokeAPI — em inglês, num
- * documento `lang="pt-BR"`. Traduzir aqui, e não no build, mantém a regra do
- * repositório de que `dex.ts` guarda o que vem de fora e o texto que o jogador
- * lê é coisa deste módulo.
+ * documento `lang="pt-BR"`. A palavra virou a chave `generation.label`, e o que
+ * sobrou aqui é o algarismo: ele é o mesmo nos dois idiomas, e mandá-lo para o
+ * locale obrigaria a escrever nove traduções idênticas em cada arquivo novo.
  *
  * O algarismo sai da lista, e não de um conversor: são nove valores fixos, e um
  * conversor genérico seria mais código para cobrir 991 números que não existem.
  */
 const ROMAN_NUMERALS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
 
-export function generationLabel(generation: number): string {
-  return `Geração ${ROMAN_NUMERALS[generation - 1] ?? generation}`
+export function generationNumeral(generation: number): string {
+  return ROMAN_NUMERALS[generation - 1] ?? String(generation)
 }
 
 /**
@@ -172,12 +173,78 @@ export const HABITAT_LABELS: Record<Habitat, string> = {
  * Mora aqui e não em `status.ts` pelo mesmo motivo de `typeKey`: `dex.ts`
  * guarda o que vem da PokeAPI e `status.ts` guarda a regra; o texto que o
  * jogador lê é coisa que este módulo inventa.
+ *
+ * Hoje ele devolve o **endereço** — `ailment.burn`, nunca *queimadura* —, e
+ * quem resolve o `t()` é o consumidor. É o que mantém `shared/` sem texto de
+ * tela com a fronteira do `shared-purity` intacta.
  */
-export const AILMENT_LABELS: Record<AilmentName, string> = {
-  paralysis: 'paralisia',
-  burn: 'queimadura',
-  poison: 'envenenamento',
-  sleep: 'sono',
+export function ailmentKey(ailment: AilmentName): string {
+  return `ailment.${ailment}`
+}
+
+/**
+ * The locale key of the badge the battle HUD stamps on a combatant — three
+ * letters, and they are **not** the first three of the word.
+ *
+ * A second namespace over the same four ids, because the two texts differ per
+ * language in different ways: *queimadura* shortens to `QUE` and *burn* to
+ * `BRN`, so deriving one from the other would need a rule per locale. Two keys
+ * is the cheaper truth.
+ *
+ * It moved here from `status.ts` with the translation. The docblock above said
+ * why it should always have been here — `status.ts` holds the rule, this module
+ * holds the text the game invents — and the label sitting next to
+ * `residualDamage` was the leftover of an older cut.
+ */
+export function conditionKey(ailment: AilmentName): string {
+  return `condition.${ailment}`
+}
+
+/** The locale key of the class a move belongs to — `FÍS`, `ESP`, `STATUS`. */
+export function damageClassKey(damageClass: DamageClass): string {
+  return `move.class.${damageClass}`
+}
+
+/**
+ * The locale key of the note a status move carries against someone already
+ * under a condition — *JÁ PARALISADO*.
+ *
+ * A third namespace over the same four ids, and the third one is not a
+ * duplicate: the word (*paralisia*), the badge (*PAR*) and this note (*JÁ
+ * PARALISADO*) sit on three different screens and shorten differently in each
+ * language. One key holding all three would pick one and let the other two
+ * render the wrong length into a fixed-width chip.
+ */
+export function affectedKey(ailment: AilmentName): string {
+  return `affected.${ailment}`
+}
+
+/**
+ * Every multiplier two types can multiply into, with the six of them named.
+ *
+ * The list is the domain fact: the 18×18 matrix holds `0`, `½`, `1` and `2`, and
+ * a Pokémon with two types multiplies a pair of them — which is where `¼` and
+ * `4` come from, and why nothing else can appear. `multiplierLabel()` in
+ * `shared/game/typechart.ts` writes the symbol (`×½`), the same in both
+ * languages; this writes the address of the **word** next to it, which is not.
+ *
+ * Names and not the numbers themselves, because a locale key is addressed with
+ * dots: `effectiveness.0.25` would ask the locale file for a `25` nested inside
+ * a `0`, and the translation would be missing in a way that reads like a typo.
+ */
+export const EFFECTIVENESS_MULTIPLIERS = [0, 0.25, 0.5, 1, 2, 4] as const
+
+const EFFECTIVENESS_NAMES: Record<number, string> = {
+  0: 'none',
+  0.25: 'barely',
+  0.5: 'weak',
+  1: 'neutral',
+  2: 'strong',
+  4: 'devastating',
+}
+
+export function effectivenessKey(multiplier: number): string {
+  return `effectiveness.${EFFECTIVENESS_NAMES[multiplier] ?? 'neutral'}`
 }
 
 /**

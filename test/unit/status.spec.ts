@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { AILMENT_NAMES } from '~~/shared/types/dex'
 import { createRng } from '~~/shared/game/rng'
 import { toBattleStats } from '~~/shared/game/stats'
 import type { Condition } from '~~/shared/game/status'
 import {
   BURN_DAMAGE_FRACTION,
-  CONDITION_LABELS,
   POISON_DAMAGE_FRACTION,
   checkImpediment,
   createCondition,
@@ -127,9 +125,10 @@ describe('sem condição', () => {
   })
 })
 
-describe('rótulos', () => {
-  it('as quatro condições têm rótulo, e nenhuma a mais', () => {
-    expect(Object.keys(CONDITION_LABELS).sort()).toEqual([...AILMENT_NAMES].sort())
-    expect(CONDITION_LABELS.paralysis).toBe('PAR')
-  })
-})
+/**
+ * `CONDITION_LABELS` left with the translation, and so did the two assertions
+ * that lived here: `i18n-gate` derives one `condition.*` key per `AILMENT_NAMES`
+ * and asks it of **every** locale, which is the half a `Record` in one language
+ * could not reach. `PAR` is named in `IDENTICAL_LABELS` there, because it is the
+ * one badge the two languages shorten the same way.
+ */

@@ -4,7 +4,8 @@ import type {
   SideName,
 } from '~~/shared/game/battle'
 import type { Condition } from '~~/shared/game/status'
-import type { MoveEntry } from '~~/shared/types/dex'
+import type { AilmentName, MoveEntry } from '~~/shared/types/dex'
+import { AILMENT_NAMES } from '~~/shared/types/dex'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
 /**
@@ -29,27 +30,77 @@ export interface NarratedTurn {
   readonly lines: readonly string[]
 }
 
-const CONDITION_PHRASES: Record<Condition['kind'], string> = {
-  paralysis: 'paralisado',
-  burn: 'queimado',
-  poison: 'envenenado',
-  sleep: 'dormindo',
-}
+/**
+ * How the narrator asks for a sentence.
+ *
+ * It takes the translator instead of reaching for `useI18n()` because it is a
+ * plain function with no component around it, and `t()` outside a setup scope is
+ * either undefined or the wrong locale. The parameter is **required** for the
+ * same reason `describeEvolution` made its resolver required: a default would
+ * have to be something, and anything plausible enough to compile is plausible
+ * enough to ship a half-translated log.
+ */
+export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
 
-const BLOCK_PHRASES: Record<Condition['kind'], string> = {
-  paralysis: 'perdeu o turno pela paralisia',
-  burn: 'perdeu o turno',
-  poison: 'perdeu o turno',
-  sleep: 'está dormindo',
-}
+/**
+ * Where each sentence lives, spelled once.
+ *
+ * The switch below reads from here and so does `NARRATION_KEYS`, which is what
+ * lets `test/unit/battle-narration.spec.ts` compare the list against the keys
+ * the function actually asks for. Two hand-kept lists would drift, and the
+ * direction they drift in is the expensive one: a key the log asks for and the
+ * list omits is invisible to `i18n-gate`, which then reports its translation as
+ * an orphan and has it deleted.
+ */
+const KEY = {
+  switch: 'battle.log.switch',
+  potion: 'battle.log.potion',
+  miss: 'battle.log.miss',
+  hit: 'battle.log.hit',
+  damage: 'battle.log.damage',
+  critical: 'battle.log.critical',
+  noEffect: 'battle.log.noEffect',
+  faint: 'battle.log.faint',
+  blocked: (kind: AilmentName) => `battle.log.blocked.${kind}`,
+  ailment: (kind: AilmentName) => `battle.log.ailment.${kind}`,
+  residual: (cause: AilmentName | 'generic') => `battle.log.residual.${cause}`,
+  outcome: (outcome: 'won' | 'lost') => `battle.log.outcome.${outcome}`,
+} as const
 
-/** Só queimadura e veneno cobram dano residual; as outras duas estão aqui
- * porque o `Record` é completo — um estado novo não compila sem frase. */
-const RESIDUAL_PHRASES: Record<Condition['kind'], string> = {
-  paralysis: 'no fim do turno',
-  burn: 'pela queimadura',
-  poison: 'pelo veneno',
-  sleep: 'no fim do turno',
+/**
+ * The name a move falls back to when the dex does not carry its id.
+ *
+ * Outside `NARRATION_KEYS` because it belongs to no single kind — every event
+ * that names a move can reach it — and the `Record` is keyed by kind. Exported
+ * so the gate can union it in with the rest.
+ */
+export const UNKNOWN_MOVE_KEY = 'battle.log.unknownMove'
+
+/**
+ * Every key the log can print, by the kind of event that prints it.
+ *
+ * A `Record` over `BattleEvent['kind']`, so an eleventh event fails to compile
+ * instead of failing to be translated — which is the guarantee the old
+ * `Record<Condition['kind'], string>` of phrases used to give, kept through the
+ * move to JSON where the compiler cannot follow.
+ *
+ * The four residual causes carry two pairs of identical sentences today
+ * (paralysis and sleep both end the turn without a reason of their own, and so
+ * does `generic`). They stay four keys and not one: which conditions charge
+ * damage is an engine rule that has already changed once, and when it changes
+ * again the sentence should follow from the locale, not from an edit here.
+ */
+export const NARRATION_KEYS: Record<BattleEvent['kind'], readonly string[]> = {
+  'switch': [KEY.switch],
+  'potion': [KEY.potion],
+  'blocked': AILMENT_NAMES.map(name => KEY.blocked(name)),
+  'miss': [KEY.miss],
+  'hit': [KEY.hit, KEY.damage, KEY.critical],
+  'ailment': AILMENT_NAMES.map(name => KEY.ailment(name)),
+  'no-effect': [KEY.noEffect],
+  'residual': [...AILMENT_NAMES.map(name => KEY.residual(name)), KEY.residual('generic')],
+  'faint': [KEY.faint],
+  'outcome': [KEY.outcome('won'), KEY.outcome('lost')],
 }
 
 /**
@@ -63,6 +114,7 @@ export function narrate(
   before: BattleState,
   events: readonly BattleEvent[],
   moves: ReadonlyMap<number, MoveEntry>,
+  t: Translate,
 ): NarratedTurn {
   const active: Record<SideName, number> = {
     player: before.player.active,
@@ -79,7 +131,7 @@ export function narrate(
   }
 
   function moveName(id: number): string {
-    return moves.get(id)?.displayName ?? 'o golpe'
+    return moves.get(id)?.displayName ?? t(UNKNOWN_MOVE_KEY)
   }
 
   /**
@@ -102,57 +154,64 @@ export function narrate(
       case 'switch':
         // O cursor anda **antes** da frase: quem entrou é o novo índice.
         active[event.side] = event.to
-        lines.push(`${nameOf(event.side)} entrou em campo.`)
+        lines.push(t(KEY.switch, { name: nameOf(event.side) }))
         break
 
       case 'potion':
-        lines.push(`${nameOf(event.side)} recuperou ${event.healed} HP.`)
+        lines.push(t(KEY.potion, { name: nameOf(event.side), healed: event.healed }))
         break
 
       case 'blocked':
-        lines.push(`${nameOf(event.side)} ${BLOCK_PHRASES[event.condition.kind]}.`)
+        lines.push(t(KEY.blocked(event.condition.kind), { name: nameOf(event.side) }))
         break
 
       case 'miss':
-        lines.push(`${nameOf(event.side)} errou ${moveName(event.moveId)}.`)
+        lines.push(t(KEY.miss, { name: nameOf(event.side), move: moveName(event.moveId) }))
         break
 
       case 'hit': {
-        const target = nameOf(other(event.side))
-        const effect = event.effectiveness === 1 ? '' : ` ${multiplierLabel(event.effectiveness)}`
-        const crit = event.critical ? ' Acerto crítico!' : ''
-        lines.push(
-          `${nameOf(event.side)} usou ${moveName(event.moveId)}.${effect}`
-          + ` ${target} perdeu ${event.damage} HP.${crit}`,
-        )
+        // Three whole sentences and a symbol, not one sentence with swappable
+        // pieces inside it: `×2` reads the same in both languages, and each of
+        // the other three is a clause a translator can reorder without asking
+        // the code for permission.
+        const parts = [t(KEY.hit, { name: nameOf(event.side), move: moveName(event.moveId) })]
+        if (event.effectiveness !== 1) parts.push(multiplierLabel(event.effectiveness))
+        parts.push(t(KEY.damage, { target: nameOf(other(event.side)), damage: event.damage }))
+        if (event.critical) parts.push(t(KEY.critical))
+
+        lines.push(parts.join(' '))
         break
       }
 
       case 'ailment':
         // `side` aqui é **quem recebeu** a condição, não quem a aplicou: é assim
         // que o motor emite, e o comentário existe para ninguém "consertar".
-        lines.push(`${nameOf(event.side)} ficou ${CONDITION_PHRASES[event.condition.kind]}.`)
+        lines.push(t(KEY.ailment(event.condition.kind), { name: nameOf(event.side) }))
         break
 
       case 'no-effect':
-        lines.push(`${moveName(event.moveId)} não afetou ${nameOf(other(event.side))}.`)
+        lines.push(t(KEY.noEffect, {
+          move: moveName(event.moveId),
+          target: nameOf(other(event.side)),
+        }))
         break
 
       case 'residual': {
         const cause = conditionAt(event.side, active[event.side])
-        lines.push(cause === null
-          ? `${nameOf(event.side)} perdeu ${event.damage} HP no fim do turno.`
-          : `${nameOf(event.side)} perdeu ${event.damage} HP ${RESIDUAL_PHRASES[cause]}.`)
+        lines.push(t(KEY.residual(cause ?? 'generic'), {
+          name: nameOf(event.side),
+          damage: event.damage,
+        }))
         break
       }
 
       case 'faint':
-        lines.push(`${nameOf(event.side)} desmaiou.`)
+        lines.push(t(KEY.faint, { name: nameOf(event.side) }))
         break
 
       case 'outcome':
-        if (event.outcome === 'won') lines.push('Você venceu o ginásio.')
-        if (event.outcome === 'lost') lines.push('Seu time caiu.')
+        if (event.outcome === 'won') lines.push(t(KEY.outcome('won')))
+        if (event.outcome === 'lost') lines.push(t(KEY.outcome('lost')))
         break
     }
   }

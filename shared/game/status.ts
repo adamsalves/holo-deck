@@ -132,11 +132,3 @@ export function residualDamage(condition: Condition | null, maxHp: number): numb
   if (condition.kind === 'poison') return Math.max(1, Math.floor(maxHp * POISON_DAMAGE_FRACTION))
   return 0
 }
-
-/** O rótulo curto que a interface mostra na carta — `PAR` na prancha. */
-export const CONDITION_LABELS: Record<AilmentName, string> = {
-  paralysis: 'PAR',
-  burn: 'QUE',
-  poison: 'ENV',
-  sleep: 'SON',
-}

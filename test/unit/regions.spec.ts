@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dexNumber, dexRange, toRegions } from '~~/shared/dex/regions'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
-import { generationLabel, isRegionName, REGION_LABELS, REGION_NAMES } from '~~/shared/types/game'
+import { generationNumeral, isRegionName, REGION_LABELS, REGION_NAMES } from '~~/shared/types/game'
 import { readCore, readGeneration } from '../support/generated-dex'
 
 /**
@@ -32,15 +32,20 @@ describe('regiões', () => {
   })
 })
 
-describe('rótulo da geração', () => {
-  it('escreve em português com algarismo romano, como a prancha', () => {
-    expect(generationLabel(1)).toBe('Geração I')
-    expect(generationLabel(4)).toBe('Geração IV')
-    expect(generationLabel(GENERATION_COUNT)).toBe('Geração IX')
+/**
+ * The word moved to the locale (`generation.label`) and what stayed here is the
+ * numeral, which is the same in both languages. `i18n-gate` owns the word now;
+ * these two still own the arithmetic, which no translation can check.
+ */
+describe('the generation numeral', () => {
+  it('writes a roman numeral, the way the artboard does', () => {
+    expect(generationNumeral(1)).toBe('I')
+    expect(generationNumeral(4)).toBe('IV')
+    expect(generationNumeral(GENERATION_COUNT)).toBe('IX')
   })
 
-  it('cobre todas as gerações que o dex tem', () => {
-    const withoutRoman = generations.filter(meta => /\d/.test(generationLabel(meta.generation)))
+  it('covers every generation the dex ships', () => {
+    const withoutRoman = generations.filter(meta => /\d/.test(generationNumeral(meta.generation)))
 
     expect(withoutRoman.map(meta => meta.generation)).toEqual([])
   })
@@ -95,11 +100,13 @@ describe('toRegions', () => {
     }
   })
 
-  it('rotula toda região com o vocabulário em português, nunca com o slug', () => {
+  it('rotula toda região com o vocabulário, nunca com o slug', () => {
     expect(regions.filter(region => region.label === region.slug)).toEqual([])
-    expect(regions.map(region => region.generationLabel)).toEqual(
-      generations.map(meta => generationLabel(meta.generation)),
-    )
+
+    // `generationLabel` saiu da estrutura para o payload pré-renderizado não
+    // carregar texto traduzido; o que sobrou para a tela compor é o número.
+    expect(regions.map(region => region.generation))
+      .toEqual(generations.map(meta => meta.generation))
   })
 })
 

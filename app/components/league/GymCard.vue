@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GymView } from '~/composables/useLeague'
-import { generationLabel, REGION_LABELS, typeKey } from '~~/shared/types/game'
+import { generationNumeral, REGION_LABELS, typeKey } from '~~/shared/types/game'
 import { gameNumber } from '~~/shared/game/progress'
 import { aceOf } from '~~/shared/game/gyms'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * Uma das nove cartas da trilha — a prancha *Liga*, nos três estados.
@@ -39,11 +40,28 @@ const shown = computed(() => {
   return props.view.status === 'won' ? [aceOf(team)] : team
 })
 
+/**
+ * The only name the link has, and it is one message, not two glued together.
+ *
+ * The first version built *Revanche contra* + `${name}, ginásio ${gym}` in two
+ * steps, which reads as one sentence only because Portuguese puts the verb
+ * first. Each of the two states now owns a whole message with both values in
+ * it — the translator sees the sentence the screen reader will say.
+ */
 const label = computed(() => {
-  const name = `${leader.value.name}, ginásio ${leader.value.gym}`
-  if (props.view.status === 'won') return `Revanche contra ${name}`
-  return `Desafiar ${name}`
+  // Duas chamadas e não uma com a chave escolhida dentro: `i18n-gate` só vê a
+  // chave que vem colada no `t(`, e uma chave que ele não vê é acusada de órfã.
+  const values = { leader: leader.value.name, gym: leader.value.gym }
+
+  return props.view.status === 'won'
+    ? t('league.gym.rematchLabel', values)
+    : t('league.gym.challengeLabel', values)
 })
+
+/** `Geração IV` — the word from the locale, the numeral from the dex. */
+const generation = computed(() => t('generation.label', {
+  numeral: generationNumeral(leader.value.generation),
+}))
 </script>
 
 <template>
@@ -57,7 +75,7 @@ const label = computed(() => {
          dentro do rodapé, mas a escada é a mesma e o brilho fica por baixo. -->
     <NuxtLink
       v-if="unlocked"
-      :to="`/battle/${leader.gym}`"
+      :to="localePath(`/battle/${leader.gym}`)"
       class="gym__link"
       :aria-label="label"
     />
@@ -69,7 +87,7 @@ const label = computed(() => {
 
     <template v-if="unlocked">
       <header class="gym__top">
-        <span class="numeric gym__generation">{{ generationLabel(leader.generation) }}</span>
+        <span class="numeric gym__generation">{{ generation }}</span>
 
         <svg
           v-if="view.status === 'won'"
@@ -90,7 +108,7 @@ const label = computed(() => {
         <span
           v-else
           class="numeric gym__now"
-        >AGORA</span>
+        >{{ t('league.gym.now') }}</span>
       </header>
 
       <div class="gym__team">
@@ -119,13 +137,15 @@ const label = computed(() => {
 
       <footer class="numeric gym__foot">
         <template v-if="view.status === 'won'">
-          <span class="gym__badge">VENCIDO</span>
-          <span class="gym__rematch">REVANCHE +{{ gameNumber(view.reward.total) }}</span>
+          <span class="gym__badge">{{ t('league.gym.won') }}</span>
+          <span class="gym__rematch">
+            {{ t('league.gym.rematch', { coins: gameNumber(view.reward.total) }) }}
+          </span>
         </template>
         <span
           v-else
           class="gym__challenge"
-        >DESAFIAR · +{{ gameNumber(view.reward.total) }}</span>
+        >{{ t('league.gym.challenge', { coins: gameNumber(view.reward.total) }) }}</span>
       </footer>
     </template>
 
@@ -161,7 +181,7 @@ const label = computed(() => {
 
       <div>
         <p class="numeric gym__generation">
-          {{ generationLabel(leader.generation) }}
+          {{ generation }}
         </p>
         <p class="gym__name">
           {{ leader.name }}

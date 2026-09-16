@@ -5,8 +5,11 @@ import { computed, onMounted, ref } from 'vue'
 import { rarityOf } from '~~/shared/game/rarity'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
+import { generationNumeral } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from '~/composables/useDex'
+
+const { t } = useI18n()
 
 /**
  * O grid de uma geração — a prancha *Pokédex*.
@@ -149,7 +152,7 @@ useSeoMeta({
   title: () => `${region.value?.label ?? 'Pokédex'} — Pokédex — Holo Deck`,
   description: () => region.value === null
     ? 'Pokédex do Holo Deck.'
-    : `As ${region.value.speciesCount} espécies de ${region.value.label}, da ${region.value.generationLabel}, com tipos, stats e evolução.`,
+    : `As ${region.value.speciesCount} espécies de ${region.value.label}, da ${t('generation.label', { numeral: generationNumeral(region.value.generation) })}, com tipos, stats e evolução.`,
 })
 </script>
 
@@ -178,7 +181,9 @@ useSeoMeta({
                  contar coleção. Era a última pendência do canvas sem token, e a
                  Fase 5 é a que criou o dado que ele significa. -->
             <p class="numeric region-header__generation">
-              {{ region?.generationLabel }}
+              {{ region === null
+                ? ''
+                : t('generation.label', { numeral: generationNumeral(region.generation) }) }}
             </p>
             <h1 class="region-header__name">
               {{ region?.label }}

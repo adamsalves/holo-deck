@@ -240,5 +240,185 @@
       "hint": "ARRASTE{break}UMA CARTA",
       "removeLabel": "Tirar {name} do slot {slot}"
     }
+  },
+  "ailment": {
+    "paralysis": "paralisia",
+    "burn": "queimadura",
+    "poison": "envenenamento",
+    "sleep": "sono"
+  },
+  "condition": {
+    "paralysis": "PAR",
+    "burn": "QUE",
+    "poison": "ENV",
+    "sleep": "SON"
+  },
+  "affected": {
+    "paralysis": "JÁ PARALISADO",
+    "burn": "JÁ QUEIMADO",
+    "poison": "JÁ ENVENENADO",
+    "sleep": "JÁ DORMINDO"
+  },
+  "effectiveness": {
+    "none": "NÃO AFETA",
+    "barely": "MAL ARRANHA",
+    "weak": "POUCO EFETIVO",
+    "neutral": "NEUTRO",
+    "strong": "SUPER EFETIVO",
+    "devastating": "DEVASTADOR"
+  },
+  "generation": {
+    "label": "Geração {numeral}"
+  },
+  "move": {
+    "class": {
+      "physical": "FÍS",
+      "special": "ESP",
+      "status": "STATUS"
+    },
+    "detail": {
+      "status": "{ailment} · ACC {accuracy}",
+      "damage": "PWR {power} · ACC {accuracy}"
+    }
+  },
+  "league": {
+    "eyebrow": "Uma geração, um líder",
+    "title": "A Liga",
+    "badges": "insígnias",
+    "loading": "Carregando a Liga…",
+    "seo": {
+      "title": "A Liga"
+    },
+    "foot": {
+      "unlock": "Desbloqueio sequencial — cada líder só abre com a insígnia anterior",
+      "teams": "Times montados pela regra: mesmo tipo, mesma geração, sob o teto de BST da faixa"
+    },
+    "next": {
+      "rematch": "Revanche",
+      "next": "Próximo",
+      "meta": "Ginásio {gym} · {type}",
+      "team": "Time",
+      "teamSize": "{count} Pokémon",
+      "level": "Nível",
+      "prize": "Prêmio",
+      "deck": "Seu deck",
+      "adjustments": "{count} ajuste | {count} ajustes",
+      "noAdjustments": "sem ajustes",
+      "rematchAction": "REVANCHE",
+      "challengeAction": "DESAFIAR",
+      "buildDeck": "MONTE UM DECK DE {size}"
+    },
+    "gym": {
+      "now": "AGORA",
+      "won": "VENCIDO",
+      "rematch": "REVANCHE +{coins}",
+      "challenge": "DESAFIAR · +{coins}",
+      "rematchLabel": "Revanche contra {leader}, ginásio {gym}",
+      "challengeLabel": "Desafiar {leader}, ginásio {gym}"
+    }
+  },
+  "battle": {
+    "seo": {
+      "title": "Batalha",
+      "gym": "Ginásio {gym} · {leader}"
+    },
+    "bar": {
+      "gym": "Ginásio {gym} / {total}",
+      "turn": "TURNO",
+      "level": "Lv50 fixo"
+    },
+    "result": {
+      "wonEyebrow": "Ginásio vencido",
+      "lostEyebrow": "Seu time caiu",
+      "won": "Vitória",
+      "lost": "Derrota",
+      "nothingLost": "Nada foi perdido — nem carta, nem moeda. A revanche é imediata.",
+      "againWon": "LUTAR DE NOVO",
+      "againLost": "TENTAR DE NOVO"
+    },
+    "prize": {
+      "rematch": "Revanche",
+      "reward": "Recompensa",
+      "flawless": "Imaculada",
+      "balance": "Saldo"
+    },
+    "backToLeague": "VOLTAR À LIGA",
+    "forced": {
+      "fainted": "{name} desmaiou",
+      "title": "Quem entra?",
+      "note": "Escolha no banco, à direita. O turno não anda até lá."
+    },
+    "choose": {
+      "move": "Escolha o golpe"
+    },
+    "potion": "POÇÃO {count}",
+    "bench": {
+      "title": "Seu banco",
+      "standing": "{count} de pé",
+      "swap": "Trocar para {name}"
+    },
+    "note": {
+      "noPp": "SEM PP · STRUGGLE",
+      "noEffect": "×0 NÃO AFETA",
+      "statusMove": "GOLPE DE STATUS"
+    },
+    "initiative": {
+      "tie": "empate de Speed ({speed}) — o desempate é sorteado",
+      "mine": "você ataca primeiro (SPD {mine} > {foe})",
+      "foe": "{name} ataca primeiro (SPD {foe} > {mine})"
+    },
+    "standing": {
+      "loading": "Montando o campo…",
+      "lockedTitle": "Ginásio fechado",
+      "lockedNote": "Cada líder só abre com a insígnia anterior. O seu próximo é o {gym}.",
+      "lockedAction": "IR PARA A LIGA",
+      "busyTitle": "Você já está lutando",
+      "busyNote": "Ginásio {gym} · {leader}, com {count} jogada feita. Começar esta luta apaga aquela. | Ginásio {gym} · {leader}, com {count} jogadas feitas. Começar esta luta apaga aquela.",
+      "busyResume": "RETOMAR AQUELA",
+      "busyDrop": "DESISTIR E COMEÇAR ESTA",
+      "noDeckTitle": "Sem time",
+      "noDeckNote": "A batalha precisa dos {size} slots preenchidos.",
+      "noDeckAction": "MONTAR O DECK",
+      "unknownGymTitle": "Ginásio inexistente",
+      "unknownGymNote": "A Liga tem {total} ginásios.",
+      "noDexTitle": "O dex não carregou",
+      "noDexNote": "Sem o dex não há como montar o time do líder. Tente de novo."
+    },
+    "log": {
+      "title": "Registro do turno",
+      "empty": "A luta começa agora.",
+      "switch": "{name} entrou em campo.",
+      "potion": "{name} recuperou {healed} HP.",
+      "miss": "{name} errou {move}.",
+      "hit": "{name} usou {move}.",
+      "damage": "{target} perdeu {damage} HP.",
+      "critical": "Acerto crítico!",
+      "noEffect": "{move} não afetou {target}.",
+      "faint": "{name} desmaiou.",
+      "unknownMove": "o golpe",
+      "blocked": {
+        "paralysis": "{name} perdeu o turno pela paralisia.",
+        "burn": "{name} perdeu o turno.",
+        "poison": "{name} perdeu o turno.",
+        "sleep": "{name} está dormindo."
+      },
+      "ailment": {
+        "paralysis": "{name} ficou paralisado.",
+        "burn": "{name} ficou queimado.",
+        "poison": "{name} ficou envenenado.",
+        "sleep": "{name} ficou dormindo."
+      },
+      "residual": {
+        "paralysis": "{name} perdeu {damage} HP no fim do turno.",
+        "burn": "{name} perdeu {damage} HP pela queimadura.",
+        "poison": "{name} perdeu {damage} HP pelo veneno.",
+        "sleep": "{name} perdeu {damage} HP no fim do turno.",
+        "generic": "{name} perdeu {damage} HP no fim do turno."
+      },
+      "outcome": {
+        "won": "Você venceu o ginásio.",
+        "lost": "Seu time caiu."
+      }
+    }
   }
 }
