@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '../../app/utils/nav-links.ts'
-import { defaultLocale, label, localeCodes, localeUrl, message } from '../support/locales'
+import {
+  defaultLocale,
+  defaultOnlyLabels,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+} from '../support/locales'
 import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
 
 /**
@@ -20,9 +27,18 @@ import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from '
 /**
  * Six species, which is what the Hub asks for before it writes *DESAFIAR*.
  *
- * Any six do: the challenge door only looks at the deck being full. They are
- * spelled out rather than opened from packs because a pack draws at random, and
- * a test about links should not depend on what came out of one.
+ * They are spelled out rather than opened from packs because a pack draws at
+ * random, and a test about links should not depend on what came out of one.
+ *
+ * **Not any six, and the earlier note here said otherwise.** The challenge door
+ * only looks at the deck being full — that part was right — but the Hub also
+ * calls `invite.offer()` when the profile owns an ultra or above, and the invite
+ * is a `role="dialog" aria-modal="true"` over the whole screen. These six are
+ * all common but for Snorlax, which is rare, so the dialog stays shut *by
+ * accident*: swap one for a legendary — exactly what "any six do" invited — and
+ * the test fails for a reason that has nothing to do with links. The
+ * `skipInvite` below is what makes the choice not matter, and it is the house
+ * pattern for it.
  */
 const READY_DECK = [1, 4, 7, 25, 133, 143]
 
@@ -324,6 +340,18 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
  * prefixo. Um link novo entra nesta medição por existir, que é a mesma inversão
  * que o portão de disco aplica do outro lado.
  *
+ * **E cobra o idioma do texto, não só o do link.** Sem isso, `/en` tinha as duas
+ * metades da medição para o *link* e só a metade de disco para a *frase*: um
+ * `<p>Carregando…</p>` literal acrescentado amanhã escaparia dos três portões ao
+ * mesmo tempo — o `i18n-gate` não o vê porque não é chave, este teste não o via
+ * porque não é `href`, e o portão de link não o vê porque não é link. Era o vão
+ * exato que este PR existe para fechar, aberto de novo e verde.
+ *
+ * A chave de cada tela é escolhida dentro do painel pelo qual a tela já espera,
+ * e o teste **recusa uma chave cujos dois idiomas sejam iguais**: um rótulo que
+ * não muda entre locales passaria sem medir nada, que é como uma asserção de
+ * idioma morre sem avisar.
+ *
  * O perfil é novo de propósito. Com cartas, o binder desenha as `PokeCard` do
  * grid, e o `to` delas é um dos links que a issue #37 ainda deve — a asserção
  * ficaria vermelha por um defeito que este PR não se propôs a consertar, e a
@@ -335,21 +363,63 @@ test('de dentro de `/en`, os links das telas não voltam ao português', async (
   // O outro lado: sem locale prefixado, o laço abaixo não visita nada.
   expect(prefixed.length).toBeGreaterThan(0)
 
+  // `speaks` mora dentro do painel que `ready` espera, e não em qualquer canto
+  // da tela: uma chave escolhida fora dele mediria a barra, que o PR 1 já
+  // consertou, e diria que a tela está traduzida quando só a moldura está.
   const screens = [
-    { path: '/', ready: '.hub__panel' },
-    { path: '/packs', ready: '.packs__offer' },
-    { path: '/collection', ready: '.collection__empty' },
-    { path: '/deck', ready: '.deck-slot' },
+    { path: '/', ready: '.hub__panel', speaks: 'hub.next.challenge' },
+    { path: '/packs', ready: '.packs__offer', speaks: 'packs.shop.rng' },
+    { path: '/collection', ready: '.collection__empty', speaks: 'collection.eyebrow' },
+    { path: '/deck', ready: '.deck-slot', speaks: 'deck.eyebrow' },
   ]
 
   for (const locale of prefixed) {
-    for (const { path, ready } of screens) {
+    const leaked = defaultOnlyLabels(locale)
+
+    // O outro lado: sem rótulo que difira entre os idiomas, o `filter` abaixo
+    // devolveria `[]` por não ter o que procurar.
+    expect(leaked.length, `nada difere entre ${defaultLocale()} e ${locale}`).toBeGreaterThan(50)
+
+    for (const { path, ready, speaks } of screens) {
       await page.goto(localeUrl(path, locale))
 
       // Tudo o que estas telas mostram mora dentro de `ClientOnly`: antes da
       // hidratação a página tem a barra e mais nada, e a varredura mediria só os
       // links que o PR anterior já consertou.
       await expect(page.locator(ready).first()).toBeVisible()
+
+      // O outro lado da asserção de idioma: um rótulo igual nos dois locales
+      // passaria em `/en` sem provar tradução nenhuma.
+      expect(
+        label(speaks, locale),
+        `\`${speaks}\` é igual nos dois idiomas e não mede tradução`,
+      ).not.toBe(label(speaks, defaultLocale()))
+
+      await expect(
+        page.getByText(label(speaks, locale)).first(),
+        `${path} em ${locale} desenha o corpo da tela em português`,
+      ).toBeVisible()
+
+      // E nenhum rótulo do idioma padrão vazou para dentro desta tela. A lista
+      // vem dos dois arquivos de locale, nunca escrita aqui: rótulo novo entra
+      // na medição por ser traduzido diferente.
+      //
+      // **Sem caixa, e isso foi medido, não suposto.** O `innerText` devolve o
+      // texto como o CSS o desenha, e este tema tem 47 declarações de
+      // `text-transform: uppercase` em 20 arquivos de `app/`: com `Montagem de
+      // deck` plantado à mão na tela, a varredura sensível a caixa procurava
+      // aquilo e a página dizia `MONTAGEM DE DECK` — defeito na tela e asserção
+      // verde. `textContent` devolveria o texto sem transformação, mas arrasta
+      // junto o conteúdo de `<script>`, onde o payload do Nuxt carrega rótulo
+      // dos dois idiomas.
+      const body = (await page.locator('body').innerText())
+        .replaceAll(/\s+/g, ' ')
+        .toLowerCase()
+
+      expect(
+        leaked.filter(text => body.includes(text.toLowerCase())),
+        `${path} em ${locale} mostra rótulo em ${defaultLocale()}`,
+      ).toEqual([])
 
       const hrefs = await page.locator('a[href^="/"]').evaluateAll(
         links => links.map(link => link.getAttribute('href') ?? ''),
@@ -379,6 +449,10 @@ test('o link de batalha do Hub, montado em template literal, carrega o idioma', 
   expect(prefixed.length).toBeGreaterThan(0)
 
   for (const locale of prefixed) {
+    // O convite sai da frente antes do save: com um ultra ou lendário no perfil,
+    // o Hub abre o diálogo modal por cima e o link de batalha fica inalcançável.
+    // Ver `READY_DECK`, que hoje não dispara — e não deve depender disso.
+    await skipInvite(page)
     await seedLocalSave(page, saveWith({
       collection: Object.fromEntries(READY_DECK.map(id => [id, { c: 1, s: 0 }])),
       deck: READY_DECK,
