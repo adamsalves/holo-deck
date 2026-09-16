@@ -1217,6 +1217,43 @@ não alcança — o link que existe no dado e não chega à tela — é
 `test/e2e/collection.spec.ts`, que **itera sobre os mesmos destinos** e clica em
 cada um.
 
+### Os dois portões de idioma
+
+[`test/unit/i18n-gate.spec.ts`](test/unit/i18n-gate.spec.ts) cobra que os locales
+combinem chave por chave e que nenhuma chave fique órfã dos dois lados — rótulo
+pedido que ninguém traduziu, e tradução que tela nenhuma pede. Ele varre `t('…')`
+e também `keypath="…"`, que é como `<i18n-t>` carrega a chave: sem a segunda
+expressão, as frases com markup dentro seriam acusadas de órfãs e a asserção
+mandaria **apagar a tradução de uma frase que está na tela**.
+
+[`test/unit/locale-link-gate.spec.ts`](test/unit/locale-link-gate.spec.ts) pergunta
+a outra coisa — *como o link foi escrito*. `NuxtLink` com caminho literal **não é
+localizado pelo módulo**: de dentro de `/en`, `to="/deck"` devolve o jogador ao
+português sem caminho de volta. Quem localiza é `localePath()` ou
+`<NuxtLinkLocale>`. Ele lê a fonte, ao contrário do `nav-gate`, porque um template
+literal — `` :to="`/battle/${gym}`" `` — não existe em lista nenhuma, e enumera
+quem **sai**: link novo é infrator por omissão, e a lista de exceções esvazia com
+a issue #37.
+
+As duas metades: `test/e2e/collection.spec.ts` abre as quatro telas em `/en` e
+cobra o prefixo de todo `href` interno **e o idioma do corpo da tela** — sem a
+segunda, um literal em português acrescentado amanhã escaparia dos três portões
+ao mesmo tempo.
+
+A regra que os dois pagaram: **conjunto, nunca contagem.** A primeira versão do
+portão de link afirmava `links.length > 20` contra 29 links reais, e nove podiam
+sumir antes de a asserção tremer — o que importa, porque é *sumindo* que aquele
+leitor falha: um `>` dentro de atributo (20 deles em `app/` — 18 comparações como
+`v-if="count > 0"`, e duas arrow functions) truncava a tag, o `to=` caía fora da
+captura, e o link deixava de existir para a varredura em vez de reprová-la.
+
+O que sustenta as duas metades é o leitor de locale, e ele tem portão próprio:
+[`test/unit/locale-message.spec.ts`](test/unit/locale-message.spec.ts) roda o
+`pluralForm` contra o `vue-i18n` de verdade, mensagem por mensagem, em vez de
+reafirmar a regra. É reimplementação de código alheio dentro da infraestrutura de
+~40 asserções de e2e — e uma cópia que deriva reprova nomeando a tela, não a si
+mesma.
+
 ### A seção atual, e um mecanismo que nunca existiu
 
 O sublinhado do destino atual saía de `router-link-active`, com um comentário
