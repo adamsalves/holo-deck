@@ -329,43 +329,45 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
 })
 
 /**
- * E as telas, que é a metade que faltava — e a que o defeito atravessou.
+ * And the screens, which is the half that was missing — and the one the defect
+ * walked through.
  *
- * O portão de `test/unit/locale-link-gate.spec.ts` lê a fonte e cobra
- * `localePath` de todo link; **disco não alcança a tela**. Foi exatamente esse
- * vão que o PR 1 pagou: nada na suíte visitava `/en`, e a barra saía com
- * `href="/deck"` em toda rota inglesa sem nenhum check ficar vermelho.
+ * The gate in `test/unit/locale-link-gate.spec.ts` reads the source and demands
+ * `localePath` of every link; **disk does not reach the screen**. That gap is
+ * exactly the one PR 1 paid for: nothing in the suite visited `/en`, and the bar
+ * shipped `href="/deck"` on every English route with no check going red.
  *
- * Ele não nomeia link nenhum: varre **todo** `href` interno da página e cobra o
- * prefixo. Um link novo entra nesta medição por existir, que é a mesma inversão
- * que o portão de disco aplica do outro lado.
+ * It names no link: it sweeps **every** internal `href` on the page and demands
+ * the prefix. A new link enters this measurement by existing, which is the same
+ * inversion the disk gate applies from the other side.
  *
- * **E cobra o idioma do texto, não só o do link.** Sem isso, `/en` tinha as duas
- * metades da medição para o *link* e só a metade de disco para a *frase*: um
- * `<p>Carregando…</p>` literal acrescentado amanhã escaparia dos três portões ao
- * mesmo tempo — o `i18n-gate` não o vê porque não é chave, este teste não o via
- * porque não é `href`, e o portão de link não o vê porque não é link. Era o vão
- * exato que este PR existe para fechar, aberto de novo e verde.
+ * **And it demands the language of the text, not only of the link.** Without
+ * that, `/en` had both halves of the measurement for the *link* and only the
+ * disk half for the *sentence*: a literal `<p>Carregando…</p>` added tomorrow
+ * would escape all three gates at once — `i18n-gate` cannot see it because it is
+ * not a key, this test could not see it because it is not an `href`, and the
+ * link gate cannot see it because it is not a link. That was the exact gap this
+ * PR exists to close, reopened and green.
  *
- * A chave de cada tela é escolhida dentro do painel pelo qual a tela já espera,
- * e o teste **recusa uma chave cujos dois idiomas sejam iguais**: um rótulo que
- * não muda entre locales passaria sem medir nada, que é como uma asserção de
- * idioma morre sem avisar.
+ * Each screen's key is picked from inside the panel the screen already waits
+ * for, and the test **refuses a key whose two languages are identical**: a label
+ * that does not change between locales would pass without measuring anything,
+ * which is how a language assertion dies without saying so.
  *
- * O perfil é novo de propósito. Com cartas, o binder desenha as `PokeCard` do
- * grid, e o `to` delas é um dos links que a issue #37 ainda deve — a asserção
- * ficaria vermelha por um defeito que este PR não se propôs a consertar, e a
- * lista de exceções do portão é quem o registra.
+ * The profile is new on purpose. With cards, the binder draws the grid's
+ * `PokeCard`, and their `to` is one of the links issue #37 still owes — the
+ * assertion would go red over a defect this PR did not set out to fix, and the
+ * gate's exception list is what records it.
  */
-test('de dentro de `/en`, os links das telas não voltam ao português', async ({ page }) => {
+test('from inside `/en`, the screens keep the locale in links and in text', async ({ page }) => {
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
 
-  // O outro lado: sem locale prefixado, o laço abaixo não visita nada.
+  // The other side: with no prefixed locale, the loop below visits nothing.
   expect(prefixed.length).toBeGreaterThan(0)
 
-  // `speaks` mora dentro do painel que `ready` espera, e não em qualquer canto
-  // da tela: uma chave escolhida fora dele mediria a barra, que o PR 1 já
-  // consertou, e diria que a tela está traduzida quando só a moldura está.
+  // `speaks` lives inside the panel `ready` waits for, and not in some corner
+  // of the screen: a key picked outside it would measure the bar, which PR 1
+  // already fixed, and would call the screen translated when only the frame is.
   const screens = [
     { path: '/', ready: '.hub__panel', speaks: 'hub.next.challenge' },
     { path: '/packs', ready: '.packs__offer', speaks: 'packs.shop.rng' },
@@ -376,20 +378,20 @@ test('de dentro de `/en`, os links das telas não voltam ao português', async (
   for (const locale of prefixed) {
     const leaked = defaultOnlyLabels(locale)
 
-    // O outro lado: sem rótulo que difira entre os idiomas, o `filter` abaixo
-    // devolveria `[]` por não ter o que procurar.
+    // The other side: with no label that differs between the languages, the
+    // `filter` below would return `[]` for lack of anything to look for.
     expect(leaked.length, `nada difere entre ${defaultLocale()} e ${locale}`).toBeGreaterThan(50)
 
     for (const { path, ready, speaks } of screens) {
       await page.goto(localeUrl(path, locale))
 
-      // Tudo o que estas telas mostram mora dentro de `ClientOnly`: antes da
-      // hidratação a página tem a barra e mais nada, e a varredura mediria só os
-      // links que o PR anterior já consertou.
+      // Everything these screens show lives inside `ClientOnly`: before
+      // hydration the page has the bar and nothing else, and the sweep would
+      // measure only the links the previous PR already fixed.
       await expect(page.locator(ready).first()).toBeVisible()
 
-      // O outro lado da asserção de idioma: um rótulo igual nos dois locales
-      // passaria em `/en` sem provar tradução nenhuma.
+      // The other side of the language assertion: a label identical in both
+      // locales would pass in `/en` without proving any translation.
       expect(
         label(speaks, locale),
         `\`${speaks}\` é igual nos dois idiomas e não mede tradução`,
@@ -400,18 +402,18 @@ test('de dentro de `/en`, os links das telas não voltam ao português', async (
         `${path} em ${locale} desenha o corpo da tela em português`,
       ).toBeVisible()
 
-      // E nenhum rótulo do idioma padrão vazou para dentro desta tela. A lista
-      // vem dos dois arquivos de locale, nunca escrita aqui: rótulo novo entra
-      // na medição por ser traduzido diferente.
+      // And no label of the default locale leaked into this screen. The list
+      // comes from the two locale files and is never written here: a new label
+      // enters the measurement by being translated differently.
       //
-      // **Sem caixa, e isso foi medido, não suposto.** O `innerText` devolve o
-      // texto como o CSS o desenha, e este tema tem 47 declarações de
-      // `text-transform: uppercase` em 20 arquivos de `app/`: com `Montagem de
-      // deck` plantado à mão na tela, a varredura sensível a caixa procurava
-      // aquilo e a página dizia `MONTAGEM DE DECK` — defeito na tela e asserção
-      // verde. `textContent` devolveria o texto sem transformação, mas arrasta
-      // junto o conteúdo de `<script>`, onde o payload do Nuxt carrega rótulo
-      // dos dois idiomas.
+      // **Case-insensitive, and that was measured, not assumed.** `innerText`
+      // returns the text as the CSS draws it, and this theme carries 47
+      // `text-transform: uppercase` declarations across 20 files of `app/`: with
+      // `Montagem de deck` planted on the screen by hand, the case-sensitive
+      // sweep looked for that while the page said `MONTAGEM DE DECK` — defect on
+      // screen, assertion green. `textContent` would return the text without the
+      // transform, but it drags along the content of `<script>`, where the Nuxt
+      // payload carries labels in both languages.
       const body = (await page.locator('body').innerText())
         .replaceAll(/\s+/g, ' ')
         .toLowerCase()
@@ -435,23 +437,24 @@ test('de dentro de `/en`, os links das telas não voltam ao português', async (
 })
 
 /**
- * O link de destino montado em template literal, que é a forma que nenhuma lista
- * enxerga.
+ * The destination built in a template literal, which is the shape no list sees.
  *
- * `` :to="`/battle/${gym}`" `` não aparece em `NAV_DESTINATIONS` nem em busca por
- * `to="/…"`, e é a forma que o Hub usa nas duas portas para a batalha. O teste
- * acima só a alcança com o deck cheio — sem seis cartas o Hub escreve *MONTAR O
- * DECK* —, então ela ganha um save semeado e uma asserção que **nomeia** o link:
- * uma varredura que não achasse a porta passaria calada.
+ * `` :to="`/battle/${gym}`" `` appears neither in `NAV_DESTINATIONS` nor in a
+ * search for `to="/…"`, and it is the shape the Hub uses for both doors into a
+ * battle. The test above only reaches it with a full deck — without six cards
+ * the Hub writes *MONTAR O DECK* — so it gets a seeded save and an assertion
+ * that **names** the link: a sweep that failed to find the door would pass in
+ * silence.
  */
-test('o link de batalha do Hub, montado em template literal, carrega o idioma', async ({ page }) => {
+test('the Hub battle link, built in a template literal, carries the locale', async ({ page }) => {
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
   expect(prefixed.length).toBeGreaterThan(0)
 
   for (const locale of prefixed) {
-    // O convite sai da frente antes do save: com um ultra ou lendário no perfil,
-    // o Hub abre o diálogo modal por cima e o link de batalha fica inalcançável.
-    // Ver `READY_DECK`, que hoje não dispara — e não deve depender disso.
+    // The invite gets out of the way before the save: with an ultra or a
+    // legendary in the profile, the Hub opens the modal dialog on top and the
+    // battle link becomes unreachable. See `READY_DECK`, which does not trigger
+    // it today — and should not depend on that.
     await skipInvite(page)
     await seedLocalSave(page, saveWith({
       collection: Object.fromEntries(READY_DECK.map(id => [id, { c: 1, s: 0 }])),
