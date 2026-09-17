@@ -4,21 +4,9 @@ import { computed } from 'vue'
 import { describeEvolution, toStages } from '~~/shared/game/evolution'
 import { baseStatTotal } from '~~/shared/game/rarity'
 import { dexNumber } from '~~/shared/dex/regions'
-import { typeKey } from '~~/shared/types/game'
 
+const localePath = useLocalePath()
 const { t } = useI18n()
-
-/**
- * The type name inside an evolution condition — *sabendo um golpe do tipo
- * Elétrico*.
- *
- * `describeEvolution` builds the sentence and asks for this: the frame lives in
- * `shared/`, which has no `t()`, so the screen supplies the two words that have
- * a translation.
- */
-function typeLabelOf(type: TypeName): string {
-  return t(typeKey(type))
-}
 
 /**
  * A linha evolutiva, resolvida do JSON local — zero requisições, que é a
@@ -56,8 +44,8 @@ function nameOf(node: EvolutionNode): string {
 <template>
   <section :data-type="type">
     <h2 class="chain__title">
-      Linha evolutiva
-      <span class="chain__note">— resolvida do JSON local, zero requisições</span>
+      {{ t('dex.chain.title') }}
+      <span class="chain__note">{{ t('dex.chain.note') }}</span>
     </h2>
 
     <ol class="chain">
@@ -81,7 +69,7 @@ function nameOf(node: EvolutionNode): string {
             :key="node.speciesId"
           >
             <NuxtLink
-              :to="`/pokemon/${node.slug}`"
+              :to="localePath(`/pokemon/${node.slug}`)"
               class="chain__card bevel-chip"
               :class="{ 'chain__card--current': node.speciesId === currentId }"
               :aria-current="node.speciesId === currentId ? 'page' : undefined"
@@ -97,12 +85,12 @@ function nameOf(node: EvolutionNode): string {
               >
               <span class="chain__name">{{ nameOf(node) }}</span>
               <span class="numeric chain__meta">
-                {{ dexNumber(node.speciesId) }}<template v-if="bstOf(node.speciesId) !== null"> · BST {{ bstOf(node.speciesId) }}</template>
+                {{ dexNumber(node.speciesId) }}<template v-if="bstOf(node.speciesId) !== null"> · {{ t('dex.bst') }} {{ bstOf(node.speciesId) }}</template>
               </span>
               <span
                 v-if="node.via"
                 class="numeric chain__condition"
-              >{{ describeEvolution(node.via, typeLabelOf) }}</span>
+              >{{ describeEvolution(node.via, t) }}</span>
             </NuxtLink>
           </li>
         </ul>

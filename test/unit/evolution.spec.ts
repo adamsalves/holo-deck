@@ -1,9 +1,8 @@
-import type { TypeName } from '~~/shared/types/dex'
+import type { Translate } from '~~/shared/types/game'
 import { describe, expect, it } from 'vitest'
-import { describeEvolution, flattenChain, humanizeSlug, toStages } from '~~/shared/game/evolution'
-import { typeKey } from '~~/shared/types/game'
+import { describeEvolution, EVOLUTION_KEY_LIST, flattenChain, humanizeSlug, toStages } from '~~/shared/game/evolution'
 import { readAllSpecies, readChains } from '../support/generated-dex'
-import { defaultLocale, label } from '../support/locales'
+import { defaultLocale, localeCodes, message } from '../support/locales'
 
 /**
  * O rótulo da aresta de evolução, medido contra as 483 condições reais.
@@ -13,20 +12,25 @@ import { defaultLocale, label } from '../support/locales'
  * do dex inteiro — `turnUpsideDown` em uma, `partyType` em uma. Um `if` faltando
  * não quebra nada, não aparece em nenhuma tela que alguém vá abrir, e transforma
  * "troca segurando Metal Coat" em "troca".
+ *
+ * **Every assertion now runs in both languages**, because the sentence stopped
+ * being built from Portuguese fragments in `shared/` and became a message per
+ * condition. What the composition has to survive is the crossing: a qualifier
+ * that vanishes in one locale and not the other, or a placeholder the message
+ * does not spell, is a defect that only a second language can show.
  */
 
 /**
- * The type resolver `describeEvolution` asks its caller for, reading the same
+ * The translator `describeEvolution` asks its caller for, reading the locale
  * file the screen reads.
  *
- * The default locale and not `'pt-BR'` written out: the sentence frames around
- * this word are Portuguese literals inside `shared/game/evolution.ts`, so the
- * language this spec asserts **is** the default one. The day that stops being
- * true, the frames have to move too, and this line is one of the things that
- * should break.
+ * `message()` **throws on a placeholder with no value**, and that is half of why
+ * the tests below are worth running: a message rewritten to ask for `{level}`
+ * where the code passes `{value}` fails here, naming the key, instead of
+ * rendering the literal `{level}` under an arrow on a page nobody opens.
  */
-function typeLabelOf(type: TypeName): string {
-  return label(typeKey(type), defaultLocale())
+function translator(code: string): Translate {
+  return (key, values) => message(key, code, values ?? {})
 }
 
 const chains = readChains()
@@ -36,46 +40,108 @@ const conditions = Object.values(chains)
   .flatMap(flattenChain)
   .flatMap(node => (node.via === undefined ? [] : [node.via]))
 
+/** Both languages, so the absence assertions below compare something. */
+const LOCALES = localeCodes()
+
 describe('rótulo da condição', () => {
+  it('mede mais de um idioma', () => {
+    expect(LOCALES.length).toBeGreaterThan(1)
+  })
+
+  /**
+   * The two labels the *Detalhe* board draws, spelled out.
+   *
+   * A literal and not a `message()` lookup, because the board **is** the
+   * specification for these two: `Lv 16` and `Lv 36` under the Charmander line
+   * is what it draws, and asserting the locale against itself would agree with a
+   * file where someone replaced both with the same word.
+   */
   it('escreve o nível, que é a condição de 348 das 483 arestas', () => {
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 16 }, typeLabelOf)).toBe('Nível 16')
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 16 }, translator('pt-BR'))).toBe('Nível 16')
+    expect(describeEvolution({ trigger: 'level-up', minLevel: 16 }, translator('en'))).toBe('Level 16')
   })
 
   it('reproduz os dois rótulos que a prancha Detalhe desenha', () => {
     const charizard = chains[Object.keys(chains).find(id => chains[id]?.slug === 'charmander') ?? '']
     const charmeleon = charizard?.evolvesTo[0]
+    const pt = translator('pt-BR')
 
-    expect(charmeleon?.via && describeEvolution(charmeleon.via, typeLabelOf)).toBe('Nível 16')
-    expect(charmeleon?.evolvesTo[0]?.via && describeEvolution(charmeleon.evolvesTo[0].via, typeLabelOf)).toBe('Nível 36')
+    expect(charmeleon?.via && describeEvolution(charmeleon.via, pt)).toBe('Nível 16')
+    expect(charmeleon?.evolvesTo[0]?.via && describeEvolution(charmeleon.evolvesTo[0].via, pt)).toBe('Nível 36')
   })
 
   it('não promete um número quando a subida de nível não tem um', () => {
-    expect(describeEvolution({ trigger: 'level-up', minHappiness: 160 }, typeLabelOf)).toBe('Subir de nível, felicidade 160')
+    for (const code of LOCALES) {
+      expect(describeEvolution({ trigger: 'level-up', minHappiness: 160 }, translator(code))).toBe(
+        `${message('evolution.trigger.levelUp', code)}, ${message('evolution.with.happiness', code, { value: 160 })}`,
+      )
+    }
   })
 
   it('põe o nome próprio como a PokeAPI o entrega, só humanizado', () => {
     expect(humanizeSlug('fire-stone')).toBe('Fire Stone')
-    expect(describeEvolution({ trigger: 'use-item', item: 'water-stone' }, typeLabelOf)).toBe('Usar Water Stone')
+
+    for (const code of LOCALES) {
+      expect(describeEvolution({ trigger: 'use-item', item: 'water-stone' }, translator(code)))
+        .toBe(message('evolution.main.useItem', code, { item: 'Water Stone' }))
+    }
   })
 
   it('não repete o item quando ele já é a cláusula principal', () => {
-    const phrase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' }, typeLabelOf)
+    for (const code of LOCALES) {
+      const phrase = describeEvolution({ trigger: 'use-item', item: 'sun-stone' }, translator(code))
 
-    expect(phrase).toBe('Usar Sun Stone')
-    expect(phrase.match(/Sun Stone/g)).toHaveLength(1)
+      expect(phrase).toBe(message('evolution.main.useItem', code, { item: 'Sun Stone' }))
+      expect(phrase.match(/Sun Stone/g)).toHaveLength(1)
+    }
   })
 
   it('acumula as ressalvas na ordem em que se lê a frase', () => {
     // A vírgula separa toda ressalva, sem exceção por gatilho: uma regra de
-    // pontuação por caso daria frases que só um `switch` explica.
-    expect(describeEvolution({ trigger: 'trade', heldItem: 'metal-coat' }, typeLabelOf)).toBe('Troca, segurando Metal Coat')
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 25, timeOfDay: 'night' }, typeLabelOf)).toBe('Nível 25, de noite')
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 30, gender: 1 }, typeLabelOf)).toBe('Nível 30, fêmea')
+    // pontuação por caso daria frases que só um `switch` explica. Ela sobrevive
+    // à travessia — *Level 16, at night* lê em inglês como *Nível 16, de noite*
+    // lê em português —, e é a única composição que restou neste módulo.
+    for (const code of LOCALES) {
+      const t = translator(code)
+
+      expect(describeEvolution({ trigger: 'trade', heldItem: 'metal-coat' }, t)).toBe(
+        `${message('evolution.trigger.trade', code)}, ${message('evolution.with.heldItem', code, { item: 'Metal Coat' })}`,
+      )
+      expect(describeEvolution({ trigger: 'level-up', minLevel: 25, timeOfDay: 'night' }, t)).toBe(
+        `${message('evolution.main.level', code, { level: 25 })}, ${message('evolution.time.night', code)}`,
+      )
+      expect(describeEvolution({ trigger: 'level-up', minLevel: 30, gender: 1 }, t)).toBe(
+        `${message('evolution.main.level', code, { level: 30 })}, ${message('evolution.gender.female', code)}`,
+      )
+    }
+  })
+
+  /**
+   * The dangling gerund the measurement found, and the reason it is a test.
+   *
+   * `spin` occurs once in all 1025 chains — Milcery — and the dex carries **no
+   * item** with it. The old fragment map spelled the trigger as *Girar
+   * segurando*, so the screen read "Girar segurando" with nothing after it: a
+   * preposition with no object, on a real page, in the language the game
+   * shipped in. Splitting the bare trigger from the one that takes an item is
+   * what fixes it, and the bare form is the one the dex actually reaches.
+   */
+  it('não deixa preposição pendurada quando o dex não traz o item', () => {
+    for (const code of LOCALES) {
+      const phrase = describeEvolution({ trigger: 'spin' }, translator(code))
+
+      expect(phrase).toBe(message('evolution.trigger.spin', code))
+      expect(phrase.trimEnd(), 'gerúndio sem objeto na tela').toBe(phrase)
+    }
   })
 
   it('traduz o tipo da ressalva, que é vocabulário do jogo e não nome próprio', () => {
-    expect(describeEvolution({ trigger: 'level-up', minLevel: 1, knownMoveType: 'fairy' }, typeLabelOf))
-      .toBe('Nível 1, sabendo um golpe do tipo Fada')
+    for (const code of LOCALES) {
+      expect(describeEvolution({ trigger: 'level-up', minLevel: 1, knownMoveType: 'fairy' }, translator(code))).toBe(
+        `${message('evolution.main.level', code, { level: 1 })}, ${
+          message('evolution.with.knownMoveType', code, { type: message('type.fairy', code) })}`,
+      )
+    }
   })
 
   /**
@@ -83,24 +149,71 @@ describe('rótulo da condição', () => {
    * produzir frase vazia, e nenhuma pode produzir um slug cru com hífen — que é
    * como um campo esquecido apareceria se alguém o concatenasse sem passar pelo
    * humanizador.
+   *
+   * **A terceira varredura é a que o PR #53 pagou para aprender:** um
+   * `translate` que não resolve devolve a própria chave, e `evolution.time.night`
+   * sob uma seta é tão silencioso quanto uma frase vazia. Nada no disco vê isso;
+   * aqui vê, porque a saída é comparada contra a forma de uma chave.
    */
-  it('produz frase para cada uma das arestas do dex', () => {
+  it('produz frase para cada uma das arestas do dex, nos dois idiomas', () => {
     expect(conditions.length).toBeGreaterThan(400)
 
-    const empty = conditions.filter(via => describeEvolution(via, typeLabelOf).trim() === '')
-    expect(empty, 'aresta sem rótulo é seta sem explicação na tela').toEqual([])
+    for (const code of LOCALES) {
+      const t = translator(code)
+      const phrases = conditions.map(via => describeEvolution(via, t))
 
-    const withSlug = conditions.filter(via => /[a-z]-[a-z]/.test(describeEvolution(via, typeLabelOf)))
-    expect(withSlug.map(via => describeEvolution(via, typeLabelOf)), 'slug cru vazando para a tela').toEqual([])
+      expect(phrases.filter(phrase => phrase.trim() === ''), 'aresta sem rótulo é seta sem explicação na tela')
+        .toEqual([])
+      // O hífen sozinho não é slug, e foi o inglês que mostrou isso: o detector
+      // antigo (`/[a-z]-[a-z]/`) acusava *knowing a Fairy-type move* de vazar
+      // `fairy-type` da API. Um slug que escapou do humanizador é minúsculo
+      // **inteiro** — `water-stone` —, então o que identifica é a palavra
+      // começar em caixa baixa, não o hífen existir. Escrito como estava, a
+      // única saída seria reescrever a frase inglesa para caber no detector.
+      expect(phrases.filter(phrase => /(?:^|[\s(])[a-z]+-[a-z]/.test(phrase)), 'slug cru vazando para a tela')
+        .toEqual([])
+      expect(phrases.filter(phrase => /(?:^|[\s,])[a-z]+\.[a-z]+[\w.]*/.test(phrase)), 'chave crua na tela')
+        .toEqual([])
+    }
   })
 
   it('não deixa nenhum gatilho cair no humanizador', () => {
     // Um gatilho fora da tabela vira `Three Critical Hits` — legível, em inglês,
     // e sinal de que a lista envelheceu em relação ao dex.
+    const t = translator(defaultLocale())
     const withoutLabel = [...new Set(conditions.map(via => via.trigger))]
-      .filter(trigger => describeEvolution({ trigger }, typeLabelOf) === humanizeSlug(trigger) && trigger.includes('-'))
+      .filter(trigger => describeEvolution({ trigger }, t) === humanizeSlug(trigger) && trigger.includes('-'))
 
-    expect(withoutLabel, 'gatilho sem rótulo em português').toEqual([])
+    expect(withoutLabel, 'gatilho sem rótulo no locale').toEqual([])
+  })
+
+  /**
+   * The list the gates read is the list the sentence uses.
+   *
+   * `EVOLUTION_KEY_LIST` exists so `i18n-gate` can see keys that are assembled
+   * at runtime; if it drifted from the maps it is built from, the gate would
+   * report live translations as orphans and have them deleted. Asking every key
+   * in it to resolve in every locale is the cheap half of that, and it fails
+   * here — naming the key — instead of in a gate that names the locale file.
+   */
+  it('endereça só chaves que os dois locales traduzem', () => {
+    expect(EVOLUTION_KEY_LIST).not.toEqual([])
+    expect(new Set(EVOLUTION_KEY_LIST).size).toBe(EVOLUTION_KEY_LIST.length)
+
+    for (const code of LOCALES) {
+      const missing = EVOLUTION_KEY_LIST.filter((key) => {
+        try {
+          // Placeholders are not the question here — an unfilled one throws and
+          // that is the assertion above; a missing key is what this one reads.
+          return message(key, code, { level: 1, item: 'x', move: 'x', value: 1, place: 'x', type: 'x', species: 'x', code: 1 }) === ''
+        }
+        catch {
+          return true
+        }
+      })
+
+      expect(missing, `o locale ${code} não traduz chave de evolução`).toEqual([])
+    }
   })
 })
 

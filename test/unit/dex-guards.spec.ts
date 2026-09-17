@@ -392,9 +392,9 @@ describe('guardas cobram as mesmas restrições do schema de escrita', () => {
   })
 
   it('recusa habitat fora dos 9 da PokeAPI', () => {
-    // O painel *Sobre* traduz o habitat por `HABITAT_LABELS`, e o põe em
-    // `--accent` — um valor fora da lista não teria rótulo em português e
-    // apareceria como o identificador cru no lugar mais destacado do painel.
+    // O painel *Sobre* resolve `t(habitatKey(habitat))` e põe o resultado em
+    // `--accent` — um valor fora da lista não teria tradução em locale nenhum e
+    // apareceria como o endereço cru no lugar mais destacado do painel.
     // O guarda o para aqui, que é onde o dado entra.
     expect(isGenerationData(withSpecies({ habitat: 'grassland' }))).toBe(true)
     expect(isGenerationData(withSpecies({ habitat: 'space' }))).toBe(false)

@@ -1,35 +1,67 @@
 import { describe, expect, it } from 'vitest'
 import { HABITAT_NAMES, isHabitat } from '~~/shared/types/dex'
-import { HABITAT_LABELS } from '~~/shared/types/game'
+import { habitatKey } from '~~/shared/types/game'
 import { readAllSpecies } from '../support/generated-dex'
+import { defaultLocale, label, localeCodes } from '../support/locales'
 
 /**
  * A lista de habitats é escrita à mão e o dex é gerado — este teste mantém as
  * duas iguais, pelo mesmo motivo que `regions.spec.ts` faz com as regiões.
  *
- * O `Record<Habitat, string>` já obriga o compilador a cobrar rótulo para todo
- * nome da tupla. O que ele **não** vê é a outra ponta: um habitat no dex que a
- * tupla não conhece. Hoje o guarda de leitura recusaria a geração inteira, o que
- * é ruidoso mas honesto; o que este teste faz é transformar isso num erro de
- * `yarn test` em vez de uma tela em branco.
+ * O sintoma de divergirem é o painel *Sobre* escrevendo `habitat.cave` onde vai
+ * o nome do lugar — e ali o habitat está em `--accent`, que é o valor mais
+ * destacado do painel.
  *
- * O sintoma de divergirem seria `HABITAT_LABELS[habitat]` devolvendo
- * `undefined` no painel *Sobre* — e ali o habitat está em `--accent`, que é o
- * lugar mais destacado do painel.
+ * **O `Record<Habitat, string>` que fechava metade disso não existe mais.**
+ * Enquanto o rótulo morava em `shared/`, o compilador cobrava um por nome da
+ * tupla e o que faltava era só a outra ponta — um habitat no dex que a tupla não
+ * conhece. Agora o texto mora em JSON, onde não há compilador: as duas pontas
+ * são deste arquivo, e é a troca que `rarityKey` documenta lá, de garantia de
+ * tipo por portão.
  */
 
 const SPECIES = readAllSpecies()
 
 describe('habitats', () => {
-  it('são os nove, e todos com rótulo em português', () => {
+  it('são os nove, e todos com rótulo em cada idioma', () => {
     expect(HABITAT_NAMES).toHaveLength(9)
-    expect(Object.keys(HABITAT_LABELS).sort()).toEqual([...HABITAT_NAMES].sort())
 
+    const codes = localeCodes()
+    expect(codes.length, 'nenhum locale para comparar').toBeGreaterThan(1)
+
+    for (const code of codes) {
+      for (const name of HABITAT_NAMES) {
+        expect(label(habitatKey(name), code), `${habitatKey(name)} não tem rótulo em ${code}`).not.toBe('')
+      }
+    }
+
+    // Nenhum rótulo pode ser o próprio identificador: é exatamente o
+    // `ROUGH TERRAIN` que a varredura tirou da tela. **Só no locale padrão**,
+    // pela razão que `i18n-gate` já escreve na mesma asserção sobre o
+    // vocabulário: em inglês o rótulo *é* o identificador com inicial maiúscula,
+    // e `cave` → *Cave* está certo. Cobrar isso dos dois reprovaria seis dos
+    // nove habitats por estarem traduzidos corretamente.
     for (const name of HABITAT_NAMES) {
-      expect(HABITAT_LABELS[name]).not.toBe('')
-      // Nenhum rótulo pode ser o próprio identificador: é exatamente o
-      // `ROUGH TERRAIN` que a varredura tirou da tela.
-      expect(HABITAT_LABELS[name].toLowerCase()).not.toBe(name)
+      const written = label(habitatKey(name), defaultLocale())
+
+      expect(written.toLowerCase(), `o locale padrão escreve o identificador em ${name}`).not.toBe(name)
+    }
+  })
+
+  /**
+   * `rare` é o que precisou de decisão em vez de dicionário.
+   *
+   * Na PokeAPI ele é o habitat de quem não mora em lugar nenhum comum, então
+   * *raro* mediria a mesma coisa que `rarity.uncommon` e diria outra. Os dois
+   * idiomas nomeiam o lugar — *Ermo*, *Wilds* —, e esta asserção existe para que
+   * uma tradução futura não o devolva à escada de raridade.
+   */
+  it('não empresta a palavra da escada de raridade para o habitat `rare`', () => {
+    for (const code of localeCodes()) {
+      const habitat = label(habitatKey('rare'), code).toLowerCase()
+
+      expect([label('rarity.rare', code).toLowerCase(), label('rarity.uncommon', code).toLowerCase()])
+        .not.toContain(habitat)
     }
   })
 

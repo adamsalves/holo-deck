@@ -5,6 +5,7 @@ import type {
 } from '~~/shared/game/battle'
 import type { Condition } from '~~/shared/game/status'
 import type { AilmentName, MoveEntry } from '~~/shared/types/dex'
+import type { Translate } from '~~/shared/types/game'
 import { AILMENT_NAMES } from '~~/shared/types/dex'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
@@ -33,14 +34,13 @@ export interface NarratedTurn {
 /**
  * How the narrator asks for a sentence.
  *
- * It takes the translator instead of reaching for `useI18n()` because it is a
- * plain function with no component around it, and `t()` outside a setup scope is
- * either undefined or the wrong locale. The parameter is **required** for the
- * same reason `describeEvolution` made its resolver required: a default would
- * have to be something, and anything plausible enough to compile is plausible
- * enough to ship a half-translated log.
+ * Declared here first and moved to `shared/types/game.ts` when
+ * `describeEvolution` came to need the same contract: two identical definitions
+ * of one signature is the shape whose drift the compiler reports at the call
+ * site instead of at the definition. Re-exported rather than relocated in the
+ * importers, because where the type is written is not their business.
  */
-export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
+export type { Translate } from '~~/shared/types/game'
 
 /**
  * Where each sentence lives, spelled once.

@@ -37,9 +37,11 @@ export const TYPE_COUNT = TYPE_NAMES.length
  * fechado: a API parou de preencher o campo na geração 6 e nenhum nome novo
  * entrou desde então.
  *
- * Existe como tupla pela mesma razão que `REGION_NAMES`: é o que permite
- * `HABITAT_LABELS` ser um `Record` completo, e um habitat novo sem rótulo
- * escrito deixa de compilar em vez de aparecer em inglês na tela.
+ * Existe como tupla pela mesma razão que `REGION_NAMES`: é dela que
+ * `test/unit/habitats.spec.ts` deriva a chave de cada habitat para cobrar
+ * tradução nos dois locales. Enquanto o rótulo era um `Record` aqui do lado, a
+ * tupla comprava isso do compilador; o texto mora em JSON desde a Fase 8, e a
+ * cobrança passou para o portão — a mesma troca que `rarityKey` documenta.
  */
 export const HABITAT_NAMES = [
   'cave', 'forest', 'grassland', 'mountain', 'rare',
@@ -271,8 +273,8 @@ export function isDexVersion(value: unknown): value is string {
  * Uma espécie no grid. `habitat` é `null` da geração 6 em diante — a PokeAPI
  * parou de preencher o campo, e inventar um valor mentiria na aba Sobre. Quando
  * não é nulo é um dos 9 de `HABITAT_NAMES`, e não uma string qualquer: o painel
- * *Sobre* o traduz por `HABITAT_LABELS`, e um valor fora da lista não teria
- * rótulo em português para mostrar.
+ * *Sobre* resolve `t(habitatKey(habitat))`, e um valor fora da lista chegaria à
+ * tela como o endereço cru — `habitat.space` no ponto que o painel mais destaca.
  */
 export interface SpeciesEntry {
   readonly id: SpeciesId

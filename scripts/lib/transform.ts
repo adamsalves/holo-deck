@@ -220,8 +220,8 @@ export function toTypes(pokemon: Pokemon): readonly [TypeName] | readonly [TypeN
  * Um nome fora dos 9 **para o build**, e não vira `null`. Silenciá-lo perderia
  * um habitat de verdade sem ninguém notar; e deixá-lo passar cru chegaria à aba
  * *Sobre* como identificador em inglês, no valor que o painel mais destaca.
- * Parar aqui é o único momento em que dá para escrever o rótulo em
- * `HABITAT_LABELS` antes de o dado existir na tela.
+ * Parar aqui é o único momento em que dá para escrever a tradução do habitat
+ * nos dois locales antes de o dado existir na tela.
  */
 export function toHabitat(species: Species): Habitat | null {
   const name = species.habitat?.name

@@ -3,6 +3,8 @@ import type { CoreData, TypeName } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { incomingDamageRelations, multiplierLabel } from '~~/shared/game/typechart'
 
+const { t } = useI18n()
+
 /**
  * As relações de dano *recebido* — o painel que a prancha *Detalhe* anota como
  * *calculado na matriz 18×18, tipo duplo multiplicativo*.
@@ -21,14 +23,14 @@ const relations = computed(() => incomingDamageRelations(props.effectiveness, pr
 <template>
   <section>
     <h2 class="relations__title">
-      Relações de dano
-      <span class="relations__note">— calculadas na matriz 18×18, tipo duplo multiplicativo</span>
+      {{ t('dex.relations.title') }}
+      <span class="relations__note">{{ t('dex.relations.note') }}</span>
     </h2>
 
     <div class="relations__groups">
       <div v-if="relations.weak.length > 0">
         <p class="numeric relations__group">
-          Recebe mais dano
+          {{ t('dex.relations.weak') }}
         </p>
         <ul class="relations__list">
           <li
@@ -43,7 +45,7 @@ const relations = computed(() => incomingDamageRelations(props.effectiveness, pr
 
       <div v-if="relations.resistant.length > 0">
         <p class="numeric relations__group">
-          Recebe menos / nada
+          {{ t('dex.relations.resistant') }}
         </p>
         <ul class="relations__list">
           <li

@@ -67,11 +67,11 @@ const rows = computed(() => props.baseStats.map((value, index) => {
   <section :data-type="type">
     <header class="stat-header">
       <h2 class="stat-header__title">
-        Base stats
+        {{ t('dex.stats.title') }}
       </h2>
       <p class="numeric stat-header__total">
-        BST <strong class="stat-header__value">{{ total }}</strong>
-        <span class="stat-header__max"> / {{ MAX_BASE_STAT_TOTAL }} máx</span>
+        {{ t('dex.bst') }} <strong class="stat-header__value">{{ total }}</strong>
+        <span class="stat-header__max"> {{ t('dex.stats.ofMax', { max: MAX_BASE_STAT_TOTAL }) }}</span>
       </p>
     </header>
 

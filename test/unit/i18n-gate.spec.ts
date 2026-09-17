@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, STAT_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
+import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, HABITAT_NAMES, STAT_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
+import { EVOLUTION_KEY_LIST } from '~~/shared/game/evolution'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
 import {
@@ -11,6 +12,7 @@ import {
   damageClassKey,
   EFFECTIVENESS_MULTIPLIERS,
   effectivenessKey,
+  habitatKey,
   RARITY_NAMES,
   rarityKey,
   statKey,
@@ -96,6 +98,7 @@ const VOCABULARY: readonly (readonly [id: string, key: string])[] = [
   )),
   ...STAT_NAMES.map(name => [name, statKey(name)] as const),
   ...STAT_NAMES.map(name => [name, statNameKey(name)] as const),
+  ...HABITAT_NAMES.map(name => [name, habitatKey(name)] as const),
 ]
 
 const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
@@ -119,6 +122,22 @@ const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
  * warns about one paragraph above.
  */
 const NARRATION_KEYS_USED: readonly string[] = NARRATION_KEY_LIST
+
+/**
+ * The evolution conditions, which spell their keys the same way for a third
+ * time.
+ *
+ * `describeEvolution` builds an address per condition — trigger, time of day,
+ * gender, the fifteen ressalvas — so `literalKeys()` sees none of the 43. The
+ * list is published by the module itself, built from the same maps the sentence
+ * reads, and `test/unit/evolution.spec.ts` asks every key in it to resolve in
+ * every locale.
+ *
+ * Without it the whole `evolution.*` namespace reads as orphaned, and the orphan
+ * assertion below would have 43 live translations deleted — the same failure the
+ * turn log would have had, arriving by the same door one PR later.
+ */
+const EVOLUTION_KEYS_USED: readonly string[] = EVOLUTION_KEY_LIST
 
 /**
  * The words that really are the same in both languages.
@@ -158,6 +177,15 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * five all differ — `PV`/`HP`, `ATQ`/`ATK`, `ATE`/`SpA`, `DEE`/`SpD`, `VEL`/`SPE`
  * — and the *Detail* board specifies both sets, so this one was read off the
  * board rather than assumed.
+ *
+ * The Detail screen brought seven, of all three kinds at once. `dex.bst` and
+ * `species.tabs.stats` are abbreviations the game writes the same way; `dex.stats.title`
+ * is *Base stats* in Portuguese too, borrowed the way *Shiny* and *Deck* are, and
+ * the board writes it that way; `species.about.habitat` is the one word that
+ * happens to be spelled identically in both; `species.about.training` is the name
+ * of a tab in the old Pokédex, which is a proper noun and not a word; and the two
+ * `species.seo.*` titles are a species name between em dashes. None of them is a
+ * paste — checked one at a time, which is the only way this list is worth having.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -170,6 +198,8 @@ const IDENTICAL_LABELS: readonly string[] = [
   'condition.paralysis',
   'deck.seo.title',
   'deck.slotsCount',
+  'dex.bst',
+  'dex.stats.title',
   'hub.shiny',
   'league.next.teamSize',
   'move.class.status',
@@ -186,6 +216,11 @@ const IDENTICAL_LABELS: readonly string[] = [
   'packs.seo.title',
   'packs.shop.title',
   'rarity.ultra',
+  'species.about.habitat',
+  'species.about.training',
+  'species.seo.title',
+  'species.seo.titleFallback',
+  'species.tabs.stats',
   'stat.short.defense',
   'type.normal',
 ]
@@ -277,6 +312,7 @@ const USED_KEYS: ReadonlySet<string> = new Set([
   ...NAV_KEYS,
   ...VOCABULARY_KEYS,
   ...NARRATION_KEYS_USED,
+  ...EVOLUTION_KEYS_USED,
 ])
 
 describe('paridade entre os locales', () => {
@@ -430,14 +466,15 @@ describe('as chaves e quem as usa', () => {
    * `VOCABULARY_KEYS` short, the missing ids would never be asked of any locale,
    * and both assertions above would pass over a vocabulary nobody checked.
    */
-  it('derives one key per rarity, type, ailment, damage class, multiplier and stat', () => {
+  it('derives one key per rarity, type, ailment, damage class, multiplier, stat and habitat', () => {
     expect(VOCABULARY_KEYS.length).toBe(
       RARITY_NAMES.length
       + TYPE_NAMES.length
       + AILMENT_NAMES.length * 3
       + DAMAGE_CLASS_NAMES.length
       + EFFECTIVENESS_MULTIPLIERS.length
-      + STAT_NAMES.length * 2,
+      + STAT_NAMES.length * 2
+      + HABITAT_NAMES.length,
     )
     expect(new Set(VOCABULARY_KEYS).size).toBe(VOCABULARY_KEYS.length)
   })
