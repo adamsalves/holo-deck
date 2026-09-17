@@ -188,7 +188,7 @@ useSeoMeta({
       <div class="hero__nav">
         <nav
           class="hero__crumbs"
-          :aria-label="t('species.crumbs')"
+          :aria-label="t('a11y.breadcrumb')"
         >
           <NuxtLink :to="localePath('/pokedex')">
             {{ t('nav.pokedex') }}

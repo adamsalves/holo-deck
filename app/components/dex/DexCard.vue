@@ -42,14 +42,22 @@ const typeLabels = computed(() => props.species.types.map(type => t(typeKey(type
  * A frase que o leitor de tela ouve. O link cobre a carta e não tem texto dentro,
  * então o `aria-label` é o **único** nome que ele tem — precisa carregar tudo,
  * inclusive a raridade, que na tela está só na cor da moldura.
+ *
+ * **The two types are joined by a message, not by a separator.** The conjunction
+ * used to be a literal `' e '` handed to `join()`, which is a word in the middle
+ * of a sentence and not punctuation: English wants *and*, and a language that
+ * puts it elsewhere would have no way to say so. One type takes no conjunction
+ * at all, so the message only exists for the pair.
  */
 const label = computed(() => [
   props.species.displayName,
-  `número ${props.species.id}`,
-  typeLabels.value.join(' e '),
+  t('dex.card.number', { id: props.species.id }),
+  typeLabels.value.length === 2
+    ? t('dex.card.types', { first: typeLabels.value[0] ?? '', second: typeLabels.value[1] ?? '' })
+    : typeLabels.value[0] ?? '',
   t(rarityKey(rarity.value)),
-  ...(props.owned === false ? ['não capturado'] : []),
-  ...(props.shiny ? ['shiny'] : []),
+  ...(props.owned === false ? [t('dex.card.missing')] : []),
+  ...(props.shiny ? [t('dex.card.shiny')] : []),
 ].join(', '))
 </script>
 

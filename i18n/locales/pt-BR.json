@@ -18,7 +18,8 @@
     "signOut": "SAIR"
   },
   "a11y": {
-    "skipToContent": "Pular para o conteúdo"
+    "skipToContent": "Pular para o conteúdo",
+    "breadcrumb": "Trilha"
   },
   "rarity": {
     "common": "Comum",
@@ -233,6 +234,9 @@
       "scrap": "{count} dup · {dust}",
       "dustAmount": "{dust} pó",
       "scrapLabel": "Transformar {count} duplicata de {name} em {dust} de pó | Transformar {count} duplicatas de {name} em {dust} de pó"
+    },
+    "progress": {
+      "valueText": "{progress} capturados"
     }
   },
   "deck": {
@@ -528,10 +532,46 @@
     "chain": {
       "title": "Linha evolutiva",
       "note": "— resolvida do JSON local, zero requisições"
+    },
+    "card": {
+      "number": "número {id}",
+      "types": "{first} e {second}",
+      "missing": "não capturado",
+      "shiny": "shiny"
+    },
+    "filters": {
+      "all": "Todos · {count}",
+      "counted": "{shown} de {total}",
+      "owned": "Possuídos · {count}",
+      "missing": "Faltando · {count}"
+    },
+    "grid": {
+      "rendered": "{rendered} de {total} renderizados",
+      "virtualized": "{counted} · scroll virtualizado",
+      "note": "A Pokédex é referência: mostra tudo, possuídas ou não."
+    }
+  },
+  "pokedex": {
+    "overline": "Referência completa",
+    "intro": "As 1025 espécies, possuídas ou não. Escolha uma região ou busque direto.",
+    "owned": "{owned} / {total} capturados",
+    "speciesCount": "{count} espécie | {count} espécies",
+    "progress": "Progresso em {region}: {progress}",
+    "seo": {
+      "title": "Pokédex — Holo Deck",
+      "description": "As 1025 espécies das nove gerações, com stats, evolução e relações de dano. Dados da PokeAPI."
+    },
+    "region": {
+      "empty": "Nenhuma espécie de {region} combina com esses filtros.",
+      "notFound": "Geração fora do dex",
+      "load": "Não foi possível carregar a geração",
+      "seo": {
+        "title": "{region} — Pokédex — Holo Deck",
+        "description": "As {count} espécies de {region}, da {generation}, com tipos, stats e evolução."
+      }
     }
   },
   "species": {
-    "crumbs": "Trilha",
     "artwork": "Arte oficial de {name}",
     "height": "Altura",
     "weight": "Peso",

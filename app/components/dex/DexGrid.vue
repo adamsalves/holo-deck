@@ -4,6 +4,8 @@ import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import { computed, useTemplateRef, watch } from 'vue'
 import { useElementBounding, useElementSize } from '@vueuse/core'
 
+const { t } = useI18n()
+
 /**
  * O grid de espécies — o mesmo desenho nas duas formas em que ele existe.
  *
@@ -191,9 +193,9 @@ const renderedPercent = computed(() => {
  * 156. Quem quer o número tem os dois reais na primeira metade da frase.
  */
 const renderedLabel = computed(() => {
-  const counted = `${rendered.value} de ${props.species.length} renderizados`
+  const counted = t('dex.grid.rendered', { rendered: rendered.value, total: props.species.length })
   if (!props.virtualize || rendered.value >= props.species.length) return counted
-  return `${counted} · scroll virtualizado`
+  return t('dex.grid.virtualized', { counted })
 })
 </script>
 
@@ -259,7 +261,7 @@ const renderedLabel = computed(() => {
            prosa. -->
       <p class="grid-footer__count">
         <span class="numeric">{{ renderedLabel }}</span>
-        <span class="grid-footer__note">A Pokédex é referência: mostra tudo, possuídas ou não.</span>
+        <span class="grid-footer__note">{{ t('dex.grid.note') }}</span>
       </p>
 
       <div class="grid-footer__extent">

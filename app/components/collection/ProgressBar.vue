@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { progressLabel, progressRatio, progressStep } from '~~/shared/game/progress'
 
+const { t } = useI18n()
+
 /**
  * A barra de progresso de coleção — a fileira de nove que abre o binder e o Hub.
  *
@@ -49,7 +51,7 @@ const percent = computed(() =>
     :aria-valuenow="owned"
     :aria-valuemin="0"
     :aria-valuemax="total"
-    :aria-valuetext="`${progressLabel(owned, total)} capturados`"
+    :aria-valuetext="t('collection.progress.valueText', { progress: progressLabel(owned, total) })"
   >
     <div class="progress__track">
       <!-- Largura zero não renderiza nada, e é assim que a prancha desenha as

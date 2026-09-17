@@ -186,6 +186,14 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * of a tab in the old Pokédex, which is a proper noun and not a word; and the two
  * `species.seo.*` titles are a species name between em dashes. None of them is a
  * paste — checked one at a time, which is the only way this list is worth having.
+ *
+ * The Pokédex screens brought three more of the same two kinds: `dex.card.shiny`
+ * is the borrowed word again, and the two remaining `*.seo.title` are a proper
+ * noun between em dashes. What did **not** land here is `pokedex.speciesCount`,
+ * and it is worth saying why: its two English plural forms are identical to each
+ * other (*species* does not inflect), but the Portuguese ones are not, so the
+ * two locales differ and the assertion below never sees it. A message can repeat
+ * itself inside one language without repeating across languages.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -199,6 +207,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'deck.seo.title',
   'deck.slotsCount',
   'dex.bst',
+  'dex.card.shiny',
   'dex.stats.title',
   'hub.shiny',
   'league.next.teamSize',
@@ -215,6 +224,8 @@ const IDENTICAL_LABELS: readonly string[] = [
   'packs.rates.shinyChip',
   'packs.seo.title',
   'packs.shop.title',
+  'pokedex.region.seo.title',
+  'pokedex.seo.title',
   'rarity.ultra',
   'species.about.habitat',
   'species.about.training',
