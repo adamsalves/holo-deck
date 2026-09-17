@@ -7,6 +7,7 @@ import {
   localeCodes,
   localeUrl,
   message,
+  spells,
 } from '../support/locales'
 import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
 
@@ -370,13 +371,6 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
  * assertion would go red over a defect this PR did not set out to fix, and the
  * gate's exception list is what records it.
  */
-/** Whether `body` says `text` as a word of its own, both already case folded. */
-function spoken(body: string, text: string): boolean {
-  const escaped = text.toLowerCase().replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-  return new RegExp(`(?<![\\p{L}\\d])${escaped}(?![\\p{L}\\d])`, 'u').test(body)
-}
-
 test('from inside `/en`, the screens keep the locale in links and in text', async ({ page }) => {
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
 
@@ -449,13 +443,14 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
       // `/en/packs` as leaking Portuguese while that screen was right. It is the
       // same border the `rules-gate` docblock explains — a sweep has to exclude
       // every class the value can hide in, and for a word that class is letters
-      // and digits, not only the one it is matching.
+      // and digits, not only the one it is matching. It lives in `spells()` in
+      // `test/support/locales.ts`, because the three stat e2e ask it too.
       const body = (await page.locator('body').innerText())
         .replaceAll(/\s+/g, ' ')
         .toLowerCase()
 
       expect(
-        leaked.filter(text => spoken(body, text)),
+        leaked.filter(text => spells(body, text.toLowerCase())),
         `${path} em ${locale} mostra rótulo em ${defaultLocale()}`,
       ).toEqual([])
 

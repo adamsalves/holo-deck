@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, STAT_NAMES } from '~~/shared/types/dex'
 import { conditionKey, damageClassKey, statKey, statNameKey } from '~~/shared/types/game'
-import { label, localeCodes, repeated } from '../support/locales'
+import { label, leafEntries, localeCodes, readLocale, repeated } from '../support/locales'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
 import { join } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 
 /**
  * The six stat abbreviations, in every locale, spelled in exactly one place.
@@ -23,14 +23,18 @@ import { readFileSync } from 'node:fs'
  * the same document, in the same language. So the abbreviations became locale
  * keys derived from `STAT_NAMES`, and this file is what keeps them there.
  *
- * It asks four questions, and they fail in different ways on purpose:
+ * It asks five questions, and they fail in different ways on purpose:
  *
  * 1. the twelve addresses exist, derived from the tuple rather than listed here;
  * 2. no two abbreviations of one locale collide **once case is folded**, which
  *    is the #20 defect and the reason `repeated()` alone is not enough — the
  *    `i18n-gate` compares labels exactly, and `SpD` against `SPD` passes it;
  * 3. no abbreviation collides with a badge that shares a screen with it;
- * 4. nobody spells one by hand.
+ * 4. nobody spells one by hand in the source;
+ * 5. nobody spells one by hand **inside a locale value** either — which is where
+ *    the second defect of this PR actually lived: `SPD` was written into the
+ *    three `battle.initiative` messages, and a sweep of the source cannot see a
+ *    string that ships in `pt-BR.json`.
  */
 
 /** The twelve addresses, mapped through the very functions the screens call. */
@@ -69,8 +73,50 @@ const NEIGHBOR_KEYS: readonly string[] = [
   ...AILMENT_NAMES.map(name => conditionKey(name)),
 ]
 
+/**
+ * What the sweep walks, and what it deliberately does not.
+ *
+ * `ROOTS` reads like the entry list this repository has been burned by three
+ * times, so `EXCLUDED_ROOTS` is what makes it safe: every other top-level directory is
+ * named here, and `covers every top-level directory` below fails when one
+ * appears in neither list. A `composables/` added tomorrow does not get swept
+ * silently — it stops the gate until somebody says which side it is on.
+ *
+ * `test/` is out because this very file, and the e2e beside it, spell every
+ * abbreviation on purpose. The rest hold no rendered badge: `server/` and
+ * `scripts/` never render, `i18n/` is the source the badges come *from* — and it
+ * gets its own question below, because that is where a hand-written badge hides
+ * best.
+ */
 const ROOTS = ['app', 'shared'] as const
-const SKIP = new Set(['node_modules'])
+const EXCLUDED_ROOTS: readonly string[] = [
+  'docs', 'drizzle', 'i18n', 'public', 'scripts', 'server', 'test', 'types',
+]
+
+/** Every top-level directory that is on one of the two lists. */
+const CLASSIFIED: readonly string[] = [...ROOTS, ...EXCLUDED_ROOTS]
+
+/**
+ * The directories that are not source, read from `.gitignore` rather than listed.
+ *
+ * Built from the file for the reason the gate-writing rule gives: a list written
+ * here would age beside the one it mirrors. It also keeps the coverage question
+ * below **deterministic** — `test-results/` and `playwright-report/` exist after a
+ * local e2e run and not on a fresh CI checkout, so a hand-written list would
+ * classify them on one machine and fail on the other.
+ */
+function ignoredDirs(): Set<string> {
+  return new Set(
+    readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.endsWith('/') && !line.startsWith('#') && !line.startsWith('!'))
+      .map(line => line.replace(/\/$/, ''))
+      .filter(name => !name.startsWith('.') && !name.includes('/')),
+  )
+}
+
+const SKIP = ignoredDirs()
 const SOURCE = hasExtension(['.vue', '.ts'])
 
 /**
@@ -95,31 +141,72 @@ const SOURCE = hasExtension(['.vue', '.ts'])
  * - `styleguide.vue` is a numeric-font specimen (`110 HP · 1.600 pó`), not a
  *   screen of the game, and nothing about it is translated.
  */
+/**
+ * The badge a message may spell, because it is also an ordinary word of the game.
+ *
+ * `HP` only, and for the same reason the two files in `ALLOWED` are excused: it
+ * is the English badge **and** what both languages call the resource in play.
+ * Measured — the 8 `battle.log.*` messages per locale are the whole of it, and
+ * they are about the quantity rather than the axis of a chart.
+ */
+const EXCUSED_IN_LOCALES: ReadonlySet<string> = new Set(['HP'])
+
 const ALLOWED: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['app/pages/rules.vue', new Set(['HP'])],
   ['app/pages/styleguide.vue', new Set(['HP'])],
 ])
 
 /**
- * The abbreviations as the locales spell them, deduplicated.
+ * The abbreviations as the locales spell them, plus the all-caps spelling of the
+ * ones a locale writes in mixed case.
  *
  * `DEF` is the one both languages agree on, so eleven tokens come out of twelve
- * labels. The set is built from the files rather than written here, which is
- * what makes it follow a locale that renames one.
+ * labels — and `SpA`/`SpD` bring `SPA`/`SPD` with them, which is the whole point.
+ * The sweep matches case sensitively (see `sightings`), so without the variant a
+ * template could spell `SPD` by hand and stay green: that is the **literal token
+ * of issue #20**, the one that used to mean speed, and it would be the one
+ * spelling the gate could not see. Measured on this tree, the widened set finds
+ * the same zero sites as the narrow one, so it costs nothing today.
+ *
+ * Folding case in the sweep instead would be the wrong trade: measured, it turns
+ * 0 findings into 32, because `hp` is a property, a CSS class and a prop all over
+ * `app/`. The variant names the two spellings that are badges; case folding names
+ * every spelling that is not.
+ *
+ * The set is built from the locales rather than written here, which is what makes
+ * it follow a locale that renames one.
  */
 function abbreviations(): string[] {
-  return [...new Set(CODES.flatMap(code => SHORT_KEYS.map(key => label(key, code))))].sort()
+  const written = CODES.flatMap(code => SHORT_KEYS.map(key => label(key, code)))
+
+  return [...new Set([...written, ...written.map(badge => badge.toUpperCase())])].sort()
 }
 
 /**
  * Where a token is spelled with letters or digits on neither side.
  *
- * The border is `[A-Za-z0-9_]` and not `\d`, which is the lesson `rules-gate`
- * paid for: a border that only excludes the class it is matching leaves the
- * value hidden in every other one. `HP` had to be invisible inside
- * `POTION_HP_THRESHOLD` and `maxHp`, and `DEF` inside `stats.defense` — measured
- * on this tree, that border is what separates the seven real sites from the
- * twenty-one a looser one reports.
+ * The border is the full letter class and not `\d`, which is the lesson
+ * `rules-gate` paid for: a border that only excludes the class it is matching
+ * leaves the value hidden in every other one. `HP` had to be invisible inside
+ * `POTION_HP_THRESHOLD` and `maxHp`, and `DEF` inside `stats.defense`. Measured
+ * on this tree, the borders separate like this — 5 real sites, all of them the
+ * `HP` of the two excused files:
+ *
+ * | border | sites |
+ * |---|---|
+ * | `\p{L}\p{N}_` (this one) | 5 |
+ * | `[A-Za-z]` | 9 |
+ * | `\d` only | 53 |
+ * | substring | 53 |
+ *
+ * **It is `\p{L}` and not `[A-Za-z]`, and that is the half that bites.** An
+ * ASCII-only border does not exclude an accented letter, so `VEL` matches inside
+ * `NÍVEL` and `DISPONÍVEL` — plausible words in caps on a screen that already
+ * stamps `GOLPE DE STATUS`. That is a gate reprovando entrada boa, and the
+ * instinctive repair is to excuse the whole file in `ALLOWED`, which switches off
+ * the real check for that token. Measured both ways: `NÍVEL 5 · DISPONÍVEL`
+ * reports 2 sites under `[A-Za-z0-9_]` and 0 under this one, while a genuine
+ * hand-written `VEL` still reports 1 under both.
  *
  * It matches **case sensitively**, unlike every comparison above, and the
  * difference is deliberate: a badge written by hand is written in the case it
@@ -128,7 +215,7 @@ function abbreviations(): string[] {
  * the badge.
  */
 function sightings(source: string, token: string): number[] {
-  const pattern = new RegExp(`(?<![A-Za-z0-9_])${token}(?![A-Za-z0-9_])`, 'g')
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${token}(?![\\p{L}\\p{N}_])`, 'gu')
   const lines: number[] = []
 
   for (const match of source.matchAll(pattern)) {
@@ -172,7 +259,7 @@ describe('the six stat abbreviations', () => {
 
     for (const code of CODES) {
       for (const key of [...SHORT_KEYS, ...LONG_KEYS]) {
-        expect(label(key, code).trim(), `\`${key}\` vazia no locale ${code}`).not.toBe('')
+        expect(label(key, code).trim(), `\`${key}\` is empty in locale ${code}`).not.toBe('')
       }
     }
   })
@@ -188,10 +275,10 @@ describe('the six stat abbreviations', () => {
     for (const code of CODES) {
       const labels = SHORT_KEYS.map(key => label(key, code))
 
-      expect(labels.length, `nada medido no locale ${code}`).toBe(STAT_NAMES.length)
+      expect(labels.length, `nothing measured in locale ${code}`).toBe(STAT_NAMES.length)
       expect(
         repeated(folded(labels)),
-        `o locale ${code} escreve a mesma sigla em dois stats`,
+        `locale ${code} writes the same abbreviation on two stats`,
       ).toEqual([])
     }
   })
@@ -213,7 +300,7 @@ describe('the six stat abbreviations', () => {
 
       expect(
         clash,
-        `o locale ${code} dá a mesma sigla a um stat e a um badge da mesma tela`,
+        `locale ${code} gives one abbreviation to a stat and to a badge of the same screen`,
       ).toEqual([])
     }
   })
@@ -228,7 +315,44 @@ describe('who spells an abbreviation by hand', () => {
    */
   it('has files and abbreviations to sweep', () => {
     expect(sourceFiles().length).toBeGreaterThan(100)
-    expect(abbreviations().length).toBe(11)
+
+    // Compared as a set against the locales, never as a count. A hard `11` is the
+    // disguise the gate-writing rule names first: renaming one badge so that both
+    // locales agree drops the set to 10 and fails with `expected 10 to be 11`,
+    // which names nothing and reads like a broken gate rather than a renamed
+    // badge — the opposite of what the docblock above promises.
+    const swept = abbreviations()
+
+    expect(swept.length).toBeGreaterThanOrEqual(STAT_NAMES.length)
+
+    for (const code of CODES) {
+      expect(
+        SHORT_KEYS.map(key => label(key, code)).filter(badge => !swept.includes(badge)),
+        `locale ${code} spells a badge the sweep never looks for`,
+      ).toEqual([])
+    }
+  })
+
+  /**
+   * The entry list, guarded by an exit list.
+   *
+   * `ROOTS` names who is swept, which is the shape this repository has been
+   * burned by three times. This is what keeps it honest: every top-level
+   * directory sits on exactly one of the two lists, so one added tomorrow stops
+   * the gate until somebody says which side it is on, instead of being skipped
+   * in silence.
+   */
+  it('covers every top-level directory', () => {
+    const tracked = readdirSync(REPO_ROOT, { withFileTypes: true })
+      .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+      .map(entry => entry.name)
+      .filter(name => !SKIP.has(name))
+
+    expect(tracked.length).toBeGreaterThan(ROOTS.length)
+    expect(
+      tracked.filter(name => !CLASSIFIED.includes(name)).sort(),
+      'a top-level directory that is neither swept nor deliberately left out',
+    ).toEqual([])
   })
 
   /**
@@ -252,12 +376,12 @@ describe('who spells an abbreviation by hand', () => {
         if (ALLOWED.get(file)?.has(token) === true) continue
 
         for (const line of sightings(source, token)) {
-          found.push(`${file}:${line} escreve \`${token}\` à mão`)
+          found.push(`${file}:${line} spells \`${token}\` by hand`)
         }
       }
     }
 
-    expect(found.sort(), 'sigla de stat escrita à mão em vez de vinda do locale').toEqual([])
+    expect(found.sort(), 'a stat abbreviation spelled by hand instead of read from the locale').toEqual([])
   })
 
   /**
@@ -279,6 +403,60 @@ describe('who spells an abbreviation by hand', () => {
       }
     }
 
-    expect(unused.sort(), 'exceção que não tem mais o que desculpar').toEqual([])
+    expect(unused.sort(), 'an exception with nothing left to excuse').toEqual([])
+  })
+})
+
+/**
+ * The half of the sweep that lives in the locales, not in the source.
+ *
+ * **This is where the second defect of this PR actually was.** `SPD` was not
+ * written in a template — it was written *inside* three `battle.initiative`
+ * messages, in both languages, and shipped that way. While the badge was also
+ * hand-written in the HUD the two agreed by coincidence and the screen was
+ * right; the moment the badge came from the locale, the same screen would have
+ * named speed two ways. No sweep of `app/` and `shared/` can see that string,
+ * because it is not in `app/` or `shared/`.
+ *
+ * `HP` is the one exception, and it is the same accident the source sweep
+ * excuses: `HP` is the English badge **and** the word this game uses for the
+ * resource in play, in both languages. The 8 `battle.log.*` messages are about
+ * the quantity — *"perdeu 20 HP"* — and pt-BR keeps `PV` on the bar while the
+ * prose keeps `HP`. That divergence is declared in the *Canvas divergences*
+ * section of the README, not tolerated here by accident.
+ */
+describe('who spells an abbreviation inside a locale', () => {
+  /**
+   * The other side: with nothing read, or with every token excused, the
+   * assertion below would be empty forever. Both are asserted against the
+   * locales they come from.
+   */
+  it('has locale values to sweep', () => {
+    for (const code of CODES) {
+      const values = leafEntries(readLocale(code)).filter(([, value]) => typeof value === 'string')
+
+      expect(values.length, `locale ${code} read empty`).toBeGreaterThan(100)
+    }
+
+    expect(abbreviations().filter(token => !EXCUSED_IN_LOCALES.has(token)).length)
+      .toBeGreaterThan(0)
+  })
+
+  it('lets no message outside `stat.short.*` spell one', () => {
+    const tokens = abbreviations().filter(token => !EXCUSED_IN_LOCALES.has(token))
+    const found: string[] = []
+
+    for (const code of CODES) {
+      for (const [key, value] of leafEntries(readLocale(code))) {
+        if (typeof value !== 'string') continue
+        if (key.startsWith('stat.short.') || key.startsWith('stat.long.')) continue
+
+        for (const token of tokens) {
+          if (sightings(value, token).length > 0) found.push(`${code} ${key} spells \`${token}\``)
+        }
+      }
+    }
+
+    expect(found.sort(), 'a stat abbreviation written into a message').toEqual([])
   })
 })

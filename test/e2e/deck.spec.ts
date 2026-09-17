@@ -3,11 +3,13 @@ import { STAT_NAMES } from '../../shared/types/dex.ts'
 import { statKey } from '../../shared/types/game.ts'
 import {
   defaultLocale,
+  foreignBadges,
   label,
   localeCodes,
   localeUrl,
   message,
   messagePattern,
+  spells,
 } from '../support/locales'
 import { openWelcomePack, saveWith, seedLocalSave } from './support'
 
@@ -315,6 +317,11 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
  * badge belongs to this locale: `HP` against `PV` is the pair that tells the two
  * apart in the footer, and it is measured in both directions.
  */
+/** The six stat badges of one locale, as that locale spells them. */
+function badgesOf(code: string): string[] {
+  return STAT_NAMES.map(stat => label(statKey(stat), code))
+}
+
 test('the slot footer names its stats in the language of the URL', async ({ page }) => {
   const others = localeCodes().filter(code => code !== defaultLocale())
 
@@ -339,28 +346,24 @@ test('the slot footer names its stats in the language of the URL', async ({ page
     ).toBeVisible()
 
     const shown = (await foot.innerText()).replaceAll(/\s+/g, ' ')
-    const mine = STAT_NAMES.map(stat => label(statKey(stat), locale))
-    const spoken = mine.filter(
-      badge => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(shown),
-    )
+    const mine = badgesOf(locale)
+    const drawn = mine.filter(badge => spells(shown, badge))
 
-    // The other side: a footer that rendered the key, or nothing at all, would
-    // leave this empty and every absence assertion below would be vacuous.
-    expect(spoken.length, `/deck in ${locale} drew no stat badge at all: ${shown}`)
-      .toBeGreaterThan(1)
+    // The other side, and it counts **two**: the footer draws the HP badge and
+    // whichever of the other four is highest, so anything less means one of the
+    // two halves rendered the key or nothing — and every absence assertion below
+    // would be measuring a footer that never spoke.
+    expect(
+      drawn.length,
+      `/deck in ${locale} drew ${drawn.length} of the two stat badges: ${shown}`,
+    ).toBe(2)
 
-    for (const other of others.concat(defaultLocale()).filter(code => code !== locale)) {
-      const foreign = STAT_NAMES
-        .map(stat => label(statKey(stat), other))
-        .filter(badge => !mine.includes(badge))
+    const foreign = foreignBadges(locale, badgesOf)
 
-      expect(foreign.length, `no badge left that tells ${locale} apart from ${other}`)
-        .toBeGreaterThan(0)
-
-      expect(
-        foreign.filter(badge => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(shown)),
-        `/deck in ${locale} drew a stat badge of ${other}: ${shown}`,
-      ).toEqual([])
-    }
+    expect(foreign.length, `no badge left that tells ${locale} apart`).toBeGreaterThan(0)
+    expect(
+      foreign.filter(badge => spells(shown, badge)),
+      `/deck in ${locale} drew a stat badge of another language: ${shown}`,
+    ).toEqual([])
   }
 })

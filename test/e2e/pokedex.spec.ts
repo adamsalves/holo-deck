@@ -1,7 +1,19 @@
 import { expect, test } from '@playwright/test'
 import { STAT_NAMES, TYPE_NAMES } from '../../shared/types/dex.ts'
 import { statKey, statNameKey, typeKey } from '../../shared/types/game.ts'
-import { defaultLocale, label, localeCodes, localeUrl } from '../support/locales.ts'
+import {
+  defaultLocale,
+  foreignBadges,
+  label,
+  localeCodes,
+  localeUrl,
+  spells,
+} from '../support/locales.ts'
+
+/** The six stat badges of one locale, as that locale spells them. */
+function badgesOf(code: string): string[] {
+  return STAT_NAMES.map(stat => label(statKey(stat), code))
+}
 
 /**
  * O que só o navegador prova.
@@ -286,24 +298,22 @@ test('the six stat badges, and their spelled-out names, follow the URL', async (
     }
 
     // And no badge of the other language got in. The one both languages write
-    // the same way is dropped: demanding it stay out would fail on a panel that
-    // is right.
-    for (const other of others.concat(defaultLocale()).filter(code => code !== locale)) {
-      const foreign = STAT_NAMES
-        .map(stat => ({ stat, badge: label(statKey(stat), other) }))
-        .filter(({ stat }) => label(statKey(stat), other) !== label(statKey(stat), locale))
+    // the same way is dropped by `foreignBadges`: demanding it stay out would
+    // fail on a panel that is right.
+    //
+    // **Subtracted as a set, not stat by stat.** Asking whether `other` spells
+    // *this* stat differently keeps a badge that this locale legitimately draws
+    // for a different stat — the two agree on the two locales that exist today
+    // and stop agreeing the moment a third one shows up.
+    const foreign = foreignBadges(locale, badgesOf)
 
-      expect(
-        foreign.length,
-        `no badge left that tells ${locale} apart from ${other}`,
-      ).toBeGreaterThan(0)
+    expect(foreign.length, `no badge left that tells ${locale} apart`).toBeGreaterThan(0)
 
-      const panel = await stats.innerText()
-      const leaked = foreign
-        .filter(({ badge }) => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(panel))
-        .map(({ stat }) => stat)
+    const panel = await stats.innerText()
 
-      expect(leaked, `/pokemon/charizard in ${locale} drew the badges of ${other}`).toEqual([])
-    }
+    expect(
+      foreign.filter(badge => spells(panel, badge)),
+      `/pokemon/charizard in ${locale} drew the badges of another language`,
+    ).toEqual([])
   }
 })

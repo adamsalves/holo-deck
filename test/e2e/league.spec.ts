@@ -4,6 +4,7 @@ import { MOVES_IN_BATTLE, STAT_NAMES } from '../../shared/types/dex.ts'
 import { statKey, statNameKey } from '../../shared/types/game.ts'
 import {
   defaultLocale,
+  foreignBadges,
   label,
   leafEntries,
   localeCodes,
@@ -11,6 +12,7 @@ import {
   message,
   messagePattern,
   readLocale,
+  spells,
 } from '../support/locales'
 import { openWelcomePack } from './support'
 
@@ -417,19 +419,20 @@ function logPatterns(code: string): { key: string, pattern: RegExp }[] {
 }
 
 /**
- * The stat badges that belong to another language, and only those.
+ * The six stat badges of one locale, as that locale spells them.
  *
- * A badge both languages write the same way — `DEF`, which the `i18n-gate` names
- * in `IDENTICAL_LABELS` — is dropped: demanding it stay out would fail on a
- * screen that is right.
+ * Fed to `foreignBadges` in `test/support/locales.ts`, which is what drops a
+ * badge both languages write the same way — `DEF`, which the `i18n-gate` names
+ * in `IDENTICAL_LABELS`: demanding it stay out would fail on a screen that is
+ * right.
  */
-function foreignBadges(locale: string): string[] {
-  const mine = STAT_NAMES.map(stat => label(statKey(stat), locale))
+function badgesOf(code: string): string[] {
+  return STAT_NAMES.map(stat => label(statKey(stat), code))
+}
 
-  return localeCodes()
-    .filter(code => code !== locale)
-    .flatMap(code => STAT_NAMES.map(stat => label(statKey(stat), code)))
-    .filter(badge => !mine.includes(badge))
+/** The badge and the spelled-out name of speed — the two ways a screen names it. */
+function speedNames(code: string): string[] {
+  return [label(statKey('speed'), code), label(statNameKey('speed'), code)]
 }
 
 /** The links that would take the player out of the language they are reading. */
@@ -491,10 +494,12 @@ test('the league and the battle speak the language of the URL, from link to log'
     // moment the badge came from the locale. Both are measured together for that
     // reason — either one alone passes while the screen says two things.
     const speed = label(statKey('speed'), locale)
-    const foreignSpeed = localeCodes()
-      .filter(code => code !== locale)
-      .flatMap(code => [label(statKey('speed'), code), label(statNameKey('speed'), code)])
-      .filter(badge => !STAT_NAMES.some(stat => label(statKey(stat), locale) === badge))
+
+    // Subtracted against **both** spellings this locale uses, not only its six
+    // badges: a long name shared between two languages would otherwise survive
+    // the filter and be demanded absent from a header that is right.
+    const foreignSpeed = foreignBadges(locale, code => [...badgesOf(code), ...speedNames(code)])
+      .filter(name => speedNames(locale).includes(name) === false)
 
     // **Read after the barrier, never before it.** The body of this screen is
     // `ClientOnly`, so both lines below exist only once the client has rendered
@@ -520,9 +525,7 @@ test('the league and the battle speak the language of the URL, from link to log'
       `/battle/1 in ${locale} drew a locale key instead of a badge: ${footer}`,
     ).toEqual([])
     expect(
-      foreignBadges(locale).filter(
-        badge => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(footer),
-      ),
+      foreignBadges(locale, badgesOf).filter(badge => spells(footer, badge)),
       `/battle/1 in ${locale} drew a stat badge of another language: ${footer}`,
     ).toEqual([])
 
@@ -547,13 +550,13 @@ test('the league and the battle speak the language of the URL, from link to log'
     // vacuous, and a tie renders the spelled-out name instead of the badge —
     // both spellings count as this locale naming the stat.
     expect(
-      [speed, label(statNameKey('speed'), locale)].some(name => header.includes(name)),
+      speedNames(locale).some(name => spells(header, name)),
       `/battle/1 in ${locale} named no speed stat in the initiative line: ${header}`,
     ).toBe(true)
     expect(foreignSpeed.length, `no spelling left that tells ${locale} apart`)
       .toBeGreaterThan(0)
     expect(
-      foreignSpeed.filter(badge => header.includes(badge)),
+      foreignSpeed.filter(name => spells(header, name)),
       `the ${locale} initiative line named the speed stat of another language`,
     ).toEqual([])
 
