@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test'
-import { defaultLocale, label, message, messagePattern } from '../support/locales'
+import { STAT_NAMES } from '../../shared/types/dex.ts'
+import { statKey } from '../../shared/types/game.ts'
+import {
+  defaultLocale,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+  messagePattern,
+} from '../support/locales'
 import { openWelcomePack, saveWith, seedLocalSave } from './support'
 
 /**
@@ -82,7 +91,9 @@ test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ 
    */
   const stats = page.locator('.deck-slot__foot').first()
   await expect(stats).toBeVisible()
-  await expect(stats).toHaveText(/HP \d+/)
+  await expect(stats).toHaveText(
+    new RegExp(`${label(statKey('hp'), defaultLocale())} \\d+`),
+  )
   await expect(stats).not.toHaveText(/—/)
 })
 
@@ -135,7 +146,9 @@ test('a faixa de alerta divide o pé da carta com os stats, sem cobri-los', asyn
   )
 
   const stats = page.locator('.deck-slot__foot').first()
-  await expect(stats).toHaveText(/HP \d+/)
+  await expect(stats).toHaveText(
+    new RegExp(`${label(statKey('hp'), defaultLocale())} \\d+`),
+  )
 
   // As duas caixas não se cruzam: a faixa começa depois de o rodapé terminar.
   const [warningBox, statsBox] = await Promise.all([warningBand.boundingBox(), stats.boundingBox()])
@@ -284,4 +297,70 @@ test('moer a última cópia esvazia o slot, e o deck redesenha sozinho', async (
   await expect(page.getByText(
     messagePattern('deck.slotsCount', defaultLocale(), { total: 6 }),
   )).toBeVisible()
+})
+
+/**
+ * The card footer names its two stats in the language of the URL.
+ *
+ * The deck is the second of the three screens that used to draw these
+ * abbreviations by hand, and the reason the six of them became locale keys in a
+ * PR of their own: translating only the Pokédex would have left this footer
+ * saying `HP` and `SPD` inside a `/en` document whose bars said the same thing,
+ * and inside a pt-BR one whose bars said `PV` and `VEL`. One document, two
+ * vocabularies, and no gate on disk able to see it.
+ *
+ * Unlike the Detail panel, this screen draws **one** of the five candidates —
+ * whichever stat is highest on that card — so the assertion asks which badge is
+ * there rather than demanding a particular one. What it can demand is that the
+ * badge belongs to this locale: `HP` against `PV` is the pair that tells the two
+ * apart in the footer, and it is measured in both directions.
+ */
+test('the slot footer names its stats in the language of the URL', async ({ page }) => {
+  const others = localeCodes().filter(code => code !== defaultLocale())
+
+  expect(others.length).toBeGreaterThan(0)
+
+  await seedLocalSave(page, saveWith({
+    collection: Object.fromEntries(ADVICE_DECK.map(id => [id, { c: 1, s: 0 }])),
+    deck: ADVICE_DECK,
+  }))
+
+  for (const locale of [defaultLocale(), ...others]) {
+    await page.goto(localeUrl('/deck', locale))
+
+    const foot = page.locator('.deck-slot__foot').first()
+    await expect(foot).toBeVisible()
+
+    // The HP badge is the fixed half of the footer, so it can be demanded by
+    // name — and it is the half that differs between the two languages.
+    await expect(
+      foot.getByText(label(statKey('hp'), locale), { exact: false }),
+      `/deck in ${locale} did not name HP from its own locale`,
+    ).toBeVisible()
+
+    const shown = (await foot.innerText()).replaceAll(/\s+/g, ' ')
+    const mine = STAT_NAMES.map(stat => label(statKey(stat), locale))
+    const spoken = mine.filter(
+      badge => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(shown),
+    )
+
+    // The other side: a footer that rendered the key, or nothing at all, would
+    // leave this empty and every absence assertion below would be vacuous.
+    expect(spoken.length, `/deck in ${locale} drew no stat badge at all: ${shown}`)
+      .toBeGreaterThan(1)
+
+    for (const other of others.concat(defaultLocale()).filter(code => code !== locale)) {
+      const foreign = STAT_NAMES
+        .map(stat => label(statKey(stat), other))
+        .filter(badge => !mine.includes(badge))
+
+      expect(foreign.length, `no badge left that tells ${locale} apart from ${other}`)
+        .toBeGreaterThan(0)
+
+      expect(
+        foreign.filter(badge => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(shown)),
+        `/deck in ${locale} drew a stat badge of ${other}: ${shown}`,
+      ).toEqual([])
+    }
+  }
 })

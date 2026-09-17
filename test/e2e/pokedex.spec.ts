@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
-import { TYPE_NAMES } from '../../shared/types/dex.ts'
-import { typeKey } from '../../shared/types/game.ts'
-import { label, localeCodes, localeUrl } from '../support/locales.ts'
+import { STAT_NAMES, TYPE_NAMES } from '../../shared/types/dex.ts'
+import { statKey, statNameKey, typeKey } from '../../shared/types/game.ts'
+import { defaultLocale, label, localeCodes, localeUrl } from '../support/locales.ts'
 
 /**
  * O que só o navegador prova.
@@ -223,4 +223,87 @@ test('espécie que não existe responde 404, e não uma página vazia', async ({
   const response = await page.goto('/pokemon/missingno')
 
   expect(response?.status()).toBe(404)
+})
+
+/**
+ * The six stat badges, on the one screen that draws all six at once.
+ *
+ * This is the half of `test/unit/stat-label-gate.spec.ts` that a gate on disk
+ * cannot take. That gate reads what is written — that nobody spells an
+ * abbreviation by hand, and that no two of them collide once case is folded —
+ * and stays perfectly green on a page that renders the **key**: a
+ * `statKey(stat)` where a `t(statKey(stat))` belongs puts `stat.short.hp` on the
+ * bar and nothing on disk can tell. PR #48 paid for that lesson with the rarity
+ * labels, and it is proved here the same way, by planting it.
+ *
+ * It also measures the `sr-only` name beside each badge, which is the reason
+ * there are two namespaces: `PV` is the badge and *Pontos de vida* is what a
+ * screen reader is handed, through a span rather than an `aria-label`, because a
+ * `dt` maps to the `term` role and ARIA 1.2 prohibits a name on it. A screen
+ * reader getting the badge twice is the defect that hides best — nothing looks
+ * wrong.
+ *
+ * **Both languages, and the abbreviations of the other one must be absent.** Five
+ * of the six differ between pt-BR and English (`DEF` is the one both shorten the
+ * same way, and the `i18n-gate` names it in `IDENTICAL_LABELS`), so the wrong
+ * language on this panel is visible — a page stuck in Portuguese would pass a
+ * sweep that only asked whether *some* badge was there.
+ *
+ * `/en/pokemon/charizard` renders on demand rather than from the prerender: the
+ * crawler reaches nine `/en` pages and stops, because the region links of
+ * `/en/pokedex` are still literal `NuxtLink`s pointing at `/pokedex/1`. That is
+ * issue #37, it is the next PR's work, and it is written here rather than left
+ * for a reader to assume this page is reachable by clicking today.
+ */
+test('the six stat badges, and their spelled-out names, follow the URL', async ({ page }) => {
+  const others = localeCodes().filter(code => code !== defaultLocale())
+
+  // The other side: with a single locale on disk, the absence assertion below
+  // compares nothing and passes on a panel that never translated.
+  expect(others.length).toBeGreaterThan(0)
+
+  for (const locale of [defaultLocale(), ...others]) {
+    await page.goto(localeUrl('/pokemon/charizard', locale))
+
+    const stats = page.getByRole('tabpanel', { name: 'Stats' })
+
+    // The same `toPass` the test above explains: the tab is markup until
+    // hydration arrives, and clicking before it lands on nothing.
+    await expect(async () => {
+      await page.getByRole('tab', { name: 'Stats' }).click()
+      await expect(stats.getByText('BST 534')).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 15_000 })
+
+    for (const stat of STAT_NAMES) {
+      await expect(
+        stats.getByText(label(statKey(stat), locale), { exact: true }),
+        `/pokemon/charizard in ${locale} did not draw the badge of ${stat}`,
+      ).toBeVisible()
+      await expect(
+        stats.getByText(label(statNameKey(stat), locale), { exact: true }),
+        `/pokemon/charizard in ${locale} did not name ${stat} for a screen reader`,
+      ).toBeAttached()
+    }
+
+    // And no badge of the other language got in. The one both languages write
+    // the same way is dropped: demanding it stay out would fail on a panel that
+    // is right.
+    for (const other of others.concat(defaultLocale()).filter(code => code !== locale)) {
+      const foreign = STAT_NAMES
+        .map(stat => ({ stat, badge: label(statKey(stat), other) }))
+        .filter(({ stat }) => label(statKey(stat), other) !== label(statKey(stat), locale))
+
+      expect(
+        foreign.length,
+        `no badge left that tells ${locale} apart from ${other}`,
+      ).toBeGreaterThan(0)
+
+      const panel = await stats.innerText()
+      const leaked = foreign
+        .filter(({ badge }) => new RegExp(`(?<![A-Za-z])${badge}(?![A-Za-z])`).test(panel))
+        .map(({ stat }) => stat)
+
+      expect(leaked, `/pokemon/charizard in ${locale} drew the badges of ${other}`).toEqual([])
+    }
+  }
 })

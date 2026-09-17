@@ -370,6 +370,13 @@ test('a barra não tira o jogador do idioma em que ele está', async ({ page }) 
  * assertion would go red over a defect this PR did not set out to fix, and the
  * gate's exception list is what records it.
  */
+/** Whether `body` says `text` as a word of its own, both already case folded. */
+function spoken(body: string, text: string): boolean {
+  const escaped = text.toLowerCase().replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  return new RegExp(`(?<![\\p{L}\\d])${escaped}(?![\\p{L}\\d])`, 'u').test(body)
+}
+
 test('from inside `/en`, the screens keep the locale in links and in text', async ({ page }) => {
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
 
@@ -434,12 +441,21 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
       // screen, assertion green. `textContent` would return the text without the
       // transform, but it drags along the content of `<script>`, where the Nuxt
       // payload carries labels in both languages.
+      //
+      // **And it matches on a letter border, not as a substring.** `includes`
+      // was enough while every label was a word or a phrase, and stopped being
+      // enough at the first three-letter one: `ATE`, the pt-BR badge for special
+      // attack, is inside *rate*, *duplicate* and *separate*, so it reported
+      // `/en/packs` as leaking Portuguese while that screen was right. It is the
+      // same border the `rules-gate` docblock explains — a sweep has to exclude
+      // every class the value can hide in, and for a word that class is letters
+      // and digits, not only the one it is matching.
       const body = (await page.locator('body').innerText())
         .replaceAll(/\s+/g, ' ')
         .toLowerCase()
 
       expect(
-        leaked.filter(text => body.includes(text.toLowerCase())),
+        leaked.filter(text => spoken(body, text)),
         `${path} em ${locale} mostra rótulo em ${defaultLocale()}`,
       ).toEqual([])
 
