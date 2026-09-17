@@ -264,8 +264,10 @@ test('espécie que não existe responde 404, e não uma página vazia', async ({
  * `/en/pokemon/charizard` renders on demand rather than from the prerender: the
  * crawler reaches nine `/en` pages and stops, because the region links of
  * `/en/pokedex` are still literal `NuxtLink`s pointing at `/pokedex/1`. That is
- * issue #37, it is the next PR's work, and it is written here rather than left
- * for a reader to assume this page is reachable by clicking today.
+ * issue #37, and it is the Pokédex screens that close it — measured on this
+ * build, which is still 1.061 pages with nine of them under `/en`. Written here
+ * rather than left for a reader to assume this page is reachable by clicking
+ * today.
  */
 test('the six stat badges, and their spelled-out names, follow the URL', async ({ page }) => {
   const others = localeCodes().filter(code => code !== defaultLocale())
@@ -277,13 +279,14 @@ test('the six stat badges, and their spelled-out names, follow the URL', async (
   for (const locale of [defaultLocale(), ...others]) {
     await page.goto(localeUrl('/pokemon/charizard', locale))
 
-    const stats = page.getByRole('tabpanel', { name: 'Stats' })
+    const tab = label('species.tabs.stats', locale)
+    const stats = page.getByRole('tabpanel', { name: tab })
 
     // The same `toPass` the test above explains: the tab is markup until
     // hydration arrives, and clicking before it lands on nothing.
     await expect(async () => {
-      await page.getByRole('tab', { name: 'Stats' }).click()
-      await expect(stats.getByText('BST 534')).toBeVisible({ timeout: 1000 })
+      await page.getByRole('tab', { name: tab }).click()
+      await expect(stats.getByText(`${label('dex.bst', locale)} 534`)).toBeVisible({ timeout: 1000 })
     }).toPass({ timeout: 15_000 })
 
     for (const stat of STAT_NAMES) {
@@ -315,5 +318,100 @@ test('the six stat badges, and their spelled-out names, follow the URL', async (
       foreign.filter(badge => spells(panel, badge)),
       `/pokemon/charizard in ${locale} drew the badges of another language`,
     ).toEqual([])
+  }
+})
+
+/**
+ * The Detail screen, in the language of the URL — panels, sentence and links.
+ *
+ * Three things a gate on disk cannot take, and each one is a defect this phase
+ * has already shipped once somewhere else:
+ *
+ * - **The evolution condition is composed at runtime**, from a message and a
+ *   number, and nothing on disk can tell `Nível 16` from `evolution.main.level`
+ *   under the arrow. That is the `statKey` defect of PR #53, on the one panel
+ *   that builds a sentence instead of printing a label.
+ * - **The habitat is the value the panel highlights**, and it is the last label
+ *   map that left `shared/`. A page stuck in Portuguese still draws *Montanha*
+ *   in `--accent` inside a `lang="en"` document.
+ * - **The three links of issue #37 that this PR closes** are only links once
+ *   they are rendered: `localePath()` is a function call on disk and an `href`
+ *   here. `test/unit/locale-link-gate.spec.ts` reads how they were written;
+ *   this reads where they point.
+ *
+ * Charmander and not Charizard: it is the species the *Detalhe* board draws the
+ * evolution line of, its habitat is one of the nine (`mountain`), and the two
+ * conditions of its chain are the `Lv 16` / `Lv 36` the board writes.
+ */
+test('the Detail screen reads in the language of the URL, links included', async ({ page }) => {
+  const codes = localeCodes()
+
+  // The other side: with a single locale on disk this loop would run once and
+  // every absence assertion in it would compare nothing.
+  expect(codes.length).toBeGreaterThan(1)
+
+  for (const locale of codes) {
+    await page.goto(localeUrl('/pokemon/charmander', locale))
+
+    for (const key of ['species.height', 'species.weight', 'species.rarity'] as const) {
+      await expect(
+        page.getByText(label(key, locale), { exact: true }),
+        `/pokemon/charmander in ${locale} did not draw ${key}`,
+      ).toBeVisible()
+    }
+
+    // The *About* panel opens without a click — it is the tab the board marks.
+    const about = page.getByRole('tabpanel', { name: label('species.tabs.about', locale) })
+
+    await expect(about.getByText(label('species.about.captureRate', locale))).toBeVisible()
+    await expect(
+      about.getByText(label('habitat.mountain', locale), { exact: true }),
+      `/pokemon/charmander in ${locale} did not translate the habitat`,
+    ).toBeVisible()
+
+    // And the habitat of the other language is not on the panel. `Montanha` and
+    // `Mountain` are two words, so a page stuck in one language is visible here.
+    const foreign = codes
+      .filter(code => code !== locale)
+      .map(code => label('habitat.mountain', code))
+      .filter(word => word !== label('habitat.mountain', locale))
+
+    expect(foreign.length, `no habitat left that tells ${locale} apart`).toBeGreaterThan(0)
+
+    const panel = await about.innerText()
+
+    expect(
+      foreign.filter(word => spells(panel, word)),
+      `/pokemon/charmander in ${locale} drew the habitat of another language`,
+    ).toEqual([])
+
+    const evolutionTab = label('species.tabs.evolution', locale)
+    const evolution = page.getByRole('tabpanel', { name: evolutionTab })
+
+    await expect(async () => {
+      await page.getByRole('tab', { name: evolutionTab }).click()
+      await expect(evolution.getByText(label('dex.chain.title', locale))).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 15_000 })
+
+    // The sentence, composed: the message with the number in it, and not the
+    // message with `{level}` still in it — which is what an unfilled
+    // placeholder would leave on the arrow.
+    const condition = label('evolution.main.level', locale).replace('{level}', '16')
+
+    await expect(
+      evolution.getByText(condition, { exact: true }).first(),
+      `/pokemon/charmander in ${locale} did not write the evolution condition`,
+    ).toBeVisible()
+
+    // The three links that left the exception list of `locale-link-gate`: the
+    // two crumbs and the card of the next stage.
+    const prefix = locale === defaultLocale() ? '' : `/${locale}`
+
+    await expect(page.locator(`.hero__crumbs a[href="${prefix}/pokedex"]`)).toBeVisible()
+    await expect(page.locator(`.hero__crumbs a[href="${prefix}/pokedex/1"]`)).toBeVisible()
+    await expect(
+      evolution.locator(`a[href="${prefix}/pokemon/charmeleon"]`),
+      `the evolution line of /pokemon/charmander in ${locale} left the locale`,
+    ).toBeVisible()
   }
 })
