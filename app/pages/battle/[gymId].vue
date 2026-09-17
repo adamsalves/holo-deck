@@ -11,7 +11,15 @@ import { battleSpriteUrl } from '~~/shared/dex/artwork'
 import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
-import { affectedKey, ailmentKey, effectivenessKey, REGION_LABELS, typeKey } from '~~/shared/types/game'
+import {
+  affectedKey,
+  ailmentKey,
+  effectivenessKey,
+  REGION_LABELS,
+  statKey,
+  statNameKey,
+  typeKey,
+} from '~~/shared/types/game'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
@@ -349,7 +357,21 @@ const reading = computed(() => {
   }
 })
 
-/** Quem age primeiro, com o número à vista — o texto do cabeçalho da prancha. */
+/**
+ * Who acts first, with the number in plain sight — the header text of the board.
+ *
+ * **The stat name is interpolated, not written into the message.** All three
+ * sentences spelled `SPD` in both locales, and `BattleCombatant` right above
+ * them spelled the same abbreviation by hand — while the two agreed by
+ * coincidence the screen was right. With the badges coming from the locale
+ * (`VEL` in pt-BR, `SPE` in English), a message with `SPD` inside it would start
+ * naming speed two ways on one screen, which is issue #20 through a third door.
+ *
+ * The tie gets the spelled-out name and the other two get the badge: *Velocity
+ * tie* is a sentence, and `VEL 120 > 90` is the compact line the board draws
+ * between parentheses. `test/unit/stat-label-gate.spec.ts` sweeps the locale
+ * values for exactly this, so the abbreviation cannot come back into a message.
+ */
 const initiative = computed(() => {
   const mine = player.value
   const foe = opponent.value
@@ -357,10 +379,18 @@ const initiative = computed(() => {
 
   const mineSpeed = effectiveSpeed(mine.stats, mine.condition)
   const foeSpeed = effectiveSpeed(foe.stats, foe.condition)
-  if (mineSpeed === foeSpeed) return t('battle.initiative.tie', { speed: mineSpeed })
+  const stat = t(statKey('speed'))
+  if (mineSpeed === foeSpeed) {
+    return t('battle.initiative.tie', { speed: mineSpeed, stat: t(statNameKey('speed')) })
+  }
   return mineSpeed > foeSpeed
-    ? t('battle.initiative.mine', { mine: mineSpeed, foe: foeSpeed })
-    : t('battle.initiative.foe', { name: foe.displayName, foe: foeSpeed, mine: mineSpeed })
+    ? t('battle.initiative.mine', { mine: mineSpeed, foe: foeSpeed, stat })
+    : t('battle.initiative.foe', {
+        name: foe.displayName,
+        foe: foeSpeed,
+        mine: mineSpeed,
+        stat,
+      })
 })
 
 const bench = computed(() => (state.value === null ? [] : state.value.player.team))

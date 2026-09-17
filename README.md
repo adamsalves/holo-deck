@@ -377,6 +377,7 @@ está aqui é só o que sobrou de propósito.
 | separador de milhar em toda parte | a prancha escreve `custa 1.600 pó` e `FALTAM 1.260 PÓ`, e `1600` na tabela ao lado — inconsistência do mockup. Vale o separador em todo lugar: duas grafias do mesmo valor na mesma tela é pior que discordar de um canto da prancha |
 | `PackOpener` em CSS, sem `motion-v` | o plano nomeia a biblioteca; a cascata é uma propriedade transformada com atraso por índice, o "foil só depois dos 90°" é um passo de keyframe a 50%, e `prefers-reduced-motion` desliga tudo por media query |
 | carta não-possuída legível, não silhueta | a prancha anota "anel vazado"; aqui é moldura tracejada mais dessaturação leve. A Pokédex é **referência** antes de ser coleção, e apagar a arte de 900 espécies transformaria a tela numa lista de sombras |
+| `PV` na barra e `HP` na prosa, em pt-BR | a prancha *Detalhe* especifica o conjunto de siglas (`PV ATQ DEF ATE DEE VEL`) e só especifica as **barras**. `HP` é a sigla do stat **e** a palavra que o jogo usa para o recurso em jogo: *"perdeu 20 HP"* nas 8 chaves de `battle.log` e *"do HP máximo"* em `/rules` falam da quantidade, não do eixo do gráfico. A barra é o eixo e a prosa é a quantidade — `test/unit/stat-label-gate.spec.ts` guarda as duas, com `HP` como a única exceção nomeada dos dois lados da varredura |
 
 ### A prancha estava errada, e foi corrigida em 02/09
 

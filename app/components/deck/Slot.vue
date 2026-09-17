@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { multiplierLabel } from '~~/shared/game/typechart'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { BattleStats } from '~~/shared/game/stats'
-import type { SearchEntry } from '~~/shared/types/dex'
-import { rarityKey, typeKey } from '~~/shared/types/game'
+import type { SearchEntry, StatName } from '~~/shared/types/dex'
+import { rarityKey, statKey, typeKey } from '~~/shared/types/game'
 
 const { t } = useI18n()
 
@@ -69,25 +69,37 @@ const card = computed(() => {
 })
 
 /**
- * O segundo número do rodapé — o stat mais alto depois do HP.
+ * The second number of the footer — the highest stat after HP.
  *
- * A prancha escolhe um por carta e não o mesmo para todas (Pikachu mostra SPD,
- * Alakazam SpA, Geodude DEF), e é o que faz a linha dizer alguma coisa: repetir
- * ATK em seis cartas seria seis vezes o mesmo eixo.
+ * The board picks one per card rather than the same one for all (Pikachu shows
+ * speed, Alakazam special attack, Geodude defense), and that is what makes the
+ * line say something: repeating attack across six cards would be six times the
+ * same axis.
+ *
+ * **The candidates carry the stat id and the locale writes the badge.** They
+ * used to carry the abbreviation, and this was one of the three hand-written
+ * copies of it: `SpA`, `SpD` and `SPD` sat in this very list, where the last two
+ * are one badge to anyone reading it. Issue #20 has the finding and
+ * `test/unit/stat-label-gate.spec.ts` is the gate; the annotation is what makes
+ * the compiler check each id against `STAT_NAMES` instead of trusting a string.
  */
 const standout = computed(() => {
   const stats = props.stats
   if (stats === null) return null
 
-  const candidates = [
-    { label: 'ATK', value: stats.attack },
-    { label: 'DEF', value: stats.defense },
-    { label: 'SpA', value: stats.specialAttack },
-    { label: 'SpD', value: stats.specialDefense },
-    { label: 'SPD', value: stats.speed },
+  const candidates: readonly { stat: StatName, value: number }[] = [
+    { stat: 'attack', value: stats.attack },
+    { stat: 'defense', value: stats.defense },
+    { stat: 'special-attack', value: stats.specialAttack },
+    { stat: 'special-defense', value: stats.specialDefense },
+    { stat: 'speed', value: stats.speed },
   ]
 
-  return candidates.reduce((best, candidate) => (candidate.value > best.value ? candidate : best))
+  const best = candidates.reduce((top, candidate) => (
+    candidate.value > top.value ? candidate : top
+  ))
+
+  return { label: t(statKey(best.stat)), value: best.value }
 })
 
 /**
@@ -138,7 +150,7 @@ function onDrop(event: DragEvent): void {
           v-if="stats && standout"
           class="numeric deck-slot__foot"
         >
-          <span>HP {{ stats.hp }}</span>
+          <span>{{ t(statKey('hp')) }} {{ stats.hp }}</span>
           <span>{{ standout.label }} {{ standout.value }}</span>
         </p>
         <!-- Sem os stats a linha continua existindo, vazia: é a mesma caixa, e

@@ -47,7 +47,7 @@ import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import type { AilmentName, TypeName } from '~~/shared/types/dex'
 import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { ailmentKey, rarityKey, RARITY_NAMES } from '~~/shared/types/game'
+import { ailmentKey, rarityKey, RARITY_NAMES, statKey } from '~~/shared/types/game'
 
 const { t } = useI18n()
 
@@ -496,9 +496,15 @@ useSeoMeta({
         </ul>
 
         <p class="numeric rules__aside rules__aside--inline">
-          <b>A/D</b> usa Atk/Def em golpe físico e SpA/SpD em especial. A
-          efetividade sai da matriz {{ TYPE_COUNT }}×{{ TYPE_COUNT }}; tipo duplo
-          multiplica, então ×4 e ×¼ existem.
+          <!-- `A/D` is the variable of the formula above and stays; the four
+               stats it reads come from the locale, because they are the same
+               badges the *Detail* board stamps on the bars. Spelled by hand
+               here, this page would say `Atk/Def` inside a document whose bars
+               say `ATQ/DEF`. -->
+          <b>A/D</b> usa {{ t(statKey('attack')) }}/{{ t(statKey('defense')) }} em
+          golpe físico e {{ t(statKey('special-attack')) }}/{{ t(statKey('special-defense')) }}
+          em especial. A efetividade sai da matriz {{ TYPE_COUNT }}×{{ TYPE_COUNT }};
+          tipo duplo multiplica, então ×4 e ×¼ existem.
         </p>
 
         <p class="rules__eyebrow rules__eyebrow--spaced">

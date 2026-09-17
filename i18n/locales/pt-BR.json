@@ -49,6 +49,24 @@
     "dark": "Sombrio",
     "fairy": "Fada"
   },
+  "stat": {
+    "short": {
+      "hp": "PV",
+      "attack": "ATQ",
+      "defense": "DEF",
+      "special-attack": "ATE",
+      "special-defense": "DEE",
+      "speed": "VEL"
+    },
+    "long": {
+      "hp": "Pontos de vida",
+      "attack": "Ataque",
+      "defense": "Defesa",
+      "special-attack": "Ataque especial",
+      "special-defense": "Defesa especial",
+      "speed": "Velocidade"
+    }
+  },
   "hub": {
     "advantage": "{card} contra {type} {multiplier}",
     "shiny": "Shiny",
@@ -363,9 +381,9 @@
       "statusMove": "GOLPE DE STATUS"
     },
     "initiative": {
-      "tie": "empate de Speed ({speed}) — o desempate é sorteado",
-      "mine": "você ataca primeiro (SPD {mine} > {foe})",
-      "foe": "{name} ataca primeiro (SPD {foe} > {mine})"
+      "tie": "empate de {stat} ({speed}) — o desempate é sorteado",
+      "mine": "você ataca primeiro ({stat} {mine} > {foe})",
+      "foe": "{name} ataca primeiro ({stat} {foe} > {mine})"
     },
     "standing": {
       "loading": "Montando o campo…",

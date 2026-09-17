@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { MOVES_IN_BATTLE } from '../../shared/types/dex.ts'
+import { MOVES_IN_BATTLE, STAT_NAMES } from '../../shared/types/dex.ts'
+import { statKey, statNameKey } from '../../shared/types/game.ts'
 import {
   defaultLocale,
+  foreignBadges,
   label,
   leafEntries,
   localeCodes,
@@ -10,6 +12,7 @@ import {
   message,
   messagePattern,
   readLocale,
+  spells,
 } from '../support/locales'
 import { openWelcomePack } from './support'
 
@@ -415,6 +418,23 @@ function logPatterns(code: string): { key: string, pattern: RegExp }[] {
     .map(([key]) => ({ key, pattern: messagePattern(key, code) }))
 }
 
+/**
+ * The six stat badges of one locale, as that locale spells them.
+ *
+ * Fed to `foreignBadges` in `test/support/locales.ts`, which is what drops a
+ * badge both languages write the same way — `DEF`, which the `i18n-gate` names
+ * in `IDENTICAL_LABELS`: demanding it stay out would fail on a screen that is
+ * right.
+ */
+function badgesOf(code: string): string[] {
+  return STAT_NAMES.map(stat => label(statKey(stat), code))
+}
+
+/** The badge and the spelled-out name of speed — the two ways a screen names it. */
+function speedNames(code: string): string[] {
+  return [label(statKey('speed'), code), label(statNameKey('speed'), code)]
+}
+
 /** The links that would take the player out of the language they are reading. */
 function strayLinks(hrefs: string[], locale: string, prefixed: string[]): string[] {
   if (locale === defaultLocale()) {
@@ -466,6 +486,79 @@ test('the league and the battle speak the language of the URL, from link to log'
       page.getByText(message('battle.bar.gym', locale, { gym: 1, total: 9 })),
       `/battle/1 in ${locale} did not translate the header`,
     ).toBeVisible()
+
+    // The HUD and the initiative line name the same stat, and this screen is
+    // where they can contradict each other: the combatant footer drew `SPD` by
+    // hand and the three `battle.initiative` messages spelled `SPD` inside the
+    // translation, so the two agreed by coincidence and stopped agreeing the
+    // moment the badge came from the locale. Both are measured together for that
+    // reason — either one alone passes while the screen says two things.
+    const speed = label(statKey('speed'), locale)
+
+    // Subtracted against **both** spellings this locale uses, not only its six
+    // badges: a long name shared between two languages would otherwise survive
+    // the filter and be demanded absent from a header that is right.
+    const foreignSpeed = foreignBadges(locale, code => [...badgesOf(code), ...speedNames(code)])
+      .filter(name => speedNames(locale).includes(name) === false)
+
+    // **Read after the barrier, never before it.** The body of this screen is
+    // `ClientOnly`, so both lines below exist only once the client has rendered
+    // — and a first version of this block called `innerText()` first and asserted
+    // afterwards. It passed alone and failed inside the full suite, which is the
+    // signature of reading state before the thing that guarantees the state.
+    await expect(
+      page.locator('.combatant__stats').first().getByText(speed, { exact: false }),
+      `/battle/1 in ${locale} did not name the speed stat from its own locale`,
+    ).toBeVisible()
+
+    const footer = (await page.locator('.combatant__stats').first().innerText())
+      .replaceAll(/\s+/g, ' ')
+
+    // The footer draws two badges: the speed, always, and whichever of the other
+    // four is highest on that Pokémon. The second one is data, so it cannot be
+    // demanded by name — what can be demanded is that neither is a raw locale
+    // key. That is the defect no gate on disk can see: `statKey(stat)` where a
+    // `t(statKey(stat))` belongs puts `stat.short.attack` on the HUD and leaves
+    // every sweep of the source green. Measured by planting it.
+    expect(
+      footer.match(/stat\.(short|long)\.[a-z-]+/g) ?? [],
+      `/battle/1 in ${locale} drew a locale key instead of a badge: ${footer}`,
+    ).toEqual([])
+    expect(
+      foreignBadges(locale, badgesOf).filter(badge => spells(footer, badge)),
+      `/battle/1 in ${locale} drew a stat badge of another language: ${footer}`,
+    ).toEqual([])
+
+    // **Scoped to the move-choice eyebrow, and not by class alone.**
+    // `.battle__initiative` names two different lines in this template — the
+    // turn order beside *choose a move*, and the standing beside *bench* — so
+    // `.first()` reads whichever exists, and during the client render that is the
+    // bench. A selector that can silently answer about another element is not
+    // measuring the one it names.
+    const order = page
+      .locator('.battle__eyebrow', { hasText: label('battle.choose.move', locale) })
+      .locator('.battle__initiative')
+
+    await expect(
+      order,
+      `/battle/1 in ${locale} drew no turn order line`,
+    ).toBeVisible()
+
+    const header = (await order.innerText()).replaceAll(/\s+/g, ' ')
+
+    // The other side: an empty header would make the absence check below
+    // vacuous, and a tie renders the spelled-out name instead of the badge —
+    // both spellings count as this locale naming the stat.
+    expect(
+      speedNames(locale).some(name => spells(header, name)),
+      `/battle/1 in ${locale} named no speed stat in the initiative line: ${header}`,
+    ).toBe(true)
+    expect(foreignSpeed.length, `no spelling left that tells ${locale} apart`)
+      .toBeGreaterThan(0)
+    expect(
+      foreignSpeed.filter(name => spells(header, name)),
+      `the ${locale} initiative line named the speed stat of another language`,
+    ).toEqual([])
 
     // The log is page state, so it starts empty in whatever language the URL
     // says — and a turn is what puts a narrated sentence in it.

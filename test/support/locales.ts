@@ -173,6 +173,25 @@ export function defaultOnlyLabels(other: string): string[] {
 }
 
 /**
+ * The labels that appear more than once, named — an empty list is the pass.
+ *
+ * **It lives here because two gates ask it**, which is the rule the
+ * `stripComments` docblock in `test/support/source-tree.ts` explains the cost of
+ * breaking: the `i18n-gate` asks it of the game vocabulary, and
+ * `stat-label-gate` asks it of the six stat abbreviations. The two ask it
+ * differently — one compares labels as written, the other folds case first,
+ * because `SpD` and `SPD` are two values and one badge — so the folding belongs
+ * to the caller and the counting belongs here. A private copy in each file would
+ * have been the second `stripComments`.
+ */
+export function repeated(values: readonly string[]): string[] {
+  const counted = new Map<string, number>()
+  for (const value of values) counted.set(value, (counted.get(value) ?? 0) + 1)
+
+  return [...counted].filter(([, times]) => times > 1).map(([value]) => value).sort()
+}
+
+/**
  * One translated message with its placeholders filled — the string the screen
  * actually renders.
  *
@@ -289,4 +308,51 @@ export function messagePattern(
     .join('')
 
   return new RegExp(pattern)
+}
+
+/**
+ * Whether `text` spells `token` with no letter or digit on either side.
+ *
+ * **It lives here because four callers ask it**, and they asked it four ways
+ * before: `collection.spec.ts` matched by substring until `ATE` — the pt-BR
+ * badge for special attack — was found inside *rate*, *duplicate* and
+ * *separate*, and reported `/en/packs` as leaking Portuguese while that screen
+ * was right. The three stat e2e each grew their own `(?<![A-Za-z])` copy, which
+ * is the same border with the accents left out.
+ *
+ * The class is `\p{L}\p{N}` and not `[A-Za-z0-9]`, for the reason the
+ * `rules-gate` docblock gives: a border that only excludes the class it is
+ * matching leaves the value hidden in every other one. An ASCII-only border
+ * finds `VEL` inside `NÍVEL`.
+ *
+ * Case is the caller's business — `innerText` is compared already folded, while
+ * a badge on screen is compared as it renders.
+ */
+export function spells(text: string, token: string): boolean {
+  const escaped = token.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(text)
+}
+
+/**
+ * The stat badges of every other locale that `locale` does not also write.
+ *
+ * The subtraction is what keeps it usable: `DEF` is what both languages shorten
+ * *Defesa* and *Defense* to, so demanding it stay off a pt-BR screen would fail
+ * on a screen that is right. Everything left differs, which is what makes it a
+ * test of *which* language the panel is in rather than whether it drew anything.
+ *
+ * **Compared as a set, not stat by stat.** A per-stat comparison — is the badge
+ * of `other` for *this* stat different from mine? — keeps a badge that the
+ * locale legitimately draws for a *different* stat, and would report a correct
+ * panel. The two agree on the two locales that exist today; they stop agreeing
+ * the moment a third one, or a locale that reuses a badge, shows up.
+ */
+export function foreignBadges(locale: string, badgeOf: (code: string) => string[]): string[] {
+  const mine = badgeOf(locale)
+
+  return localeCodes()
+    .filter(code => code !== locale)
+    .flatMap(code => badgeOf(code))
+    .filter(badge => !mine.includes(badge))
 }

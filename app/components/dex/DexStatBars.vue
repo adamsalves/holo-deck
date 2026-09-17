@@ -2,6 +2,10 @@
 import type { BaseStats, TypeName } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { baseStatTotal, MAX_BASE_STAT, MAX_BASE_STAT_TOTAL } from '~~/shared/game/rarity'
+import { STAT_NAMES } from '~~/shared/types/dex'
+import { statKey, statNameKey } from '~~/shared/types/game'
+
+const { t } = useI18n()
 
 /**
  * Os seis base stats, como a prancha *Detalhe* os desenha.
@@ -19,38 +23,44 @@ const props = defineProps<{
   type: TypeName
 }>()
 
-/**
- * As seis abreviações, e o nome por extenso que o leitor de tela recebe.
- *
- * `SpD` (defesa especial) e `SPD` (velocidade) diferiam só por caixa, em linhas
- * vizinhas — e para um leitor de tela elas são a mesma sequência de letras.
- * `VEL` desfaz a colisão à vista, e o nome por extenso resolve as seis de uma
- * vez: num projeto que trocou `{{ rarity }}` cru por rótulo traduzido para não
- * ler enum em inglês no meio de uma frase em português, seis siglas mudas
- * destoam.
- */
-const STAT_LABELS = [
-  { short: 'HP', long: 'Pontos de saúde' },
-  { short: 'ATK', long: 'Ataque' },
-  { short: 'DEF', long: 'Defesa' },
-  { short: 'SpA', long: 'Ataque especial' },
-  { short: 'SpD', long: 'Defesa especial' },
-  { short: 'VEL', long: 'Velocidade' },
-] as const
-
 const total = computed(() => baseStatTotal(props.baseStats))
 
 const highest = computed(() => Math.max(...props.baseStats))
 
-const rows = computed(() => props.baseStats.map((value, index) => ({
-  label: STAT_LABELS[index]?.short ?? '',
-  longLabel: STAT_LABELS[index]?.long ?? '',
-  value,
-  percent: (value / MAX_BASE_STAT) * 100,
-  // Empate acende os dois: escolher um pelo índice mentiria sobre qual é o
-  // maior, e há espécies com dois stats iguais no topo.
-  isHighest: value === highest.value,
-})))
+/**
+ * One row per base stat, named by the locale.
+ *
+ * **The index reads `STAT_NAMES` and no longer a parallel list of labels.** The
+ * six abbreviations used to be written here, and `SpD` (special defense) and
+ * `SPD` (speed) differed only by case in neighbouring rows — one badge to
+ * anyone reading a column of six, and the same sequence of letters to a screen
+ * reader. Issue #20 carries the finding, and the same list was drawn by hand in
+ * `deck/Slot.vue` and `battle/Combatant.vue` too: three copies, which a second
+ * language turns from untidy into a single document saying `PV` in one panel and
+ * `HP` in another.
+ *
+ * Indexing the tuple that **defines** the reading order of `baseStats` is also
+ * the stronger version of what the old array did: two lists in the same order
+ * could drift apart into swapping Attack for Defense, which is the silent defect
+ * the docblock of `STAT_NAMES` was written about. Now there is one order.
+ *
+ * `id` carries the `v-for` key rather than the label, because the label changes
+ * with the locale and a key may not.
+ */
+const rows = computed(() => props.baseStats.map((value, index) => {
+  const stat = STAT_NAMES[index]
+
+  return {
+    id: stat ?? String(index),
+    label: stat === undefined ? '' : t(statKey(stat)),
+    longLabel: stat === undefined ? '' : t(statNameKey(stat)),
+    value,
+    percent: (value / MAX_BASE_STAT) * 100,
+    // Empate acende os dois: escolher um pelo índice mentiria sobre qual é o
+    // maior, e há espécies com dois stats iguais no topo.
+    isHighest: value === highest.value,
+  }
+}))
 </script>
 
 <template>
@@ -68,7 +78,7 @@ const rows = computed(() => props.baseStats.map((value, index) => ({
     <dl class="stat-rows">
       <div
         v-for="row in rows"
-        :key="row.label"
+        :key="row.id"
         class="stat-row"
       >
         <!-- Sigla à vista, nome por extenso para quem ouve. **Não** por

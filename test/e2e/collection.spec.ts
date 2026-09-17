@@ -7,6 +7,7 @@ import {
   localeCodes,
   localeUrl,
   message,
+  spells,
 } from '../support/locales'
 import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
 
@@ -434,12 +435,22 @@ test('from inside `/en`, the screens keep the locale in links and in text', asyn
       // screen, assertion green. `textContent` would return the text without the
       // transform, but it drags along the content of `<script>`, where the Nuxt
       // payload carries labels in both languages.
+      //
+      // **And it matches on a letter border, not as a substring.** `includes`
+      // was enough while every label was a word or a phrase, and stopped being
+      // enough at the first three-letter one: `ATE`, the pt-BR badge for special
+      // attack, is inside *rate*, *duplicate* and *separate*, so it reported
+      // `/en/packs` as leaking Portuguese while that screen was right. It is the
+      // same border the `rules-gate` docblock explains — a sweep has to exclude
+      // every class the value can hide in, and for a word that class is letters
+      // and digits, not only the one it is matching. It lives in `spells()` in
+      // `test/support/locales.ts`, because the three stat e2e ask it too.
       const body = (await page.locator('body').innerText())
         .replaceAll(/\s+/g, ' ')
         .toLowerCase()
 
       expect(
-        leaked.filter(text => body.includes(text.toLowerCase())),
+        leaked.filter(text => spells(body, text.toLowerCase())),
         `${path} em ${locale} mostra rótulo em ${defaultLocale()}`,
       ).toEqual([])
 

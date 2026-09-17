@@ -1,5 +1,5 @@
 import type { SpeciesId } from './brand.ts'
-import type { AilmentName, DamageClass, Habitat, TypeName } from './dex.ts'
+import type { AilmentName, DamageClass, Habitat, StatName, TypeName } from './dex.ts'
 
 /**
  * Tipos do jogo — o que a Pokédex não conhece.
@@ -274,6 +274,47 @@ export function effectivenessKey(multiplier: number): string {
  */
 export function typeKey(type: TypeName): string {
   return `type.${type}`
+}
+
+/**
+ * The locale key of the badge a base stat carries — `stat.short.hp`, `PV` in
+ * pt-BR and `HP` in English.
+ *
+ * The *Detail* board specifies both sets, and it specifies them because two of
+ * the six used to collide: `SpD` for special defense and `SPD` for speed are one
+ * badge to anyone reading a column of six, and the same sequence of letters to a
+ * screen reader. Issue #20 carries the finding; the board answered it with
+ * `PV ATQ DEF ATE DEE VEL` in Portuguese and `HP ATK DEF SpA SpD SPE` in English,
+ * where `SPE` no longer collides with `SpD`.
+ *
+ * Three components drew these by hand — the Pokédex bars, the deck card footer
+ * and the battle HUD — and a second language is what turned that from untidy into
+ * visible: translating one of them would have made a single document say `PV` in
+ * one panel and `HP` in another. `test/unit/stat-label-gate.spec.ts` is the gate
+ * on that, and it folds case, which is the comparison the collision needed.
+ *
+ * It lives here rather than in `dex.ts` for the reason `typeKey` gives: `dex.ts`
+ * is the contract for what the PokeAPI sends, and `STAT_NAMES` is that contract's
+ * fixed reading order — the badge over it is something this game invents, twice,
+ * once per locale.
+ */
+export function statKey(stat: StatName): string {
+  return `stat.short.${stat}`
+}
+
+/**
+ * The locale key of the same stat spelled out — *Pontos de vida*, `Health
+ * points`.
+ *
+ * A second namespace over the same six ids, for the reason `ailment`/`condition`
+ * are two: `PV` is not the first two letters of anything, and deriving either
+ * from the other would need a rule per language. Both are real text on the same
+ * row of the *Detail* board — the badge is drawn and this is handed to whoever is
+ * listening, through an `sr-only` span rather than an `aria-label`, because a
+ * `dt` maps to the `term` role and ARIA 1.2 prohibits a name on it.
+ */
+export function statNameKey(stat: StatName): string {
+  return `stat.long.${stat}`
 }
 
 /**

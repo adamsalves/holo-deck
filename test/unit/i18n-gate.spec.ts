@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
+import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, STAT_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
 import {
@@ -13,9 +13,11 @@ import {
   effectivenessKey,
   RARITY_NAMES,
   rarityKey,
+  statKey,
+  statNameKey,
   typeKey,
 } from '~~/shared/types/game'
-import { defaultLocale, label, leafEntries, localeCodes, readLocale } from '../support/locales'
+import { defaultLocale, label, leafEntries, localeCodes, readLocale, repeated } from '../support/locales'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
 
 /**
@@ -67,6 +69,14 @@ const NAV_KEYS: readonly string[] = [
  * of these keys. Without this union they would all read as orphans and the
  * gate would fail on its own vocabulary.
  *
+ * `stat.short.*` and `stat.long.*` are the same shape over the six base stats:
+ * the badge the bar carries (`PV`) and the name a screen reader is handed
+ * (*Pontos de vida*). Their own question — whether two of the six badges collide
+ * once case is folded — is asked in `test/unit/stat-label-gate.spec.ts` and
+ * deliberately not repeated here: `repeated()` below compares labels as written,
+ * and `SpD` against `SPD` passes it, which is exactly how the collision of issue
+ * #20 survived two phases.
+ *
  * `ailment.*` and `condition.*` are two namespaces over the same four ids, and
  * that is deliberate: one is the word a move card spells out (*queimadura*) and
  * the other the three letters the battle HUD stamps on a combatant (*QUE*, and
@@ -84,6 +94,8 @@ const VOCABULARY: readonly (readonly [id: string, key: string])[] = [
   ...EFFECTIVENESS_MULTIPLIERS.map(multiplier => (
     [String(multiplier), effectivenessKey(multiplier)] as const
   )),
+  ...STAT_NAMES.map(name => [name, statKey(name)] as const),
+  ...STAT_NAMES.map(name => [name, statNameKey(name)] as const),
 ]
 
 const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
@@ -140,6 +152,12 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * the other three condition badges do differ — *QUE* against `BRN`, *ENV*
  * against `PSN`, *SON* against `SLP` — and paralysis is the single one where the
  * two languages shorten to the same three letters.
+ *
+ * `stat.short.defense` is the sixth of that kind and the only stat badge in this
+ * list: `DEF` is what both languages shorten *Defesa* and *Defense* to. The other
+ * five all differ — `PV`/`HP`, `ATQ`/`ATK`, `ATE`/`SpA`, `DEE`/`SpD`, `VEL`/`SPE`
+ * — and the *Detail* board specifies both sets, so this one was read off the
+ * board rather than assumed.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -168,6 +186,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'packs.seo.title',
   'packs.shop.title',
   'rarity.ultra',
+  'stat.short.defense',
   'type.normal',
 ]
 
@@ -181,14 +200,6 @@ function placeholdersOf(value: unknown): string[] {
 /** How many `|`-separated forms a message carries — 1 for everything but a plural. */
 function pluralFormsOf(value: unknown): number {
   return typeof value === 'string' ? value.split('|').length : 0
-}
-
-/** The labels that appear more than once, named — an empty list is the pass. */
-function repeated(values: readonly string[]): string[] {
-  const counted = new Map<string, number>()
-  for (const value of values) counted.set(value, (counted.get(value) ?? 0) + 1)
-
-  return [...counted].filter(([, times]) => times > 1).map(([value]) => value).sort()
 }
 
 /**
@@ -419,13 +430,14 @@ describe('as chaves e quem as usa', () => {
    * `VOCABULARY_KEYS` short, the missing ids would never be asked of any locale,
    * and both assertions above would pass over a vocabulary nobody checked.
    */
-  it('derives one key per rarity, type, ailment, damage class and multiplier', () => {
+  it('derives one key per rarity, type, ailment, damage class, multiplier and stat', () => {
     expect(VOCABULARY_KEYS.length).toBe(
       RARITY_NAMES.length
       + TYPE_NAMES.length
       + AILMENT_NAMES.length * 3
       + DAMAGE_CLASS_NAMES.length
-      + EFFECTIVENESS_MULTIPLIERS.length,
+      + EFFECTIVENESS_MULTIPLIERS.length
+      + STAT_NAMES.length * 2,
     )
     expect(new Set(VOCABULARY_KEYS).size).toBe(VOCABULARY_KEYS.length)
   })
