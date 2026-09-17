@@ -182,7 +182,7 @@ const ROUTES_ONLY_IN_DEFAULT: readonly string[] = Array.from(
  * the other language is then reported as missing — which is what the first
  * version of this did, and the failure names the wrong thing twice.
  */
-async function prerenderedRoutes(): Promise<Map<string, Set<string>>> {
+async function routesByLocale(): Promise<Map<string, Set<string>>> {
   const entries = await readdir(PUBLIC, { withFileTypes: true, recursive: true })
   const prefixed = localeCodes().filter(code => code !== defaultLocale())
   const byLocale = new Map<string, Set<string>>(localeCodes().map(code => [code, new Set<string>()]))
@@ -202,7 +202,7 @@ async function prerenderedRoutes(): Promise<Map<string, Set<string>>> {
 }
 
 test('toda rota pré-renderizada existe em cada idioma, ou está escrita como exceção', async () => {
-  const byLocale = await prerenderedRoutes()
+  const byLocale = await routesByLocale()
   const base = byLocale.get(defaultLocale()) ?? new Set<string>()
 
   // `[] === []` passa: uma build que não rodou, ou um diretório renomeado,
