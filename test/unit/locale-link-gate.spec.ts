@@ -171,13 +171,10 @@ function nameOf(link: Link): string {
  */
 const EXEMPT: readonly string[] = [
   'app/components/AccountInvite.vue → NAV_ACCOUNT.to',
-  'app/components/dex/DexEvolutionChain.vue → `/pokemon/${node.slug}`',
   'app/components/dex/PokeCard.vue → link.to',
   'app/pages/login.vue → /',
   'app/pages/pokedex/[gen].vue → /pokedex',
   'app/pages/pokedex/index.vue → `/pokedex/${region.generation}`',
-  'app/pages/pokemon/[name].vue → /pokedex',
-  'app/pages/pokemon/[name].vue → `/pokedex/${region?.generation ?? 1}`',
 ]
 
 describe('locale link gate', () => {
