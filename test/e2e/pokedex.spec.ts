@@ -421,3 +421,84 @@ test('the Detail screen reads in the language of the URL, links included', async
     ).toBeVisible()
   }
 })
+
+/**
+ * The two Pokédex screens, in the language of the URL — and the links that make
+ * the rest of `/en` exist at all.
+ *
+ * **The links are the load-bearing half, and they are load-bearing twice.** For
+ * the player they are issue #37: from `/en/pokedex`, a literal `to="/pokedex/1"`
+ * renders the same `href` it renders in Portuguese and drops whoever clicks it
+ * out of English with no way back but the URL bar. For the build they are the
+ * crawler's only path: with them literal, the prerender stopped after nine `/en`
+ * pages, and with them localized it reaches 1.043 — measured, and asserted route
+ * by route in `test/e2e/prerender-payload.spec.ts`.
+ *
+ * So this walks the same two hops a player walks, in both languages, and reads
+ * the `href` at each one: index → region → species. The species page itself is
+ * the previous PR's test; what is new is that a click gets there.
+ */
+test('the Pokédex screens read in the language of the URL, links included', async ({ page }) => {
+  const codes = localeCodes()
+
+  expect(codes.length).toBeGreaterThan(1)
+
+  for (const locale of codes) {
+    const prefix = locale === defaultLocale() ? '' : `/${locale}`
+
+    await page.goto(localeUrl('/pokedex', locale))
+
+    await expect(page.getByText(label('pokedex.overline', locale))).toBeVisible()
+    await expect(page.getByText(label('pokedex.intro', locale))).toBeVisible()
+
+    // The word of the other language is absent. `pokedex.overline` is two words
+    // in both, so a page stuck in one of them is visible here — which a shared
+    // abbreviation would not be.
+    const foreign = codes
+      .filter(code => code !== locale)
+      .map(code => label('pokedex.overline', code))
+      .filter(text => text !== label('pokedex.overline', locale))
+
+    expect(foreign.length, `no wording left that tells ${locale} apart`).toBeGreaterThan(0)
+
+    const header = await page.locator('header').first().innerText()
+
+    expect(
+      foreign.filter(text => spells(header, text)),
+      `/pokedex in ${locale} wrote the other language`,
+    ).toEqual([])
+
+    // Hop one: the region card. This is the link the prerender crawler follows.
+    const region = page.locator(`a[href="${prefix}/pokedex/1"]`)
+
+    await expect(region, `/pokedex in ${locale} did not link the region in-locale`).toBeVisible()
+    await region.click()
+    await expect(page).toHaveURL(new RegExp(`${prefix}/pokedex/1$`))
+
+    // The chips carry a word and a count, and the count is a slot inside the
+    // message — a chip that lost its number would still match the word.
+    await expect(page.getByRole('button', {
+      name: message('dex.filters.all', locale, { count: 151 }),
+    })).toBeVisible()
+
+    await expect(page.locator('.grid-footer__note')).toHaveText(label('dex.grid.note', locale))
+
+    // Hop two: a card. `PokeCard` renders the link for every screen that draws a
+    // card, so this is the one assertion covering all 1025 of them.
+    const card = page.locator(`a[href="${prefix}/pokemon/bulbasaur"]`)
+
+    await expect(card, `/pokedex/1 in ${locale} did not link the species in-locale`).toBeVisible()
+
+    // And the accessible name of that link is a sentence, not a key: it is built
+    // from four messages and read out in place of the card's artwork.
+    await expect(card).toHaveAttribute(
+      'aria-label',
+      new RegExp(escapeForRegExp(label('rarity.common', locale))),
+    )
+  }
+})
+
+/** The characters a locale string can carry that a regular expression would read. */
+function escapeForRegExp(text: string): string {
+  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
