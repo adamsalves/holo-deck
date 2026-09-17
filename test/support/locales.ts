@@ -173,6 +173,25 @@ export function defaultOnlyLabels(other: string): string[] {
 }
 
 /**
+ * The labels that appear more than once, named — an empty list is the pass.
+ *
+ * **It lives here because two gates ask it**, which is the rule the
+ * `stripComments` docblock in `test/support/source-tree.ts` explains the cost of
+ * breaking: the `i18n-gate` asks it of the game vocabulary, and
+ * `stat-label-gate` asks it of the six stat abbreviations. The two ask it
+ * differently — one compares labels as written, the other folds case first,
+ * because `SpD` and `SPD` are two values and one badge — so the folding belongs
+ * to the caller and the counting belongs here. A private copy in each file would
+ * have been the second `stripComments`.
+ */
+export function repeated(values: readonly string[]): string[] {
+  const counted = new Map<string, number>()
+  for (const value of values) counted.set(value, (counted.get(value) ?? 0) + 1)
+
+  return [...counted].filter(([, times]) => times > 1).map(([value]) => value).sort()
+}
+
+/**
  * One translated message with its placeholders filled — the string the screen
  * actually renders.
  *
