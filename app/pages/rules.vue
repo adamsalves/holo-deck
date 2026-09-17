@@ -496,11 +496,11 @@ useSeoMeta({
         </ul>
 
         <p class="numeric rules__aside rules__aside--inline">
-          <!-- `A/D` é a variável da fórmula acima e fica; os quatro stats que
-               ela lê vêm do locale, porque são as mesmas siglas que a prancha
-               *Detalhe* estampa nas barras. Escritas à mão aqui, esta página
-               diria `Atk/Def` dentro de um documento em que a barra diz
-               `ATQ/DEF`. -->
+          <!-- `A/D` is the variable of the formula above and stays; the four
+               stats it reads come from the locale, because they are the same
+               badges the *Detail* board stamps on the bars. Spelled by hand
+               here, this page would say `Atk/Def` inside a document whose bars
+               say `ATQ/DEF`. -->
           <b>A/D</b> usa {{ t(statKey('attack')) }}/{{ t(statKey('defense')) }} em
           golpe físico e {{ t(statKey('special-attack')) }}/{{ t(statKey('special-defense')) }}
           em especial. A efetividade sai da matriz {{ TYPE_COUNT }}×{{ TYPE_COUNT }};

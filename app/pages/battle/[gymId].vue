@@ -358,18 +358,19 @@ const reading = computed(() => {
 })
 
 /**
- * Quem age primeiro, com o número à vista — o texto do cabeçalho da prancha.
+ * Who acts first, with the number in plain sight — the header text of the board.
  *
- * **O nome do stat entra interpolado, e não escrito na mensagem.** As três
- * frases diziam `SPD` nos dois locales, e o `BattleCombatant` logo acima delas
- * escrevia a mesma sigla à mão — enquanto as duas coincidiam por acaso, a tela
- * estava certa. Com as siglas vindas do locale (`VEL` em pt, `SPE` em en), uma
- * mensagem com `SPD` dentro passaria a nomear a velocidade de duas formas na
- * mesma tela, que é exatamente o defeito da issue #20 numa terceira porta.
+ * **The stat name is interpolated, not written into the message.** All three
+ * sentences spelled `SPD` in both locales, and `BattleCombatant` right above
+ * them spelled the same abbreviation by hand — while the two agreed by
+ * coincidence the screen was right. With the badges coming from the locale
+ * (`VEL` in pt-BR, `SPE` in English), a message with `SPD` inside it would start
+ * naming speed two ways on one screen, which is issue #20 through a third door.
  *
- * O empate recebe o nome por extenso e as outras duas a sigla: *empate de
- * Velocidade* é uma frase, e `VEL 120 > 90` é a linha compacta que a prancha
- * desenha entre parênteses.
+ * The tie gets the spelled-out name and the other two get the badge: *Velocity
+ * tie* is a sentence, and `VEL 120 > 90` is the compact line the board draws
+ * between parentheses. `test/unit/stat-label-gate.spec.ts` sweeps the locale
+ * values for exactly this, so the abbreviation cannot come back into a message.
  */
 const initiative = computed(() => {
   const mine = player.value

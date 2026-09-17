@@ -40,13 +40,13 @@ const paralysed = computed(() => props.pokemon.condition?.kind === 'paralysis')
 const speed = computed(() => effectiveSpeed(props.pokemon.stats, props.pokemon.condition))
 
 /**
- * O segundo número da linha, e a velocidade é sempre o primeiro.
+ * The second number of the line, and speed is always the first.
  *
- * A velocidade fica porque é ela que decide a ordem do turno e é a única que a
- * paralisia muda — a prancha estampa a linha com o valor dividido (`45 (90÷2)`)
- * justamente por isso. O acompanhante é o mais alto dos outros quatro, pela
- * mesma razão que a carta do deck escolhe um: repetir o ataque nos dois lados
- * seria dizer duas vezes a mesma coisa sobre Pokémon diferentes.
+ * Speed stays because it is what decides the turn order and the only one
+ * paralysis changes — the board stamps the line with the divided value
+ * (`45 (90÷2)`) for exactly that reason. Its companion is the highest of the
+ * other four, for the same reason the deck card picks one: repeating attack on
+ * both sides would say the same thing twice about different Pokémon.
  *
  * **The badge comes from the locale**, and the abbreviation this HUD wrote by
  * hand is where issue #20 was most visible: `SpD` in this list and `SPD` in the

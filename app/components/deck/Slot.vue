@@ -69,12 +69,12 @@ const card = computed(() => {
 })
 
 /**
- * O segundo número do rodapé — o stat mais alto depois do HP.
+ * The second number of the footer — the highest stat after HP.
  *
- * A prancha escolhe um por carta e não o mesmo para todas (Pikachu mostra a
- * velocidade, Alakazam o ataque especial, Geodude a defesa), e é o que faz a
- * linha dizer alguma coisa: repetir o ataque em seis cartas seria seis vezes o
- * mesmo eixo.
+ * The board picks one per card rather than the same one for all (Pikachu shows
+ * speed, Alakazam special attack, Geodude defense), and that is what makes the
+ * line say something: repeating attack across six cards would be six times the
+ * same axis.
  *
  * **The candidates carry the stat id and the locale writes the badge.** They
  * used to carry the abbreviation, and this was one of the three hand-written
