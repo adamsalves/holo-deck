@@ -7,6 +7,8 @@ import {
   label,
   localeCodes,
   localeUrl,
+  message,
+  messagePattern,
   spells,
 } from '../support/locales.ts'
 
@@ -83,8 +85,12 @@ test('o grid virtualiza depois de montar — o DOM não segura as 151', async ({
   // real decidindo quantas colunas cabem. É o outro lado do
   // `test/nuxt/dex-grid.spec.ts`, que mede a mesma regra sem layout.
   const rendered = await page.locator('.dex-card').count()
-  await expect(page.locator('.grid-footer__count')).toContainText(`${rendered} de 151 renderizados`)
-  await expect(page.locator('.grid-footer__count')).toContainText('scroll virtualizado')
+  await expect(page.locator('.grid-footer__count')).toContainText(
+    message('dex.grid.rendered', defaultLocale(), { rendered, total: 151 }),
+  )
+  await expect(page.locator('.grid-footer__count')).toContainText(
+    messagePattern('dex.grid.virtualized', defaultLocale()),
+  )
 })
 
 test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre eles', async ({ page }) => {

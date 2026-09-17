@@ -2,6 +2,8 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { describe, expect, it } from 'vitest'
 import ProgressBar from '~~/app/components/collection/ProgressBar.vue'
+import ptSource from '~~/i18n/locales/pt-BR.json?raw'
+import { messagesFrom } from '../support/default-messages'
 
 /**
  * A barra de progresso — o que o componente decide, e não o que `progress.ts`
@@ -49,6 +51,11 @@ describe('o que o leitor de tela lê', () => {
   /**
    * `aria-valuetext` diz `98 / 151 capturados`, e não "65%": o número que o
    * jogador persegue é a contagem, e a porcentagem é a forma da barra.
+   *
+   * A palavra sai do locale desde a Fase 8 — ela era a última frase em português
+   * cravada num componente de coleção, e renderiza no `/en/pokedex`. O JSON entra
+   * pelo `default-messages.ts` e não pelo `locales.ts`: aquele resolve caminho
+   * por `fileURLToPath`, que não sobrevive ao ambiente `nuxt`.
    */
   it('anuncia a contagem, o rótulo e a faixa', async () => {
     const progress = (await bar(98, 151)).find('[role="progressbar"]')
@@ -56,6 +63,7 @@ describe('o que o leitor de tela lê', () => {
     expect(progress.attributes('aria-label')).toBe('Progresso em Kanto')
     expect(progress.attributes('aria-valuenow')).toBe('98')
     expect(progress.attributes('aria-valuemax')).toBe('151')
-    expect(progress.attributes('aria-valuetext')).toBe('98 / 151 capturados')
+    expect(progress.attributes('aria-valuetext'))
+      .toBe(messagesFrom(ptSource)('collection.progress.valueText', { progress: '98 / 151' }))
   })
 })

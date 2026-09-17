@@ -7,6 +7,7 @@ import {
   localeCodes,
   localeUrl,
   message,
+  messagePattern,
   spells,
 } from '../support/locales'
 import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
@@ -148,17 +149,23 @@ test('a Pokédex conta o que o binder tem, e o filtro de posse separa os dois la
   // A contagem do cabeçalho e a do filtro saem de caminhos diferentes — uma
   // conta espécies da região no save, a outra recebe o mesmo número como prop.
   // Elas discordarem é o defeito que este teste existe para pegar.
-  const ownedChip = page.getByRole('button', { name: /^Possuídos · / })
+  const ownedChip = page.getByRole('button', {
+    name: messagePattern('dex.filters.owned', defaultLocale()),
+  })
   await expect(ownedChip).toBeVisible({ timeout: 15_000 })
 
   const chipText = (await ownedChip.textContent()) ?? ''
   const ownedCount = Number(chipText.replace(/\D/g, ''))
 
-  await expect(page.getByText(`${ownedCount} / 151 capturados`)).toBeVisible()
+  await expect(page.getByText(
+    message('pokedex.owned', defaultLocale(), { owned: ownedCount, total: 151 }),
+  )).toBeVisible()
 
   // Possuídos e faltando particionam as 151: o rótulo de um é o complemento do
   // outro, e não há terceira classe.
-  await expect(page.getByRole('button', { name: `Faltando · ${151 - ownedCount}` })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: message('dex.filters.missing', defaultLocale(), { count: 151 - ownedCount }),
+  })).toBeVisible()
 
   await ownedChip.click()
 
@@ -168,7 +175,9 @@ test('a Pokédex conta o que o binder tem, e o filtro de posse separa os dois la
 
   // Ligar *Faltando* desliga *Possuídos* — posse é exclusiva, ao contrário de
   // tipo e raridade.
-  await page.getByRole('button', { name: /^Faltando · / }).click()
+  await page.getByRole('button', {
+    name: messagePattern('dex.filters.missing', defaultLocale()),
+  }).click()
   await expect(ownedChip).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('.dex-card:not(.dex-card--missing)')).toHaveCount(0)
 })
@@ -181,8 +190,12 @@ test('sem coleção, a Pokédex não afirma uma coleção vazia', async ({ page 
   // Com save limpo a contagem é real e é zero — o que a tela não pode fazer é
   // escrever `0 / 151` **antes** de saber, que é o caso que `null` cobre. Aqui a
   // asserção é que o grupo de posse existe e diz a verdade.
-  await expect(page.getByRole('button', { name: 'Possuídos · 0' })).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByRole('button', { name: 'Faltando · 151' })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: message('dex.filters.owned', defaultLocale(), { count: 0 }),
+  })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', {
+    name: message('dex.filters.missing', defaultLocale(), { count: 151 }),
+  })).toBeVisible()
   await expect(page.locator('.dex-card:not(.dex-card--missing)')).toHaveCount(0)
 })
 
