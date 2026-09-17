@@ -80,8 +80,8 @@ const DOMAIN = [
  * dictionary for one word costs more than this line does.
  */
 const DERIVATIONS = [
-  'backoff', 'cond', 'debounce', 'focusables', 'hrefs', 'overscan', 'paralysed', 'pre',
-  'replayable', 'responder', 'resumable', 'virtualize', 'virtualizer',
+  'backoff', 'cond', 'debounce', 'focusables', 'hrefs', 'namespaces', 'overscan', 'paralysed',
+  'pre', 'replayable', 'responder', 'resumable', 'virtualize', 'virtualizer',
 ]
 
 const BY_HAND = [...PLATFORM, ...TOOLING, ...DOMAIN, ...DERIVATIONS]

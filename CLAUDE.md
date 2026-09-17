@@ -79,14 +79,20 @@ Todo **nome** é em inglês: variáveis, tipos, componentes, arquivos, rotas, ta
 `localStorage`, scripts e branches. Texto visível ao jogador não é nome — ele é i18n, e nasce em
 pt-BR e EN; a *chave* segue a regra. Plano, commits e PRs em português.
 
-**A prosa dentro do código também é inglês**: comentário, docblock e descrição de `describe`/`it`.
-Vale para tudo que se escreve a partir do PR 2 da Fase 8. O que já está em português fica para uma
-varredura única depois do `1.0.0` — são ~7.600 linhas em 197 arquivos, e elas guardam medição e
-motivo (*"Medido: a arte oficial pesa 118 KB"*), então traduzir mal custa mais que deixar.
+**A prosa dentro do código também é inglês**: comentário, docblock, descrição de `describe`/`it` e
+**mensagem de asserção** — tudo que se lê dentro de um arquivo de código, e não só o que a pessoa
+comenta. Vale para tudo que se escreve a partir do PR 2 da Fase 8. O que já está em português fica
+para uma varredura única depois do `1.0.0` — são ~7.600 linhas em 197 arquivos, e elas guardam
+medição e motivo (*"Medido: a arte oficial pesa 118 KB"*), então traduzir mal custa mais que deixar.
 
 Essa regra existe porque a lista de *nomes* acima e a lista do que segue em português eram ambas
 fechadas, e comentário e descrição de teste não estavam em nenhuma das duas — foi nessa lacuna que
-eles cresceram, sem ninguém quebrar regra.
+eles cresceram, sem ninguém quebrar regra. **A mensagem de asserção entrou na lista pelo mesmo
+motivo, e uma fase depois:** ela não era nome, não era texto de jogador e não estava entre as três
+que a regra nomeava, então o PR das telas de batalha escreveu oito delas em português com todo mundo
+achando que estava seguindo a regra. Uma lista fechada de exemplos vira, na leitura de quem aplica,
+uma lista fechada do que a regra alcança — e é por isso que ela agora diz *tudo que se lê dentro do
+arquivo*, com os exemplos servindo de exemplo.
 
 **Identificador em português é defeito, não estilo.** Conferir com a medição, não a olho: a
 varredura por lista de palavras já subestimou o problema em uma ordem de grandeza, porque perde

@@ -8,6 +8,7 @@ import { GYM_COUNT } from '~~/shared/types/brand'
 import { typeKey } from '~~/shared/types/game'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * A Liga — a prancha *Liga*.
@@ -24,7 +25,7 @@ const { t } = useI18n()
 const progress = useProgressStore()
 const view = await useLeague()
 
-useHead({ title: 'A Liga' })
+useHead({ title: () => t('league.seo.title') })
 
 const firstRow = computed(() => view.gyms.value.slice(0, 5))
 const secondRow = computed(() => view.gyms.value.slice(5))
@@ -51,10 +52,10 @@ const next = computed(() => view.next.value)
     <header class="league__head">
       <div>
         <p class="league__eyebrow">
-          Uma geração, um líder
+          {{ t('league.eyebrow') }}
         </p>
         <h1 class="league__title">
-          A Liga
+          {{ t('league.title') }}
         </h1>
       </div>
 
@@ -65,7 +66,7 @@ const next = computed(() => view.next.value)
               {{ progress.badges }}<span>/{{ GYM_COUNT }}</span>
             </p>
             <p class="league__eyebrow">
-              insígnias
+              {{ t('league.badges') }}
             </p>
           </div>
           <div class="league__meter">
@@ -107,32 +108,35 @@ const next = computed(() => view.next.value)
             :data-type="next.leader.type"
           >
             <p class="league__eyebrow">
-              {{ progress.leagueComplete ? 'Revanche' : 'Próximo' }}
+              {{ progress.leagueComplete ? t('league.next.rematch') : t('league.next.next') }}
             </p>
             <h2 class="league__next-name">
               {{ next.leader.name }}
             </h2>
             <p class="numeric league__next-meta">
-              Ginásio {{ next.leader.gym }} · {{ t(typeKey(next.leader.type)) }}
+              {{ t('league.next.meta', {
+                gym: next.leader.gym,
+                type: t(typeKey(next.leader.type)),
+              }) }}
             </p>
 
             <dl class="numeric league__facts">
               <div>
-                <dt>Time</dt>
-                <dd>{{ next.leader.teamSize }} Pokémon</dd>
+                <dt>{{ t('league.next.team') }}</dt>
+                <dd>{{ t('league.next.teamSize', { count: next.leader.teamSize }) }}</dd>
               </div>
               <div>
-                <dt>Nível</dt>
+                <dt>{{ t('league.next.level') }}</dt>
                 <dd>Lv50</dd>
               </div>
               <div>
-                <dt>Prêmio</dt>
+                <dt>{{ t('league.next.prize') }}</dt>
                 <dd class="league__prize">
                   +{{ gameNumber(next.reward.total) }}
                 </dd>
               </div>
               <div>
-                <dt>Seu deck</dt>
+                <dt>{{ t('league.next.deck') }}</dt>
                 <!--
                   `N ajuste(s)` é a leitura de cobertura: quantas cartas apanham
                   mais que o normal deste líder. A prancha escreve o número e não
@@ -141,27 +145,29 @@ const next = computed(() => view.next.value)
                 -->
                 <dd :class="view.risky.value > 0 ? 'league__risk' : ''">
                   {{ view.risky.value > 0
-                    ? `${view.risky.value} ajuste${view.risky.value > 1 ? 's' : ''}`
-                    : 'sem ajustes' }}
+                    ? t('league.next.adjustments', { count: view.risky.value }, view.risky.value)
+                    : t('league.next.noAdjustments') }}
                 </dd>
               </div>
             </dl>
 
             <NuxtLink
               v-if="view.deckReady.value"
-              :to="`/battle/${next.leader.gym}`"
+              :to="localePath(`/battle/${next.leader.gym}`)"
               class="league__action bevel-control"
             >
-              {{ progress.hasBadge(next.leader.gym) ? 'REVANCHE' : 'DESAFIAR' }}
+              {{ progress.hasBadge(next.leader.gym)
+                ? t('league.next.rematchAction')
+                : t('league.next.challengeAction') }}
             </NuxtLink>
             <!-- Sem os seis, não há batalha: o motor recusa um lado vazio e a
                  tela não deve oferecer o que ela sabe que não vai acontecer. -->
             <NuxtLink
               v-else
-              to="/deck"
+              :to="localePath('/deck')"
               class="league__action league__action--empty bevel-control"
             >
-              MONTE UM DECK DE {{ DECK_SIZE }}
+              {{ t('league.next.buildDeck', { size: DECK_SIZE }) }}
             </NuxtLink>
           </section>
         </div>
@@ -169,14 +175,14 @@ const next = computed(() => view.next.value)
 
       <template #fallback>
         <p class="league__loading">
-          Carregando a Liga…
+          {{ t('league.loading') }}
         </p>
       </template>
     </ClientOnly>
 
     <footer class="league__foot">
-      <span>Desbloqueio sequencial — cada líder só abre com a insígnia anterior</span>
-      <span>Times montados pela regra: mesmo tipo, mesma geração, sob o teto de BST da faixa</span>
+      <span>{{ t('league.foot.unlock') }}</span>
+      <span>{{ t('league.foot.teams') }}</span>
     </footer>
   </div>
 </template>

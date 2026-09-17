@@ -1,9 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { TYPE_NAMES } from '~~/shared/types/dex'
+import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, TYPE_NAMES } from '~~/shared/types/dex'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
-import { RARITY_NAMES, rarityKey, typeKey } from '~~/shared/types/game'
+import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
+import {
+  affectedKey,
+  ailmentKey,
+  conditionKey,
+  damageClassKey,
+  EFFECTIVENESS_MULTIPLIERS,
+  effectivenessKey,
+  RARITY_NAMES,
+  rarityKey,
+  typeKey,
+} from '~~/shared/types/game'
 import { defaultLocale, label, leafEntries, localeCodes, readLocale } from '../support/locales'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
 
@@ -53,25 +64,64 @@ const NAV_KEYS: readonly string[] = [
  * `test/support/locales.ts` already documents for the locale directory.
  *
  * `t(rarityKey(tier))` is not a literal call, so `literalKeys()` cannot see any
- * of these 24 keys. Without this union they would all read as orphans and the
+ * of these keys. Without this union they would all read as orphans and the
  * gate would fail on its own vocabulary.
+ *
+ * `ailment.*` and `condition.*` are two namespaces over the same four ids, and
+ * that is deliberate: one is the word a move card spells out (*queimadura*) and
+ * the other the three letters the battle HUD stamps on a combatant (*QUE*, and
+ * *BRN* in English). One namespace would have to pick one of the two texts, and
+ * the screen that lost would get the other one — which is how the badge ended up
+ * saying `QUE` inside `/en` in the first place.
  */
 const VOCABULARY: readonly (readonly [id: string, key: string])[] = [
   ...RARITY_NAMES.map(rarity => [rarity, rarityKey(rarity)] as const),
   ...TYPE_NAMES.map(type => [type, typeKey(type)] as const),
+  ...AILMENT_NAMES.map(name => [name, ailmentKey(name)] as const),
+  ...AILMENT_NAMES.map(name => [name, conditionKey(name)] as const),
+  ...DAMAGE_CLASS_NAMES.map(name => [name, damageClassKey(name)] as const),
+  ...AILMENT_NAMES.map(name => [name, affectedKey(name)] as const),
+  ...EFFECTIVENESS_MULTIPLIERS.map(multiplier => (
+    [String(multiplier), effectivenessKey(multiplier)] as const
+  )),
 ]
 
 const VOCABULARY_KEYS: readonly string[] = VOCABULARY.map(([, key]) => key)
 
 /**
- * The two words that really are the same in both languages.
+ * The turn log, which spells its keys the same way and for the same reason.
+ *
+ * `narrate()` resolves a key per event kind, so the addresses are computed and
+ * `literalKeys()` sees none of the twenty-four. The list is published by the
+ * narrator itself — a `Record` over `BattleEvent['kind']`, which is what makes
+ * an eleventh event fail to compile instead of failing to be translated — and
+ * `test/unit/battle-narration.spec.ts` asserts that the list is exactly the set
+ * the function asks for. Here it is only unioned in: without it the whole
+ * `battle.log` namespace reads as orphaned and the orphan assertion deletes the
+ * translation of every line the log prints.
+ *
+ * **Read from the module, and no longer flattened here.** Both gates used to
+ * spell the same union, and both had to remember `UNKNOWN_MOVE_KEY` — the one
+ * address that lives outside the `Record` because it belongs to no event kind.
+ * Two copies of a list whose whole job is to be complete is the drift this file
+ * warns about one paragraph above.
+ */
+const NARRATION_KEYS_USED: readonly string[] = NARRATION_KEY_LIST
+
+/**
+ * The words that really are the same in both languages.
  *
  * Written out because they are the **exception**, and the assertion below
  * compares the whole set in both directions: a translation that starts matching
  * pt-BR fails, and so does one of these two if it ever stops matching. A list
  * that only forgave would quietly forgive an untranslated file.
+ *
+ * `move.class.status` is the third, and it is the same accident from the other
+ * side: the word the card stamps on a status move **is** the identifier, in both
+ * languages. Translating it to anything else would be inventing a word to keep a
+ * gate quiet.
  */
-const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal']
+const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.class.status']
 
 /**
  * Every message that really is the same in both languages.
@@ -81,7 +131,15 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal']
  * differing fails here too and has to leave the list. What is in it is the game's
  * own vocabulary, borrowed untranslated by the pt-BR community — *Shiny*,
  * *Binder*, *Deck*, *Packs*, *Tier*, *Base*, *Pokédex*, *Ultra*, *Normal* — plus
- * the five messages that are nothing but placeholders and punctuation.
+ * the messages that are nothing but placeholders, numbers and punctuation.
+ *
+ * The battle screens brought four of the second kind and one of a third. `PWR 90
+ * · ACC 100` and `{ailment} · ACC 90` are abbreviations the game writes the same
+ * way in both languages, and `{count} Pokémon` is the word itself. `PAR` is the
+ * one that is **not** a coincidence and had to be checked rather than assumed:
+ * the other three condition badges do differ — *QUE* against `BRN`, *ENV*
+ * against `PSN`, *SON* against `SLP` — and paralysis is the single one where the
+ * two languages shorten to the same three letters.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -91,9 +149,14 @@ const IDENTICAL_LABELS: readonly string[] = [
   'collection.shiny',
   'collection.table.tier',
   'collection.title',
+  'condition.paralysis',
   'deck.seo.title',
   'deck.slotsCount',
   'hub.shiny',
+  'league.next.teamSize',
+  'move.class.status',
+  'move.detail.damage',
+  'move.detail.status',
   'nav.base',
   'nav.deck',
   'nav.packs',
@@ -202,6 +265,7 @@ const USED_KEYS: ReadonlySet<string> = new Set([
   ...literalKeys(),
   ...NAV_KEYS,
   ...VOCABULARY_KEYS,
+  ...NARRATION_KEYS_USED,
 ])
 
 describe('paridade entre os locales', () => {
@@ -345,7 +409,9 @@ describe('as chaves e quem as usa', () => {
    */
   it('acha chave literal além das da barra', () => {
     expect(NAV_KEYS.length).toBeGreaterThan(0)
-    expect(USED_KEYS.size).toBeGreaterThan(NAV_KEYS.length + VOCABULARY_KEYS.length)
+    expect(USED_KEYS.size).toBeGreaterThan(
+      NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length,
+    )
   })
 
   /**
@@ -353,9 +419,29 @@ describe('as chaves e quem as usa', () => {
    * `VOCABULARY_KEYS` short, the missing ids would never be asked of any locale,
    * and both assertions above would pass over a vocabulary nobody checked.
    */
-  it('derives one key per rarity and one per type', () => {
-    expect(VOCABULARY_KEYS.length).toBe(RARITY_NAMES.length + TYPE_NAMES.length)
+  it('derives one key per rarity, type, ailment, damage class and multiplier', () => {
+    expect(VOCABULARY_KEYS.length).toBe(
+      RARITY_NAMES.length
+      + TYPE_NAMES.length
+      + AILMENT_NAMES.length * 3
+      + DAMAGE_CLASS_NAMES.length
+      + EFFECTIVENESS_MULTIPLIERS.length,
+    )
     expect(new Set(VOCABULARY_KEYS).size).toBe(VOCABULARY_KEYS.length)
+  })
+
+  /**
+   * The same other side for the log, and it catches a different mistake.
+   *
+   * `NARRATION_KEYS` is a `Record` of **lists**, and a flatten that stopped
+   * flattening would leave one key per kind instead of twenty-four: the ten that
+   * survived would keep the gate green while fourteen translations went orphan.
+   * Asking for more keys than kinds is what makes that visible.
+   */
+  it('derives more log keys than there are kinds of event', () => {
+    expect(NARRATION_KEYS_USED.length).toBeGreaterThan(Object.keys(NARRATION_KEYS).length)
+    expect(new Set(NARRATION_KEYS_USED).size).toBe(NARRATION_KEYS_USED.length)
+    expect(NARRATION_KEYS_USED.filter(key => !key.startsWith('battle.log.'))).toEqual([])
   })
 
   /** Chave pedida e não traduzida vira o próprio nome dela na tela. */
@@ -421,7 +507,8 @@ describe('the game vocabulary', () => {
    */
   it('repeats no label inside one language', () => {
     for (const [name] of LOCALES) {
-      for (const namespace of ['rarity', 'type']) {
+      const namespaces = ['rarity', 'type', 'ailment', 'condition', 'affected', 'effectiveness']
+      for (const namespace of [...namespaces, 'move.class']) {
         const labels = VOCABULARY
           .filter(([, key]) => key.startsWith(`${namespace}.`))
           .map(([, key]) => label(key, name))

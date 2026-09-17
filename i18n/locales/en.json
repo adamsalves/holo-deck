@@ -240,5 +240,185 @@
       "hint": "DRAG{break}A CARD",
       "removeLabel": "Remove {name} from slot {slot}"
     }
+  },
+  "ailment": {
+    "paralysis": "paralysis",
+    "burn": "burn",
+    "poison": "poisoning",
+    "sleep": "sleep"
+  },
+  "condition": {
+    "paralysis": "PAR",
+    "burn": "BRN",
+    "poison": "PSN",
+    "sleep": "SLP"
+  },
+  "affected": {
+    "paralysis": "ALREADY PARALYZED",
+    "burn": "ALREADY BURNED",
+    "poison": "ALREADY POISONED",
+    "sleep": "ALREADY ASLEEP"
+  },
+  "effectiveness": {
+    "none": "NO EFFECT",
+    "barely": "BARELY SCRATCHES",
+    "weak": "NOT VERY EFFECTIVE",
+    "neutral": "NEUTRAL",
+    "strong": "SUPER EFFECTIVE",
+    "devastating": "DEVASTATING"
+  },
+  "generation": {
+    "label": "Generation {numeral}"
+  },
+  "move": {
+    "class": {
+      "physical": "PHY",
+      "special": "SPE",
+      "status": "STATUS"
+    },
+    "detail": {
+      "status": "{ailment} · ACC {accuracy}",
+      "damage": "PWR {power} · ACC {accuracy}"
+    }
+  },
+  "league": {
+    "eyebrow": "One generation, one leader",
+    "title": "The League",
+    "badges": "badges",
+    "loading": "Loading the League…",
+    "seo": {
+      "title": "The League"
+    },
+    "foot": {
+      "unlock": "Sequential unlock — each leader opens only with the previous badge",
+      "teams": "Teams built by the rule: same type, same generation, under the tier BST cap"
+    },
+    "next": {
+      "rematch": "Rematch",
+      "next": "Next",
+      "meta": "Gym {gym} · {type}",
+      "team": "Team",
+      "teamSize": "{count} Pokémon",
+      "level": "Level",
+      "prize": "Prize",
+      "deck": "Your deck",
+      "adjustments": "{count} fix | {count} fixes",
+      "noAdjustments": "no fixes",
+      "rematchAction": "REMATCH",
+      "challengeAction": "CHALLENGE",
+      "buildDeck": "BUILD A DECK OF {size}"
+    },
+    "gym": {
+      "now": "NOW",
+      "won": "BEATEN",
+      "rematch": "REMATCH +{coins}",
+      "challenge": "CHALLENGE · +{coins}",
+      "rematchLabel": "Rematch against {leader}, gym {gym}",
+      "challengeLabel": "Challenge {leader}, gym {gym}"
+    }
+  },
+  "battle": {
+    "seo": {
+      "title": "Battle",
+      "gym": "Gym {gym} · {leader}"
+    },
+    "bar": {
+      "gym": "Gym {gym} / {total}",
+      "turn": "TURN",
+      "level": "Lv50 fixed"
+    },
+    "result": {
+      "wonEyebrow": "Gym beaten",
+      "lostEyebrow": "Your team went down",
+      "won": "Victory",
+      "lost": "Defeat",
+      "nothingLost": "Nothing was lost — no card, no coin. The rematch is immediate.",
+      "againWon": "FIGHT AGAIN",
+      "againLost": "TRY AGAIN"
+    },
+    "prize": {
+      "rematch": "Rematch",
+      "reward": "Reward",
+      "flawless": "Flawless",
+      "balance": "Balance"
+    },
+    "backToLeague": "BACK TO THE LEAGUE",
+    "forced": {
+      "fainted": "{name} fainted",
+      "title": "Who is in?",
+      "note": "Pick from the bench, on the right. The turn waits until you do."
+    },
+    "choose": {
+      "move": "Choose the move"
+    },
+    "potion": "POTION {count}",
+    "bench": {
+      "title": "Your bench",
+      "standing": "{count} standing",
+      "swap": "Switch to {name}"
+    },
+    "note": {
+      "noPp": "NO PP · STRUGGLE",
+      "noEffect": "×0 NO EFFECT",
+      "statusMove": "STATUS MOVE"
+    },
+    "initiative": {
+      "tie": "Speed tie ({speed}) — the tiebreak is drawn",
+      "mine": "you strike first (SPD {mine} > {foe})",
+      "foe": "{name} strikes first (SPD {foe} > {mine})"
+    },
+    "standing": {
+      "loading": "Setting the field…",
+      "lockedTitle": "Gym closed",
+      "lockedNote": "Each leader opens only with the previous badge. Yours is gym {gym}.",
+      "lockedAction": "GO TO THE LEAGUE",
+      "busyTitle": "You are already in a fight",
+      "busyNote": "Gym {gym} · {leader}, with {count} move played. Starting this one erases that. | Gym {gym} · {leader}, with {count} moves played. Starting this one erases that.",
+      "busyResume": "RESUME THAT ONE",
+      "busyDrop": "GIVE UP AND START THIS",
+      "noDeckTitle": "No team",
+      "noDeckNote": "A battle needs all {size} slots filled.",
+      "noDeckAction": "BUILD THE DECK",
+      "unknownGymTitle": "No such gym",
+      "unknownGymNote": "The League has {total} gyms.",
+      "noDexTitle": "The dex did not load",
+      "noDexNote": "Without the dex there is no way to build the leader team. Try again."
+    },
+    "log": {
+      "title": "Turn log",
+      "empty": "The fight starts now.",
+      "switch": "{name} took the field.",
+      "potion": "{name} recovered {healed} HP.",
+      "miss": "{name} missed {move}.",
+      "hit": "{name} used {move}.",
+      "damage": "{target} lost {damage} HP.",
+      "critical": "Critical hit!",
+      "noEffect": "{move} did not affect {target}.",
+      "faint": "{name} fainted.",
+      "unknownMove": "the move",
+      "blocked": {
+        "paralysis": "{name} is paralyzed and could not move.",
+        "burn": "{name} lost the turn.",
+        "poison": "{name} lost the turn.",
+        "sleep": "{name} is fast asleep."
+      },
+      "ailment": {
+        "paralysis": "{name} was paralyzed.",
+        "burn": "{name} was burned.",
+        "poison": "{name} was poisoned.",
+        "sleep": "{name} fell asleep."
+      },
+      "residual": {
+        "paralysis": "{name} lost {damage} HP at the end of the turn.",
+        "burn": "{name} lost {damage} HP to the burn.",
+        "poison": "{name} lost {damage} HP to the poison.",
+        "sleep": "{name} lost {damage} HP at the end of the turn.",
+        "generic": "{name} lost {damage} HP at the end of the turn."
+      },
+      "outcome": {
+        "won": "You beat the gym.",
+        "lost": "Your team went down."
+      }
+    }
   }
 }

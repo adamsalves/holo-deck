@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { BattlePokemon } from '~~/shared/game/battle'
-import { CONDITION_LABELS, effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
+import { effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
+import { conditionKey } from '~~/shared/types/game'
 import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
+
+const { t } = useI18n()
 
 /**
  * O painel de quem está em campo — a prancha *Batalha*, nos dois lados.
@@ -72,7 +75,7 @@ const standout = computed(() => {
         <span
           v-if="pokemon.condition"
           class="numeric combatant__condition"
-        >{{ CONDITION_LABELS[pokemon.condition.kind] }}</span>
+        >{{ t(conditionKey(pokemon.condition.kind)) }}</span>
         <DexTypeBadge
           v-for="type in pokemon.types"
           :key="type"

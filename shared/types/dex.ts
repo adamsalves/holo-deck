@@ -114,8 +114,15 @@ export type Effectiveness = 0 | 0.5 | 1 | 2
 /**
  * As três classes da PokeAPI. `status` entrou na Fase 4: sem ela o catálogo não
  * tem Thunder Wave, e as quatro condições do motor ficam sem origem nenhuma.
+ *
+ * It is a tuple for the same reason as `REGION_NAMES` and `AILMENT_NAMES`: the
+ * move card stamps one word per class, and it is from this list that the i18n
+ * gate derives the three keys. Without it they would be three computed addresses
+ * no scan can see — and the orphan assertion would delete their translation.
  */
-export type DamageClass = 'physical' | 'special' | 'status'
+export const DAMAGE_CLASS_NAMES = ['physical', 'special', 'status'] as const
+
+export type DamageClass = typeof DAMAGE_CLASS_NAMES[number]
 
 /** As duas que passam pela fórmula de dano. */
 export type DamagingClass = Exclude<DamageClass, 'status'>

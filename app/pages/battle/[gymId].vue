@@ -11,7 +11,7 @@ import { battleSpriteUrl } from '~~/shared/dex/artwork'
 import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
-import { AILMENT_LABELS, REGION_LABELS, typeKey } from '~~/shared/types/game'
+import { affectedKey, ailmentKey, effectivenessKey, REGION_LABELS, typeKey } from '~~/shared/types/game'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
@@ -22,6 +22,7 @@ import type { NarratedTurn } from '~~/app/utils/battle-narration'
 import { narrate } from '~~/app/utils/battle-narration'
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 
 /**
  * A batalha — a prancha *Batalha*.
@@ -58,7 +59,9 @@ const leader = computed(() => (gym.value === null ? null : gymLeader(gym.value))
 definePageMeta({ layout: false })
 
 useHead({
-  title: () => (leader.value === null ? 'Batalha' : `Ginásio ${gym.value} · ${leader.value.name}`),
+  title: () => (leader.value === null
+    ? t('battle.seo.title')
+    : t('battle.seo.gym', { gym: gym.value, leader: leader.value.name })),
   // O sprite animado vem do repositório de sprites da PokeAPI, e só esta rota o
   // usa — o `preconnect` mora aqui pelo mesmo motivo que o da arte oficial mora
   // na página de detalhe: nas outras rotas seria um DNS+TLS que ninguém gasta.
@@ -283,20 +286,13 @@ function noteFor(
   foe: BattlePokemon,
   multiplier: number,
 ): string | null {
-  if (slot.pp <= 0) return 'SEM PP · STRUGGLE'
-  if (multiplier === 0) return '×0 NÃO AFETA'
+  if (slot.pp <= 0) return t('battle.note.noPp')
+  if (multiplier === 0) return t('battle.note.noEffect')
   if (slot.move.damageClass === 'status' && foe.condition !== null) {
-    return `JÁ ${AFFECTED[foe.condition.kind]}`
+    return t(affectedKey(foe.condition.kind))
   }
   return null
 }
-
-const AFFECTED = {
-  paralysis: 'PARALISADO',
-  burn: 'QUEIMADO',
-  poison: 'ENVENENADO',
-  sleep: 'DORMINDO',
-} as const
 
 /**
  * A leitura grande do centro: o golpe em foco contra quem está do outro lado.
@@ -338,8 +334,8 @@ const reading = computed(() => {
     return {
       kind: 'status' as const,
       multiplier: 1,
-      title: AILMENT_LABELS[move.ailment.kind].toUpperCase(),
-      label: 'GOLPE DE STATUS',
+      title: t(ailmentKey(move.ailment.kind)).toUpperCase(),
+      label: t('battle.note.statusMove'),
       detail,
     }
   }
@@ -348,19 +344,10 @@ const reading = computed(() => {
     kind: 'damage' as const,
     multiplier,
     title: multiplierLabel(multiplier),
-    label: EFFECTIVENESS_LABELS[multiplier] ?? 'NEUTRO',
+    label: t(effectivenessKey(multiplier)),
     detail,
   }
 })
-
-const EFFECTIVENESS_LABELS: Record<number, string> = {
-  0: 'NÃO AFETA',
-  0.25: 'MAL ARRANHA',
-  0.5: 'POUCO EFETIVO',
-  1: 'NEUTRO',
-  2: 'SUPER EFETIVO',
-  4: 'DEVASTADOR',
-}
 
 /** Quem age primeiro, com o número à vista — o texto do cabeçalho da prancha. */
 const initiative = computed(() => {
@@ -370,10 +357,10 @@ const initiative = computed(() => {
 
   const mineSpeed = effectiveSpeed(mine.stats, mine.condition)
   const foeSpeed = effectiveSpeed(foe.stats, foe.condition)
-  if (mineSpeed === foeSpeed) return `empate de Speed (${mineSpeed}) — o desempate é sorteado`
+  if (mineSpeed === foeSpeed) return t('battle.initiative.tie', { speed: mineSpeed })
   return mineSpeed > foeSpeed
-    ? `você ataca primeiro (SPD ${mineSpeed} > ${foeSpeed})`
-    : `${foe.displayName} ataca primeiro (SPD ${foeSpeed} > ${mineSpeed})`
+    ? t('battle.initiative.mine', { mine: mineSpeed, foe: foeSpeed })
+    : t('battle.initiative.foe', { name: foe.displayName, foe: foeSpeed, mine: mineSpeed })
 })
 
 const bench = computed(() => (state.value === null ? [] : state.value.player.team))
@@ -409,7 +396,10 @@ function play(action: BattleAction): void {
   // `AccountInvite`.
   if (state.value?.outcome === 'won') invite.offer()
 
-  const turn = narrate(before, battle.events, ctx.moves)
+  // The log keeps finished sentences, not events: switching language means
+  // another URL, the page remounts, and the history starts empty in the new
+  // language — never half of it in each.
+  const turn = narrate(before, battle.events, ctx.moves, t)
   if (turn.lines.length > 0) history.value = [...history.value, turn].slice(-LOG_LINES)
   focused.value = 0
 }
@@ -476,15 +466,17 @@ function fallbackSprite(event: Event, id: number): void {
       <template v-if="standing === 'ready' && state && player && opponent && leader">
         <header class="battle__bar">
           <div class="battle__who">
-            <span class="numeric battle__gym">Ginásio {{ gym }} / {{ GYM_COUNT }}</span>
+            <span class="numeric battle__gym">
+              {{ t('battle.bar.gym', { gym, total: GYM_COUNT }) }}
+            </span>
             <span class="battle__leader">{{ leader.name }}</span>
             <span class="numeric battle__region">
               {{ REGION_LABELS[leader.region] }} · {{ t(typeKey(leader.type)) }}
             </span>
           </div>
           <div class="numeric battle__meta">
-            <span>TURNO <b>{{ String(state.turn).padStart(2, '0') }}</b></span>
-            <span>Lv50 fixo</span>
+            <span>{{ t('battle.bar.turn') }} <b>{{ String(state.turn).padStart(2, '0') }}</b></span>
+            <span>{{ t('battle.bar.level') }}</span>
           </div>
         </header>
 
@@ -545,10 +537,12 @@ function fallbackSprite(event: Event, id: number): void {
             class="battle__result"
           >
             <p class="battle__eyebrow">
-              {{ state.outcome === 'won' ? 'Ginásio vencido' : 'Seu time caiu' }}
+              {{ state.outcome === 'won'
+                ? t('battle.result.wonEyebrow')
+                : t('battle.result.lostEyebrow') }}
             </p>
             <h2 class="battle__outcome">
-              {{ state.outcome === 'won' ? 'Vitória' : 'Derrota' }}
+              {{ state.outcome === 'won' ? t('battle.result.won') : t('battle.result.lost') }}
             </h2>
 
             <dl
@@ -556,15 +550,15 @@ function fallbackSprite(event: Event, id: number): void {
               class="numeric battle__prize"
             >
               <div>
-                <dt>{{ rematched ? 'Revanche' : 'Recompensa' }}</dt>
+                <dt>{{ rematched ? t('battle.prize.rematch') : t('battle.prize.reward') }}</dt>
                 <dd>+{{ gameNumber(battle.reward.earned) }}</dd>
               </div>
               <div v-if="battle.reward.flawless > 0">
-                <dt>Imaculada</dt>
+                <dt>{{ t('battle.prize.flawless') }}</dt>
                 <dd>+{{ gameNumber(battle.reward.flawless) }}</dd>
               </div>
               <div class="battle__prize-total">
-                <dt>Saldo</dt>
+                <dt>{{ t('battle.prize.balance') }}</dt>
                 <dd>{{ gameNumber(progress.coins) }}</dd>
               </div>
             </dl>
@@ -572,7 +566,7 @@ function fallbackSprite(event: Event, id: number): void {
               v-else
               class="battle__note"
             >
-              Nada foi perdido — nem carta, nem moeda. A revanche é imediata.
+              {{ t('battle.result.nothingLost') }}
             </p>
 
             <div class="battle__buttons">
@@ -581,13 +575,15 @@ function fallbackSprite(event: Event, id: number): void {
                 class="battle__button battle__button--primary bevel-control"
                 @click="again"
               >
-                {{ state.outcome === 'won' ? 'LUTAR DE NOVO' : 'TENTAR DE NOVO' }}
+                {{ state.outcome === 'won'
+                  ? t('battle.result.againWon')
+                  : t('battle.result.againLost') }}
               </button>
               <NuxtLink
-                to="/league"
+                :to="localePath('/league')"
                 class="battle__button bevel-control"
               >
-                VOLTAR À LIGA
+                {{ t('battle.backToLeague') }}
               </NuxtLink>
             </div>
           </div>
@@ -598,13 +594,13 @@ function fallbackSprite(event: Event, id: number): void {
             class="battle__forced"
           >
             <p class="battle__eyebrow">
-              {{ player.displayName }} desmaiou
+              {{ t('battle.forced.fainted', { name: player.displayName }) }}
             </p>
             <h2 class="battle__outcome">
-              Quem entra?
+              {{ t('battle.forced.title') }}
             </h2>
             <p class="battle__note">
-              Escolha no banco, à direita. O turno não anda até lá.
+              {{ t('battle.forced.note') }}
             </p>
           </div>
 
@@ -614,7 +610,7 @@ function fallbackSprite(event: Event, id: number): void {
           >
             <header class="battle__choose-head">
               <p class="battle__eyebrow">
-                Escolha o golpe
+                {{ t('battle.choose.move') }}
                 <span
                   v-if="initiative"
                   class="battle__initiative"
@@ -633,7 +629,7 @@ function fallbackSprite(event: Event, id: number): void {
                 :disabled="potions <= 0"
                 @click="drink"
               >
-                POÇÃO {{ potions }}
+                {{ t('battle.potion', { count: potions }) }}
               </button>
             </header>
 
@@ -654,7 +650,7 @@ function fallbackSprite(event: Event, id: number): void {
 
           <aside class="battle__side">
             <p class="battle__eyebrow">
-              Registro do turno
+              {{ t('battle.log.title') }}
             </p>
             <ol class="numeric battle__log">
               <li
@@ -668,14 +664,16 @@ function fallbackSprite(event: Event, id: number): void {
                 v-if="history.length === 0"
                 class="battle__log-empty"
               >
-                A luta começa agora.
+                {{ t('battle.log.empty') }}
               </li>
             </ol>
 
             <div class="battle__bench-wrap">
               <p class="battle__eyebrow">
-                Seu banco
-                <span class="battle__initiative">— {{ teamStanding }} de pé</span>
+                {{ t('battle.bench.title') }}
+                <span class="battle__initiative">
+                  — {{ t('battle.bench.standing', { count: teamStanding }) }}
+                </span>
               </p>
               <div class="battle__bench">
                 <button
@@ -689,7 +687,7 @@ function fallbackSprite(event: Event, id: number): void {
                   }"
                   :data-type="card.types[0]"
                   :disabled="isFainted(card) || index === state.player.active || !canSwitch"
-                  :aria-label="`Trocar para ${card.displayName}`"
+                  :aria-label="t('battle.bench.swap', { name: card.displayName })"
                   @click="swap(index)"
                 >
                   <img
@@ -720,38 +718,39 @@ function fallbackSprite(event: Event, id: number): void {
           v-if="standing === 'loading'"
           class="battle__note"
         >
-          Montando o campo…
+          {{ t('battle.standing.loading') }}
         </p>
         <template v-else-if="standing === 'locked'">
           <h1 class="battle__outcome">
-            Ginásio fechado
+            {{ t('battle.standing.lockedTitle') }}
           </h1>
           <p class="battle__note">
-            Cada líder só abre com a insígnia anterior. O seu próximo é o
-            {{ progress.nextGym }}.
+            {{ t('battle.standing.lockedNote', { gym: progress.nextGym }) }}
           </p>
           <NuxtLink
-            to="/league"
+            :to="localePath('/league')"
             class="battle__button battle__button--primary bevel-control"
           >
-            IR PARA A LIGA
+            {{ t('battle.standing.lockedAction') }}
           </NuxtLink>
         </template>
         <template v-else-if="standing === 'busy' && busyWith">
           <h1 class="battle__outcome">
-            Você já está lutando
+            {{ t('battle.standing.busyTitle') }}
           </h1>
           <p class="battle__note">
-            Ginásio {{ busyWith.gym }} · {{ busyWith.leader.name }}, com
-            {{ busyWith.actions }} {{ busyWith.actions === 1 ? 'jogada feita' : 'jogadas feitas' }}.
-            Começar esta luta apaga aquela.
+            {{ t(
+              'battle.standing.busyNote',
+              { gym: busyWith.gym, leader: busyWith.leader.name, count: busyWith.actions },
+              busyWith.actions,
+            ) }}
           </p>
           <div class="battle__buttons">
             <NuxtLink
-              :to="`/battle/${busyWith.gym}`"
+              :to="localePath(`/battle/${busyWith.gym}`)"
               class="battle__button battle__button--primary bevel-control"
             >
-              RETOMAR AQUELA
+              {{ t('battle.standing.busyResume') }}
             </NuxtLink>
             <button
               type="button"
@@ -759,38 +758,40 @@ function fallbackSprite(event: Event, id: number): void {
               :disabled="!deck.ready"
               @click="dropAndStart"
             >
-              DESISTIR E COMEÇAR ESTA
+              {{ t('battle.standing.busyDrop') }}
             </button>
           </div>
         </template>
         <template v-else-if="standing === 'no-deck'">
           <h1 class="battle__outcome">
-            Sem time
+            {{ t('battle.standing.noDeckTitle') }}
           </h1>
           <p class="battle__note">
-            A batalha precisa dos {{ DECK_SIZE }} slots preenchidos.
+            {{ t('battle.standing.noDeckNote', { size: DECK_SIZE }) }}
           </p>
           <NuxtLink
-            to="/deck"
+            :to="localePath('/deck')"
             class="battle__button battle__button--primary bevel-control"
           >
-            MONTAR O DECK
+            {{ t('battle.standing.noDeckAction') }}
           </NuxtLink>
         </template>
         <template v-else>
           <h1 class="battle__outcome">
-            {{ standing === 'unknown-gym' ? 'Ginásio inexistente' : 'O dex não carregou' }}
+            {{ standing === 'unknown-gym'
+              ? t('battle.standing.unknownGymTitle')
+              : t('battle.standing.noDexTitle') }}
           </h1>
           <p class="battle__note">
             {{ standing === 'unknown-gym'
-              ? `A Liga tem ${GYM_COUNT} ginásios.`
-              : 'Sem o dex não há como montar o time do líder. Tente de novo.' }}
+              ? t('battle.standing.unknownGymNote', { total: GYM_COUNT })
+              : t('battle.standing.noDexNote') }}
           </p>
           <NuxtLink
-            to="/league"
+            :to="localePath('/league')"
             class="battle__button battle__button--primary bevel-control"
           >
-            VOLTAR À LIGA
+            {{ t('battle.backToLeague') }}
           </NuxtLink>
         </template>
       </div>

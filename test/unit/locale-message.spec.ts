@@ -41,8 +41,25 @@ function pluralKeys(code: string): string[] {
     .map(([key]) => key)
 }
 
-/** Placeholders the plural messages need, by name, so every branch can render. */
-const VALUES = { count: 0, name: 'Bulbasaur', dust: 1600 }
+/**
+ * The placeholders a message asks for, read **from the message**.
+ *
+ * It was a written-out fixture — `{ count, name, dust }` — and the battle
+ * screens brought the first plural message with three placeholders in it, which
+ * that list did not have. It failed with *sem valor para `{gym}`*: a fixture
+ * that ages next to the file it feeds, which is the mistake the docblock above
+ * already describes in its other form. Derived, a new placeholder arrives
+ * already covered.
+ *
+ * The value of a placeholder is its own name, and `count` is the exception
+ * because the branch depends on it. Both sides of the comparison are handed the
+ * same values, so what is being measured is the **branch**, never the filling.
+ */
+function valuesFor(raw: string, count: number): Record<string, string | number> {
+  const names = [...raw.matchAll(/\{(\w+)\}/g)].map(match => match[1] ?? '')
+
+  return { ...Object.fromEntries(names.map(name => [name, name])), count }
+}
 
 /** The counts that separate the two plural rules, `0` first. */
 const COUNTS: readonly number[] = [0, 1, 2, 5]
@@ -63,7 +80,7 @@ function renderedByLibrary(code: string, key: string, raw: string, count: number
     messages: { [code]: { subject: raw } },
   })
 
-  return i18n.global.t('subject', { ...VALUES, count }, count)
+  return i18n.global.t('subject', valuesFor(raw, count), count)
 }
 
 describe('locale message helper', () => {
@@ -103,7 +120,7 @@ describe('locale message helper', () => {
 
         for (const count of COUNTS) {
           expect(
-            message(key, code, { ...VALUES, count }, count),
+            message(key, code, valuesFor(raw, count), count),
             `${key} (${code}) com count=${count}`,
           ).toBe(renderedByLibrary(code, key, raw, count))
 

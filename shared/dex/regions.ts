@@ -1,9 +1,18 @@
 import type { GenerationMeta } from '../types/dex.ts'
-import { generationLabel, isRegionName, REGION_LABELS } from '../types/game.ts'
+import { isRegionName, REGION_LABELS } from '../types/game.ts'
 
 /**
- * Uma região como a tela a lê: rótulos em português e a faixa de dex que ela
- * ocupa.
+ * A region as the screen reads it: the proper name and the stretch of dex it
+ * occupies.
+ *
+ * **`generationLabel` left this structure, and the reason is the prerender.**
+ * The Pokédex index loads these nine regions through
+ * `useAsyncData('pokedex-regions')`, a key with no locale inside it — had the
+ * structure carried a finished *Geração IV*, `/pokedex` and `/en/pokedex` would
+ * share one payload and one of them would come out in the other's language. It
+ * is the defect the first PR of this phase fixed in `league-teams`, and what
+ * keeps it from coming back is the structure carrying no translated text: it
+ * brings `generation`, and the screen composes `t('generation.label')`.
  *
  * A faixa não vem do dex — ela é **derivada** somando as contagens anteriores, e
  * é isso que a torna barata: o índice de regiões mostra `#0001–0151` sem abrir
@@ -21,8 +30,6 @@ import { generationLabel, isRegionName, REGION_LABELS } from '../types/game.ts'
 export interface Region {
   readonly generation: number
   readonly slug: string
-  /** `Geração I` */
-  readonly generationLabel: string
   /** `Kanto` */
   readonly label: string
   readonly speciesCount: number
@@ -40,7 +47,6 @@ export function toRegions(metas: readonly GenerationMeta[]): readonly Region[] {
     return {
       generation: meta.generation,
       slug: meta.region,
-      generationLabel: generationLabel(meta.generation),
       // O dex traz `main_region.name` em caixa baixa. Uma região que o
       // vocabulário não conheça aparece com o próprio slug em vez de sumir da
       // tela — o portão de regiões é quem impede isso de acontecer calado.

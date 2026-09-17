@@ -47,7 +47,7 @@ import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import type { AilmentName, TypeName } from '~~/shared/types/dex'
 import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { AILMENT_LABELS, rarityKey, RARITY_NAMES } from '~~/shared/types/game'
+import { ailmentKey, rarityKey, RARITY_NAMES } from '~~/shared/types/game'
 
 const { t } = useI18n()
 
@@ -175,7 +175,7 @@ const CONDITION_TYPES: Record<AilmentName, TypeName> = {
 const conditions = computed(() => AILMENT_NAMES.map(name => ({
   name,
   type: CONDITION_TYPES[name],
-  label: AILMENT_LABELS[name].toUpperCase(),
+  label: t(ailmentKey(name)).toUpperCase(),
   effect: {
     paralysis: `Speed ×${decimal(PARALYSIS_SPEED_FACTOR)} e ${gamePercent(PARALYSIS_SKIP_CHANCE)} de chance de perder o turno.`,
     burn: `Ataque físico ×${decimal(BURN_ATTACK_FACTOR)} e ${ratio(BURN_DAMAGE_FRACTION)} do HP máximo por turno.`,

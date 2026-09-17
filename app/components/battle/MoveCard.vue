@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { MoveEntry } from '~~/shared/types/dex'
 import { multiplierLabel } from '~~/shared/game/typechart'
-import { AILMENT_LABELS } from '~~/shared/types/game'
+import { ailmentKey, damageClassKey } from '~~/shared/types/game'
 
 /**
  * Um dos quatro golpes — a prancha *Batalha*, com os três estados que ela desenha.
@@ -41,11 +41,7 @@ const props = defineProps<{
 
 defineEmits<{ choose: [], focus: [] }>()
 
-const CLASS_LABELS: Record<MoveEntry['damageClass'], string> = {
-  physical: 'FÍS',
-  special: 'ESP',
-  status: 'STATUS',
-}
+const { t } = useI18n()
 
 const empty = computed(() => props.pp <= 0)
 
@@ -80,9 +76,9 @@ const detail = computed(() => {
   const accuracy = move.accuracy === null ? '—' : move.accuracy
 
   if (move.damageClass === 'status') {
-    return `${AILMENT_LABELS[move.ailment.kind]} · ACC ${accuracy}`
+    return t('move.detail.status', { ailment: t(ailmentKey(move.ailment.kind)), accuracy })
   }
-  return `PWR ${move.power} · ACC ${accuracy}`
+  return t('move.detail.damage', { power: move.power, accuracy })
 })
 </script>
 
@@ -107,7 +103,7 @@ const detail = computed(() => {
 
     <span class="move__foot">
       <DexTypeBadge :type="move.type" />
-      <span class="numeric move__detail">{{ CLASS_LABELS[move.damageClass] }} · {{ detail }}</span>
+      <span class="numeric move__detail">{{ t(damageClassKey(move.damageClass)) }} · {{ detail }}</span>
       <span class="numeric move__pp">PP {{ pp }}/{{ move.pp }}</span>
     </span>
   </button>

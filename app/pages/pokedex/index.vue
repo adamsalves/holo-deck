@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { dexRange, toRegions } from '~~/shared/dex/regions'
+import { generationNumeral } from '~~/shared/types/game'
 import { progressLabel } from '~~/shared/game/progress'
 import { isSpeciesId } from '~~/shared/types/brand'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDex } from '~/composables/useDex'
+
+const { t } = useI18n()
 
 /**
  * O índice da Pokédex — as 9 gerações como cartas de região.
@@ -109,7 +112,9 @@ useSeoMeta({
           :to="`/pokedex/${region.generation}`"
           class="region-card bevel-tile"
         >
-          <span class="numeric region-card__generation">{{ region.generationLabel }}</span>
+          <span class="numeric region-card__generation">
+            {{ t('generation.label', { numeral: generationNumeral(region.generation) }) }}
+          </span>
           <span class="region-card__name">{{ region.label }}</span>
           <span class="numeric region-card__range">
             <template v-if="region.owned !== null">
