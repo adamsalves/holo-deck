@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import type { BattlePokemon } from '~~/shared/game/battle'
 import { effectiveSpeed, PARALYSIS_SPEED_FACTOR } from '~~/shared/game/status'
-import { conditionKey } from '~~/shared/types/game'
+import type { StatName } from '~~/shared/types/dex'
+import { conditionKey, statKey } from '~~/shared/types/game'
 import { POTION_HP_THRESHOLD } from '~~/shared/game/ai'
 
 const { t } = useI18n()
@@ -39,23 +40,34 @@ const paralysed = computed(() => props.pokemon.condition?.kind === 'paralysis')
 const speed = computed(() => effectiveSpeed(props.pokemon.stats, props.pokemon.condition))
 
 /**
- * O segundo número da linha, e a Speed é sempre o primeiro.
+ * O segundo número da linha, e a velocidade é sempre o primeiro.
  *
- * A Speed fica porque é ela que decide a ordem do turno e é a única que a
- * paralisia muda — a prancha estampa `SPD 45 (90÷2)` justamente por isso. O
- * acompanhante é o mais alto dos outros quatro, pela mesma razão que a carta do
- * deck escolhe um: repetir ATK nos dois lados seria dizer duas vezes a mesma
- * coisa sobre Pokémon diferentes.
+ * A velocidade fica porque é ela que decide a ordem do turno e é a única que a
+ * paralisia muda — a prancha estampa a linha com o valor dividido (`45 (90÷2)`)
+ * justamente por isso. O acompanhante é o mais alto dos outros quatro, pela
+ * mesma razão que a carta do deck escolhe um: repetir o ataque nos dois lados
+ * seria dizer duas vezes a mesma coisa sobre Pokémon diferentes.
+ *
+ * **The badge comes from the locale**, and the abbreviation this HUD wrote by
+ * hand is where issue #20 was most visible: `SpD` in this list and `SPD` in the
+ * template below were one badge on one screen. The *Detail* board answers with
+ * `DEE`/`VEL` in Portuguese and `SpD`/`SPE` in English, and
+ * `test/unit/stat-label-gate.spec.ts` holds both sides of it.
  */
 const standout = computed(() => {
   const stats = props.pokemon.stats
-  const candidates = [
-    { label: 'ATK', value: stats.attack },
-    { label: 'DEF', value: stats.defense },
-    { label: 'SpA', value: stats.specialAttack },
-    { label: 'SpD', value: stats.specialDefense },
+  const candidates: readonly { stat: StatName, value: number }[] = [
+    { stat: 'attack', value: stats.attack },
+    { stat: 'defense', value: stats.defense },
+    { stat: 'special-attack', value: stats.specialAttack },
+    { stat: 'special-defense', value: stats.specialDefense },
   ]
-  return candidates.reduce((best, candidate) => (candidate.value > best.value ? candidate : best))
+
+  const best = candidates.reduce((top, candidate) => (
+    candidate.value > top.value ? candidate : top
+  ))
+
+  return { label: t(statKey(best.stat)), value: best.value }
 })
 </script>
 
@@ -96,7 +108,8 @@ const standout = computed(() => {
       <p class="combatant__stats">
         <span>{{ standout.label }} <b>{{ standout.value }}</b></span>
         <span>
-          SPD <b :class="{ combatant__slowed: paralysed }">{{ speed }}</b>
+          {{ t(statKey('speed')) }}
+          <b :class="{ combatant__slowed: paralysed }">{{ speed }}</b>
           <template v-if="paralysed">
             ({{ pokemon.stats.speed }}÷{{ 1 / PARALYSIS_SPEED_FACTOR }})
           </template>

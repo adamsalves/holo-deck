@@ -49,6 +49,24 @@
     "dark": "Dark",
     "fairy": "Fairy"
   },
+  "stat": {
+    "short": {
+      "hp": "HP",
+      "attack": "ATK",
+      "defense": "DEF",
+      "special-attack": "SpA",
+      "special-defense": "SpD",
+      "speed": "SPE"
+    },
+    "long": {
+      "hp": "Health points",
+      "attack": "Attack",
+      "defense": "Defense",
+      "special-attack": "Special attack",
+      "special-defense": "Special defense",
+      "speed": "Speed"
+    }
+  },
   "hub": {
     "advantage": "{card} vs {type} {multiplier}",
     "shiny": "Shiny",
@@ -273,7 +291,7 @@
   "move": {
     "class": {
       "physical": "PHY",
-      "special": "SPE",
+      "special": "SPC",
       "status": "STATUS"
     },
     "detail": {
@@ -363,9 +381,9 @@
       "statusMove": "STATUS MOVE"
     },
     "initiative": {
-      "tie": "Speed tie ({speed}) — the tiebreak is drawn",
-      "mine": "you strike first (SPD {mine} > {foe})",
-      "foe": "{name} strikes first (SPD {foe} > {mine})"
+      "tie": "{stat} tie ({speed}) — the tiebreak is drawn",
+      "mine": "you strike first ({stat} {mine} > {foe})",
+      "foe": "{name} strikes first ({stat} {foe} > {mine})"
     },
     "standing": {
       "loading": "Setting the field…",

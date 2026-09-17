@@ -56,7 +56,7 @@ function folded(values: readonly string[]): string[] {
  *
  * `/battle/[gymId]` renders `BattleCombatant` and `BattleMoveCard` at once, so
  * the move's damage class (`SPC`, `PHY`) and the condition badge (`PAR`, `BRN`)
- * are three-letter neighbours of the HUD's stat line. This is not a theory: the
+ * are three-letter neighbors of the HUD's stat line. This is not a theory: the
  * English damage class was `SPE` until this PR, which is the abbreviation the
  * *Detail* board specifies for **speed** — the #20 collision, reintroduced from
  * a different file and caught here rather than on screen.
@@ -64,7 +64,7 @@ function folded(values: readonly string[]): string[] {
  * Built from the id tuples for the same reason as everything else in this file:
  * a fifth condition or a fourth damage class joins the comparison by existing.
  */
-const NEIGHBOUR_KEYS: readonly string[] = [
+const NEIGHBOR_KEYS: readonly string[] = [
   ...DAMAGE_CLASS_NAMES.map(name => damageClassKey(name)),
   ...AILMENT_NAMES.map(name => conditionKey(name)),
 ]
@@ -204,12 +204,12 @@ describe('the six stat abbreviations', () => {
    * reads `SPC` today.
    */
   it('collides with no badge that shares a screen with it', () => {
-    expect(NEIGHBOUR_KEYS.length).toBeGreaterThan(0)
+    expect(NEIGHBOR_KEYS.length).toBeGreaterThan(0)
 
     for (const code of CODES) {
       const shorts = folded(SHORT_KEYS.map(key => label(key, code)))
-      const neighbours = folded(NEIGHBOUR_KEYS.map(key => label(key, code)))
-      const clash = shorts.filter(short => neighbours.includes(short)).sort()
+      const neighbors = folded(NEIGHBOR_KEYS.map(key => label(key, code)))
+      const clash = shorts.filter(short => neighbors.includes(short)).sort()
 
       expect(
         clash,

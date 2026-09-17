@@ -11,7 +11,15 @@ import { battleSpriteUrl } from '~~/shared/dex/artwork'
 import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { STRUGGLE_MOVE_ID } from '~~/shared/types/dex'
-import { affectedKey, ailmentKey, effectivenessKey, REGION_LABELS, typeKey } from '~~/shared/types/game'
+import {
+  affectedKey,
+  ailmentKey,
+  effectivenessKey,
+  REGION_LABELS,
+  statKey,
+  statNameKey,
+  typeKey,
+} from '~~/shared/types/game'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
@@ -349,7 +357,20 @@ const reading = computed(() => {
   }
 })
 
-/** Quem age primeiro, com o número à vista — o texto do cabeçalho da prancha. */
+/**
+ * Quem age primeiro, com o número à vista — o texto do cabeçalho da prancha.
+ *
+ * **O nome do stat entra interpolado, e não escrito na mensagem.** As três
+ * frases diziam `SPD` nos dois locales, e o `BattleCombatant` logo acima delas
+ * escrevia a mesma sigla à mão — enquanto as duas coincidiam por acaso, a tela
+ * estava certa. Com as siglas vindas do locale (`VEL` em pt, `SPE` em en), uma
+ * mensagem com `SPD` dentro passaria a nomear a velocidade de duas formas na
+ * mesma tela, que é exatamente o defeito da issue #20 numa terceira porta.
+ *
+ * O empate recebe o nome por extenso e as outras duas a sigla: *empate de
+ * Velocidade* é uma frase, e `VEL 120 > 90` é a linha compacta que a prancha
+ * desenha entre parênteses.
+ */
 const initiative = computed(() => {
   const mine = player.value
   const foe = opponent.value
@@ -357,10 +378,18 @@ const initiative = computed(() => {
 
   const mineSpeed = effectiveSpeed(mine.stats, mine.condition)
   const foeSpeed = effectiveSpeed(foe.stats, foe.condition)
-  if (mineSpeed === foeSpeed) return t('battle.initiative.tie', { speed: mineSpeed })
+  const stat = t(statKey('speed'))
+  if (mineSpeed === foeSpeed) {
+    return t('battle.initiative.tie', { speed: mineSpeed, stat: t(statNameKey('speed')) })
+  }
   return mineSpeed > foeSpeed
-    ? t('battle.initiative.mine', { mine: mineSpeed, foe: foeSpeed })
-    : t('battle.initiative.foe', { name: foe.displayName, foe: foeSpeed, mine: mineSpeed })
+    ? t('battle.initiative.mine', { mine: mineSpeed, foe: foeSpeed, stat })
+    : t('battle.initiative.foe', {
+        name: foe.displayName,
+        foe: foeSpeed,
+        mine: mineSpeed,
+        stat,
+      })
 })
 
 const bench = computed(() => (state.value === null ? [] : state.value.player.team))
