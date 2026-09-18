@@ -603,5 +603,95 @@
       "description": "{name}, {number} do dex nacional. Tipos, base stats, linha evolutiva e relações de dano.",
       "descriptionFallback": "Pokédex do Holo Deck."
     }
+  },
+  "rules": {
+    "overline": "Referência",
+    "source": "Cada número desta página é lido de {module} — o mesmo módulo que o motor usa.",
+    "derived": "Nada aqui foi digitado à mão, então nada aqui pode divergir do jogo.",
+    "packCount": "{count} pack | {count} packs",
+    "rarity": {
+      "title": "Raridade",
+      "note": "rarity.ts — derivada do base stat total",
+      "foot": "Os limiares saem do percentil do dex, não de números redondos: a maioria das espécies é evolução final, e uma escada de valores redondos faria {rare} ser o maior tier do jogo. Foil começa em raro."
+    },
+    "packs": {
+      "title": "Packs",
+      "note": "packs.ts — {count} cartas, sorteadas com seed",
+      "common": "Comuns",
+      "uncommon": "Incomuns",
+      "rarePlus": "Raro ou acima",
+      "rarePlusRoll": "O SLOT RARO+ ROLA",
+      "pity": "Pity",
+      "shiny": "Shiny",
+      "foot": "O pity conta packs sem ultra ou acima; no último, o slot raro+ vira ultra garantido e a contagem zera. Shiny rola sobre qualquer carta e vira tratamento foil."
+    },
+    "forge": {
+      "title": "Pó e forja",
+      "note": "dust.ts — duplicata vira pó, pó compra carta escolhida",
+      "tier": "TIER",
+      "dustForge": "PÓ · FORJA",
+      "foot": "Razão ×{ratio} em toda a escala: quatro duplicatas de um tier pagam uma carta daquele tier. É a forja que torna o dex completável — a cauda longa não fecha por sorteio."
+    },
+    "battle": {
+      "title": "Batalha",
+      "note": "damage.ts · engine.ts — nível fixo Lv{level} dos dois lados, IV {iv} e EV 0",
+      "formula": "dano = floor(floor(floor((2·{level}/5 + 2) · power · A/D) / 50) + 2) · mods",
+      "stab": "STAB ×{multiplier}",
+      "effectiveness": "efetividade ×0 a ×4",
+      "crit": "crítico ×{multiplier} · {chance}",
+      "random": "aleatório {min} – {max} por cento",
+      "ratios": "{ad} usa {physical} em golpe físico e {special} em especial. A efetividade sai da matriz {types}×{types}; tipo duplo multiplica, então ×4 e ×¼ existem.",
+      "turnOrder": "Ordem do turno",
+      "steps": {
+        "order": "Prioridade do golpe; empate resolve por {stat}; empate de {stat} {seed}.",
+        "seed": "sorteia pela seed",
+        "blocked": "Impedimento — dormindo não age, paralisado perde o turno em {chance}.",
+        "hit": "Acerto — rola a acurácia do golpe.",
+        "damage": "Dano, pela fórmula acima.",
+        "pp": "PP decrementa; {struggle}, que não gasta PP e machuca quem o usa.",
+        "struggle": "no zero aquele slot vira Struggle",
+        "residual": "Fim de turno — queimadura, veneno, e então checagem de faint."
+      },
+      "moves": "Cada Pokémon leva {slots} golpes, escolhidos por cobertura de tipo e não por poder bruto.",
+      "potion": "Item: uma {potion} por lado por batalha, restaurando {heal} do HP máximo. | Item: {count} {potion} por lado por batalha, restaurando {heal} do HP máximo.",
+      "potionWord": "poção | poções",
+      "rematch": "Perder não custa nada — a revanche é imediata."
+    },
+    "conditions": {
+      "title": "Condições",
+      "note": "status.ts — uma por vez, não empilha",
+      "paralysis": "{stat} ×{factor} e {chance} de chance de perder o turno.",
+      "burn": "Ataque físico ×{factor} e {fraction} do HP máximo por turno.",
+      "poison": "{fraction} do HP máximo por turno.",
+      "sleep": "Não age por {min} a {max} turnos, sorteados.",
+      "foot": "Congelamento fica de fora de propósito: é frustrante de receber e pouco interessante de aplicar."
+    },
+    "league": {
+      "title": "A Liga",
+      "note": "gyms.ts — {count} líderes, um por geração, desbloqueio sequencial",
+      "band": "GINÁSIOS {first}–{last}",
+      "bandCap": "Pokémon · teto de BST",
+      "foot": "Todo Pokémon de um time carrega o tipo do líder {and} vem da geração dele — vencer em ordem passeia pelas gerações. O último do time é o ace, o de maior BST. A IA do líder é gulosa com ruído que cai de {first} no primeiro ginásio a {last} no último; a poção entra no ginásio {potion} e a troca por matchup no {swap}.",
+      "and": "e"
+    },
+    "economy": {
+      "title": "Economia",
+      "note": "economy.ts — de onde vêm as moedas",
+      "welcome": "Boas-vindas",
+      "gymFirst": "Ginásio, 1ª vitória",
+      "gymRematch": "Ginásio, revanche",
+      "flawless": "Vitória imaculada",
+      "daily": "Pack diário",
+      "free": "grátis",
+      "shop": "Pack na loja",
+      "foot": "A campanha inteira paga {coins} — cerca de {packs} packs. A revanche existe porque sem ela a renda depois do último ginásio cairia para um pack por dia, para sempre. A imaculada é sobre o que está sendo pago, então numa revanche ela acompanha a revanche."
+    },
+    "end": "Não existe tela de tutorial, e é de propósito: a interface ensina no ponto de decisão — o botão de golpe mostra a efetividade antes de você escolher, o deck builder marca quem {weakness}, e a loja traz as taxas ao lado do preço. Esta página é a referência para consultar depois, não o portão antes.",
+    "weakness": "leva ×2",
+    "credits": "Dados de Pokémon por PokeAPI · projeto não-comercial · Pokémon é marca da Nintendo / Game Freak",
+    "seo": {
+      "title": "Regras — Holo Deck",
+      "description": "Raridade, packs, forja, fórmula de dano, condições, a Liga e a economia. Cada número desta página é lido de shared/game/ — o mesmo módulo que o motor usa."
+    }
   }
 }

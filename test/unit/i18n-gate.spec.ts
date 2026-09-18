@@ -5,6 +5,7 @@ import { AILMENT_NAMES, DAMAGE_CLASS_NAMES, HABITAT_NAMES, STAT_NAMES, TYPE_NAME
 import { EVOLUTION_KEY_LIST } from '~~/shared/game/evolution'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
+import { TURN_STEPS, TURN_STEP_KEYS, turnStepKey } from '~~/app/utils/turn-order'
 import {
   affectedKey,
   ailmentKey,
@@ -194,8 +195,19 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * other (*species* does not inflect), but the Portuguese ones are not, so the
  * two locales differ and the assertion below never sees it. A message can repeat
  * itself inside one language without repeating across languages.
+ *
+ * `/rules` brought six, and five of them are the same borrowing the list is
+ * already full of: *Packs*, *Pity*, *Shiny* and *TIER* are how this game writes
+ * those words in Portuguese — `nav.packs` and `collection.table.tier` were
+ * borrowed the same way two PRs ago — and `rules.packCount` is *pack* inflecting
+ * identically in both languages. `rules.battle.stab` is the sixth and the one
+ * that is not a word at all: STAB is the series' own acronym, and the page
+ * stamps it beside `crit` and `random`, which do differ (*crítico*,
+ * *aleatório*) and are therefore not here.
  */
-const IDENTICAL_LABELS: readonly string[] = [
+const IDENTICAL_LABELS: readonly string[
+
+] = [
   'collection.card.scrap',
   'collection.card.shiny',
   'collection.card.shinyBadge',
@@ -227,6 +239,12 @@ const IDENTICAL_LABELS: readonly string[] = [
   'pokedex.region.seo.title',
   'pokedex.seo.title',
   'rarity.ultra',
+  'rules.battle.stab',
+  'rules.forge.tier',
+  'rules.packCount',
+  'rules.packs.pity',
+  'rules.packs.shiny',
+  'rules.packs.title',
   'species.about.habitat',
   'species.about.training',
   'species.seo.title',
@@ -355,6 +373,7 @@ const USED_KEYS: ReadonlySet<string> = new Set([
   ...VOCABULARY_KEYS,
   ...NARRATION_KEYS_USED,
   ...EVOLUTION_KEYS_USED,
+  ...TURN_STEP_KEYS,
 ])
 
 describe('paridade entre os locales', () => {
@@ -516,8 +535,34 @@ describe('as chaves e quem as usa', () => {
     expect(new Set(keypathKeys()).size, 'the `keypath=` sweep found nothing').toBeGreaterThan(0)
     expect(USED_KEYS.size).toBeGreaterThan(
       NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length
-      + EVOLUTION_KEYS_USED.length,
+      + EVOLUTION_KEYS_USED.length + TURN_STEP_KEYS.length,
     )
+  })
+
+  /**
+   * The turn order's own side of the derivation, asked by name.
+   *
+   * It is the fifth source to enter `USED_KEYS` without going through a sweep,
+   * and the fourth one is why this assertion exists at all: the evolution keys
+   * landed in the set and not in the floor, and the total stayed comfortably
+   * above a right-hand side that had stopped counting them. Adding the term
+   * above is necessary and is **not** sufficient — a sum is held up by whichever
+   * part still works, so the list is also asked, here, to prove it derived
+   * something.
+   *
+   * Derived from `TURN_STEPS` rather than counted: a seventh step of the turn
+   * enters both sides by existing, and a `map` that stopped mapping fails here
+   * instead of quietly asking for fewer translations.
+   */
+  it('derives one key per step of the turn, and the two it emphasises', () => {
+    expect(TURN_STEPS.length).toBeGreaterThan(0)
+    expect(TURN_STEP_KEYS).toEqual([
+      ...TURN_STEPS.map(turnStepKey),
+      'rules.battle.steps.seed',
+      'rules.battle.steps.struggle',
+    ])
+    expect(new Set(TURN_STEP_KEYS).size).toBe(TURN_STEP_KEYS.length)
+    expect(TURN_STEP_KEYS.filter(key => !key.startsWith('rules.battle.steps.'))).toEqual([])
   })
 
   /**

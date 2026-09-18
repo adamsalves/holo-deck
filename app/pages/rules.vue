@@ -48,6 +48,7 @@ import type { AilmentName, TypeName } from '~~/shared/types/dex'
 import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
 import { ailmentKey, rarityKey, RARITY_NAMES, statKey } from '~~/shared/types/game'
+import { TURN_STEPS, turnStepKey } from '~~/app/utils/turn-order'
 
 const { t } = useI18n()
 
@@ -146,15 +147,20 @@ const rarePlusOdds = computed(() =>
   RARE_PLUS_TIERS.map(tier => gamePercent(RARE_PLUS_WEIGHTS[tier])).join(' / '))
 
 /**
- * A fórmula, com o nível à vista.
+ * The formula, with the level in plain sight.
  *
- * `BATTLE_LEVEL` entra interpolado porque ele **é** uma decisão do jogo — nível
- * fixo dos dois lados —, e não parte da forma da conta. Os outros números da
- * expressão (o 5, os dois 2 e o 50) são a fórmula da série, e mudá-los seria
- * escrever outra fórmula, não recalibrar esta.
+ * `BATTLE_LEVEL` is interpolated because it **is** a decision of the game —
+ * fixed level on both sides — and not part of the shape of the arithmetic. The
+ * other numbers in the expression (the 5, the two 2s and the 50) are the
+ * series' formula, and changing them would be writing a different formula, not
+ * recalibrating this one.
+ *
+ * It is the one message `rules-gate` cuts before sweeping, and it cuts it **by
+ * key**: the sentence that used to be spelled here in Portuguese is now spelled
+ * in each locale, and a pattern matching `dano = …` would have stopped matching
+ * the English one the moment it said `damage = …`.
  */
-const damageFormula = computed(() =>
-  `dano = floor(floor(floor((2·${BATTLE_LEVEL}/5 + 2) · power · A/D) / 50) + 2) · mods`)
+const damageFormula = computed(() => t('rules.battle.formula', { level: BATTLE_LEVEL }))
 
 /**
  * As quatro condições, cada uma pintada pelo **tipo que a causa** — elétrico
@@ -177,54 +183,19 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
   type: CONDITION_TYPES[name],
   label: t(ailmentKey(name)).toUpperCase(),
   effect: {
-    paralysis: `Speed ×${decimal(PARALYSIS_SPEED_FACTOR)} e ${gamePercent(PARALYSIS_SKIP_CHANCE)} de chance de perder o turno.`,
-    burn: `Ataque físico ×${decimal(BURN_ATTACK_FACTOR)} e ${ratio(BURN_DAMAGE_FRACTION)} do HP máximo por turno.`,
-    poison: `${ratio(POISON_DAMAGE_FRACTION)} do HP máximo por turno.`,
-    sleep: `Não age por ${SLEEP_MIN_TURNS} a ${SLEEP_MAX_TURNS} turnos, sorteados.`,
+    paralysis: t('rules.conditions.paralysis', {
+      stat: t(statKey('speed')),
+      factor: decimal(PARALYSIS_SPEED_FACTOR),
+      chance: gamePercent(PARALYSIS_SKIP_CHANCE),
+    }),
+    burn: t('rules.conditions.burn', {
+      factor: decimal(BURN_ATTACK_FACTOR),
+      fraction: ratio(BURN_DAMAGE_FRACTION),
+    }),
+    poison: t('rules.conditions.poison', { fraction: ratio(POISON_DAMAGE_FRACTION) }),
+    sleep: t('rules.conditions.sleep', { min: SLEEP_MIN_TURNS, max: SLEEP_MAX_TURNS }),
   }[name],
 })))
-
-/**
- * Os seis passos do turno, na ordem em que o motor os executa.
- *
- * Como dado e não como seis `<li>` escritos: o marcador precisa ser um elemento
- * de verdade para receber a classe `numeric` (`::marker` não recebe classe), e
- * escrever o ordinal ao lado do texto em cada linha seria a numeração da lista
- * mantida à mão ao lado da numeração que o `<ol>` já dá.
- *
- * **O passo 5 corrige a prancha.** Ela escreve "no zero o golpe fica
- * inselecionável", e o motor faz o contrário: `moveFromSlot` devolve Struggle
- * para o slot vazio, e o golpe continua clicável — foi o que o review do PR
- * anterior corrigiu na carta de golpe, e a prancha ficou para trás.
- */
-const TURN_ORDER = computed(() => [
-  {
-    key: 'order',
-    before: 'Prioridade do golpe; empate resolve por Speed; empate de Speed ',
-    strong: 'sorteia pela seed',
-    after: '.',
-  },
-  {
-    key: 'blocked',
-    before: `Impedimento — dormindo não age, paralisado perde o turno em ${gamePercent(PARALYSIS_SKIP_CHANCE)}.`,
-    strong: '',
-    after: '',
-  },
-  { key: 'hit', before: 'Acerto — rola a acurácia do golpe.', strong: '', after: '' },
-  { key: 'damage', before: 'Dano, pela fórmula acima.', strong: '', after: '' },
-  {
-    key: 'pp',
-    before: 'PP decrementa; ',
-    strong: 'no zero aquele slot vira Struggle',
-    after: ', que não gasta PP e machuca quem o usa.',
-  },
-  {
-    key: 'residual',
-    before: 'Fim de turno — queimadura, veneno, e então checagem de faint.',
-    strong: '',
-    after: '',
-  },
-])
 
 /** O ruído do primeiro ginásio e o do último — a curva de dificuldade, medida. */
 const noiseRange = computed(() => ({
@@ -269,8 +240,8 @@ const rewardCurve = computed(() =>
   `${gameNumber(GYM_REWARD_BASE)} + ${gameNumber(GYM_REWARD_STEP)}×n`)
 
 useSeoMeta({
-  title: 'Regras — Holo Deck',
-  description: 'Raridade, packs, forja, fórmula de dano, condições, a Liga e a economia. Cada número desta página é lido de shared/game/ — o mesmo módulo que o motor usa.',
+  title: () => t('rules.seo.title'),
+  description: () => t('rules.seo.description'),
 })
 </script>
 
@@ -279,17 +250,24 @@ useSeoMeta({
     <header class="rules__header">
       <div>
         <p class="rules__eyebrow">
-          Referência
+          {{ t('rules.overline') }}
         </p>
         <h1 class="rules__title">
-          Regras
+          {{ t('nav.rules') }}
         </h1>
       </div>
 
       <p class="numeric rules__aside">
-        Cada número desta página é lido de <b>shared/game/</b> — o mesmo módulo
-        que o motor usa.<br>
-        <b>Nada aqui foi digitado à mão, então nada aqui pode divergir do jogo.</b>
+        <i18n-t
+          keypath="rules.source"
+          scope="global"
+          tag="span"
+        >
+          <template #module>
+            <b>shared/game/</b>
+          </template>
+        </i18n-t><br>
+        <b>{{ t('rules.derived') }}</b>
       </p>
     </header>
 
@@ -303,10 +281,10 @@ useSeoMeta({
         data-panel="rarity"
       >
         <h2 class="rules__panel-title">
-          Raridade
+          {{ t('rules.rarity.title') }}
         </h2>
         <p class="rules__panel-note">
-          rarity.ts — derivada do base stat total
+          {{ t('rules.rarity.note') }}
         </p>
 
         <dl class="rules__list">
@@ -339,19 +317,25 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
-          Os limiares saem do percentil do dex, não de números redondos: a maioria
-          das espécies é evolução final, e uma escada de valores redondos faria
-          <em>raro</em> ser o maior tier do jogo. Foil começa em raro.
+          <i18n-t
+            keypath="rules.rarity.foot"
+            scope="global"
+            tag="span"
+          >
+            <template #rare>
+              <em>{{ t(rarityKey('rare')) }}</em>
+            </template>
+          </i18n-t>
         </p>
       </section>
 
       <!-- PACKS -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          Packs
+          {{ t('rules.packs.title') }}
         </h2>
         <p class="rules__panel-note">
-          packs.ts — {{ PACK_SIZE }} cartas, sorteadas com seed
+          {{ t('rules.packs.note', { count: PACK_SIZE }) }}
         </p>
 
         <dl class="rules__list">
@@ -360,7 +344,7 @@ useSeoMeta({
             data-rarity="common"
           >
             <dt class="rules__key">
-              Comuns
+              {{ t('rules.packs.common') }}
             </dt>
             <dd class="numeric rules__value rules__value--rarity">
               {{ COMMON_SLOTS }}
@@ -371,7 +355,7 @@ useSeoMeta({
             data-rarity="uncommon"
           >
             <dt class="rules__key">
-              Incomuns
+              {{ t('rules.packs.uncommon') }}
             </dt>
             <dd class="numeric rules__value rules__value--rarity">
               {{ UNCOMMON_SLOTS }}
@@ -382,7 +366,7 @@ useSeoMeta({
             data-rarity="rare"
           >
             <dt class="rules__key">
-              Raro ou acima
+              {{ t('rules.packs.rarePlus') }}
             </dt>
             <dd class="numeric rules__value rules__value--rarity">
               {{ RARE_PLUS_SLOTS }}
@@ -390,7 +374,7 @@ useSeoMeta({
           </div>
           <div class="rules__line">
             <dt class="numeric rules__key rules__key--small">
-              O SLOT RARO+ ROLA
+              {{ t('rules.packs.rarePlusRoll') }}
             </dt>
             <dd class="numeric rules__value rules__value--small">
               {{ rarePlusOdds }}
@@ -401,15 +385,15 @@ useSeoMeta({
             data-rarity="ultra"
           >
             <dt class="rules__key">
-              Pity
+              {{ t('rules.packs.pity') }}
             </dt>
             <dd class="numeric rules__value rules__value--rarity">
-              {{ PITY_THRESHOLD }} packs
+              {{ t('rules.packCount', { count: PITY_THRESHOLD }, PITY_THRESHOLD) }}
             </dd>
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Shiny
+              {{ t('rules.packs.shiny') }}
             </dt>
             <dd class="numeric rules__value rules__value--shiny">
               1 / {{ 1 / SHINY_ODDS }}
@@ -418,28 +402,26 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
-          O pity conta packs sem ultra ou acima; no último, o slot raro+ vira
-          ultra garantido e a contagem zera. Shiny rola sobre qualquer carta e
-          vira tratamento foil.
+          {{ t('rules.packs.foot') }}
         </p>
       </section>
 
       <!-- PÓ E FORJA -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          Pó e forja
+          {{ t('rules.forge.title') }}
         </h2>
         <p class="rules__panel-note">
-          dust.ts — duplicata vira pó, pó compra carta escolhida
+          {{ t('rules.forge.note') }}
         </p>
 
         <dl class="rules__list">
           <div class="rules__line">
             <dt class="numeric rules__key rules__key--small">
-              TIER
+              {{ t('rules.forge.tier') }}
             </dt>
             <dd class="numeric rules__value rules__value--small">
-              PÓ · FORJA
+              {{ t('rules.forge.dustForge') }}
             </dd>
           </div>
           <div
@@ -458,9 +440,7 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
-          Razão ×{{ FORGE_RATIO }} em toda a escala: quatro duplicatas de um tier
-          pagam uma carta daquele tier. É a forja que torna o dex completável — a
-          cauda longa não fecha por sorteio.
+          {{ t('rules.forge.foot', { ratio: FORGE_RATIO }) }}
         </p>
       </section>
     </div>
@@ -469,11 +449,10 @@ useSeoMeta({
       <!-- BATALHA -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          Batalha
+          {{ t('rules.battle.title') }}
         </h2>
         <p class="rules__panel-note">
-          damage.ts · engine.ts — nível fixo Lv{{ BATTLE_LEVEL }} dos dois lados,
-          IV {{ BATTLE_IV }} e EV 0
+          {{ t('rules.battle.note', { level: BATTLE_LEVEL, iv: BATTLE_IV }) }}
         </p>
 
         <p class="numeric rules__formula">
@@ -482,16 +461,22 @@ useSeoMeta({
 
         <ul class="rules__chips">
           <li class="numeric rules__chip">
-            STAB ×{{ decimal(STAB_MULTIPLIER) }}
+            {{ t('rules.battle.stab', { multiplier: decimal(STAB_MULTIPLIER) }) }}
           </li>
           <li class="numeric rules__chip">
-            efetividade ×0 a ×4
+            {{ t('rules.battle.effectiveness') }}
           </li>
           <li class="numeric rules__chip">
-            crítico ×{{ decimal(CRIT_MULTIPLIER) }} · {{ ratio(CRIT_CHANCE) }}
+            {{ t('rules.battle.crit', {
+              multiplier: decimal(CRIT_MULTIPLIER),
+              chance: ratio(CRIT_CHANCE),
+            }) }}
           </li>
           <li class="numeric rules__chip">
-            aleatório {{ RANDOM_MIN_PERCENT }} – {{ RANDOM_MAX_PERCENT }} por cento
+            {{ t('rules.battle.random', {
+              min: RANDOM_MIN_PERCENT,
+              max: RANDOM_MAX_PERCENT,
+            }) }}
           </li>
         </ul>
 
@@ -501,47 +486,99 @@ useSeoMeta({
                badges the *Detail* board stamps on the bars. Spelled by hand
                here, this page would say `Atk/Def` inside a document whose bars
                say `ATQ/DEF`. -->
-          <b>A/D</b> usa {{ t(statKey('attack')) }}/{{ t(statKey('defense')) }} em
-          golpe físico e {{ t(statKey('special-attack')) }}/{{ t(statKey('special-defense')) }}
-          em especial. A efetividade sai da matriz {{ TYPE_COUNT }}×{{ TYPE_COUNT }};
-          tipo duplo multiplica, então ×4 e ×¼ existem.
+          <i18n-t
+            keypath="rules.battle.ratios"
+            scope="global"
+            tag="span"
+          >
+            <template #ad>
+              <b>A/D</b>
+            </template>
+            <template #physical>
+              {{ t(statKey('attack')) }}/{{ t(statKey('defense')) }}
+            </template>
+            <template #special>
+              {{ t(statKey('special-attack')) }}/{{ t(statKey('special-defense')) }}
+            </template>
+            <template #types>
+              {{ TYPE_COUNT }}
+            </template>
+          </i18n-t>
         </p>
 
         <p class="rules__eyebrow rules__eyebrow--spaced">
-          Ordem do turno
+          {{ t('rules.battle.turnOrder') }}
         </p>
         <!-- Os marcadores são `<span>`, e não `::marker`: a prancha os desenha
              em mono e azul, e um pseudo-elemento não recebe a classe `numeric`
              que traz fonte e `tabular-nums` juntos. -->
         <ol class="rules__steps">
           <li
-            v-for="(step, index) in TURN_ORDER"
-            :key="step.key"
+            v-for="(step, index) in TURN_STEPS"
+            :key="step"
           >
             <span class="numeric rules__step-mark">{{ index + 1 }}</span>
-            <span>
-              {{ step.before }}<b v-if="step.strong">{{ step.strong }}</b>{{ step.after }}
-            </span>
+            <!-- Every slot the six messages can ask for, offered to all of them:
+                 vue-i18n fills the placeholders a message actually spells and
+                 ignores the rest, which is what keeps this a loop. Naming them
+                 per step would mean six written `<li>` and the ordinal above
+                 kept by hand. -->
+            <i18n-t
+              :keypath="turnStepKey(step)"
+              scope="global"
+              tag="span"
+            >
+              <template #stat>
+                {{ t(statKey('speed')) }}
+              </template>
+              <template #chance>
+                {{ gamePercent(PARALYSIS_SKIP_CHANCE) }}
+              </template>
+              <template #seed>
+                <b>{{ t('rules.battle.steps.seed') }}</b>
+              </template>
+              <template #struggle>
+                <b>{{ t('rules.battle.steps.struggle') }}</b>
+              </template>
+            </i18n-t>
           </li>
         </ol>
 
         <p class="rules__foot">
-          Cada Pokémon leva {{ BATTLE_MOVE_SLOTS }} golpes, escolhidos por
-          cobertura de tipo e não por poder bruto. Item:
-          {{ POTIONS_PER_SIDE === 1 ? 'uma' : POTIONS_PER_SIDE }}
-          <em class="rules__potion">poção</em> por lado por batalha, restaurando
-          {{ gamePercent(POTION_HEAL_FRACTION) }} do HP máximo. Perder não custa nada
-          — a revanche é imediata.
+          {{ t('rules.battle.moves', { slots: BATTLE_MOVE_SLOTS }) }}
+          <!-- The item sentence carries the count and the emphasis, so it is its
+               own message: folding it into the two around it would have written
+               the whole paragraph twice per language for the sake of one
+               plural. -->
+          <i18n-t
+            keypath="rules.battle.potion"
+            scope="global"
+            tag="span"
+            :plural="POTIONS_PER_SIDE"
+          >
+            <template #count>
+              {{ POTIONS_PER_SIDE }}
+            </template>
+            <template #potion>
+              <em class="rules__potion">
+                {{ t('rules.battle.potionWord', POTIONS_PER_SIDE) }}
+              </em>
+            </template>
+            <template #heal>
+              {{ gamePercent(POTION_HEAL_FRACTION) }}
+            </template>
+          </i18n-t>
+          {{ t('rules.battle.rematch') }}
         </p>
       </section>
 
       <!-- CONDIÇÕES -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          Condições
+          {{ t('rules.conditions.title') }}
         </h2>
         <p class="rules__panel-note">
-          status.ts — uma por vez, não empilha
+          {{ t('rules.conditions.note') }}
         </p>
 
         <dl class="rules__conditions">
@@ -562,8 +599,7 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
-          Congelamento fica de fora de propósito: é frustrante de receber e pouco
-          interessante de aplicar.
+          {{ t('rules.conditions.foot') }}
         </p>
       </section>
     </div>
@@ -572,10 +608,10 @@ useSeoMeta({
       <!-- A LIGA -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          A Liga
+          {{ t('rules.league.title') }}
         </h2>
         <p class="rules__panel-note">
-          gyms.ts — {{ GYM_COUNT }} líderes, um por geração, desbloqueio sequencial
+          {{ t('rules.league.note', { count: GYM_COUNT }) }}
         </p>
 
         <div class="rules__bands">
@@ -585,49 +621,64 @@ useSeoMeta({
             class="rules__band bevel-tile"
           >
             <p class="numeric rules__band-range">
-              GINÁSIOS {{ band.first }}–{{ band.last }}
+              {{ t('rules.league.band', { first: band.first, last: band.last }) }}
             </p>
             <p class="numeric rules__band-size">
               {{ band.teamSize }}
             </p>
             <p class="rules__band-cap">
-              Pokémon · teto de BST
+              {{ t('rules.league.bandCap') }}
               <b class="numeric">{{ band.bstCap }}</b>
             </p>
           </div>
         </div>
 
         <p class="rules__foot">
-          Todo Pokémon de um time carrega o tipo do líder <b>e</b> vem da geração
-          dele — vencer em ordem passeia pelas gerações. O último do time é o ace,
-          o de maior BST. A IA do líder é gulosa com ruído que cai de
-          {{ noiseRange.first }} no primeiro ginásio a {{ noiseRange.last }} no
-          último; a poção entra no ginásio {{ aiSteps.potion }} e a troca por
-          matchup no {{ aiSteps.swap }}.
+          <i18n-t
+            keypath="rules.league.foot"
+            scope="global"
+            tag="span"
+          >
+            <template #and>
+              <b>{{ t('rules.league.and') }}</b>
+            </template>
+            <template #first>
+              {{ noiseRange.first }}
+            </template>
+            <template #last>
+              {{ noiseRange.last }}
+            </template>
+            <template #potion>
+              {{ aiSteps.potion }}
+            </template>
+            <template #swap>
+              {{ aiSteps.swap }}
+            </template>
+          </i18n-t>
         </p>
       </section>
 
       <!-- ECONOMIA -->
       <section class="rules__panel">
         <h2 class="rules__panel-title">
-          Economia
+          {{ t('rules.economy.title') }}
         </h2>
         <p class="rules__panel-note">
-          economy.ts — de onde vêm as moedas
+          {{ t('rules.economy.note') }}
         </p>
 
         <dl class="rules__list">
           <div class="rules__line">
             <dt class="rules__key">
-              Boas-vindas
+              {{ t('rules.economy.welcome') }}
             </dt>
             <dd class="numeric rules__value rules__value--forge">
-              {{ WELCOME_PACKS }} packs
+              {{ t('rules.packCount', { count: WELCOME_PACKS }, WELCOME_PACKS) }}
             </dd>
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Ginásio, 1ª vitória
+              {{ t('rules.economy.gymFirst') }}
             </dt>
             <dd class="numeric rules__value rules__value--coin">
               {{ rewardCurve }}
@@ -635,7 +686,7 @@ useSeoMeta({
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Ginásio, revanche
+              {{ t('rules.economy.gymRematch') }}
             </dt>
             <dd class="numeric rules__value rules__value--coin">
               {{ gamePercent(REMATCH_RATE) }}
@@ -643,7 +694,7 @@ useSeoMeta({
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Vitória imaculada
+              {{ t('rules.economy.flawless') }}
             </dt>
             <dd class="numeric rules__value rules__value--progress">
               +{{ gamePercent(FLAWLESS_RATE) }}
@@ -651,15 +702,15 @@ useSeoMeta({
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Pack diário
+              {{ t('rules.economy.daily') }}
             </dt>
             <dd class="numeric rules__value rules__value--progress">
-              grátis
+              {{ t('rules.economy.free') }}
             </dd>
           </div>
           <div class="rules__line">
             <dt class="rules__key">
-              Pack na loja
+              {{ t('rules.economy.shop') }}
             </dt>
             <dd class="numeric rules__value">
               {{ gameNumber(PACK_PRICE) }}
@@ -668,24 +719,26 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
-          A campanha inteira paga {{ gameNumber(campaign.total) }} — cerca de
-          {{ campaign.packs }} packs. A revanche existe porque sem ela a renda
-          depois do último ginásio cairia para um pack por dia, para sempre. A
-          imaculada é sobre o que está sendo pago, então numa revanche ela
-          acompanha a revanche.
+          {{ t('rules.economy.foot', {
+            coins: gameNumber(campaign.total),
+            packs: campaign.packs,
+          }) }}
         </p>
       </section>
     </div>
 
     <footer class="numeric rules__end">
-      Não existe tela de tutorial, e é de propósito: a interface ensina no ponto
-      de decisão — o botão de golpe mostra a efetividade antes de você escolher,
-      o deck builder marca quem <b class="rules__end-warn">leva ×2</b>, e a loja
-      traz as taxas ao lado do preço. Esta página é a referência para consultar
-      depois, não o portão antes.<br>
+      <i18n-t
+        keypath="rules.end"
+        scope="global"
+        tag="span"
+      >
+        <template #weakness>
+          <b class="rules__end-warn">{{ t('rules.weakness') }}</b>
+        </template>
+      </i18n-t><br>
       <span class="rules__credits">
-        Dados de Pokémon por PokeAPI · projeto não-comercial · Pokémon é marca da
-        Nintendo / Game Freak
+        {{ t('rules.credits') }}
       </span>
     </footer>
   </main>
