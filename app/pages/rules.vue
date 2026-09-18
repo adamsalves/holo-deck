@@ -47,7 +47,7 @@ import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import type { AilmentName, TypeName } from '~~/shared/types/dex'
 import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
-import { ailmentKey, rarityKey, RARITY_NAMES, statKey } from '~~/shared/types/game'
+import { ailmentKey, rarityKey, RARITY_NAMES, statKey, statNameKey } from '~~/shared/types/game'
 import { TURN_STEPS, turnStepKey } from '~~/app/utils/turn-order'
 
 const { t } = useI18n()
@@ -537,8 +537,12 @@ useSeoMeta({
               scope="global"
               tag="span"
             >
+              <!-- The spelled-out name and not the badge, which is the split
+                   `battle.initiative` already draws: prose names the stat
+                   (*empate resolve por Velocidade*), a badge beside a number
+                   abbreviates it (*VEL ×0,5*, two panels down). -->
               <template #stat>
-                {{ t(statKey('speed')) }}
+                {{ t(statNameKey('speed')) }}
               </template>
               <template #chance>
                 {{ gamePercent(PARALYSIS_SKIP_CHANCE) }}

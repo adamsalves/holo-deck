@@ -513,16 +513,22 @@ Entre o primeiro e o último, `/en` mostra telas **meio traduzidas** — e isso 
 estado conhecido e datado, não defeito solto. Em inglês hoje: a barra global, o
 painel de conta, o pular-para-o-conteúdo, o **vocabulário do jogo** (as 6
 raridades, os 18 tipos, as 6 siglas de stat e os 9 habitats), o Hub, `/packs`,
-`/collection`, `/deck`, `/league`, `/battle/N`, a tela de **Detalhe** de espécie
-e as duas telas da **Pokédex**.
+`/collection`, `/deck`, `/league`, `/battle/N`, a tela de **Detalhe** de espécie,
+as duas telas da **Pokédex** e `/rules`.
 
 O que ainda sai em português dentro de `/en`, com o PR que o leva:
 
 | onde | o que se lê em `/en` | leva |
 | --- | --- | --- |
-| `/rules` | a página inteira, menos a escada de raridade | PR de `/rules` |
 | `/settings` | a página inteira | PR de `/settings` |
 | número | `1.600`, `0,4%`, `6,9 kg` — separador de `pt-BR` fixo | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
+
+**`/rules` é a tela mais densa em número do jogo, e entrou traduzida com os
+números ainda em pt-BR** — `4,5%`, `×0,5`, `1/16`. Enquanto a página estava em
+português isso era coerente; em inglês é o caso que a #49 descreve como o pior
+dos dois: o jogador não vê que é outro idioma, ele lê um número errado. Fechar a
+origem certa reabre os onze consumidores dos dois helpers de `shared/`, o que não
+cabia neste PR — está registrado lá, com estas duas telas nomeadas.
 
 A ordem é deliberada: o vocabulário é **transversal** — 26 pontos de uso
 espalhados por telas de três PRs diferentes —, então ele vai antes das telas. Uma
@@ -1136,16 +1142,35 @@ página —, senão uma página vazia passaria.
 
 Duas exceções ficam escritas no portão, em vez de escondidas:
 
-- **A linha da fórmula de dano.** O `5`, os dois `2` e o `/50` são a forma da
-  conta da série, não a calibração dela. O nível, que **é** decisão do jogo, entra
-  interpolado — e `BATTLE_LEVEL` está na lista de proibidos justamente por isso.
+- **A fórmula de dano**, recortada **pela chave** `rules.battle.formula`. O `5`,
+  os dois `2` e o `/50` são a forma da conta da série, não a calibração dela. O
+  nível, que **é** decisão do jogo, entra interpolado — e `BATTLE_LEVEL` está na
+  lista de proibidos justamente por isso.
 - **Constantes de um dígito.** A página pode e deve escrever `×0 a ×4` sobre
   efetividade, e um `4` na prosa é indistinguível de um `FORGE_RATIO` digitado.
   Cobrar os dois produziria falso positivo em cima de texto correto, que é como
   um portão deixa de ser levado a sério.
 
-O par disso é `test/e2e/shop.spec.ts`, que lê os mesmos números **na tela**. O
-portão sozinho passaria numa página que não renderiza nada.
+**A tradução da página mudou o que o portão precisa varrer.** A prosa saiu do
+`.vue` e foi para `i18n/locales/*.json`: um portão lendo só o arquivo da página
+acharia uma tela sem número nenhum e ficaria **verde medindo nada**, com um `475`
+livre para ser digitado no JSON onde ele não olhava. Ele varre as duas coisas, e
+cobra **cada origem pelo nome** — piso por fonte, e o defeito plantado reportado
+uma vez por origem. A exceção da fórmula deixou de ser o padrão `` `dano = …` ``
+pelo mesmo motivo: escrito em português, ele pararia de casar no instante em que
+o inglês dissesse `damage = …`, e mudaria em silêncio o que era varrido. Chave é
+igual nos dois idiomas.
+
+A asserção nova de que **nenhuma exceção sobrevive à constante que ela perdoa**
+achou as duas que existiam já mortas: `DEX_SIZE` virou `SPECIES_COUNT` na Fase 3,
+e `PERCENT_BASE` foi apagada — nenhuma das duas existia no repositório fora da
+linha que as perdoava.
+
+O par disso é [`test/e2e/rules.spec.ts`](test/e2e/rules.spec.ts), que lê os
+números **na tela** e nos dois idiomas — o portão sozinho passaria numa página
+que não renderiza nada, e nenhuma varredura de disco alcança a chave que o
+`<i18n-t :keypath>` monta por variável. `test/e2e/shop.spec.ts` continua com a
+escada de raridade.
 
 ### `/settings` entrega só o que tem dado
 
@@ -1264,11 +1289,21 @@ mandaria **apagar a tradução de uma frase que está na tela**.
 **O que a varredura não vê, ele importa da fonte.** Chave montada em runtime —
 `` t(`ailment.${kind}`) `` — não existe em texto nenhum, então as famílias
 derivadas de tupla (`ailment`, `condition`, `affected`, `move.class`,
-`effectiveness`) entram pelas próprias funções que as telas chamam, e as 24 do
-log de turno por `NARRATION_KEY_LIST`, que
-[`app/utils/battle-narration.ts`](app/utils/battle-narration.ts) publica. É uma
-lista só, lida pelos dois portões: escrita duas vezes, bastava um esquecimento de
-um lado para o outro acusar a tradução de órfã e mandar apagá-la.
+`effectiveness`) entram pelas próprias funções que as telas chamam, as 24 do log
+de turno por `NARRATION_KEY_LIST`, que
+[`app/utils/battle-narration.ts`](app/utils/battle-narration.ts) publica, e os
+seis passos da ordem do turno por `TURN_STEP_KEYS`, de
+[`app/utils/turn-order.ts`](app/utils/turn-order.ts). É uma lista só, lida pelos
+dois portões: escrita duas vezes, bastava um esquecimento de um lado para o outro
+acusar a tradução de órfã e mandar apagá-la.
+
+**Toda fonte que entra no conjunto medido entra também no piso, pelo nome.** Esse
+é o defeito que este portão repetiu em três PRs seguidos — fonte nova no conjunto
+e não no piso —, e o primeiro conserto somou um termo à soma, o que durou
+exatamente um PR: uma soma é sustentada por qualquer parcela que ainda funcione.
+Cada origem tem asserção própria de **derivação**, não de contagem: a dos passos
+do turno compara `TURN_STEP_KEYS` com o que `TURN_STEPS` produz, então um passo
+novo entra dos dois lados por existir.
 
 [`test/unit/locale-link-gate.spec.ts`](test/unit/locale-link-gate.spec.ts) pergunta
 a outra coisa — *como o link foi escrito*. `NuxtLink` com caminho literal **não é
