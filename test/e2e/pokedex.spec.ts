@@ -468,6 +468,31 @@ test('the Pokédex screens read in the language of the URL, links included', asy
       `/pokedex in ${locale} wrote the other language`,
     ).toEqual([])
 
+    // The progress bar's `aria-valuetext`, which nothing else reaches. It is an
+    // attribute, so it never lands in `innerText` and the sweep above walks past
+    // it; it is interpolated, so `defaultOnlyLabels` skips it too. It held a raw
+    // `capturados` until this PR — on this very screen, in English — and the
+    // unit test that mounts the bar cannot see that: it builds its expectation
+    // from the same locale file the component reads, so it agrees with a
+    // hardcoded string as readily as with a translated one. Only the other
+    // language tells the two apart, which is why the assertion lives here.
+    const bar = page.locator('[role="progressbar"]').first()
+
+    await expect(bar, `/pokedex in ${locale} drew no progress bar`).toBeVisible()
+
+    const valueText = await bar.getAttribute('aria-valuetext') ?? ''
+
+    expect(
+      spells(valueText, progressWord(locale)),
+      `the progress bar in ${locale} does not read from the locale`,
+    ).toBe(true)
+    expect(
+      codes
+        .filter(code => code !== locale && progressWord(code) !== progressWord(locale))
+        .filter(code => spells(valueText, progressWord(code))),
+      `the progress bar in ${locale} wrote the other language`,
+    ).toEqual([])
+
     // Hop one: the region card. This is the link the prerender crawler follows.
     const region = page.locator(`a[href="${prefix}/pokedex/1"]`)
 
@@ -491,14 +516,28 @@ test('the Pokédex screens read in the language of the URL, links included', asy
 
     // And the accessible name of that link is a sentence, not a key: it is built
     // from four messages and read out in place of the card's artwork.
-    await expect(card).toHaveAttribute(
-      'aria-label',
-      new RegExp(escapeForRegExp(label('rarity.common', locale))),
-    )
+    //
+    // Read with `spells()` rather than a regular expression of our own: it is
+    // the same escaping `locales.ts` already does in two places, plus the word
+    // borders a bare `new RegExp` has no way to carry — without them, a rarity
+    // that is a prefix of another matches inside it.
+    const cardLabel = await card.getAttribute('aria-label') ?? ''
+
+    expect(
+      spells(cardLabel, label('rarity.common', locale)),
+      `the card in ${locale} does not name its rarity`,
+    ).toBe(true)
   }
 })
 
-/** The characters a locale string can carry that a regular expression would read. */
-function escapeForRegExp(text: string): string {
-  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/**
+ * The word `collection.progress.valueText` spells around its count.
+ *
+ * Taken from the message with the placeholder cut out, and not written here:
+ * *capturados* and *caught* are the halves that tell the two renderings apart,
+ * and a copy of either in this file would go stale the day the wording changes —
+ * leaving an assertion that still passes and no longer means anything.
+ */
+function progressWord(code: string): string {
+  return label('collection.progress.valueText', code).replaceAll(/\{\w+\}/g, '').trim()
 }

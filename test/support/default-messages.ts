@@ -63,16 +63,16 @@ function read(
   let node: unknown = parsed
 
   for (const part of key.split('.')) {
-    if (!isRecord(node)) throw new Error(`\`${key}\` não existe no locale padrão`)
+    if (!isRecord(node)) throw new Error(`\`${key}\` does not exist in the default locale`)
     node = node[part]
   }
 
-  if (typeof node !== 'string') throw new Error(`\`${key}\` não é mensagem no locale padrão`)
-  if (node.includes('|')) throw new Error(`\`${key}\` tem plural, e este helper não escolhe forma`)
+  if (typeof node !== 'string') throw new Error(`\`${key}\` is not a message in the default locale`)
+  if (node.includes('|')) throw new Error(`\`${key}\` is a plural, and this helper picks no form`)
 
   return node.replaceAll(/\{(\w+)\}/g, (_, name: string) => {
     const value = values[name]
-    if (value === undefined) throw new Error(`sem valor para \`{${name}}\` em \`${key}\``)
+    if (value === undefined) throw new Error(`no value for \`{${name}}\` in \`${key}\``)
 
     return String(value)
   })
@@ -85,11 +85,29 @@ function read(
  * `dex.grid.virtualized` is `{counted} · scroll virtualizado`, and one suite
  * needs the half that does not move: it asserts the sentence is **absent**,
  * which no set of placeholder values can express.
+ *
+ * **It throws when the fixed part is not contiguous, and that is the point.**
+ * Blanking a placeholder in the middle of a message leaves the two halves welded
+ * together with the gap still between them — `{done} de {total} renderizados`
+ * becomes `de  renderizados`, with the double space, which appears in no
+ * rendering of anything. A `not.toContain` built from that passes forever and
+ * reads like a guarded assertion, so the helper refuses instead of handing one
+ * back. Callers who need a middle fragment want one side of the split, not this.
  */
 export function fragmentOf(
   message: MessageReader,
   key: string,
   ...placeholders: readonly string[]
 ): string {
-  return message(key, Object.fromEntries(placeholders.map(name => [name, '']))).trim()
+  const blanked = message(key, Object.fromEntries(placeholders.map(name => [name, ''])))
+  const fragment = blanked.trim()
+
+  if (fragment.includes('  ')) {
+    throw new Error(
+      `\`${key}\` spells something around every placeholder, so blanking them welds `
+      + `the halves together (\`${fragment}\`) — ask for one side instead`,
+    )
+  }
+
+  return fragment
 }

@@ -160,10 +160,23 @@ test('o dado pré-renderizado é JSON, e a mesma chave vale o mesmo em toda pág
  * It enumerates who is OUT. The nine `/en/battle/N` are the whole exception, and
  * they are not a crawler failure: the League body is a `<ClientOnly>`, so the
  * links to `/battle/N` exist in no served HTML, and the pt-BR ones are only
- * prerendered because `nitro.prerender.routes` lists them by hand — in one
- * language. Whoever adds the locale prefix there deletes this exception, and
- * until then the `nuxt.config.ts` docblock that promises "every valid route is
- * prerendered" is true for 1.043 routes out of 1.052.
+ * prerendered because `nitro.prerender.routes` lists them by hand.
+ *
+ * **Being on that list by hand is not what keeps them out of `/en`** — `/login`
+ * and `/league` sit in the same list with no prefix and get `/en` twins anyway,
+ * and nothing served links to `/en/login` at all. What emits the twins is
+ * `@nuxtjs/i18n`, which hooks `prerender:routes` and adds one route per locale
+ * for every **page whose path has no parameter left** in it
+ * (`collectCompactPrerenderRoutes`, guarded by `remainingParamRE = /:[A-Z_]/i`).
+ * `/battle/:gymId` still carries one, so the module emits nothing for it and the
+ * hand-written list — which spells nine concrete paths, in one language — is all
+ * there is. Measured against this build, not read off the config.
+ *
+ * The fix is the same either way: whoever adds the locale prefix to those nine
+ * deletes this exception. The mechanism matters because the other reading —
+ * "a route listed by hand only comes out in one language" — is a general rule,
+ * and it is false. Until then the `nuxt.config.ts` docblock that promises "every
+ * valid route is prerendered" is true for 1.043 routes out of 1.052.
  *
  * Built from `GYM_COUNT`, so a tenth gym is exempt the day it is written and a
  * gym removed stops being forgiven.
@@ -201,13 +214,13 @@ async function routesByLocale(): Promise<Map<string, Set<string>>> {
   return byLocale
 }
 
-test('toda rota pré-renderizada existe em cada idioma, ou está escrita como exceção', async () => {
+test('every prerendered route exists in each language, or is written down as an exception', async () => {
   const byLocale = await routesByLocale()
   const base = byLocale.get(defaultLocale()) ?? new Set<string>()
 
-  // `[] === []` passa: uma build que não rodou, ou um diretório renomeado,
-  // deixaria as duas comparações abaixo medindo nada e parecendo saudáveis.
-  expect(base.size, 'nenhuma rota pré-renderizada — a build rodou?').toBeGreaterThan(1000)
+  // `[] === []` passes: a build that never ran, or a renamed directory, would
+  // leave both comparisons below measuring nothing and looking healthy for it.
+  expect(base.size, 'no prerendered route at all — did the build run?').toBeGreaterThan(1000)
   expect(localeCodes().length).toBeGreaterThan(1)
 
   for (const [code, routes] of byLocale) {
@@ -217,18 +230,18 @@ test('toda rota pré-renderizada existe em cada idioma, ou está escrita como ex
 
     expect(
       missing.filter(route => !ROUTES_ONLY_IN_DEFAULT.includes(route)),
-      `o pré-render não alcançou estas rotas em ${code}`,
+      `the prerender never reached these routes in ${code}`,
     ).toEqual([])
 
-    // E o outro lado: exceção que deixou de valer sai da lista, senão ela
-    // sobrevive à rota que perdoava e passa a esconder a próxima.
+    // And the other side: an exception that stopped applying leaves the list,
+    // or it outlives the route it forgave and hides the next one.
     expect(
       ROUTES_ONLY_IN_DEFAULT.filter(route => routes.has(route)),
-      `estas rotas já existem em ${code} e não precisam mais de exceção`,
+      `these routes already exist in ${code} and need no exception`,
     ).toEqual([])
 
-    // Nenhuma rota só em `/en`: um prefixo que vazasse para dentro do caminho
-    // (`/en/en/deck`) apareceria aqui, e em lugar nenhum acima.
-    expect([...routes].filter(route => !base.has(route)).sort(), `rota só em ${code}`).toEqual([])
+    // No route only in `/en`: a prefix leaking into the path itself
+    // (`/en/en/deck`) would show up here, and nowhere above.
+    expect([...routes].filter(route => !base.has(route)).sort(), `route only in ${code}`).toEqual([])
   }
 })

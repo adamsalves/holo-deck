@@ -56,6 +56,18 @@ describe('o que o leitor de tela lê', () => {
    * cravada num componente de coleção, e renderiza no `/en/pokedex`. O JSON entra
    * pelo `default-messages.ts` e não pelo `locales.ts`: aquele resolve caminho
    * por `fileURLToPath`, que não sobrevive ao ambiente `nuxt`.
+   *
+   * **O que esta asserção prova, e o que ela não prova.** Ela monta no idioma
+   * padrão e compara contra o mesmo arquivo que o componente lê, então prova a
+   * interpolação — que a contagem entra no lugar certo da frase. Ela **não**
+   * distingue uma frase resolvida de uma cravada: devolvendo `capturados` para
+   * dentro do template, os dois lados voltam a dizer a mesma coisa e este teste
+   * continua verde. Nenhum idioma pode mostrar isso enquanto só um renderiza.
+   *
+   * Quem prova é o e2e, em `test/e2e/pokedex.spec.ts`: ele lê o `aria-valuetext`
+   * em `/en/pokedex` e cobra a palavra do idioma da URL e a ausência da outra.
+   * Atributo não entra em `innerText` e mensagem interpolada não entra em
+   * `defaultOnlyLabels`, então ali é o único lugar de onde esse defeito é visível.
    */
   it('anuncia a contagem, o rótulo e a faixa', async () => {
     const progress = (await bar(98, 151)).find('[role="progressbar"]')
