@@ -127,7 +127,7 @@ const SOURCE = hasExtension(['.vue', '.ts'])
  * abbreviation appearing in a file excused for one. The inverse list — naming
  * who is swept — is the silent failure this repository has paid for three times.
  *
- * Both entries are `HP`, and they are the same accident: `HP` is the stat
+ * The one entry is `HP`, and the accident behind it is that `HP` is the stat
  * abbreviation English stamps on the bar **and** the word this game uses for the
  * resource in play, in both languages. *"{name} recovered {healed} HP"* and
  * *"do HP máximo"* are about the quantity, not about the axis of the chart, and
@@ -135,24 +135,37 @@ const SOURCE = hasExtension(['.vue', '.ts'])
  * explicit decision rather than an oversight, and the *Canvas divergences*
  * section of the README carries it.
  *
- * - `rules.vue` spells the resource three times in its own prose. It stops being
- *   an exception when PR 4c moves that page into the locales — and the
- *   assertion below fails if it does, rather than leaving a stale excuse here.
  * - `styleguide.vue` is a numeric-font specimen (`110 HP · 1.600 pó`), not a
  *   screen of the game, and nothing about it is translated.
+ *
+ * **It had a second entry, and `needs every exception it names` is what removed
+ * it.** `rules.vue` spelled the resource in its own prose until this PR moved
+ * that page into the locales; the excuse went stale the same commit the text
+ * left the file, and the assertion failed instead of the list quietly keeping a
+ * permission for a file that no longer needs one. The prose did not stop
+ * spelling `HP` — it moved one file over, into the sweep `who spells an
+ * abbreviation inside a locale` runs, where `EXCUSED_IN_LOCALES` covers it.
+ * A gate that only swept `app/` and `shared/` would have gone green on a
+ * translation it can no longer see, which is the review finding of PR #53
+ * happening again to a different token.
  */
 /**
  * The badge a message may spell, because it is also an ordinary word of the game.
  *
- * `HP` only, and for the same reason the two files in `ALLOWED` are excused: it
- * is the English badge **and** what both languages call the resource in play.
- * Measured — the 8 `battle.log.*` messages per locale are the whole of it, and
- * they are about the quantity rather than the axis of a chart.
+ * `HP` only, and for the same reason `styleguide.vue` is excused in `ALLOWED`:
+ * it is the English badge **and** what both languages call the resource in play.
+ *
+ * Measured, per locale: **10 messages and 11 occurrences** — 7 under
+ * `battle.log.*` and 3 under `rules.*`, which arrived with the page this PR
+ * translated (*restoring {heal} of max HP*, and the two conditions that drain
+ * it). All ten are about the quantity rather than the axis of a chart. The
+ * previous count written here said 8 `battle.log.*` messages and there were 7,
+ * which is the reason this one names both figures: a count nobody can reproduce
+ * is indistinguishable from a count nobody took.
  */
 const EXCUSED_IN_LOCALES: ReadonlySet<string> = new Set(['HP'])
 
 const ALLOWED: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ['app/pages/rules.vue', new Set(['HP'])],
   ['app/pages/styleguide.vue', new Set(['HP'])],
 ])
 
@@ -387,10 +400,14 @@ describe('who spells an abbreviation by hand', () => {
   /**
    * An exception that stopped being needed is an exception that rots.
    *
-   * Compared as a whole set, like the `IDENTICAL_LABELS` of the `i18n-gate`: the
-   * day PR 4c moves `/rules` into the locales, this fails naming the entry to
-   * delete instead of leaving a permanent excuse behind for a file that no
-   * longer needs one.
+   * Compared as a whole set, like the `IDENTICAL_LABELS` of the `i18n-gate`: it
+   * fails naming the entry to delete instead of leaving a permanent excuse behind
+   * for a file that no longer needs one.
+   *
+   * **It has already fired once.** The list carried `app/pages/rules.vue → HP`
+   * for the prose of that page; the PR that moved `/rules` into the locales made
+   * the excuse stale in the same commit the text left the file, and this is what
+   * refused to let it stay.
    */
   it('needs every exception it names', () => {
     const unused: string[] = []
@@ -420,10 +437,15 @@ describe('who spells an abbreviation by hand', () => {
  *
  * `HP` is the one exception, and it is the same accident the source sweep
  * excuses: `HP` is the English badge **and** the word this game uses for the
- * resource in play, in both languages. The 8 `battle.log.*` messages are about
- * the quantity — *"perdeu 20 HP"* — and pt-BR keeps `PV` on the bar while the
- * prose keeps `HP`. That divergence is declared in the *Canvas divergences*
- * section of the README, not tolerated here by accident.
+ * resource in play, in both languages. The 7 `battle.log.*` messages and the 3
+ * under `rules.*` are about the quantity — *"perdeu 20 HP"* — and pt-BR keeps
+ * `PV` on the bar while the prose keeps `HP`. That divergence is declared in the
+ * *Canvas divergences* section of the README, not tolerated here by accident.
+ *
+ * The figure is the one measured beside `EXCUSED_IN_LOCALES`, and it is written
+ * once per place rather than remembered: this line said 8 while that one said 7,
+ * in the same file, for one commit — which is the reincidence the other docblock
+ * claims to be closing.
  */
 describe('who spells an abbreviation inside a locale', () => {
   /**

@@ -603,5 +603,95 @@
       "description": "{name}, {number} in the national dex. Types, base stats, evolution line and damage relations.",
       "descriptionFallback": "The Holo Deck Pokédex."
     }
-  }
+  },
+    "rules": {
+      "overline": "Reference",
+      "source": "Every number on this page is read from {module} — the same module the engine uses.",
+      "derived": "Nothing here was typed by hand, so nothing here can drift from the game.",
+      "packCount": "{count} pack | {count} packs",
+      "rarity": {
+        "title": "Rarity",
+        "note": "rarity.ts — derived from the base stat total",
+        "foot": "The thresholds come from the dex percentile and not from round numbers: most species are final evolutions, and a ladder of round values would make {rare} the biggest tier in the game. Foil starts at rare."
+      },
+      "packs": {
+        "title": "Packs",
+        "note": "packs.ts — {count} cards, drawn from a seed",
+        "common": "Commons",
+        "uncommon": "Uncommons",
+        "rarePlus": "Rare or above",
+        "rarePlusRoll": "THE RARE+ SLOT ROLLS",
+        "pity": "Pity",
+        "shiny": "Shiny",
+        "foot": "Pity counts packs without an ultra or above; on the last one the rare+ slot becomes a guaranteed ultra and the count resets. Shiny rolls on any card and turns it foil."
+      },
+      "forge": {
+        "title": "Dust and forge",
+        "note": "dust.ts — a duplicate turns into dust, dust buys the card you pick",
+        "tier": "TIER",
+        "dustForge": "DUST · FORGE",
+        "foot": "A ×{ratio} ratio the whole way up: four duplicates of a tier pay for one card of that tier. The forge is what makes the dex completable — the long tail does not close by drawing packs."
+      },
+      "battle": {
+        "title": "Battle",
+        "note": "damage.ts · engine.ts — fixed Lv{level} on both sides, IV {iv} and EV 0",
+        "formula": "damage = floor(floor(floor((2·{level}/5 + 2) · power · A/D) / 50) + 2) · mods",
+        "stab": "STAB ×{multiplier}",
+        "effectiveness": "effectiveness ×0 to ×4",
+        "crit": "crit ×{multiplier} · {chance}",
+        "random": "random {min} – {max} per cent",
+        "ratios": "{ad} is {physical} on a physical move and {special} on a special one. Effectiveness comes from the {types}×{types} matrix; a dual type multiplies, so ×4 and ×¼ exist.",
+        "turnOrder": "Turn order",
+        "steps": {
+          "order": "Move priority; a tie is resolved by {stat}; a tie on {stat} {seed}.",
+          "seed": "is drawn from the seed",
+          "blocked": "Prevention — asleep does not act, paralysed loses the turn {chance} of the time.",
+          "hit": "Hit — the accuracy of the move is rolled.",
+          "damage": "Damage, by the formula above.",
+          "pp": "PP decrements; {struggle}, which spends no PP and hurts whoever uses it.",
+          "struggle": "at zero that slot becomes Struggle",
+          "residual": "End of turn — burn, poison, and then the faint check."
+        },
+        "moves": "Each Pokémon carries {slots} moves, picked for type coverage and not for raw power.",
+        "potion": "Item: one {potion} per side per battle, restoring {heal} of max HP. | Item: {count} {potion} per side per battle, restoring {heal} of max HP.",
+        "potionWord": "potion | potions",
+        "rematch": "Losing costs nothing — the rematch is immediate."
+      },
+      "conditions": {
+        "title": "Conditions",
+        "note": "status.ts — one at a time, they do not stack",
+        "paralysis": "{stat} ×{factor} and a {chance} chance to lose the turn.",
+        "burn": "Physical attack ×{factor} and {fraction} of max HP per turn.",
+        "poison": "{fraction} of max HP per turn.",
+        "sleep": "Does not act for {min} to {max} turns, drawn at random.",
+        "foot": "Freeze is left out on purpose: it is frustrating to receive and not very interesting to apply."
+      },
+      "league": {
+        "title": "The League",
+        "note": "gyms.ts — {count} leaders, one per generation, unlocked in order",
+        "band": "GYMS {first}–{last}",
+        "bandCap": "Pokémon · BST cap",
+        "foot": "Every Pokémon on a team carries the leader's type {and} comes from their generation — winning in order walks through the generations. The last one on the team is the ace, the highest BST. The leader's AI is greedy with noise that falls from {first} in the first gym to {last} in the last; the potion arrives at gym {potion} and the matchup switch at {swap}.",
+        "and": "and"
+      },
+      "economy": {
+        "title": "Economy",
+        "note": "economy.ts — where the coins come from",
+        "welcome": "Welcome",
+        "gymFirst": "Gym, 1st win",
+        "gymRematch": "Gym, rematch",
+        "flawless": "Flawless win",
+        "daily": "Daily pack",
+        "free": "free",
+        "shop": "Pack in the shop",
+        "foot": "The whole campaign pays {coins} — about {packs}. The rematch exists because without it income after the last gym would drop to one pack a day, forever. The flawless bonus is about what is being paid, so on a rematch it follows the rematch."
+      },
+      "end": "There is no tutorial screen, and that is on purpose: the interface teaches at the point of decision — the move button shows effectiveness before you pick, the deck builder marks who {weakness}, and the shop puts the rates next to the price. This page is the reference to check afterwards, not the gate before.",
+      "weakness": "takes ×2",
+      "credits": "Pokémon data by PokeAPI · non-commercial project · Pokémon is a trademark of Nintendo / Game Freak",
+      "seo": {
+        "title": "Rules — Holo Deck",
+        "description": "Rarity, packs, forge, damage formula, conditions, the League and the economy. Every number on this page is read from shared/game/ — the same module the engine uses."
+      }
+    }
 }
