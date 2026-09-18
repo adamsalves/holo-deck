@@ -3,7 +3,7 @@ import { TURN_STEPS, turnStepKey } from '../../app/utils/turn-order.ts'
 import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
 import { gamePercent } from '../../shared/game/progress.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
-import { label, localeCodes, localeUrl, namespaceLabels, spells } from '../support/locales.ts'
+import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels } from '../support/locales.ts'
 
 /**
  * `/rules` in a browser, which is the half no gate on disk can reach.
@@ -96,10 +96,12 @@ test('every panel speaks the language of the URL, read from the other one', asyn
       .toBeGreaterThan(20)
 
     await page.goto(localeUrl('/rules', code))
-    const text = await page.locator('.rules').innerText()
+    // `textContent` and not `innerText`: the CSS uppercases the small labels,
+    // and the rendered text would not match the locale's sentence case.
+    const text = (await page.locator('.rules').textContent()) ?? ''
 
     expect(
-      foreign.filter(phrase => spells(text, phrase)),
+      foreignPhrases(text, foreign),
       `/rules in ${code} wrote a sentence from another language`,
     ).toEqual([])
   }
