@@ -684,7 +684,7 @@
       "daily": "Pack diário",
       "free": "grátis",
       "shop": "Pack na loja",
-      "foot": "A campanha inteira paga {coins} — cerca de {packs} packs. A revanche existe porque sem ela a renda depois do último ginásio cairia para um pack por dia, para sempre. A imaculada é sobre o que está sendo pago, então numa revanche ela acompanha a revanche."
+      "foot": "A campanha inteira paga {coins} — cerca de {packs}. A revanche existe porque sem ela a renda depois do último ginásio cairia para um pack por dia, para sempre. A imaculada é sobre o que está sendo pago, então numa revanche ela acompanha a revanche."
     },
     "end": "Não existe tela de tutorial, e é de propósito: a interface ensina no ponto de decisão — o botão de golpe mostra a efetividade antes de você escolher, o deck builder marca quem {weakness}, e a loja traz as taxas ao lado do preço. Esta página é a referência para consultar depois, não o portão antes.",
     "weakness": "leva ×2",

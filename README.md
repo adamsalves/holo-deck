@@ -411,6 +411,20 @@ está aqui é só o que sobrou de propósito.
 | ordem do turno, passo 5: "no zero o golpe fica inselecionável" | o motor cai em **Struggle por slot** — `moveFromSlot` devolve Struggle quando o PP acaba, e o golpe continua clicável. É a mesma regra que o review do PR da Liga corrigiu na carta de golpe, e a prancha ficou para trás |
 | *Vitória imaculada*: "bônus" | **+25%**, decidido em 04/09. Quando a prancha foi desenhada o número não existia |
 
+**E a própria ordem dos seis passos diverge do motor em um deles**, achado no review
+do PR de `/rules`. A prancha e a tela listam `pp` em quinto, depois de *acerto* e
+*dano*; o motor gasta o PP **antes** de rolar a acurácia —
+[`engine.ts:222`](shared/game/engine.ts) contra `:226`. Para o jogador não muda nada
+(o PP é gasto errando ou acertando dos dois jeitos), e a lista que a tela desenha é
+a da prancha — então ela fica como está, e quem muda é a prancha, se mudar. O que
+não pode é o código **afirmar** que a ordem é a do motor: o docblock de
+[`app/utils/turn-order.ts`](app/utils/turn-order.ts) dizia isso e foi corrigido.
+
+**Nada em disco liga essa lista ao motor.** `test/e2e/rules.spec.ts` lê os seis
+passos renderizados em ordem, o que mantém a **tela** honesta contra a lista — não
+a lista honesta contra `engine.ts`. O primeiro docblock dizia que mantinha, e é a
+forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código lê.
+
 ### A prancha estava certa, e foi o código que voltou para ela
 
 | o que o código fazia | o que a prancha sempre disse |

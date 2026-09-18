@@ -400,10 +400,14 @@ describe('who spells an abbreviation by hand', () => {
   /**
    * An exception that stopped being needed is an exception that rots.
    *
-   * Compared as a whole set, like the `IDENTICAL_LABELS` of the `i18n-gate`: the
-   * day PR 4c moves `/rules` into the locales, this fails naming the entry to
-   * delete instead of leaving a permanent excuse behind for a file that no
-   * longer needs one.
+   * Compared as a whole set, like the `IDENTICAL_LABELS` of the `i18n-gate`: it
+   * fails naming the entry to delete instead of leaving a permanent excuse behind
+   * for a file that no longer needs one.
+   *
+   * **It has already fired once.** The list carried `app/pages/rules.vue → HP`
+   * for the prose of that page; the PR that moved `/rules` into the locales made
+   * the excuse stale in the same commit the text left the file, and this is what
+   * refused to let it stay.
    */
   it('needs every exception it names', () => {
     const unused: string[] = []
@@ -433,10 +437,15 @@ describe('who spells an abbreviation by hand', () => {
  *
  * `HP` is the one exception, and it is the same accident the source sweep
  * excuses: `HP` is the English badge **and** the word this game uses for the
- * resource in play, in both languages. The 8 `battle.log.*` messages are about
- * the quantity — *"perdeu 20 HP"* — and pt-BR keeps `PV` on the bar while the
- * prose keeps `HP`. That divergence is declared in the *Canvas divergences*
- * section of the README, not tolerated here by accident.
+ * resource in play, in both languages. The 7 `battle.log.*` messages and the 3
+ * under `rules.*` are about the quantity — *"perdeu 20 HP"* — and pt-BR keeps
+ * `PV` on the bar while the prose keeps `HP`. That divergence is declared in the
+ * *Canvas divergences* section of the README, not tolerated here by accident.
+ *
+ * The figure is the one measured beside `EXCUSED_IN_LOCALES`, and it is written
+ * once per place rather than remembered: this line said 8 while that one said 7,
+ * in the same file, for one commit — which is the reincidence the other docblock
+ * claims to be closing.
  */
 describe('who spells an abbreviation inside a locale', () => {
   /**

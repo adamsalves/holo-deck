@@ -205,9 +205,7 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * stamps it beside `crit` and `random`, which do differ (*crítico*,
  * *aleatório*) and are therefore not here.
  */
-const IDENTICAL_LABELS: readonly string[
-
-] = [
+const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
   'collection.card.shiny',
   'collection.card.shinyBadge',

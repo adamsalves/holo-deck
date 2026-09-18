@@ -9,10 +9,20 @@
  * screen that renders it. The gate imports this list instead, the same way it
  * imports the nav links and the log's keys.
  *
- * The order is the engine's, and it is written here because `engine.ts` runs it
- * as control flow rather than as data — there is no list in the engine to derive
- * this one from. What keeps the two honest is `test/e2e/rules.spec.ts`, which
- * reads the rendered steps in order.
+ * **The order is the page's, and it is not exactly the engine's.** `engine.ts`
+ * runs the turn as control flow rather than as data, so there is no list in the
+ * engine to derive this one from — and the two disagree on one step, measured:
+ * `spendPp` runs at `engine.ts:222`, *before* the accuracy roll at `:226`, while
+ * the page lists `pp` fifth, after `hit` and `damage`. The order shipped that way
+ * before this PR and the difference is invisible to the player (PP is spent on a
+ * miss either way), so it is registered in the README's divergences rather than
+ * reordered here: the board draws this list, and reordering it is the board's
+ * call, not a docblock's.
+ *
+ * Nothing on disk holds the two together. `test/e2e/rules.spec.ts` reads the
+ * rendered steps in order, which keeps the **page** honest against this list —
+ * not this list honest against the engine. Saying otherwise would be the shape
+ * `CLAUDE.md` warns about: an assertion reading the same source the code reads.
  *
  * As ids and not as six written `<li>`: the page's marker has to be a real
  * element to take the `numeric` class (`::marker` takes no class), and writing

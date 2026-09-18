@@ -3,7 +3,7 @@ import { TURN_STEPS, turnStepKey } from '../../app/utils/turn-order.ts'
 import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
 import { gamePercent } from '../../shared/game/progress.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
-import { label, leafEntries, localeCodes, localeUrl, readLocale, spells } from '../support/locales.ts'
+import { label, localeCodes, localeUrl, namespaceLabels, spells } from '../support/locales.ts'
 
 /**
  * `/rules` in a browser, which is the half no gate on disk can reach.
@@ -21,29 +21,6 @@ import { label, leafEntries, localeCodes, localeUrl, readLocale, spells } from '
  *
  * It runs against `yarn preview`, so against the prerendered build.
  */
-
-/**
- * The `rules.*` labels that `code` writes differently from every other locale.
- *
- * The point of the sweep below is *which language the panel is in*, and a label
- * both languages spell the same way — `Packs`, `Pity`, `TIER` — answers that
- * question with nothing. Dropping them is what keeps the assertion from failing
- * on a page that is right, which is how a gate gets switched off.
- *
- * Interpolated and plural messages are dropped for the honest reason
- * `defaultOnlyLabels` gives: they never reach the DOM as written, so matching
- * them literally would measure nothing.
- */
-function ownLabels(code: string): string[] {
-  const others = localeCodes().filter(name => name !== code)
-
-  return leafEntries(readLocale(code))
-    .filter(([key]) => key.startsWith('rules.'))
-    .filter(([, value]) => typeof value === 'string')
-    .filter(([, value]) => !String(value).includes('{') && !String(value).includes('|'))
-    .filter(([key, value]) => others.every(other => label(key, other) !== value))
-    .map(([, value]) => String(value))
-}
 
 test('the turn order renders six whole sentences, one per step of the engine', async ({ page }) => {
   const codes = localeCodes()
@@ -71,16 +48,16 @@ test('the turn order renders six whole sentences, one per step of the engine', a
 
       // The failure this test exists for: an unresolved keypath renders as the
       // key, and a key is the one string that looks the same in every language.
-      expect(text, `${step} em ${code}`).not.toContain('rules.battle')
-      expect(text, `${step} em ${code} está vazio`).not.toBe('')
+      expect(text, `${step} in ${code}`).not.toContain('rules.battle')
+      expect(text, `${step} in ${code} is empty`).not.toBe('')
 
       // Measured as **shape** and not against the file the page reads: a message
       // with a placeholder may not reach the screen as written, or the value
       // never arrived. Comparing to the locale would agree with either.
       const raw = label(turnStepKey(step), code)
       if (raw.includes('{')) {
-        expect(text, `${step} em ${code} chegou com o placeholder`).not.toContain('{')
-        expect(text, `${step} em ${code} não interpolou`).not.toBe(raw)
+        expect(text, `${step} in ${code} kept its placeholder`).not.toContain('{')
+        expect(text, `${step} in ${code} did not interpolate`).not.toBe(raw)
       }
 
       texts.push(text)
@@ -98,7 +75,7 @@ test('the turn order renders six whole sentences, one per step of the engine', a
 
       expect(
         texts.filter(text => otherTexts.includes(text)),
-        `${code} e ${other} escrevem o mesmo passo`,
+        `${code} and ${other} write the same step`,
       ).toEqual([])
     }
   }
@@ -109,11 +86,13 @@ test('every panel speaks the language of the URL, read from the other one', asyn
   expect(codes.length).toBeGreaterThan(1)
 
   for (const code of codes) {
-    const foreign = codes.filter(name => name !== code).flatMap(ownLabels)
+    const foreign = codes
+      .filter(name => name !== code)
+      .flatMap(other => namespaceLabels('rules.', code, other))
 
     // The other side of the subtraction: if it emptied — every label identical,
     // or the namespace renamed — the loop below would assert nothing at all.
-    expect(foreign.length, `nada de estrangeiro para procurar contra ${code}`)
+    expect(foreign.length, `nothing foreign to look for against ${code}`)
       .toBeGreaterThan(20)
 
     await page.goto(localeUrl('/rules', code))
@@ -121,7 +100,7 @@ test('every panel speaks the language of the URL, read from the other one', asyn
 
     expect(
       foreign.filter(phrase => spells(text, phrase)),
-      `/rules em ${code} escreveu frase de outro idioma`,
+      `/rules in ${code} wrote a sentence from another language`,
     ).toEqual([])
   }
 })
@@ -135,12 +114,12 @@ test('the calibrated numbers reach the screen, in both languages', async ({ page
     // — is a thing only the rendered page says.
     await expect(
       page.locator('[data-panel="packs"] .rules__line', { hasText: label('rules.packs.pity', code) }),
-      `pity em ${code}`,
+      `pity in ${code}`,
     ).toContainText(String(PITY_THRESHOLD))
 
     await expect(
       page.locator('[data-panel="conditions"] dd').first(),
-      `paralisia em ${code}`,
+      `paralysis in ${code}`,
     ).toContainText(gamePercent(PARALYSIS_SKIP_CHANCE))
   }
 })

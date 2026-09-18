@@ -144,10 +144,14 @@ function numbersIn(value: unknown): number[] {
  */
 const NOT_CALIBRATION: Record<string, string> = {
   // The dex size is PokeAPI data, not calibration: it is not a dial anybody
-  // turns, it is however many species exist. Named `SPECIES_COUNT` since Phase
-  // 3 — the entry said `DEX_SIZE` until `excuses no constant the engine stopped
-  // exporting` was written and found that it had been forgiving a name that no
-  // longer existed anywhere in the repository.
+  // turns, it is however many species exist.
+  //
+  // **This is a new exception, not a rename of a dead one**, and the difference
+  // matters in one direction: `DEX_SIZE` had stopped existing, so `1025` was on
+  // the forbidden list — through `SPECIES_COUNT`, which nothing excused — until
+  // this line. Excusing it loosens the gate, deliberately and by the same reason
+  // the dead entry gave. It was worth writing plainly, because a loosening that
+  // arrives inside a commit about *removing dead exceptions* reads as tidying.
   SPECIES_COUNT: 'tamanho do dex, dado e não calibração',
 }
 
@@ -201,6 +205,24 @@ interface Source {
  * this one polices `/rules`, and `no calibrated number is written by hand`
  * reports the source by name so that a widened sweep never becomes a sweep whose
  * failures nobody can place.
+ *
+ * **What the scope leaves outside is not hypothetical, and saying so is the
+ * point of writing the scope down.** Measured on this tree, with this gate's own
+ * `handWritten`, four live messages spell `TYPE_COUNT` by hand one namespace
+ * over:
+ *
+ * ```
+ * pt-BR · deck.coverage.source  "…na mesma matriz 18×18 que o motor de batalha usa…"
+ * pt-BR · dex.relations.note    "— calculadas na matriz 18×18, tipo duplo multiplicativo"
+ * en    · deck.coverage.source  "Read from the same 18×18 matrix the battle engine uses…"
+ * en    · dex.relations.note    "— computed on the 18×18 matrix, dual types multiply"
+ * ```
+ *
+ * `/rules` gets this right — `rules.battle.ratios` asks for `{types}×{types}` —
+ * which is exactly how much the scope costs. Widening the sweep is a decision
+ * about those two screens and belongs to whoever owns them; leaving this
+ * unwritten would let the next reader conclude that translating a screen is now
+ * enough for its numbers to be policed.
  */
 function localeProse(code: string): string {
   return leafEntries(readLocale(code))
@@ -399,13 +421,13 @@ describe('portão de `/rules`', () => {
     for (const code of localeCodes()) {
       const formula = label(FORMULA_KEY, code)
 
-      expect(formula, `sem fórmula em ${code}`).not.toBe('')
-      expect(localeProse(code), `a fórmula sobrou na varredura de ${code}`)
+      expect(formula, `no formula in ${code}`).not.toBe('')
+      expect(localeProse(code), `the formula was left in the sweep of ${code}`)
         .not.toContain(formula)
 
       // Load-bearing, measured: uncut, the formula is what the sweep would
       // report — so the exception forgives something real, in this language.
-      expect(handWritten(formula), `a exceção de ${code} não perdoa nada`)
+      expect(handWritten(formula), `the exception in ${code} forgives nothing`)
         .not.toEqual([])
     }
   })
@@ -424,24 +446,39 @@ describe('portão de `/rules`', () => {
   })
 
   /**
-   * The gate proven against the defect, **once per source**.
+   * The sweep proven against the defect, and against a source it can no longer
+   * read — two different questions, and the first draft of this docblock
+   * credited the wrong assertion with the second one.
    *
-   * The assertion above is the kind that passes when it has stopped reading:
-   * an empty `text`, a namespace filter that matches nothing, a `sources()` that
-   * silently lost a language — all of them produce the same green. Planting a
-   * calibrated number into each source's own text and demanding it be reported,
-   * under that source's name, is what tells a sweep that works from one that is
-   * merely quiet.
+   * It claimed that planting a number into each source was what told a working
+   * sweep from a quiet one. It is not: `handWritten(text + planted)` finds the
+   * plant **whatever `text` is**, so with `localeProse` returning `''` for every
+   * language this test stayed green — measured, in review. What catches that is
+   * `reads the page and every locale`, the floor per source above.
+   *
+   * So both halves are asserted side by side here rather than borrowed from a
+   * neighbour: the source really was read and what was read is clean, **and**
+   * the same text with a calibrated number in it is reported under that source's
+   * name. A test that needs another test to be meaningful is a test that does
+   * not survive the day somebody splits the file.
    *
    * The planted value is read from the engine rather than typed, so the day
    * `PITY_THRESHOLD` moves this keeps testing the thing it names.
    */
-  it('reports a planted number, in the page and in every locale', () => {
+  it('sweeps each source, and reports a number planted in it', () => {
     const planted = `o pity é ${packsGame.PITY_THRESHOLD} packs`
+    const expected = `${packsGame.PITY_THRESHOLD} (PITY_THRESHOLD (game/packs.ts))`
 
     for (const { name, text } of sources()) {
-      expect(handWritten(text + planted), `defeito plantado não reportado em ${name}`)
-        .toContain(`${packsGame.PITY_THRESHOLD} (PITY_THRESHOLD (game/packs.ts))`)
+      // The half the plant cannot prove: this source really was read, and what
+      // came back is clean. A `text` that arrived empty fails here.
+      expect(text.length, `nothing was read from ${name}`).toBeGreaterThan(500)
+      expect(handWritten(text), `${name} writes a calibrated number by hand`).toEqual([])
+
+      // And the half emptiness cannot prove: the sweep still reports, with the
+      // number, the constant it should have come from and this source's name.
+      expect(handWritten(text + planted), `planted defect not reported in ${name}`)
+        .toContain(expected)
     }
   })
 

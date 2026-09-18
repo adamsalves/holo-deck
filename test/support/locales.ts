@@ -173,6 +173,39 @@ export function defaultOnlyLabels(other: string): string[] {
 }
 
 /**
+ * The labels of one namespace that `code` writes differently from `other`.
+ *
+ * The narrower sibling of `defaultOnlyLabels`, and it exists because a screen is
+ * asserted one screen at a time: sweeping every namespace for a page that
+ * renders one of them turns any unrelated translation into that page's problem.
+ *
+ * **The subtraction is "differs from mine", not "differs from everyone".** With
+ * two locales the two agree; with a third they stop, and they stop silently in
+ * the direction that matters — a phrase that `pt-BR` and the third language
+ * happen to share would drop out of the set and never be looked for inside
+ * `/en`, which is the one place it would prove something. `foreignBadges` above
+ * makes the same choice for the stat badges, for the same reason.
+ *
+ * Interpolated and plural messages are dropped for the reason `defaultOnlyLabels`
+ * gives: they never reach the DOM as written. So are single-character labels —
+ * `rules.league.and` is `e` in pt-BR, and one letter searched with a word border
+ * across a whole page is a false positive waiting for the first English sentence
+ * that spells `e` on its own. A gate that cries on a correct page gets switched
+ * off, and one letter is not evidence of a language either way.
+ */
+export function namespaceLabels(namespace: string, code: string, other: string): string[] {
+  const mine = new Map(leafEntries(readLocale(code)))
+
+  return leafEntries(readLocale(other))
+    .filter(([key]) => key.startsWith(namespace))
+    .filter(([, value]) => typeof value === 'string')
+    .map(([key, value]) => [key, String(value)] as const)
+    .filter(([, value]) => !value.includes('{') && !value.includes('|') && value.length > 1)
+    .filter(([key, value]) => mine.get(key) !== value)
+    .map(([, value]) => value)
+}
+
+/**
  * The labels that appear more than once, named — an empty list is the pass.
  *
  * **It lives here because two gates ask it**, which is the rule the

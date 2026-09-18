@@ -684,7 +684,7 @@
         "daily": "Daily pack",
         "free": "free",
         "shop": "Pack in the shop",
-        "foot": "The whole campaign pays {coins} — about {packs} packs. The rematch exists because without it income after the last gym would drop to one pack a day, forever. The flawless bonus is about what is being paid, so on a rematch it follows the rematch."
+        "foot": "The whole campaign pays {coins} — about {packs}. The rematch exists because without it income after the last gym would drop to one pack a day, forever. The flawless bonus is about what is being paid, so on a rematch it follows the rematch."
       },
       "end": "There is no tutorial screen, and that is on purpose: the interface teaches at the point of decision — the move button shows effectiveness before you pick, the deck builder marks who {weakness}, and the shop puts the rates next to the price. This page is the reference to check afterwards, not the gate before.",
       "weakness": "takes ×2",

@@ -741,9 +741,12 @@ useSeoMeta({
         </dl>
 
         <p class="rules__foot">
+          <!-- `packs` arrives already spelled, through the same plural message
+               the pity line uses: written as `{packs} packs` the sentence would
+               read *about 1 packs* the day the campaign paid for one. -->
           {{ t('rules.economy.foot', {
             coins: gameNumber(campaign.total),
-            packs: campaign.packs,
+            packs: t('rules.packCount', { count: campaign.packs }, campaign.packs),
           }) }}
         </p>
       </section>
