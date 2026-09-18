@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.9.0](https://github.com/adamsalves/holo-deck/compare/v0.8.0...v0.9.0) (2026-09-18)
+
+
+### Features
+
+* /rules nos dois idiomas, com a ordem do turno remontada ([93d38e3](https://github.com/adamsalves/holo-deck/commit/93d38e3d19314a26e9bf7db3f50399f03daa124f))
+* /rules nos dois idiomas, e o portão que media o arquivo errado ([16def16](https://github.com/adamsalves/holo-deck/commit/16def166ef4f41ba3315003174f3371ea7ee12b0))
+* a Liga e a batalha nos dois idiomas, e o log de turno remontado ([cf5b96c](https://github.com/adamsalves/holo-deck/commit/cf5b96cb19c1cb7e21149fff36b9488101dd47d0))
+* a Liga e a batalha nos dois idiomas, e o log de turno remontado ([53e68c0](https://github.com/adamsalves/holo-deck/commit/53e68c0d113afcf1a77ade43f6a2cc520ab5575c))
+* a raridade e o tipo do jogo falam os dois idiomas ([9294bce](https://github.com/adamsalves/holo-deck/commit/9294bce2b8b300b160b83751688b2f7b836933f1))
+* a raridade e o tipo do jogo falam os dois idiomas ([d5b3733](https://github.com/adamsalves/holo-deck/commit/d5b3733e6b413ecc28d6e9dc5f5ab0a6e3f1a347))
+* a tela de Detalhe nos dois idiomas, e o último texto de tela sai de shared/ ([10f991b](https://github.com/adamsalves/holo-deck/commit/10f991b2efe87b19f5fc5c3325859f931bc630b2))
+* as duas telas da Pokédex nos dois idiomas, e os links que abrem o /en ([712449e](https://github.com/adamsalves/holo-deck/commit/712449e470d6b886769e3f60605b9f2ce33e9ce4))
+* as duas telas da Pokédex nos dois idiomas, e os links que abrem o /en ([24bb9d5](https://github.com/adamsalves/holo-deck/commit/24bb9d516906025f5bd241555a43e60be708ddc1))
+* as seis siglas de stat vindas do locale, e as duas colisões fechadas ([79fddff](https://github.com/adamsalves/holo-deck/commit/79fddff5bfaf5640910c435a1ed703fc5039ec09))
+* as seis siglas de stat vindas do locale, e as duas colisões que a medição achou ([58cab93](https://github.com/adamsalves/holo-deck/commit/58cab93da5d9e2bb64307ffe57d169a435818ddb))
+* o Detalhe nos dois idiomas, e o último texto de tela sai de shared/ ([6d131fd](https://github.com/adamsalves/holo-deck/commit/6d131fd20058999d8d64564a99a60ac06b64537f))
+* o Hub, a loja, o binder e o deck nos dois idiomas ([2c7c2f5](https://github.com/adamsalves/holo-deck/commit/2c7c2f597793980fbd05b072dadb6a514334c9d4))
+* o Hub, a loja, o binder e o deck nos dois idiomas ([9847b69](https://github.com/adamsalves/holo-deck/commit/9847b694e6a580a8c5cd55d911ea43b5211410dc))
+* o jogo fala pt-BR e inglês, com os rótulos da barra vindos do locale ([1d350b2](https://github.com/adamsalves/holo-deck/commit/1d350b28db74a3160a38957e238d9629a40a6678))
+* o jogo fala pt-BR e inglês, com os rótulos da barra vindos do locale ([97d25c5](https://github.com/adamsalves/holo-deck/commit/97d25c593a65d45830cd95c102c8fa7e1fbc7e4d))
+
+
+### Bug Fixes
+
+* a barra leva o jogador junto quando ele está em inglês ([242c5d5](https://github.com/adamsalves/holo-deck/commit/242c5d55a27c4619f10cfc5930dbad8291860012))
+* a tabela de forja do binder fala os dois idiomas ([836e48c](https://github.com/adamsalves/holo-deck/commit/836e48c4c29d2495371d319548176451d6b7edc5))
+* o cliente do Postgres e o better-auth passam a nascer na primeira chamada ([cce4250](https://github.com/adamsalves/holo-deck/commit/cce4250ee6d887329f0a20c4749c85f74b1e639e))
+* o portão da narração enumerando quem sai, e a Pokédex sem frase bilíngue ([e31593e](https://github.com/adamsalves/holo-deck/commit/e31593e9648edab18bd63da857fd06c98f93e18b))
+
 ## [0.8.0](https://github.com/adamsalves/holo-deck/compare/v0.7.0...v0.8.0) (2026-09-12)
 
 
