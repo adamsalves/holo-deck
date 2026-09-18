@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
+import { label, leafEntries, localeCodes, readLocale } from '../support/locales'
 import * as aiGame from '~~/shared/game/ai'
 import * as battleGame from '~~/shared/game/battle'
 import * as damageGame from '~~/shared/game/damage'
@@ -54,7 +55,6 @@ function withoutStyle(source: string): string {
 }
 
 const page = readFileSync(join(REPO_ROOT, PAGE), 'utf8')
-const prose = stripComments(withoutStyle(page))
 
 /**
  * Todo módulo do motor, importado inteiro — e é daqui que a lista de proibidos
@@ -134,15 +134,21 @@ function numbersIn(value: unknown): number[] {
  * Ela é de saída de propósito: uma constante nova do motor cai do lado de dentro
  * por omissão e reprova alto se a página a escrever à mão. Uma lista de entrada
  * faria o contrário — o defeito da versão anterior.
+ *
+ * **It had two entries and both were dead**, which is what `excuses no constant
+ * the engine stopped exporting` was written to find. `DEX_SIZE` had been renamed
+ * to `SPECIES_COUNT`; `PERCENT_BASE` had been deleted outright, and excusing a
+ * hundred here had stopped meaning anything the day `RANDOM_MAX_PERCENT` became
+ * where `100` comes from. A list that forgives nothing still reads, to whoever
+ * opens the file, as a list of decisions somebody made on purpose.
  */
 const NOT_CALIBRATION: Record<string, string> = {
-  // O tamanho do dex é dado da PokeAPI, não calibração — e a página o escreve
-  // formatado (`1.025`), então o literal nem casaria.
-  DEX_SIZE: 'tamanho do dex, dado e não calibração',
-  // Cem é a base da porcentagem antes de ser qualquer constante. `gamePercent`
-  // já tirou o literal da página; policiá-lo aqui só produziria mensagem com o
-  // módulo errado — foi o que a versão anterior fez ao acusar `GYM_REWARD_STEP`.
-  PERCENT_BASE: 'base da porcentagem, não calibração',
+  // The dex size is PokeAPI data, not calibration: it is not a dial anybody
+  // turns, it is however many species exist. Named `SPECIES_COUNT` since Phase
+  // 3 — the entry said `DEX_SIZE` until `excuses no constant the engine stopped
+  // exporting` was written and found that it had been forgiving a name that no
+  // longer existed anywhere in the repository.
+  SPECIES_COUNT: 'tamanho do dex, dado e não calibração',
 }
 
 /**
@@ -162,20 +168,68 @@ const FORBIDDEN: readonly { readonly value: number, readonly source: string }[]
           .map(form => ({ value: form, source: `${exported} (${name}.ts)` }))))
 
 /**
- * A **exceção declarada**, e ela precisa estar aqui e não escondida no arquivo.
+ * The **declared exception**, named by key and not by pattern.
  *
- * A fórmula de dano tem números que são a forma da conta, não a calibração dela:
- * `(2·Lv/5 + 2)` e o `/50` são a fórmula da série, e trocá-los seria escrever
- * outra fórmula. O nível, que **é** decisão do jogo, entra interpolado —
- * `BATTLE_LEVEL` está na lista proibida acima justamente por isso.
+ * The damage formula carries numbers that are the shape of the arithmetic and
+ * not the calibration of it: `(2·Lv/5 + 2)` and the `/50` are the series'
+ * formula, and changing them would be writing a different formula. The level,
+ * which **is** a decision of the game, is interpolated — `BATTLE_LEVEL` sits on
+ * the forbidden list above for exactly that reason.
  *
- * A linha inteira é recortada antes da varredura em vez de os valores serem
- * tirados da lista: assim a exceção vale só ali, e um `50` que aparecesse em
- * qualquer outro ponto da página continua sendo reprovado.
+ * **It used to be a regex over the page, and the regex was written in
+ * Portuguese** — `` /`dano = [^`]*`/ ``. Once the sentence moved to the locale,
+ * `dano` stopped matching in `en.json` the moment the formula was translated to
+ * `damage = …`, and the cut would have silently changed what was swept: not a
+ * failure, a different measurement. A key is the same in every language, which
+ * is what makes it the thing to name. `cuts the damage formula, and nothing
+ * else, in every locale` below holds it to that.
  */
-const FORMULA = /`dano = [^`]*`/g
+const FORMULA_KEY = 'rules.battle.formula'
 
-const scanned = prose.replace(FORMULA, '')
+/** Where the prose of this page can live, and every one of them is swept. */
+interface Source {
+  readonly name: string
+  readonly text: string
+}
+
+/**
+ * Everything `rules.*` says in one locale, minus the formula.
+ *
+ * Scoped to the namespace the page owns. A calibrated number typed into
+ * `pokedex.intro` is the same defect in a different screen's prose, and the gate
+ * that claims to police it has to be able to name the screen it belongs to —
+ * this one polices `/rules`, and `no calibrated number is written by hand`
+ * reports the source by name so that a widened sweep never becomes a sweep whose
+ * failures nobody can place.
+ */
+function localeProse(code: string): string {
+  return leafEntries(readLocale(code))
+    .filter(([key]) => key.startsWith('rules.') && key !== FORMULA_KEY)
+    .map(([, value]) => String(value))
+    .join('\n')
+}
+
+/**
+ * The sources a calibrated number can reach the screen from, each one named.
+ *
+ * **Two of them, and the second one did not exist when this gate was written.**
+ * While the prose lived in the `.vue`, sweeping the file was sweeping the page.
+ * The moment `/rules` was translated, every sentence — and every number inside
+ * one — moved to `i18n/locales/*.json`, and a gate still reading only the
+ * `.vue` would have found a page with no number left in it and gone **green
+ * measuring nothing**, with `475` free to be typed into the JSON it no longer
+ * looked at.
+ *
+ * Built from `localeCodes()` rather than listed: a third language is swept by
+ * existing, which is the same reason `test/support/locales.ts` reads the
+ * directory.
+ */
+function sources(): Source[] {
+  return [
+    { name: PAGE, text: stripComments(withoutStyle(readFileSync(join(REPO_ROOT, PAGE), 'utf8'))) },
+    ...localeCodes().map(code => ({ name: `i18n/locales/${code}.json`, text: localeProse(code) })),
+  ]
+}
 
 /**
  * O piso da varredura, e a limitação que ele admite.
@@ -213,10 +267,54 @@ function writtenLiteral(value: number): RegExp {
   return new RegExp(`(?<![\\w.,])${value}(?![\\w.,])`)
 }
 
+/**
+ * The calibrated numbers `text` writes as literals, each with the constant it
+ * should have come from.
+ *
+ * A function and not an expression evaluated once, because the assertions below
+ * need to run it over text this file builds: a source with the defect planted
+ * back in has to produce the message, and a source without it has to produce
+ * nothing. A sweep that can only be pointed at the disk can only be proven by
+ * breaking the disk.
+ */
+function handWritten(text: string): string[] {
+  const written = FORBIDDEN
+    .filter(({ value }) => Number.isInteger(value) && value >= SMALLEST_SCANNED)
+    .filter(({ value }) => writtenLiteral(value).test(text))
+    .map(({ value, source }) => `${value} (${source})`)
+
+  return [...new Set(written)].sort()
+}
+
 describe('portão de `/rules`', () => {
-  it('a página existe e tem conteúdo para varrer', () => {
-    expect(scanned.length).toBeGreaterThan(2000)
-    expect(scanned).toContain('<template>')
+  /**
+   * The floor, **per source and by name**.
+   *
+   * A floor over the total is held up by whichever part still works: with the
+   * page alone weighing a few thousand characters, a `localeProse` that returned
+   * `''` for every language would keep any sum comfortably above any threshold,
+   * and the sweep of the locales would be dead while this stayed green. The
+   * `i18n-gate` paid for that shape twice before it was written down.
+   *
+   * So each source is asked for itself, by the name it will be reported under.
+   */
+  it('reads the page and every locale, and finds prose in each', () => {
+    const read = sources()
+
+    expect(read.map(({ name }) => name)).toEqual([
+      PAGE,
+      ...localeCodes().map(code => `i18n/locales/${code}.json`),
+    ])
+
+    // The other side of the loop: one locale would prove nothing about a sweep
+    // built to compare languages, and zero would run nothing at all.
+    expect(localeCodes().length).toBeGreaterThan(1)
+
+    for (const { name, text } of read) {
+      expect(text.length, `nothing to sweep in ${name}`).toBeGreaterThan(500)
+    }
+
+    expect(sources()[0]?.text).toContain('<template>')
   })
 
   /**
@@ -266,17 +364,85 @@ describe('portão de `/rules`', () => {
   })
 
   /**
+   * An exception may not outlive the constant it forgives.
+   *
+   * `NOT_CALIBRATION` excuses a name, and a name is the one thing a rename takes
+   * away in silence: the entry stays, reads as deliberate, and forgives nothing
+   * — while the constant that replaced it is policed by nobody's decision.
+   *
+   * **This is not hypothetical here.** The list excused `DEX_SIZE` as *data, not
+   * calibration*; the constant is now `SPECIES_COUNT` in `shared/types/brand.ts`
+   * and `DEX_SIZE` exists nowhere in the repository but on the line that
+   * forgives it. The same assertion `shared-text-gate` and `locale-link-gate`
+   * each carry for their own lists, which is why all three now fail the same way
+   * instead of ageing three different ways.
+   */
+  it('excuses no constant the engine stopped exporting', () => {
+    const exported = new Set(Object.values(MODULES).flatMap(module => Object.keys(module)))
+
+    expect(Object.keys(NOT_CALIBRATION).filter(name => !exported.has(name))).toEqual([])
+  })
+
+  /**
+   * The formula exception, held to being **exactly** an exception: present in
+   * every language, and load-bearing in each.
+   *
+   * Two ways for it to rot, and one assertion each. A renamed or dropped key
+   * makes `localeProse` cut nothing — the gate goes red on `/50` and the fix
+   * would look like *add 50 to the allowed list*, which turns off the check for
+   * every other sentence too. And an exception that forgives nothing is
+   * decoration: if the formula stopped carrying a forbidden number, this cut
+   * would be excusing a line that never needed excusing, and nobody would know
+   * to remove it.
+   */
+  it('cuts the damage formula, and nothing else, in every locale', () => {
+    for (const code of localeCodes()) {
+      const formula = label(FORMULA_KEY, code)
+
+      expect(formula, `sem fórmula em ${code}`).not.toBe('')
+      expect(localeProse(code), `a fórmula sobrou na varredura de ${code}`)
+        .not.toContain(formula)
+
+      // Load-bearing, measured: uncut, the formula is what the sweep would
+      // report — so the exception forgives something real, in this language.
+      expect(handWritten(formula), `a exceção de ${code} não perdoa nada`)
+        .not.toEqual([])
+    }
+  })
+
+  /**
    * Uma asserção só, com a lista inteira no relatório: duas asserções separadas
    * dariam dois relatórios parciais do mesmo defeito, e o que quem lê precisa
-   * saber é **qual número** e **de qual módulo ele deveria ter vindo**.
+   * saber é **qual número**, **de qual módulo ele deveria ter vindo** e agora
+   * também **em qual arquivo ele foi digitado**.
    */
   it('não escreve nenhum número calibrado à mão', () => {
-    const written = FORBIDDEN
-      .filter(({ value }) => Number.isInteger(value) && value >= SMALLEST_SCANNED)
-      .filter(({ value }) => writtenLiteral(value).test(scanned))
-      .map(({ value, source }) => `${value} (${source})`)
+    const written = sources().flatMap(({ name, text }) =>
+      handWritten(text).map(hit => `${name}: ${hit}`))
 
-    expect([...new Set(written)].sort()).toEqual([])
+    expect(written).toEqual([])
+  })
+
+  /**
+   * The gate proven against the defect, **once per source**.
+   *
+   * The assertion above is the kind that passes when it has stopped reading:
+   * an empty `text`, a namespace filter that matches nothing, a `sources()` that
+   * silently lost a language — all of them produce the same green. Planting a
+   * calibrated number into each source's own text and demanding it be reported,
+   * under that source's name, is what tells a sweep that works from one that is
+   * merely quiet.
+   *
+   * The planted value is read from the engine rather than typed, so the day
+   * `PITY_THRESHOLD` moves this keeps testing the thing it names.
+   */
+  it('reports a planted number, in the page and in every locale', () => {
+    const planted = `o pity é ${packsGame.PITY_THRESHOLD} packs`
+
+    for (const { name, text } of sources()) {
+      expect(handWritten(text + planted), `defeito plantado não reportado em ${name}`)
+        .toContain(`${packsGame.PITY_THRESHOLD} (PITY_THRESHOLD (game/packs.ts))`)
+    }
   })
 
   /**
