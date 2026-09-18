@@ -18,7 +18,8 @@
     "signOut": "SIGN OUT"
   },
   "a11y": {
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "breadcrumb": "Breadcrumb"
   },
   "rarity": {
     "common": "Common",
@@ -233,6 +234,9 @@
       "scrap": "{count} dup · {dust}",
       "dustAmount": "{dust} dust",
       "scrapLabel": "Turn {count} duplicate of {name} into {dust} dust | Turn {count} duplicates of {name} into {dust} dust"
+    },
+    "progress": {
+      "valueText": "{progress} caught"
     }
   },
   "deck": {
@@ -528,10 +532,46 @@
     "chain": {
       "title": "Evolution line",
       "note": "— resolved from local JSON, zero requests"
+    },
+    "card": {
+      "number": "number {id}",
+      "types": "{first} and {second}",
+      "missing": "not caught",
+      "shiny": "shiny"
+    },
+    "filters": {
+      "all": "All · {count}",
+      "counted": "{shown} of {total}",
+      "owned": "Owned · {count}",
+      "missing": "Missing · {count}"
+    },
+    "grid": {
+      "rendered": "{rendered} of {total} rendered",
+      "virtualized": "{counted} · virtualized scroll",
+      "note": "The Pokédex is reference: it shows everything, owned or not."
+    }
+  },
+  "pokedex": {
+    "overline": "Complete reference",
+    "intro": "All 1025 species, owned or not. Pick a region or search straight away.",
+    "owned": "{owned} / {total} caught",
+    "speciesCount": "{count} species | {count} species",
+    "progress": "Progress in {region}: {progress}",
+    "seo": {
+      "title": "Pokédex — Holo Deck",
+      "description": "The 1025 species of the nine generations, with stats, evolution and damage relations. Data from the PokeAPI."
+    },
+    "region": {
+      "empty": "No {region} species matches these filters.",
+      "notFound": "Generation outside the dex",
+      "load": "Could not load the generation",
+      "seo": {
+        "title": "{region} — Pokédex — Holo Deck",
+        "description": "The {count} species of {region}, from {generation}, with types, stats and evolution."
+      }
     }
   },
   "species": {
-    "crumbs": "Breadcrumb",
     "artwork": "Official artwork of {name}",
     "height": "Height",
     "weight": "Weight",

@@ -23,6 +23,7 @@ const { t } = useI18n()
  * criou a coleção. Antes disso a linha dizia só a faixa do dex, porque era o que
  * já era verdade.
  */
+const localePath = useLocalePath()
 const { loadCore } = useDex()
 const collection = useCollectionStore()
 
@@ -80,8 +81,8 @@ const rows = computed(() => (regions.value ?? []).map((region) => {
 }))
 
 useSeoMeta({
-  title: 'Pokédex — Holo Deck',
-  description: 'As 1025 espécies das nove gerações, com stats, evolução e relações de dano. Dados da PokeAPI.',
+  title: () => t('pokedex.seo.title'),
+  description: () => t('pokedex.seo.description'),
 })
 </script>
 
@@ -90,13 +91,13 @@ useSeoMeta({
     <header class="mb-10 flex flex-wrap items-end justify-between gap-6">
       <div>
         <p class="numeric text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
-          Referência completa
+          {{ t('pokedex.overline') }}
         </p>
         <h1 class="mt-2 text-5xl font-bold tracking-tight text-highlighted">
-          Pokédex
+          {{ t('nav.pokedex') }}
         </h1>
         <p class="mt-3 max-w-xl text-sm text-toned">
-          As 1025 espécies, possuídas ou não. Escolha uma região ou busque direto.
+          {{ t('pokedex.intro') }}
         </p>
       </div>
 
@@ -109,7 +110,7 @@ useSeoMeta({
         :key="region.generation"
       >
         <NuxtLink
-          :to="`/pokedex/${region.generation}`"
+          :to="localePath(`/pokedex/${region.generation}`)"
           class="region-card bevel-tile"
         >
           <span class="numeric region-card__generation">
@@ -117,12 +118,22 @@ useSeoMeta({
           </span>
           <span class="region-card__name">{{ region.label }}</span>
           <span class="numeric region-card__range">
-            <template v-if="region.owned !== null">
-              <span class="region-card__owned">{{ region.owned }}</span>
-              / {{ region.speciesCount }} capturados
-            </template>
+            <!-- O número do que se tem ganha cor própria, então ele entra por
+                 slot: a mensagem inteira é uma frase, e só o primeiro número
+                 dela é destacado. -->
+            <i18n-t
+              v-if="region.owned !== null"
+              keypath="pokedex.owned"
+              scope="global"
+              tag="span"
+            >
+              <template #owned>
+                <span class="region-card__owned">{{ region.owned }}</span>
+              </template>
+              <template #total>{{ region.speciesCount }}</template>
+            </i18n-t>
             <template v-else>
-              {{ region.speciesCount }} espécies
+              {{ t('pokedex.speciesCount', { count: region.speciesCount }, region.speciesCount) }}
             </template>
             <span
               class="region-card__separator"
@@ -135,7 +146,10 @@ useSeoMeta({
             v-if="region.owned !== null"
             :owned="region.owned"
             :total="region.speciesCount"
-            :label="`Progresso em ${region.label}: ${progressLabel(region.owned, region.speciesCount)}`"
+            :label="t('pokedex.progress', {
+              region: region.label,
+              progress: progressLabel(region.owned, region.speciesCount),
+            })"
             class="mt-1"
           />
         </NuxtLink>

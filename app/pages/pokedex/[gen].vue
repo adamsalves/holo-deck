@@ -22,6 +22,7 @@ const { t } = useI18n()
  * progresso que ninguém pode mover.
  */
 const route = useRoute()
+const localePath = useLocalePath()
 const { loadGeneration, loadCore, seedGeneration } = useDex()
 
 /**
@@ -37,14 +38,16 @@ const generation = computed(() => {
 })
 
 if (generation.value === null) {
-  throw createError({ statusCode: 404, statusMessage: 'Geração fora do dex', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: t('pokedex.region.notFound'), fatal: true })
 }
 
 const { data, error } = await useAsyncData(
   () => `pokedex-gen-${generation.value ?? 0}`,
   async () => {
     const target = generation.value
-    if (target === null) throw createError({ statusCode: 404, statusMessage: 'Geração fora do dex', fatal: true })
+    if (target === null) {
+      throw createError({ statusCode: 404, statusMessage: t('pokedex.region.notFound'), fatal: true })
+    }
 
     const [core, dexGeneration] = await Promise.all([loadCore(), loadGeneration(target)])
     const region = toRegions(core.generations).find(candidate => candidate.generation === target) ?? null
@@ -62,7 +65,7 @@ const { data, error } = await useAsyncData(
 if (error.value) {
   throw createError({
     statusCode: error.value.statusCode ?? 500,
-    statusMessage: error.value.statusMessage ?? 'Não foi possível carregar a geração',
+    statusMessage: error.value.statusMessage ?? t('pokedex.region.load'),
     fatal: true,
   })
 }
@@ -148,18 +151,23 @@ const filtered = computed(() => species.value.filter((entry) => {
   return byType && byRarity && byOwnership
 }))
 
-// The numeral goes in raw here, and `t('generation.label')` stays in the header.
-// This page is not translated yet — it leaves with the Detail PR — so the word
-// from the locale would build *As 151 espécies de Kanto, da Generation I* inside
-// `/en`: half a sentence in each language, in the `<meta description>` a search
-// engine and a link preview read. Half-translated screens are the known state of
-// this phase; half-translated **sentences** are not, and this one goes away when
-// the page itself is translated.
+// `generation.label` goes in whole now, and the comment that used to stand here
+// was about why it could not: while this page was untranslated, the word from the
+// locale would have built *As 151 espécies de Kanto, da Generation I* inside
+// `/en` — half a sentence in each language, in the `<meta description>` a search
+// engine and a link preview read. The page is translated, so the two halves are
+// the same language again.
 useSeoMeta({
-  title: () => `${region.value?.label ?? 'Pokédex'} — Pokédex — Holo Deck`,
-  description: () => region.value === null
-    ? 'Pokédex do Holo Deck.'
-    : `As ${region.value.speciesCount} espécies de ${region.value.label}, da geração ${generationNumeral(region.value.generation)}, com tipos, stats e evolução.`,
+  title: () => (region.value === null
+    ? t('pokedex.seo.title')
+    : t('pokedex.region.seo.title', { region: region.value.label })),
+  description: () => (region.value === null
+    ? t('pokedex.seo.description')
+    : t('pokedex.region.seo.description', {
+        count: region.value.speciesCount,
+        region: region.value.label,
+        generation: t('generation.label', { numeral: generationNumeral(region.value.generation) }),
+      })),
 })
 </script>
 
@@ -172,13 +180,13 @@ useSeoMeta({
       <div class="mx-auto w-full max-w-6xl px-6 py-9">
         <nav
           class="mb-5 text-xs"
-          aria-label="Trilha"
+          :aria-label="t('a11y.breadcrumb')"
         >
           <NuxtLink
-            to="/pokedex"
+            :to="localePath('/pokedex')"
             class="region-header__back"
           >
-            Pokédex
+            {{ t('nav.pokedex') }}
           </NuxtLink>
         </nav>
 
@@ -202,12 +210,21 @@ useSeoMeta({
                  nada. A faixa de dex desceu para o rodapé do grid, que é onde a
                  prancha a desenha. -->
             <p class="numeric region-header__meta">
-              <template v-if="ownedInRegion !== null">
-                <span class="region-header__owned">{{ ownedInRegion }}</span>
-                / {{ region?.speciesCount }} capturados
-              </template>
+              <i18n-t
+                v-if="ownedInRegion !== null"
+                keypath="pokedex.owned"
+                scope="global"
+                tag="span"
+              >
+                <template #owned>
+                  <span class="region-header__owned">{{ ownedInRegion }}</span>
+                </template>
+                <template #total>
+                  {{ region?.speciesCount }}
+                </template>
+              </i18n-t>
               <template v-else>
-                {{ region?.speciesCount }} espécies
+                {{ t('pokedex.speciesCount', { count: region?.speciesCount ?? 0 }, region?.speciesCount ?? 0) }}
               </template>
             </p>
           </div>
@@ -265,7 +282,7 @@ useSeoMeta({
         v-if="filtered.length === 0"
         class="grid-empty"
       >
-        Nenhuma espécie de {{ region?.label }} combina com esses filtros.
+        {{ t('pokedex.region.empty', { region: region?.label ?? '' }) }}
       </p>
     </div>
   </main>

@@ -13,8 +13,8 @@ const { t } = useI18n()
  * e a razão de nenhum deles precisar de 18 regras próprias.
  *
  * O texto sai de `t(typeKey(type))` e não do próprio `type` pelo mesmo motivo que o da
- * raridade: o identificador é em inglês, o documento é `lang="pt-BR"`, e é a
- * etiqueta que o jogador lê.
+ * raridade: o identificador é um id do dex, e o que o jogador lê é a etiqueta —
+ * que desde a Fase 8 existe nos dois idiomas, escolhida pela URL.
  */
 defineProps<{ type: TypeName }>()
 </script>

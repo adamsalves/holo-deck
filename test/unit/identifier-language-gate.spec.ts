@@ -81,7 +81,7 @@ const DOMAIN = [
  */
 const DERIVATIONS = [
   'backoff', 'cond', 'debounce', 'focusables', 'hrefs', 'namespaces', 'overscan', 'paralysed',
-  'pre', 'replayable', 'responder', 'resumable', 'virtualize', 'virtualizer',
+  'pre', 'replayable', 'responder', 'resumable', 'virtualize', 'virtualized', 'virtualizer',
 ]
 
 const BY_HAND = [...PLATFORM, ...TOOLING, ...DOMAIN, ...DERIVATIONS]

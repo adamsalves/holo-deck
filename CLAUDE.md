@@ -50,9 +50,24 @@ Um portão errado é pior que nenhum: ele dá a impressão de que a regra está 
 - **Provar reintroduzindo o defeito e vendo a mensagem de erro** — e também medir contra entrada boa,
   senão um portão que reprova sempre parece igualmente saudável.
 - **Comparar conjuntos, não contagens.** Contagem é o disfarce mais comum de portão que não confere.
+- **Piso por fonte, nunca piso sobre a soma.** Uma asserção do tipo "achei mais que N" é sustentada
+  por qualquer parcela que ainda funcione: quando o total tem duas origens, matar uma inteira não
+  muda a cor do portão. Cobrar cada origem **pelo nome** é o que torna cada uma provadamente viva.
 - Portão de disco não alcança o que chega à tela: o portão importa a mesma lista que o componente
   renderiza, e o e2e itera sobre ela.
+- **Asserção que lê a mesma fonte que o código lê não mede nada.** Comparar a saída contra o próprio
+  locale, ou montar a expectativa a partir do arquivo que o componente resolve, concorda com uma
+  frase cravada tão bem quanto com uma traduzida — os dois lados mudam juntos. O que distingue é
+  medir a **forma** (a frase nua não pode ser a frase com valor menos o objeto) ou medir no **outro
+  idioma**, que é onde o literal aparece.
 - Helper de portão mora em `test/support/`.
+
+As três últimas entraram juntas, e da mesma raiz: o `i18n-gate` repetiu o mesmo defeito em três PRs
+seguidos — fonte nova entrando no conjunto medido e não no piso — e o primeiro conserto somou um
+termo ao piso, o que durou exatamente um PR porque tratava a instância e não a forma. No mesmo
+ciclo, dois testes apresentados como prova de conserto ficaram verdes com o defeito reintroduzido,
+porque comparavam a saída contra o arquivo de onde a saída vinha. **Conserto de portão que não muda
+a forma da asserção reaparece no PR seguinte.**
 
 ## Commits e release
 

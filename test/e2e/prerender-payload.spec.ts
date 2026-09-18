@@ -2,6 +2,8 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { GYM_COUNT } from '../../shared/types/brand.ts'
+import { defaultLocale, localeCodes } from '../support/locales.ts'
 
 /**
  * O dado pré-renderizado de `useAsyncData` é JSON, e a mesma chave vale o mesmo
@@ -141,4 +143,105 @@ test('o dado pré-renderizado é JSON, e a mesma chave vale o mesmo em toda pág
     .map(([key, variants]) => `${key}: ${[...variants.values()].map(pages => pages.join(' ')).join(' ≠ ')}`)
 
   expect.soft(divergent, 'a mesma chave com valores diferentes entre páginas: o cache compartilhado falhou').toEqual([])
+})
+
+/**
+ * Every route the build writes in the default language, it also writes in the
+ * other one — or the gap is named here.
+ *
+ * **This is the half of issue #37 that no browser can take.** The links are what
+ * the crawler follows, so a screen whose `NuxtLink` still carries a literal path
+ * does not fail a rendered assertion — it fails to **produce pages**, silently,
+ * and `/en/pokemon/charizard` goes on being served by the function while every
+ * gate stays green. Before the Pokédex screens were translated the crawler
+ * stopped after nine `/en` pages, and the only symptom was a number nobody was
+ * asserting.
+ *
+ * It enumerates who is OUT. The nine `/en/battle/N` are the whole exception, and
+ * they are not a crawler failure: the League body is a `<ClientOnly>`, so the
+ * links to `/battle/N` exist in no served HTML, and the pt-BR ones are only
+ * prerendered because `nitro.prerender.routes` lists them by hand.
+ *
+ * **Being on that list by hand is not what keeps them out of `/en`** — `/login`
+ * and `/league` sit in the same list with no prefix and get `/en` twins anyway,
+ * and nothing served links to `/en/login` at all. What emits the twins is
+ * `@nuxtjs/i18n`, which hooks `prerender:routes` and adds one route per locale
+ * for every **page whose path has no parameter left** in it
+ * (`collectCompactPrerenderRoutes`, guarded by `remainingParamRE = /:[A-Z_]/i`).
+ * `/battle/:gymId` still carries one, so the module emits nothing for it and the
+ * hand-written list — which spells nine concrete paths, in one language — is all
+ * there is. Measured against this build, not read off the config.
+ *
+ * The fix is the same either way: whoever adds the locale prefix to those nine
+ * deletes this exception. The mechanism matters because the other reading —
+ * "a route listed by hand only comes out in one language" — is a general rule,
+ * and it is false. Until then the `nuxt.config.ts` docblock that promises "every
+ * valid route is prerendered" is true for 1.043 routes out of 1.052.
+ *
+ * Built from `GYM_COUNT`, so a tenth gym is exempt the day it is written and a
+ * gym removed stops being forgiven.
+ */
+const ROUTES_ONLY_IN_DEFAULT: readonly string[] = Array.from(
+  { length: GYM_COUNT },
+  (_, index) => `/battle/${index + 1}`,
+)
+
+/**
+ * Every route the build wrote, as a path with no locale prefix, by locale.
+ *
+ * The locale **root** is the case worth spelling out: `/en` is the home page of
+ * the other language, not a page called *en* in this one. Matching only
+ * `/en/…` files it in the default bucket, where it becomes a route `/en` that
+ * the other language is then reported as missing — which is what the first
+ * version of this did, and the failure names the wrong thing twice.
+ */
+async function routesByLocale(): Promise<Map<string, Set<string>>> {
+  const entries = await readdir(PUBLIC, { withFileTypes: true, recursive: true })
+  const prefixed = localeCodes().filter(code => code !== defaultLocale())
+  const byLocale = new Map<string, Set<string>>(localeCodes().map(code => [code, new Set<string>()]))
+
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name !== 'index.html') continue
+
+    const relativePath = relative(PUBLIC, entry.parentPath)
+    const route = relativePath === '' ? '/' : `/${relativePath}`
+    const code = prefixed.find(one => route === `/${one}` || route.startsWith(`/${one}/`))
+
+    if (code === undefined) byLocale.get(defaultLocale())?.add(route)
+    else byLocale.get(code)?.add(route.slice(code.length + 1) || '/')
+  }
+
+  return byLocale
+}
+
+test('every prerendered route exists in each language, or is written down as an exception', async () => {
+  const byLocale = await routesByLocale()
+  const base = byLocale.get(defaultLocale()) ?? new Set<string>()
+
+  // `[] === []` passes: a build that never ran, or a renamed directory, would
+  // leave both comparisons below measuring nothing and looking healthy for it.
+  expect(base.size, 'no prerendered route at all — did the build run?').toBeGreaterThan(1000)
+  expect(localeCodes().length).toBeGreaterThan(1)
+
+  for (const [code, routes] of byLocale) {
+    if (code === defaultLocale()) continue
+
+    const missing = [...base].filter(route => !routes.has(route)).sort()
+
+    expect(
+      missing.filter(route => !ROUTES_ONLY_IN_DEFAULT.includes(route)),
+      `the prerender never reached these routes in ${code}`,
+    ).toEqual([])
+
+    // And the other side: an exception that stopped applying leaves the list,
+    // or it outlives the route it forgave and hides the next one.
+    expect(
+      ROUTES_ONLY_IN_DEFAULT.filter(route => routes.has(route)),
+      `these routes already exist in ${code} and need no exception`,
+    ).toEqual([])
+
+    // No route only in `/en`: a prefix leaking into the path itself
+    // (`/en/en/deck`) would show up here, and nowhere above.
+    expect([...routes].filter(route => !base.has(route)).sort(), `route only in ${code}`).toEqual([])
+  }
 })

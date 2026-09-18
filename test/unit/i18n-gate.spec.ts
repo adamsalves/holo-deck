@@ -186,6 +186,14 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * of a tab in the old Pokédex, which is a proper noun and not a word; and the two
  * `species.seo.*` titles are a species name between em dashes. None of them is a
  * paste — checked one at a time, which is the only way this list is worth having.
+ *
+ * The Pokédex screens brought three more of the same two kinds: `dex.card.shiny`
+ * is the borrowed word again, and the two remaining `*.seo.title` are a proper
+ * noun between em dashes. What did **not** land here is `pokedex.speciesCount`,
+ * and it is worth saying why: its two English plural forms are identical to each
+ * other (*species* does not inflect), but the Portuguese ones are not, so the
+ * two locales differ and the assertion below never sees it. A message can repeat
+ * itself inside one language without repeating across languages.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -199,6 +207,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'deck.seo.title',
   'deck.slotsCount',
   'dex.bst',
+  'dex.card.shiny',
   'dex.stats.title',
   'hub.shiny',
   'league.next.teamSize',
@@ -215,6 +224,8 @@ const IDENTICAL_LABELS: readonly string[] = [
   'packs.rates.shinyChip',
   'packs.seo.title',
   'packs.shop.title',
+  'pokedex.region.seo.title',
+  'pokedex.seo.title',
   'rarity.ultra',
   'species.about.habitat',
   'species.about.training',
@@ -269,21 +280,40 @@ const LITERAL_KEY = /(?<![A-Za-z0-9_])\$?t\(\s*(['"])([\w]+(?:\.[\w]+)+)\1/g
  */
 const KEYPATH = /\bkeypath="([\w]+(?:\.[\w]+)+)"/g
 
-/** Every key spelled out inside `KEY_AREAS`, swept from disk. */
-function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
-  return roots.flatMap((root) => {
-    const files = walkFiles(join(REPO_ROOT, root), skip, hasExtension(['.vue', '.ts']))
-
-    return files.flatMap((relativePath) => {
-      const source = stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))
-
-      return [
-        ...[...source.matchAll(LITERAL_KEY)].map(match => match[2]),
-        ...[...source.matchAll(KEYPATH)].map(match => match[1]),
-      ].filter((key): key is string => key !== undefined)
-    })
-  })
+/** The files of `roots`, with comments blanked out before any expression reads them. */
+function sourcesIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
+  return roots.flatMap(root =>
+    walkFiles(join(REPO_ROOT, root), skip, hasExtension(['.vue', '.ts']))
+      .map(relativePath => stripComments(readFileSync(join(REPO_ROOT, relativePath), 'utf8'))))
 }
+
+/**
+ * What **one** expression finds, kept separate from what the other finds.
+ *
+ * The two used to be merged inside a single sweep, and that is what made the
+ * floor below unprovable: with `LITERAL_KEY` broken so it matched nothing, the
+ * 17 keys `KEYPATH` contributes held the total above the floor and the guard
+ * stayed green with the literal sweep entirely dead. One expression covering the
+ * death of the other is the same shape as a source landing in the measured set
+ * and not in the floor — the defect the evolution keys arrived by — so the fix
+ * is not another term on the right-hand side, it is a floor **per expression**.
+ */
+function matched(sources: readonly string[], pattern: RegExp, group: number): string[] {
+  return sources.flatMap(source =>
+    [...source.matchAll(pattern)]
+      .map(match => match[group])
+      .filter((key): key is string => key !== undefined))
+}
+
+/** Every key spelled out inside `roots`, by either expression. */
+function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
+  const sources = sourcesIn(roots, skip)
+
+  return [...matched(sources, LITERAL_KEY, 2), ...matched(sources, KEYPATH, 1)]
+}
+
+/** Read once: both sweeps below ask the same files different questions. */
+const SCANNED_SOURCES: readonly string[] = sourcesIn(KEY_AREAS, new Set(['node_modules']))
 
 /**
  * Toda chave citada literalmente em `KEY_AREAS`, varrida do disco.
@@ -297,7 +327,18 @@ function keysIn(roots: readonly string[], skip: ReadonlySet<string>): string[] {
  * — e cai na asserção de órfã como falha ruidosa, que é o lado certo de errar.
  */
 function literalKeys(): string[] {
-  return keysIn(KEY_AREAS, new Set(['node_modules']))
+  return matched(SCANNED_SOURCES, LITERAL_KEY, 2)
+}
+
+/**
+ * O que a tela pede por `<i18n-t keypath="…">`, varrido à parte.
+ *
+ * Separado de `literalKeys()` para que cada expressão tenha piso próprio: quando
+ * as duas somavam num conjunto só, matar uma delas por inteiro não mudava a cor
+ * de portão nenhum.
+ */
+function keypathKeys(): string[] {
+  return matched(SCANNED_SOURCES, KEYPATH, 1)
 }
 
 /**
@@ -309,6 +350,7 @@ function literalKeys(): string[] {
  */
 const USED_KEYS: ReadonlySet<string> = new Set([
   ...literalKeys(),
+  ...keypathKeys(),
   ...NAV_KEYS,
   ...VOCABULARY_KEYS,
   ...NARRATION_KEYS_USED,
@@ -454,14 +496,24 @@ describe('as chaves e quem as usa', () => {
    * isso visível — a barra resolve as dela por variável, então toda chave
    * literal encontrada veio mesmo da varredura.
    *
-   * **Every source that feeds `USED_KEYS` without going through the scan has to
-   * be on the right-hand side too.** Each one that is not is that many keys of
-   * slack, and slack is what lets a dead scan look healthy: the 43 evolution
-   * keys arrived in `USED_KEYS` and not here, and with them the assertion went
-   * from failing on a broken `LITERAL_KEY` to passing on one.
+   * **A floor over the total was the wrong shape, and it took two PRs to see
+   * it.** The first reading was that every source feeding `USED_KEYS` without
+   * going through the sweep had to appear on the right-hand side too — the 43
+   * evolution keys had arrived in the set and not in the floor, and adding them
+   * brought the assertion back. But the same hole reopened immediately from the
+   * other sweep: with `LITERAL_KEY` broken so it matched nothing at all, the 17
+   * keys `KEYPATH` finds kept the total above the floor and this test stayed
+   * green while the literal sweep was dead.
+   *
+   * One total can always be held up by whichever part still works, so the floor
+   * is now **per expression**. Each sweep is asked, by name, to prove it still
+   * finds something; the total floor stays as the second line of defence, and a
+   * third expression gets its own assertion rather than a third term here.
    */
-  it('acha chave literal além das da barra', () => {
+  it('keeps every sweep it depends on provably alive', () => {
     expect(NAV_KEYS.length).toBeGreaterThan(0)
+    expect(new Set(literalKeys()).size, 'the `t(...)` sweep found nothing').toBeGreaterThan(0)
+    expect(new Set(keypathKeys()).size, 'the `keypath=` sweep found nothing').toBeGreaterThan(0)
     expect(USED_KEYS.size).toBeGreaterThan(
       NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length
       + EVOLUTION_KEYS_USED.length,

@@ -49,6 +49,18 @@ const missingCount = computed(() => props.total - (props.ownedCount ?? 0))
 const active = computed(() =>
   types.value.length > 0 || rarities.value.length > 0 || owned.value !== 'all')
 
+/**
+ * The count the *all* chip carries — the whole fraction, filtered or not.
+ *
+ * Built here and not in the template because the filtered form is a **sentence**:
+ * `18 de 151` has a word in the middle of it, and the board draws that word. A
+ * `/` would have translated itself and changed what the chip says; two messages
+ * keep the screen and let the word move.
+ */
+const countLabel = computed(() => (active.value
+  ? t('dex.filters.counted', { shown: props.shown, total: props.total })
+  : String(props.total)))
+
 function toggleType(type: TypeName) {
   types.value = types.value.includes(type)
     ? types.value.filter(current => current !== type)
@@ -79,7 +91,15 @@ function clear() {
       :aria-pressed="!active"
       @click="clear"
     >
-      Todos · <span class="numeric">{{ active ? `${props.shown} de ${props.total}` : props.total }}</span>
+      <i18n-t
+        keypath="dex.filters.all"
+        scope="global"
+        tag="span"
+      >
+        <template #count>
+          <span class="numeric">{{ countLabel }}</span>
+        </template>
+      </i18n-t>
     </button>
 
     <!-- Posse. Só aparece quando há coleção carregada: o grupo inteiro some em
@@ -92,7 +112,15 @@ function clear() {
         :aria-pressed="owned === 'owned'"
         @click="owned = owned === 'owned' ? 'all' : 'owned'"
       >
-        Possuídos · <span class="numeric">{{ props.ownedCount }}</span>
+        <i18n-t
+          keypath="dex.filters.owned"
+          scope="global"
+          tag="span"
+        >
+          <template #count>
+            <span class="numeric">{{ props.ownedCount }}</span>
+          </template>
+        </i18n-t>
       </button>
 
       <button
@@ -102,7 +130,15 @@ function clear() {
         :aria-pressed="owned === 'missing'"
         @click="owned = owned === 'missing' ? 'all' : 'missing'"
       >
-        Faltando · <span class="numeric">{{ missingCount }}</span>
+        <i18n-t
+          keypath="dex.filters.missing"
+          scope="global"
+          tag="span"
+        >
+          <template #count>
+            <span class="numeric">{{ missingCount }}</span>
+          </template>
+        </i18n-t>
       </button>
     </template>
 

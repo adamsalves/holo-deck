@@ -4,6 +4,8 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { isGenerationData } from '~~/shared/types/dex'
 import DexGrid from '~/components/dex/DexGrid.vue'
 import gen1 from '~~/public/data/gen-1.json'
+import ptSource from '~~/i18n/locales/pt-BR.json?raw'
+import { fragmentOf, messagesFrom } from '../support/default-messages'
 
 /**
  * O rodapé do grid, que é a única evidência visível da promessa da Fase 3.
@@ -21,7 +23,21 @@ import gen1 from '~~/public/data/gen-1.json'
  * resolve o caminho por `fileURLToPath(import.meta.url)`, e no ambiente `nuxt` o
  * `import.meta.url` é uma URL http — o helper morre no import. O guarda é o
  * mesmo que `useDex()` usa, então o dado entra marcado e sem um único cast.
+ *
+ * **O locale entra pelo mesmo caminho, e pela mesma razão.** As frases do rodapé
+ * mudaram de lugar na Fase 8 — elas moram em `i18n/locales/` agora —, e uma
+ * cópia em português escrita aqui passaria a afirmar contra si mesma: trocada a
+ * tradução, este arquivo reprovaria sem que nada tivesse quebrado. `message()`
+ * de `test/support/locales.ts` seria o certo e é o que a e2e usa; aqui ele não
+ * alcança, pelo motivo do parágrafo acima.
+ *
+ * O leitor está em `test/support/default-messages.ts`, e o docblock de lá conta
+ * por que ele existe ao lado do `locales.ts` e por que o import do JSON precisa
+ * de `?raw`.
  */
+
+const message = messagesFrom(ptSource)
+const VIRTUALIZED = fragmentOf(message, 'dex.grid.virtualized', 'counted')
 
 const raw: unknown = gen1
 if (!isGenerationData(raw)) throw new Error('gen-1.json não passou pelo guarda de leitura')
@@ -52,9 +68,9 @@ describe('a forma completa', () => {
     const html = grid.html()
 
     expect(cardCount(html)).toBe(40)
-    expect(footerText(html)).toContain('40 de 40 renderizados')
+    expect(footerText(html)).toContain(message('dex.grid.rendered', { rendered: 40, total: 40 }))
     // A ressalva aqui seria falsa: é a forma que o servidor renderiza inteira.
-    expect(footerText(html)).not.toContain('scroll virtualizado')
+    expect(footerText(html)).not.toContain(VIRTUALIZED)
   })
 })
 
@@ -72,7 +88,9 @@ describe('a forma virtualizada', () => {
     })
     const html = grid.html()
 
-    expect(footerText(html)).toContain(`${cardCount(html)} de 151 renderizados`)
+    expect(footerText(html)).toContain(
+      message('dex.grid.rendered', { rendered: cardCount(html), total: 151 }),
+    )
   })
 
   it('não anuncia scroll virtualizado quando não está retendo nada', async () => {
@@ -82,8 +100,8 @@ describe('a forma virtualizada', () => {
     })
     const text = footerText(grid.html())
 
-    expect(text).toContain('4 de 4 renderizados')
-    expect(text).not.toContain('scroll virtualizado')
+    expect(text).toContain(message('dex.grid.rendered', { rendered: 4, total: 4 }))
+    expect(text).not.toContain(VIRTUALIZED)
   })
 
   it('anuncia quando está', async () => {
@@ -95,10 +113,10 @@ describe('a forma virtualizada', () => {
     // Se o ambiente de teste renderizar as 151 numa janela infinita, a ressalva
     // não deve aparecer — é a mesma regra, e não uma exceção do teste.
     if (cardCount(html) < KANTO.length) {
-      expect(footerText(html)).toContain('scroll virtualizado')
+      expect(footerText(html)).toContain(VIRTUALIZED)
     }
     else {
-      expect(footerText(html)).not.toContain('scroll virtualizado')
+      expect(footerText(html)).not.toContain(VIRTUALIZED)
     }
   })
 

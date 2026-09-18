@@ -513,14 +513,13 @@ Entre o primeiro e o último, `/en` mostra telas **meio traduzidas** — e isso 
 estado conhecido e datado, não defeito solto. Em inglês hoje: a barra global, o
 painel de conta, o pular-para-o-conteúdo, o **vocabulário do jogo** (as 6
 raridades, os 18 tipos, as 6 siglas de stat e os 9 habitats), o Hub, `/packs`,
-`/collection`, `/deck`, `/league`, `/battle/N` e a tela de **Detalhe** de espécie.
+`/collection`, `/deck`, `/league`, `/battle/N`, a tela de **Detalhe** de espécie
+e as duas telas da **Pokédex**.
 
 O que ainda sai em português dentro de `/en`, com o PR que o leva:
 
 | onde | o que se lê em `/en` | leva |
 | --- | --- | --- |
-| `/pokedex` e `/pokedex/N` | a prosa das duas telas, o rodapé do grid e os filtros | PR das telas da Pokédex |
-| `aria-label` da carta do grid | `número 25`, `não capturado` | PR das telas da Pokédex |
 | `/rules` | a página inteira, menos a escada de raridade | PR de `/rules` |
 | `/settings` | a página inteira | PR de `/settings` |
 | número | `1.600`, `0,4%`, `6,9 kg` — separador de `pt-BR` fixo | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
@@ -542,23 +541,35 @@ o bastante para compilar é plausível o bastante para entregar meia frase.
 A vírgula entre cláusulas é a única composição que sobrou, e ela atravessa:
 *Level 16, at night* lê em inglês como *Nível 16, de noite* lê em português.
 
-### `/en` não é pré-renderizada por inteiro
+### O que dobra o pré-render é o link, não o `hreflang`
 
-O build fecha **1.061 páginas, 9 delas em `/en`** — e as 1.052 restantes são
-exatamente o build anterior à i18n. `/en/pokemon/*` (1.025) e `/en/pokedex/N` (9)
-**não existem no pré-render**: o rastreador do Nitro não chega nelas, porque nada
-em `/en` linka para lá.
+O build fechava **1.061 páginas, 9 delas em `/en`**. Depois do PR das telas da
+Pokédex são **2.095, com 1.043 em `/en`, e 138 MB** — e o que mudou foi uma linha
+por tela: `to="/pokedex/1"` virou `localePath('/pokedex/1')`.
 
-A consequência está num docblock que deixou de valer. O `nuxt.config.ts` afirma
-que "toda rota válida é pré-renderizada, então a função só é alcançada por URL
-inválida — que é justamente quando `useDex()` precisa ler o índice para responder
-404". Para a árvore `/en/pokemon/*` isso é falso: ela é servida pela função, que
-lê o índice a cada requisição. Funciona — é o que `yarn check:vercel-bundle`
-garante estar no pacote — e custa mais do que o docblock promete.
+`crawlLinks: true` é quem alcança as 1025 páginas de espécie, e ele só segue o
+que está escrito no HTML servido. Enquanto os links de região de `/en/pokedex`
+apontavam para `/pokedex/1`, o rastreador entrava na árvore **em português** e
+`/en` parava em nove páginas. O plano da fase atribuía essa dobra ao
+`useLocaleHead`, que faria o rastreador seguir as tags `alternate`; medido, ela
+chega antes, com a issue #37. Foi por isso que a tela de Detalhe foi traduzida
+**primeiro**: na ordem inversa, o build teria pré-renderizado 1025 páginas
+`/en/pokemon/*` em português.
 
-Fica registrado e **em aberto**: ou as rotas entram em `nitro.prerender.routes`,
-ou o docblock passa a dizer o que é verdade. A decisão cabe ao PR 4, que é quem
-leva o `hreflang` e o seletor de idioma.
+O custo é menor do que "dobrar" sugere: o build foi de 36s para 44s, porque as
+páginas novas são o mesmo render com outro locale, e o dex já está em memória.
+
+**O que sobra são nove rotas, e elas são nomeadas.** `/en/battle/1..9` continuam
+fora: o corpo da Liga é um `<ClientOnly>`, então os links para `/battle/N` não
+existem em HTML nenhum, e as nove em português só são pré-renderizadas porque
+`nitro.prerender.routes` as lista **à mão, sem prefixo de idioma**. Enquanto isso
+não mudar, o docblock do `nuxt.config.ts` que promete "toda rota válida é
+pré-renderizada" vale para 1.043 rotas de 1.052 em `/en`. A decisão cabe ao PR do
+seletor e do SEO — e a lacuna não depende mais de ninguém se lembrar dela: a
+asserção de paridade de rotas em
+[`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts)
+enumera as nove como exceção, montada de `GYM_COUNT`, e reprova no dia em que
+sobrar uma décima.
 
 ### Segurado até a fase que cria o dado
 
@@ -1268,7 +1279,14 @@ literal — `` :to="`/battle/${gym}`" `` — não existe em lista nenhuma, e enu
 quem **sai**: link novo é infrator por omissão, e a lista de exceções esvazia com
 a issue #37.
 
-As duas metades, hoje em dois arquivos: `test/e2e/collection.spec.ts` abre as
+E há uma terceira metade, que nenhum navegador alcança:
+[`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts) compara
+o **conjunto de rotas que o build escreveu** em cada idioma. Link literal não
+reprova asserção de render nenhuma — ele deixa de *produzir página*, e o sintoma
+é um número que ninguém está afirmando. Foi assim que `/en` ficou em nove páginas
+por dois PRs.
+
+As duas metades de tela, hoje em dois arquivos: `test/e2e/collection.spec.ts` abre as
 quatro telas em `/en` e `test/e2e/league.spec.ts` abre a Liga e a batalha, e os
 dois cobram o prefixo de todo `href` interno **e o idioma do corpo da tela** —
 sem a segunda, uma chave traduzida para nada chegaria ao jogador sem asserção no
@@ -1328,7 +1346,7 @@ parágrafo argumenta.
 
 E a paridade entre os locales ganhou as duas asserções que faltavam, em
 `test/unit/i18n-gate.spec.ts`: **toda** chave tem de diferir entre os idiomas ou
-estar nomeada em `IDENTICAL_LABELS` (são 35 hoje, quase todas vocabulário do
+estar nomeada em `IDENTICAL_LABELS` (são 38 hoje, quase todas vocabulário do
 jogo), e toda mensagem tem de pedir os mesmos `{placeholder}` e o mesmo número de
 formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves de então podiam
 ser coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,

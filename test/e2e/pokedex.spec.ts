@@ -7,6 +7,8 @@ import {
   label,
   localeCodes,
   localeUrl,
+  message,
+  messagePattern,
   spells,
 } from '../support/locales.ts'
 
@@ -83,8 +85,12 @@ test('o grid virtualiza depois de montar — o DOM não segura as 151', async ({
   // real decidindo quantas colunas cabem. É o outro lado do
   // `test/nuxt/dex-grid.spec.ts`, que mede a mesma regra sem layout.
   const rendered = await page.locator('.dex-card').count()
-  await expect(page.locator('.grid-footer__count')).toContainText(`${rendered} de 151 renderizados`)
-  await expect(page.locator('.grid-footer__count')).toContainText('scroll virtualizado')
+  await expect(page.locator('.grid-footer__count')).toContainText(
+    message('dex.grid.rendered', defaultLocale(), { rendered, total: 151 }),
+  )
+  await expect(page.locator('.grid-footer__count')).toContainText(
+    messagePattern('dex.grid.virtualized', defaultLocale()),
+  )
 })
 
 test('os filtros de tipo e raridade compõem — OU dentro do grupo, E entre eles', async ({ page }) => {
@@ -415,3 +421,123 @@ test('the Detail screen reads in the language of the URL, links included', async
     ).toBeVisible()
   }
 })
+
+/**
+ * The two Pokédex screens, in the language of the URL — and the links that make
+ * the rest of `/en` exist at all.
+ *
+ * **The links are the load-bearing half, and they are load-bearing twice.** For
+ * the player they are issue #37: from `/en/pokedex`, a literal `to="/pokedex/1"`
+ * renders the same `href` it renders in Portuguese and drops whoever clicks it
+ * out of English with no way back but the URL bar. For the build they are the
+ * crawler's only path: with them literal, the prerender stopped after nine `/en`
+ * pages, and with them localized it reaches 1.043 — measured, and asserted route
+ * by route in `test/e2e/prerender-payload.spec.ts`.
+ *
+ * So this walks the same two hops a player walks, in both languages, and reads
+ * the `href` at each one: index → region → species. The species page itself is
+ * the previous PR's test; what is new is that a click gets there.
+ */
+test('the Pokédex screens read in the language of the URL, links included', async ({ page }) => {
+  const codes = localeCodes()
+
+  expect(codes.length).toBeGreaterThan(1)
+
+  for (const locale of codes) {
+    const prefix = locale === defaultLocale() ? '' : `/${locale}`
+
+    await page.goto(localeUrl('/pokedex', locale))
+
+    await expect(page.getByText(label('pokedex.overline', locale))).toBeVisible()
+    await expect(page.getByText(label('pokedex.intro', locale))).toBeVisible()
+
+    // The word of the other language is absent. `pokedex.overline` is two words
+    // in both, so a page stuck in one of them is visible here — which a shared
+    // abbreviation would not be.
+    const foreign = codes
+      .filter(code => code !== locale)
+      .map(code => label('pokedex.overline', code))
+      .filter(text => text !== label('pokedex.overline', locale))
+
+    expect(foreign.length, `no wording left that tells ${locale} apart`).toBeGreaterThan(0)
+
+    const header = await page.locator('header').first().innerText()
+
+    expect(
+      foreign.filter(text => spells(header, text)),
+      `/pokedex in ${locale} wrote the other language`,
+    ).toEqual([])
+
+    // The progress bar's `aria-valuetext`, which nothing else reaches. It is an
+    // attribute, so it never lands in `innerText` and the sweep above walks past
+    // it; it is interpolated, so `defaultOnlyLabels` skips it too. It held a raw
+    // `capturados` until this PR — on this very screen, in English — and the
+    // unit test that mounts the bar cannot see that: it builds its expectation
+    // from the same locale file the component reads, so it agrees with a
+    // hardcoded string as readily as with a translated one. Only the other
+    // language tells the two apart, which is why the assertion lives here.
+    const bar = page.locator('[role="progressbar"]').first()
+
+    await expect(bar, `/pokedex in ${locale} drew no progress bar`).toBeVisible()
+
+    const valueText = await bar.getAttribute('aria-valuetext') ?? ''
+
+    expect(
+      spells(valueText, progressWord(locale)),
+      `the progress bar in ${locale} does not read from the locale`,
+    ).toBe(true)
+    expect(
+      codes
+        .filter(code => code !== locale && progressWord(code) !== progressWord(locale))
+        .filter(code => spells(valueText, progressWord(code))),
+      `the progress bar in ${locale} wrote the other language`,
+    ).toEqual([])
+
+    // Hop one: the region card. This is the link the prerender crawler follows.
+    const region = page.locator(`a[href="${prefix}/pokedex/1"]`)
+
+    await expect(region, `/pokedex in ${locale} did not link the region in-locale`).toBeVisible()
+    await region.click()
+    await expect(page).toHaveURL(new RegExp(`${prefix}/pokedex/1$`))
+
+    // The chips carry a word and a count, and the count is a slot inside the
+    // message — a chip that lost its number would still match the word.
+    await expect(page.getByRole('button', {
+      name: message('dex.filters.all', locale, { count: 151 }),
+    })).toBeVisible()
+
+    await expect(page.locator('.grid-footer__note')).toHaveText(label('dex.grid.note', locale))
+
+    // Hop two: a card. `PokeCard` renders the link for every screen that draws a
+    // card, so this is the one assertion covering all 1025 of them.
+    const card = page.locator(`a[href="${prefix}/pokemon/bulbasaur"]`)
+
+    await expect(card, `/pokedex/1 in ${locale} did not link the species in-locale`).toBeVisible()
+
+    // And the accessible name of that link is a sentence, not a key: it is built
+    // from four messages and read out in place of the card's artwork.
+    //
+    // Read with `spells()` rather than a regular expression of our own: it is
+    // the same escaping `locales.ts` already does in two places, plus the word
+    // borders a bare `new RegExp` has no way to carry — without them, a rarity
+    // that is a prefix of another matches inside it.
+    const cardLabel = await card.getAttribute('aria-label') ?? ''
+
+    expect(
+      spells(cardLabel, label('rarity.common', locale)),
+      `the card in ${locale} does not name its rarity`,
+    ).toBe(true)
+  }
+})
+
+/**
+ * The word `collection.progress.valueText` spells around its count.
+ *
+ * Taken from the message with the placeholder cut out, and not written here:
+ * *capturados* and *caught* are the halves that tell the two renderings apart,
+ * and a copy of either in this file would go stale the day the wording changes —
+ * leaving an assertion that still passes and no longer means anything.
+ */
+function progressWord(code: string): string {
+  return label('collection.progress.valueText', code).replaceAll(/\{\w+\}/g, '').trim()
+}

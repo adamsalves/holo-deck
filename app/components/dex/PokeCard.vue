@@ -109,7 +109,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
       <!-- O link **cobre** a carta em vez de envolvê-la, e é isso que permite o
            rodapé hospedar um botão sem aninhar interativos. Quem precisa ficar
            acima dele sobe de camada: ver `.poke-card__link` no estilo. -->
-      <NuxtLink
+      <NuxtLinkLocale
         v-if="link"
         :to="link.to"
         :aria-label="link.label"
@@ -131,8 +131,8 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
         </h2>
         <!-- A raridade nunca é comunicada só por brilho: a etiqueta textual está
              sempre presente, inclusive com reduced-motion ligado. É regra do canvas.
-             Em português, porque o documento é `lang="pt-BR"` e quem lê a carta —
-             inclusive o leitor de tela — lê a frase inteira no mesmo idioma.
+             No idioma da URL, porque quem lê a carta — inclusive o leitor de
+             tela — lê a frase inteira no mesmo idioma.
 
              O slot existe porque a prancha *Pokédex* põe os chips de tipo neste
              lugar em vez da etiqueta: num grid, o que se varre é o tipo. Quem
