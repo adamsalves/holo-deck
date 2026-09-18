@@ -330,7 +330,10 @@ useSeoMeta({
       </section>
 
       <!-- PACKS -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="packs"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.packs.title') }}
         </h2>
@@ -407,7 +410,10 @@ useSeoMeta({
       </section>
 
       <!-- PÓ E FORJA -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="forge"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.forge.title') }}
         </h2>
@@ -447,7 +453,10 @@ useSeoMeta({
 
     <div class="rules__row rules__row--wide">
       <!-- BATALHA -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="battle"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.battle.title') }}
         </h2>
@@ -573,7 +582,10 @@ useSeoMeta({
       </section>
 
       <!-- CONDIÇÕES -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="conditions"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.conditions.title') }}
         </h2>
@@ -606,7 +618,10 @@ useSeoMeta({
 
     <div class="rules__row rules__row--wide">
       <!-- A LIGA -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="league"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.league.title') }}
         </h2>
@@ -659,7 +674,10 @@ useSeoMeta({
       </section>
 
       <!-- ECONOMIA -->
-      <section class="rules__panel">
+      <section
+        class="rules__panel"
+        data-panel="economy"
+      >
         <h2 class="rules__panel-title">
           {{ t('rules.economy.title') }}
         </h2>

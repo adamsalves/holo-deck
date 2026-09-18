@@ -263,9 +263,13 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
  * repository already refuses to accept. `[data-panel="rarity"]` holds one line
  * per tier and nothing else.
  *
- * It asserts what is on the page and never what is absent: the page's own prose
- * is Portuguese in both languages until the PR that translates `/rules`, so a
- * `not.toContainText` here would be measuring that PR instead of this one.
+ * It asserts what is on the page and never what is absent, and now for a
+ * different reason than when it was written: the line above said the page's own
+ * prose stayed Portuguese in both languages *until the PR that translates
+ * `/rules`*, which has since landed. What is absent from that page is measured
+ * by `test/e2e/rules.spec.ts`, over the whole `rules.*` namespace and in both
+ * directions; repeating a `not.toContainText` here would be a second, weaker
+ * copy of it — this test is about the rarity **ladder**, and it stays that.
  */
 test('the rarity vocabulary reaches the screen in the language of the URL', async ({ page }) => {
   const codes = localeCodes()
