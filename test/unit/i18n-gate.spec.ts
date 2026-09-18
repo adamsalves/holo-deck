@@ -6,6 +6,7 @@ import { EVOLUTION_KEY_LIST } from '~~/shared/game/evolution'
 import { NAV_ACCOUNT, NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 import { NARRATION_KEY_LIST, NARRATION_KEYS } from '~~/app/utils/battle-narration'
 import { TURN_STEPS, TURN_STEP_KEYS, turnStepKey } from '~~/app/utils/turn-order'
+import { reasonKey, RECOVERY_KEYS, RECOVERY_REASONS, recoveryMessageKey } from '~~/app/utils/recovery-reason'
 import {
   affectedKey,
   ailmentKey,
@@ -196,6 +197,14 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * two locales differ and the assertion below never sees it. A message can repeat
  * itself inside one language without repeating across languages.
  *
+ * `/settings` brought four, of the two kinds already here. `settings.save.title`
+ * is *Save* — the word this game borrowed for the thing itself, the way `nav.deck`
+ * and `collection.card.shiny` are borrowed — and `settings.stats.size` is `KB`,
+ * a unit. `settings.version` is nothing but placeholders, a `·` and the letter
+ * `v`. `settings.via` is *via GitHub*: a proper noun behind a preposition that
+ * both languages spell the same, which was checked rather than assumed — the
+ * other short prepositions on that screen do differ.
+ *
  * `/rules` brought six, and five of them are the same borrowing the list is
  * already full of: *Packs*, *Pity*, *Shiny* and *TIER* are how this game writes
  * those words in Portuguese — `nav.packs` and `collection.table.tier` were
@@ -205,7 +214,9 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * stamps it beside `crit` and `random`, which do differ (*crítico*,
  * *aleatório*) and are therefore not here.
  */
-const IDENTICAL_LABELS: readonly string[] = [
+const IDENTICAL_LABELS: readonly string[
+
+] = [
   'collection.card.scrap',
   'collection.card.shiny',
   'collection.card.shinyBadge',
@@ -243,6 +254,10 @@ const IDENTICAL_LABELS: readonly string[] = [
   'rules.packs.pity',
   'rules.packs.shiny',
   'rules.packs.title',
+  'settings.save.title',
+  'settings.stats.size',
+  'settings.version',
+  'settings.via',
   'species.about.habitat',
   'species.about.training',
   'species.seo.title',
@@ -372,6 +387,7 @@ const USED_KEYS: ReadonlySet<string> = new Set([
   ...NARRATION_KEYS_USED,
   ...EVOLUTION_KEYS_USED,
   ...TURN_STEP_KEYS,
+  ...RECOVERY_KEYS,
 ])
 
 describe('paridade entre os locales', () => {
@@ -533,8 +549,31 @@ describe('as chaves e quem as usa', () => {
     expect(new Set(keypathKeys()).size, 'the `keypath=` sweep found nothing').toBeGreaterThan(0)
     expect(USED_KEYS.size).toBeGreaterThan(
       NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length
-      + EVOLUTION_KEYS_USED.length + TURN_STEP_KEYS.length,
+      + EVOLUTION_KEYS_USED.length + TURN_STEP_KEYS.length + RECOVERY_KEYS.length,
     )
+  })
+
+  /**
+   * The recovery reasons' own side of the derivation, asked by name.
+   *
+   * The sixth source to enter `USED_KEYS` without going through a sweep, and the
+   * term above is necessary and not sufficient for the reason this file has
+   * written down twice already: a sum is held up by whichever part still works.
+   *
+   * **Two families over one enum, and the count is what says so.** The boot
+   * notice writes a paragraph about a save that could not be loaded; Settings
+   * names the reason inside a sentence about a file the player just chose. A
+   * `map` that lost one family would leave three translations orphaned while
+   * the other three kept this green.
+   */
+  it('derives two keys per recovery reason, one per place that explains it', () => {
+    expect(RECOVERY_REASONS.length).toBeGreaterThan(0)
+    expect(RECOVERY_KEYS).toEqual([
+      ...RECOVERY_REASONS.map(reasonKey),
+      ...RECOVERY_REASONS.map(recoveryMessageKey),
+    ])
+    expect(RECOVERY_KEYS.length).toBe(RECOVERY_REASONS.length * 2)
+    expect(new Set(RECOVERY_KEYS).size).toBe(RECOVERY_KEYS.length)
   })
 
   /**

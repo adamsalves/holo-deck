@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import type { Translate } from '~~/shared/types/game'
 import { agoLabel } from '~~/app/utils/relative-time'
+import { localeCodes, message } from '../support/locales'
 
 /**
- * O `há 2 min` do indicador de sync.
+ * The *há 2 min* of the sync indicator.
  *
- * O caso que importa é o do relógio: o instante vem do servidor e o "agora" vem
- * do aparelho, e os dois não precisam concordar.
+ * The case that matters is the clock: the instant comes from the server and the
+ * "now" comes from the device, and the two need not agree.
+ *
+ * Split the same way `sync-label.spec.ts` is, and for the same reason: the
+ * function picks a key and a count, the locale writes the words. Asserting the
+ * rendered sentence against the locale it came from would pass just as happily
+ * over a hard-coded `há 2 min`, so the key and the count are read directly and
+ * the wording is measured **in the other language**.
  */
 
 const SYNCED_AT = '2026-09-11T12:00:00.000Z'
@@ -18,31 +26,100 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
+/**
+ * What `agoLabel` asked for, rather than what the locale answered.
+ *
+ * `count` is read through a guard rather than asserted: the values map is typed
+ * `string | number`, and an assertion here would be this file promising what the
+ * function under test is supposed to prove.
+ */
+function asks(now: Date): { key: string, count?: number, plural?: number } | null {
+  let seen: { key: string, count?: number, plural?: number } | null = null
+
+  const spy: Translate = (key, values, plural) => {
+    const count = values?.count
+    seen = { key, count: typeof count === 'number' ? count : undefined, plural }
+
+    return key
+  }
+
+  return agoLabel(SYNCED_AT, now, spy) === null ? null : seen
+}
+
+/** The sentence as one locale writes it, with `message()` refusing a missing value. */
+function rendered(now: Date, code: string): string | null {
+  const translate: Translate = (key, values, plural) => message(key, code, values, plural)
+
+  return agoLabel(SYNCED_AT, now, translate)
+}
+
 describe('quanto tempo desde a última sincronização', () => {
-  it('abaixo de um minuto é agora', () => {
-    expect(agoLabel(SYNCED_AT, after(0))).toBe('agora')
-    expect(agoLabel(SYNCED_AT, after(59_999))).toBe('agora')
+  it('has more than one language to compare', () => {
+    expect(localeCodes().length).toBeGreaterThan(1)
+  })
+
+  it('under a minute is "now", and carries no count', () => {
+    expect(asks(after(0))).toEqual({ key: 'time.now', count: undefined, plural: undefined })
+    expect(asks(after(59_999))?.key).toBe('time.now')
   })
 
   /**
-   * O relógio do aparelho atrás do do servidor. Sem o piso, a tela escreveria
-   * `há -3 min` — e é justamente o relógio de aparelho que o plano não deixa
-   * decidir nada.
+   * The device clock behind the server's. Without the floor the screen would
+   * write `há -3 min` — and it is precisely the device clock that the plan lets
+   * decide nothing.
    */
-  it('relógio do aparelho atrás do servidor também é agora, e nunca negativo', () => {
-    expect(agoLabel(SYNCED_AT, after(-3 * MINUTE))).toBe('agora')
+  it('a device clock behind the server is also "now", and never negative', () => {
+    expect(asks(after(-3 * MINUTE))?.key).toBe('time.now')
   })
 
-  it('minutos, horas e dias, com a unidade trocando na virada', () => {
-    expect(agoLabel(SYNCED_AT, after(2 * MINUTE))).toBe('há 2 min')
-    expect(agoLabel(SYNCED_AT, after(59 * MINUTE))).toBe('há 59 min')
-    expect(agoLabel(SYNCED_AT, after(HOUR))).toBe('há 1 h')
-    expect(agoLabel(SYNCED_AT, after(23 * HOUR + 59 * MINUTE))).toBe('há 23 h')
-    expect(agoLabel(SYNCED_AT, after(DAY))).toBe('há 1 dia')
-    expect(agoLabel(SYNCED_AT, after(3 * DAY))).toBe('há 3 dias')
+  it('minutes, hours and days, with the unit turning over at the boundary', () => {
+    expect(asks(after(2 * MINUTE))).toMatchObject({ key: 'time.minutes', count: 2 })
+    expect(asks(after(59 * MINUTE))).toMatchObject({ key: 'time.minutes', count: 59 })
+    expect(asks(after(HOUR))).toMatchObject({ key: 'time.hours', count: 1 })
+    expect(asks(after(23 * HOUR + 59 * MINUTE))).toMatchObject({ key: 'time.hours', count: 23 })
+    expect(asks(after(DAY))).toMatchObject({ key: 'time.days', count: 1 })
+    expect(asks(after(3 * DAY))).toMatchObject({ key: 'time.days', count: 3 })
   })
 
-  it('instante ilegível não vira "agora"', () => {
-    expect(agoLabel('ontem', after(0))).toBeNull()
+  /**
+   * Days is the one unit that inflects, so it is the one that has to hand the
+   * count over twice — as a value and as the plural form. Passing only the value
+   * renders both halves of the message and the pipe between them.
+   */
+  it('days picks the plural form, and the singular is not the plural', () => {
+    expect(asks(after(DAY))?.plural).toBe(1)
+    expect(asks(after(3 * DAY))?.plural).toBe(3)
+
+    for (const code of localeCodes()) {
+      const one = rendered(after(DAY), code)
+      const many = rendered(after(3 * DAY), code)
+
+      expect(one, `um dia em ${code}`).not.toBeNull()
+      expect(one, `as duas formas coincidem em ${code}`).not.toBe(many?.replace('3', '1'))
+      expect(one, `pipe na tela em ${code}`).not.toContain('|')
+    }
+  })
+
+  it('an unreadable instant does not become "now"', () => {
+    expect(asks(new Date(Date.parse(SYNCED_AT)))).not.toBeNull()
+
+    const translate: Translate = key => key
+    expect(agoLabel('ontem', after(0), translate)).toBeNull()
+  })
+
+  /** And the other language, which is where a sentence left inside would show. */
+  it('writes a different sentence in each language, at every scale', () => {
+    const [first, ...rest] = localeCodes()
+    if (first === undefined) throw new Error('sem locale para comparar')
+
+    for (const at of [after(0), after(2 * MINUTE), after(HOUR), after(3 * DAY)]) {
+      const mine = rendered(at, first)
+      expect(mine, `${at.toISOString()} em ${first} saiu vazio`).toBeTruthy()
+
+      for (const other of rest) {
+        expect(rendered(at, other), `${at.toISOString()} igual em ${first} e ${other}`)
+          .not.toBe(mine)
+      }
+    }
   })
 })

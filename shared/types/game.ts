@@ -73,8 +73,19 @@ export function isRarity(value: string): value is Rarity {
  * it first: that file is one of the two callers, and `shared/` may not import
  * from `app/`. The narrator now re-exports this one, so the contract has a
  * single definition and the existing importers did not move.
+ *
+ * **`plural` is the third argument because a count decides the sentence, not
+ * just fills it.** *1 mudança na fila* against *3 mudanças na fila* is one
+ * message with two forms, and vue-i18n picks the form from this argument rather
+ * than from `values.count` — passing only the value renders the pipe and both
+ * halves. A translator that ignores it still satisfies the type, which is what
+ * lets the callers that have no plural stay exactly as they were.
  */
-export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
+export type Translate = (
+  key: string,
+  values?: Readonly<Record<string, string | number>>,
+  plural?: number,
+) => string
 
 /**
  * The locale key of a rarity label — `rarity.common`, never `Comum`.

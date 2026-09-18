@@ -21,12 +21,14 @@ import { syncLabel } from '~~/app/utils/sync-label'
  * O *sincronizado há X* é o `updatedAt` do servidor, e não o instante da última
  * conferência: a prancha o nomeia assim, e é o único uso que o plano dá a ele.
  */
+const { t } = useI18n()
+
 const { status } = useSync()
 
 /** Um minuto é o passo do rótulo; o relógio de segundo é o que o jogo já tem. */
 const now = useGameClock()
 
-const label = computed(() => (status.value === null ? '' : syncLabel(status.value, now.value)))
+const label = computed(() => (status.value === null ? '' : syncLabel(status.value, now.value, t)))
 </script>
 
 <template>
