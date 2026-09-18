@@ -329,11 +329,13 @@ useSeoMeta({
                      usam nesta página. A troca está na seção de divergências do
                      README, com o valor exato.
 
-                     E por `HABITAT_LABELS`, não pelo `rough-terrain` da PokeAPI
-                     com o hífen trocado por espaço: `--accent` faz dele o valor
-                     mais destacado do painel, e um documento `lang="pt-BR"` não
-                     destaca ROUGH TERRAIN. É o mesmo argumento que trocou os
-                     chips de tipo de FLYING para VOADOR. -->
+                     E por `t(habitatKey(...))`, não pelo `rough-terrain` da
+                     PokeAPI com o hífen trocado por espaço: `--accent` faz dele
+                     o valor mais destacado do painel, e um documento não destaca
+                     uma palavra de outro idioma. É o mesmo argumento que trocou
+                     os chips de tipo de FLYING para VOADOR. Desde a Fase 8 o
+                     rótulo vem do locale, então são dois — *Montanha* e
+                     *Mountain* — e nenhum deles é o identificador. -->
                 <div class="facts__row">
                   <dt class="numeric">
                     {{ t('species.about.habitat') }}
