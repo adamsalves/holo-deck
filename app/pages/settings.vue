@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useNuxtApp, useRuntimeConfig } from 'nuxt/app'
 import { dayKey } from '~~/shared/game/economy'
 import { gameNumber } from '~~/shared/game/progress'
-import type { RecoveryReason, SaveData } from '~~/shared/save/schema'
+import type { SaveData } from '~~/shared/save/schema'
 import { SCHEMA_VERSION, emptySave, migrate } from '~~/shared/save/schema'
 import type { PreviousSummary } from '~~/shared/save/sync'
 import { useCollectionStore } from '~~/app/stores/collection'
@@ -12,6 +12,7 @@ import { initialsOf } from '~~/app/utils/initials'
 import { agoLabel } from '~~/app/utils/relative-time'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
 import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
+import { reasonKey } from '~~/app/utils/recovery-reason'
 import { syncLabel } from '~~/app/utils/sync-label'
 import { useAccount } from '~/composables/useAccount'
 import { useGameClock } from '~/composables/useGameClock'
@@ -51,6 +52,21 @@ const now = useGameClock()
  */
 const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
 const { appVersion, gitSha } = useRuntimeConfig().public
+
+const { t, locale } = useI18n()
+
+/**
+ * *3 cartas*, and *1 carta* — the noun inflects, so the count picks the form.
+ *
+ * One helper because five notices interpolate it, and a count spelled by hand at
+ * five call sites is five chances to write `{count} cartas` with a one in it.
+ * The sentences receive it already spelled: a message that interpolates another
+ * message keeps each of them a whole sentence in both languages, which is what
+ * the evolution chain and the turn order each had to be rebuilt to do.
+ */
+function cardCount(count: number): string {
+  return t('settings.cardCount', { count }, count)
+}
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -92,10 +108,10 @@ const sizeKb = computed(() => {
 })
 
 const stats = computed(() => [
-  { key: 'cards', value: gameNumber(collection.ownedCount), label: 'cartas' },
-  { key: 'badges', value: gameNumber(progress.badges), label: 'insígnias' },
-  { key: 'schema', value: `v${SCHEMA_VERSION}`, label: 'versão do save' },
-  { key: 'size', value: sizeKb.value, label: 'KB' },
+  { key: 'cards', value: gameNumber(collection.ownedCount), label: t('settings.stats.cards') },
+  { key: 'badges', value: gameNumber(progress.badges), label: t('settings.stats.badges') },
+  { key: 'schema', value: `v${SCHEMA_VERSION}`, label: t('settings.stats.schema') },
+  { key: 'size', value: sizeKb.value, label: t('settings.stats.size') },
 ])
 
 /**
@@ -126,20 +142,7 @@ function exportSave(): void {
   setTimeout(() => {
     URL.revokeObjectURL(url)
   }, 0)
-  notice.value = { tone: 'done', text: 'Save exportado.' }
-}
-
-/**
- * Por que um arquivo foi recusado, em português.
- *
- * `RecoveryReason` é o mesmo enum que o aviso de boot usa, e ele existe porque
- * "não deu" e "é de uma build mais nova" levam a ações opostas: a segunda tem
- * conserto, é só atualizar o jogo.
- */
-const REASONS: Record<RecoveryReason, string> = {
-  'corrupt': 'não tem a forma de um save',
-  'unknown-version': 'é de uma versão mais nova do jogo',
-  'failed-migration': 'não sobreviveu à migração',
+  notice.value = { tone: 'done', text: t('settings.notice.exported') }
 }
 
 /**
@@ -171,7 +174,7 @@ async function importSave(event: Event): Promise<void> {
    */
   try {
     if (file.size > MAX_IMPORT_BYTES) {
-      notice.value = { tone: 'failed', text: 'Esse arquivo é grande demais para ser um save deste jogo.' }
+      notice.value = { tone: 'failed', text: t('settings.notice.tooBig') }
       return
     }
 
@@ -180,13 +183,16 @@ async function importSave(event: Event): Promise<void> {
       parsed = JSON.parse(await file.text())
     }
     catch {
-      notice.value = { tone: 'failed', text: 'O arquivo não é um JSON válido.' }
+      notice.value = { tone: 'failed', text: t('settings.notice.notJson') }
       return
     }
 
     const { data, recovered } = migrate(parsed)
     if (recovered !== null) {
-      notice.value = { tone: 'failed', text: `Esse arquivo não pôde ser lido: ${REASONS[recovered]}.` }
+      notice.value = {
+        tone: 'failed',
+        text: t('settings.notice.unreadable', { reason: t(reasonKey(recovered)) }),
+      }
       return
     }
 
@@ -195,7 +201,7 @@ async function importSave(event: Event): Promise<void> {
     refreshBackups()
     notice.value = {
       tone: 'done',
-      text: `Save importado — ${gameNumber(collection.ownedCount)} cartas. O anterior foi para a cópia de segurança.`,
+      text: t('settings.notice.imported', { cards: cardCount(collection.ownedCount) }),
     }
   }
   finally {
@@ -219,8 +225,8 @@ async function clearSave(): Promise<void> {
   // caminho destrutivo, e o nativo bloqueia de verdade — um diálogo escrito à
   // mão precisaria de foco, escape, e de não deixar o clique passar por baixo.
   const question = synced
-    ? 'Apagar o save deste aparelho? O da sua conta volta em seguida, e uma cópia do deste aparelho fica guardada.'
-    : 'Apagar o save deste aparelho? Uma cópia de segurança fica guardada.'
+    ? t('settings.confirm.clearWithAccount')
+    : t('settings.confirm.clearDevice')
   if (!window.confirm(question)) return
 
   archiveCurrent()
@@ -229,7 +235,7 @@ async function clearSave(): Promise<void> {
     void $saveDriver.clear()
     apply(emptySave())
     refreshBackups()
-    notice.value = { tone: 'done', text: 'Save apagado. A cópia de segurança continua no navegador — dá para voltar por ela aqui embaixo.' }
+    notice.value = { tone: 'done', text: t('settings.notice.cleared') }
     return
   }
 
@@ -257,7 +263,7 @@ async function clearSave(): Promise<void> {
   if (!adopted) {
     notice.value = {
       tone: 'failed',
-      text: 'Save deste aparelho apagado, e a cópia ficou nas cópias de segurança. O da sua conta não pôde ser lido agora — ele volta quando houver rede, e nada sobe deste aparelho até lá.',
+      text: t('settings.notice.clearedOffline'),
     }
     return
   }
@@ -265,8 +271,8 @@ async function clearSave(): Promise<void> {
   notice.value = {
     tone: 'done',
     text: collection.ownedCount > 0
-      ? `Save deste aparelho apagado, e o da conta voltou — ${gameNumber(collection.ownedCount)} cartas. O que estava aqui ficou nas cópias de segurança.`
-      : 'Save deste aparelho apagado. O da conta volta na próxima sincronização, e o que estava aqui ficou nas cópias de segurança.',
+      ? t('settings.notice.clearedRestored', { cards: cardCount(collection.ownedCount) })
+      : t('settings.notice.clearedPending'),
   }
 }
 
@@ -295,9 +301,22 @@ function refreshBackups(): void {
   backups.value = $saveDriver.listBackups()
 }
 
-/** `05/09, 14:22` — o instante da cópia, no fuso de quem está olhando. */
+/**
+ * `05/09, 14:22` — o instante da cópia, no fuso de quem está olhando.
+ *
+ * **The locale comes from the URL, and it used to be `'pt-BR'` written by hand.**
+ * That is the defect of issue #49 in its date form: inside `/en` the same backup
+ * read `05/09, 14:22` where English reads `09/05, 02:22 PM`, and `05/09` in
+ * en-US **is the fifth of September read as May the ninth** — a wrong date, not
+ * an odd-looking one. The issue lists four origins and this is a fifth: it
+ * formats a date rather than a number, so a sweep for `toLocaleString('pt-BR')`
+ * on numbers would have walked past it.
+ *
+ * The numbers on this screen — `20,6 KB`, the card counts — are the origins the
+ * issue does name, and they stay pt-BR until it is closed.
+ */
 function backupLabel(at: number): string {
-  return new Date(at).toLocaleString('pt-BR', {
+  return new Date(at).toLocaleString(locale.value, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -317,7 +336,7 @@ function backupLabel(at: number): string {
 function restoreBackup(key: string): void {
   const raw = $saveDriver.readBackup(key)
   if (raw === null) {
-    notice.value = { tone: 'failed', text: 'Essa cópia não está mais no navegador.' }
+    notice.value = { tone: 'failed', text: t('settings.notice.backupGone') }
     refreshBackups()
     return
   }
@@ -327,13 +346,16 @@ function restoreBackup(key: string): void {
     parsed = JSON.parse(raw)
   }
   catch {
-    notice.value = { tone: 'failed', text: 'Essa cópia não tem a forma de um save.' }
+    notice.value = { tone: 'failed', text: t('settings.notice.backupShape') }
     return
   }
 
   const { data, recovered } = migrate(parsed)
   if (recovered !== null) {
-    notice.value = { tone: 'failed', text: `Essa cópia não pôde ser lida: ${REASONS[recovered]}.` }
+    notice.value = {
+      tone: 'failed',
+      text: t('settings.notice.backupUnreadable', { reason: t(reasonKey(recovered)) }),
+    }
     return
   }
 
@@ -342,7 +364,7 @@ function restoreBackup(key: string): void {
   refreshBackups()
   notice.value = {
     tone: 'done',
-    text: `Cópia restaurada — ${gameNumber(collection.ownedCount)} cartas. O save de antes virou a cópia mais recente.`,
+    text: t('settings.notice.backupRestored', { cards: cardCount(collection.ownedCount) }),
   }
 }
 
@@ -352,7 +374,7 @@ onMounted(refreshBackups)
 const initials = computed(() => initialsOf(account.value?.name ?? ''))
 
 /** A frase do indicador da barra, repetida na linha da conta como a prancha faz. */
-const syncText = computed(() => (status.value === null ? null : syncLabel(status.value, now.value)))
+const syncText = computed(() => (status.value === null ? null : syncLabel(status.value, now.value, t)))
 
 /**
  * O resumo da versão anterior do servidor — *Restaurar versão anterior*.
@@ -370,7 +392,7 @@ const idle = computed(() => status.value?.phase === 'synced')
 
 const previousAgo = computed(() => {
   const at = previous.value?.updatedAt ?? null
-  return at === null ? null : agoLabel(at, now.value)
+  return at === null ? null : agoLabel(at, now.value, t)
 })
 
 async function refreshPrevious(): Promise<void> {
@@ -416,7 +438,7 @@ async function restorePrevious(): Promise<void> {
     await $sync.restore()
     notice.value = {
       tone: 'done',
-      text: `Versão anterior restaurada — ${gameNumber(collection.ownedCount)} cartas. A que estava no ar virou a anterior: restaurar de novo desfaz.`,
+      text: t('settings.notice.previousRestored', { cards: cardCount(collection.ownedCount) }),
     }
   }
   catch (error) {
@@ -429,13 +451,13 @@ async function restorePrevious(): Promise<void> {
 }
 
 function restoreFailure(error: unknown): string {
-  if (error instanceof NoPreviousVersion) return 'O servidor não tem mais versão anterior para restaurar.'
+  if (error instanceof NoPreviousVersion) return t('settings.notice.previousMissing')
 
   if (error instanceof SaveConflict) {
-    return 'Outro aparelho gravou antes, e a coleção dele é a que vale agora. Nada foi restaurado — confira a versão anterior de novo.'
+    return t('settings.notice.previousConflict')
   }
 
-  return 'Não deu para restaurar agora. Nada foi alterado.'
+  return t('settings.notice.previousFailed')
 }
 
 /** O botão não aceita dois cliques: o segundo sairia de uma sessão já encerrada. */
@@ -455,7 +477,7 @@ const deleting = ref(false)
  * pergunta diz isso: é a diferença entre as duas linhas da zona de perigo.
  */
 async function removeAccount(): Promise<void> {
-  if (!window.confirm('Excluir a conta e o save do servidor? É permanente. O save deste aparelho continua aqui.')) return
+  if (!window.confirm(t('settings.confirm.deleteAccount'))) return
 
   deleting.value = true
   const outcome = await deleteAccount()
@@ -465,8 +487,8 @@ async function removeAccount(): Promise<void> {
   notice.value = {
     tone: 'failed',
     text: outcome === 'stale-session'
-      ? 'Por segurança, excluir a conta pede uma entrada recente. Saia, entre de novo e volte aqui — nada foi apagado.'
-      : 'Não deu para excluir a conta agora. Nada foi apagado.',
+      ? t('settings.notice.accountRecent')
+      : t('settings.notice.accountFailed'),
   }
 }
 
@@ -483,8 +505,8 @@ function apply(data: SaveData): void {
 }
 
 useSeoMeta({
-  title: 'Ajustes — Holo Deck',
-  description: 'A conta e a sincronização, exportar e importar o save, as cópias de segurança, o interruptor de animações e a versão do jogo.',
+  title: () => t('settings.seo.title'),
+  description: () => t('settings.seo.description'),
 })
 </script>
 
@@ -492,12 +514,12 @@ useSeoMeta({
   <main class="settings">
     <header class="settings__header">
       <p class="settings__eyebrow">
-        Ajustes
+        {{ t('nav.settings') }}
       </p>
       <!-- O título diz de quem é a tela: com conta, o da prancha; sem ela, o do
            aparelho, que era o único até a Fase 7. -->
       <h1 class="settings__title">
-        {{ account ? 'Sua conta e seu save' : 'Seu save e este aparelho' }}
+        {{ account ? t('settings.title.account') : t('settings.title.device') }}
       </h1>
     </header>
 
@@ -553,7 +575,7 @@ useSeoMeta({
                 v-if="status"
                 aria-hidden="true"
               >·</span>
-              via GitHub
+              {{ t('settings.via') }}
             </p>
           </div>
 
@@ -563,7 +585,7 @@ useSeoMeta({
             :disabled="signingOut"
             @click="leave()"
           >
-            SAIR
+            {{ t('account.signOut') }}
           </button>
         </div>
 
@@ -586,17 +608,17 @@ useSeoMeta({
       <section class="settings__panel">
         <div class="settings__panel-head">
           <p class="settings__eyebrow">
-            Save
+            {{ t('settings.save.title') }}
           </p>
         </div>
 
         <div class="settings__row">
           <div>
             <p class="settings__row-title">
-              Exportar
+              {{ t('settings.save.exportTitle') }}
             </p>
             <p class="settings__row-note">
-              Baixa um JSON com coleção, deck e progresso.
+              {{ t('settings.save.exportNote') }}
             </p>
           </div>
           <button
@@ -604,22 +626,21 @@ useSeoMeta({
             class="settings__action settings__action--accent bevel-control"
             @click="exportSave()"
           >
-            BAIXAR
+            {{ t('settings.save.exportAction') }}
           </button>
         </div>
 
         <div class="settings__row">
           <div>
             <p class="settings__row-title">
-              Importar
+              {{ t('settings.save.importTitle') }}
             </p>
             <p class="settings__row-note">
-              O save atual vai para a cópia de segurança antes de ser substituído
-              — nada é apagado.
+              {{ t('settings.save.importNote') }}
             </p>
           </div>
           <label class="settings__action bevel-control">
-            ESCOLHER ARQUIVO
+            {{ t('settings.save.importAction') }}
             <input
               ref="fileInput"
               type="file"
@@ -639,30 +660,43 @@ useSeoMeta({
         >
           <div>
             <p class="settings__row-title">
-              Restaurar versão anterior
+              {{ t('settings.save.previousTitle') }}
             </p>
             <p class="settings__row-note">
-              O servidor guarda a gravação imediatamente anterior.
-              <template v-if="previousAgo">
-                Feita <span class="numeric settings__when">{{ previousAgo }}</span>,
-                com {{ gameNumber(previous.cards) }} {{ previous.cards === 1 ? 'carta' : 'cartas' }}.
-              </template>
+              {{ t('settings.save.previousNote') }}
+              <!-- The count arrives already spelled, and the two shapes are two
+                   whole sentences: `{cards} {carta|cartas}` glued in the
+                   template put the noun after the number, which is Portuguese
+                   word order and not a rule of English. -->
+              <i18n-t
+                v-if="previousAgo"
+                keypath="settings.save.previousMade"
+                scope="global"
+                tag="span"
+              >
+                <template #when>
+                  <span class="numeric settings__when">{{ previousAgo }}</span>
+                </template>
+                <template #cards>
+                  {{ cardCount(previous.cards) }}
+                </template>
+              </i18n-t>
               <template v-else>
-                Ela tem {{ gameNumber(previous.cards) }} {{ previous.cards === 1 ? 'carta' : 'cartas' }}.
+                {{ t('settings.save.previousHolds', { cards: cardCount(previous.cards) }) }}
               </template>
               <template v-if="!idle">
-                Espera a fila subir para restaurar.
+                {{ t('settings.save.previousWaiting') }}
               </template>
             </p>
           </div>
           <button
             type="button"
             class="settings__action settings__action--caution bevel-control"
-            aria-label="Restaurar a versão anterior do servidor"
+            :aria-label="t('settings.save.previousAria')"
             :disabled="restoring || !idle"
             @click="restorePrevious()"
           >
-            {{ restoring ? 'RESTAURANDO…' : 'RESTAURAR' }}
+            {{ restoring ? t('settings.save.previousBusy') : t('settings.save.previousAction') }}
           </button>
         </div>
       </section>
@@ -674,10 +708,10 @@ useSeoMeta({
       >
         <div class="settings__panel-head">
           <p class="settings__eyebrow">
-            Cópias de segurança
+            {{ t('settings.backups.title') }}
           </p>
           <span class="numeric settings__scope">
-            SÓ NESTE APARELHO
+            {{ t('settings.backups.scope') }}
           </span>
         </div>
 
@@ -691,17 +725,16 @@ useSeoMeta({
               {{ backupLabel(backup.at) }}
             </p>
             <p class="settings__row-note">
-              Guardada antes de apagar, importar ou recuperar. Restaurar manda o
-              save de agora para a cópia mais recente — nada é perdido.
+              {{ t('settings.backups.note') }}
             </p>
           </div>
           <button
             type="button"
             class="settings__action bevel-control"
-            :aria-label="`Restaurar a cópia de ${backupLabel(backup.at)}`"
+            :aria-label="t('settings.backups.aria', { when: backupLabel(backup.at) })"
             @click="restoreBackup(backup.key)"
           >
-            RESTAURAR
+            {{ t('settings.backups.action') }}
           </button>
         </div>
       </section>
@@ -710,21 +743,20 @@ useSeoMeta({
       <section class="settings__panel">
         <div class="settings__panel-head">
           <p class="settings__eyebrow">
-            Preferências
+            {{ t('settings.prefs.title') }}
           </p>
           <span class="numeric settings__scope">
-            SÓ NESTE APARELHO
+            {{ t('settings.backups.scope') }}
           </span>
         </div>
 
         <div class="settings__row">
           <div>
             <p class="settings__row-title">
-              Reduzir animações
+              {{ t('settings.prefs.motionTitle') }}
             </p>
             <p class="settings__row-note">
-              Desliga o foil que segue o ponteiro e a virada dos packs. Se o seu
-              sistema já pede menos movimento, o jogo obedece sem isto.
+              {{ t('settings.prefs.motionNote') }}
             </p>
           </div>
           <!-- `aria-label` porque o texto de dentro é o **estado**, não o nome:
@@ -734,7 +766,7 @@ useSeoMeta({
           <button
             type="button"
             role="switch"
-            aria-label="Reduzir animações"
+            :aria-label="t('settings.prefs.motionTitle')"
             :aria-checked="motion.forced.value"
             class="settings__switch"
             :class="{ 'settings__switch--on': motion.forced.value }"
@@ -742,7 +774,7 @@ useSeoMeta({
           >
             <span class="settings__switch-knob" />
             <span class="settings__switch-label">
-              {{ motion.forced.value ? 'ligado' : 'desligado' }}
+              {{ motion.forced.value ? t('settings.prefs.motionOn') : t('settings.prefs.motionOff') }}
             </span>
           </button>
         </div>
@@ -752,27 +784,26 @@ useSeoMeta({
       <section class="settings__panel settings__panel--danger">
         <div class="settings__panel-head">
           <p class="settings__eyebrow settings__eyebrow--danger">
-            Zona de perigo
+            {{ t('settings.danger.title') }}
           </p>
         </div>
 
         <div class="settings__row">
           <div>
             <p class="settings__row-title">
-              Apagar save deste aparelho
+              {{ t('settings.danger.clearTitle') }}
             </p>
             <p
               v-if="account"
               class="settings__row-note"
             >
-              Com conta, ele volta na próxima sincronização.
+              {{ t('settings.danger.clearWithAccount') }}
             </p>
             <p
               v-else
               class="settings__row-note"
             >
-              Coleção, deck e progresso voltam ao zero. Uma cópia de segurança
-              fica guardada no navegador — exporte antes se quiser levá-la junto.
+              {{ t('settings.danger.clearDevice') }}
             </p>
           </div>
           <button
@@ -780,7 +811,7 @@ useSeoMeta({
             class="settings__action settings__action--danger bevel-control"
             @click="clearSave()"
           >
-            APAGAR LOCAL
+            {{ t('settings.danger.clearAction') }}
           </button>
         </div>
 
@@ -790,10 +821,10 @@ useSeoMeta({
         >
           <div>
             <p class="settings__row-title">
-              Excluir conta e save do servidor
+              {{ t('settings.danger.accountTitle') }}
             </p>
             <p class="settings__row-note">
-              Permanente. Exporte antes se quiser guardar.
+              {{ t('settings.danger.accountNote') }}
             </p>
           </div>
           <button
@@ -802,14 +833,14 @@ useSeoMeta({
             :disabled="deleting"
             @click="removeAccount()"
           >
-            {{ deleting ? 'EXCLUINDO…' : 'EXCLUIR TUDO' }}
+            {{ deleting ? t('settings.danger.accountBusy') : t('settings.danger.accountAction') }}
           </button>
         </div>
       </section>
 
       <template #fallback>
         <p class="settings__loading">
-          Carregando…
+          {{ t('settings.loading') }}
         </p>
       </template>
     </ClientOnly>
@@ -818,24 +849,38 @@ useSeoMeta({
     <section class="settings__panel settings__panel--quiet">
       <div class="settings__panel-head">
         <p class="settings__eyebrow">
-          Ainda não
+          {{ t('settings.held.title') }}
         </p>
       </div>
       <p class="settings__row-note settings__held">
-        A prancha desta tela desenha mais três coisas, e nenhuma delas tem de
-        onde tirar dado ainda: <b>idioma</b>, <b>som</b> e <b>baixar tudo para
-          offline</b> chegam com o que os sustenta. Elas não aparecem aqui de
-        propósito — um controle desligado promete uma coisa que o jogo não faz.
+        <i18n-t
+          keypath="settings.held.note"
+          scope="global"
+          tag="span"
+        >
+          <template #language>
+            <b>{{ t('settings.held.language') }}</b>
+          </template>
+          <template #sound>
+            <b>{{ t('settings.held.sound') }}</b>
+          </template>
+          <template #offline>
+            <b>{{ t('settings.held.offline') }}</b>
+          </template>
+        </i18n-t>
       </p>
     </section>
 
     <p class="numeric settings__version">
-      v{{ appVersion }} · {{ gitSha }} · save v{{ SCHEMA_VERSION }}
+      {{ t('settings.version', { app: appVersion, sha: gitSha, schema: SCHEMA_VERSION }) }}
     </p>
 
     <p class="numeric settings__foot">
-      Animação é preferência de aparelho e não sincroniza, de propósito.
-      Coleção, progresso e deck sincronizam{{ account ? '.' : ' — quando houver conta.' }}
+      {{ t('settings.footAnimation') }}
+      <!-- Two whole sentences and not one with a tail: the em-dash clause is
+           glued to the end in Portuguese, and English wants the whole sentence
+           rewritten around *once there is an account*. -->
+      {{ account ? t('settings.footSyncs') : t('settings.footSyncsNoAccount') }}
     </p>
   </main>
 </template>

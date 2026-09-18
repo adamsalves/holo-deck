@@ -368,6 +368,35 @@ export function spells(text: string, token: string): boolean {
 }
 
 /**
+ * Which of `phrases` the screen spells — fed `textContent`, never `innerText`.
+ *
+ * **The two differ, and the difference silently emptied this sweep.**
+ * `innerText` returns the text as *rendered*, and this design uppercases a lot
+ * of small labels in CSS (`.settings__eyebrow`, `.rules__eyebrow`, every
+ * `--small` key). So a hard-coded `Zona de perigo` left in `/en/settings` reads
+ * back as `ZONA DE PERIGO`, `spells` is case sensitive by contract, and the
+ * defect was reported by nobody — measured, with it planted.
+ *
+ * **Folding the case is the fix that looks right and is not.** Measured too:
+ * with both sides lowercased, `/rules` in pt-BR started failing over `Rarity`
+ * and `Economy`, because the panel notes name their modules — `rarity.ts`,
+ * `economy.ts` — and a word border treats the dot as a border. That is a gate
+ * crying on a correct page, which is how a gate gets switched off; the token set
+ * and the screen text simply are not the same kind of string once case is gone.
+ *
+ * `textContent` gives what the template and the locale actually wrote, so the
+ * comparison stays case sensitive and both problems disappear at once. It also
+ * reads text inside hidden elements, which is the right side to err on: a
+ * Portuguese sentence behind a closed panel is still a Portuguese sentence.
+ *
+ * It lives here so the screens that sweep cannot disagree about any of this,
+ * which is how the first of them shipped reading `innerText`.
+ */
+export function foreignPhrases(text: string, phrases: readonly string[]): string[] {
+  return phrases.filter(phrase => spells(text, phrase))
+}
+
+/**
  * The stat badges of every other locale that `locale` does not also write.
  *
  * The subtraction is what keeps it usable: `DEF` is what both languages shorten
