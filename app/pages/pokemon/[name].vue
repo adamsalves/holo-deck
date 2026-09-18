@@ -3,7 +3,7 @@ import type { SpeciesEntry } from '~~/shared/types/dex'
 import { computed } from 'vue'
 import { flattenChain } from '~~/shared/game/evolution'
 import { rarityOf } from '~~/shared/game/rarity'
-import { HABITAT_LABELS, rarityKey } from '~~/shared/types/game'
+import { habitatKey, rarityKey } from '~~/shared/types/game'
 import { artworkUrl } from '~~/shared/dex/artwork'
 import { dexNumber, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
@@ -22,6 +22,7 @@ const { t } = useI18n()
  * sai de `chains.json`, que é artefato commitado. É a promessa central da fase.
  */
 const route = useRoute()
+const localePath = useLocalePath()
 const { loadCore, loadChains, loadFlavor, loadGeneration, loadIndex, findBySlug } = useDex()
 
 const slug = computed(() => (typeof route.params.name === 'string' ? route.params.name : ''))
@@ -31,7 +32,7 @@ const { data, error } = await useAsyncData(
   async () => {
     const entry = await findBySlug(slug.value)
     if (entry === null) {
-      throw createError({ statusCode: 404, statusMessage: 'Espécie fora do dex', fatal: true })
+      throw createError({ statusCode: 404, statusMessage: t('species.error.notFound'), fatal: true })
     }
 
     const [core, chains, index, generation, flavor] = await Promise.all([
@@ -48,7 +49,7 @@ const { data, error } = await useAsyncData(
       // guardas descrevem — e aqui ele tem um nome e um id para citar.
       throw createError({
         statusCode: 500,
-        statusMessage: `${entry.slug} está no índice e não em gen-${entry.generation}.json`,
+        statusMessage: t('species.error.partial', { slug: entry.slug, generation: entry.generation }),
         fatal: true,
       })
     }
@@ -102,7 +103,7 @@ const { data, error } = await useAsyncData(
 if (error.value) {
   throw createError({
     statusCode: error.value.statusCode ?? 500,
-    statusMessage: error.value.statusMessage ?? 'Não foi possível carregar a espécie',
+    statusMessage: error.value.statusMessage ?? t('species.error.load'),
     fatal: true,
   })
 }
@@ -134,11 +135,11 @@ const weight = computed(() => (species.value === null ? '' : `${(species.value.w
  * que a página herda da carta, onde o primeiro que se lê é a descrição. A
  * prancha passou a desenhar só o conteúdo dela.
  */
-const tabs = [
-  { label: 'Sobre', slot: 'about' as const },
-  { label: 'Stats', slot: 'stats' as const },
-  { label: 'Evolução', slot: 'evolution' as const },
-]
+const tabs = computed(() => [
+  { label: t('species.tabs.about'), slot: 'about' as const },
+  { label: t('species.tabs.stats'), slot: 'stats' as const },
+  { label: t('species.tabs.evolution'), slot: 'evolution' as const },
+])
 
 /**
  * O `preconnect` da arte oficial mora aqui, e não no `app.head`.
@@ -155,10 +156,15 @@ useHead({
 })
 
 useSeoMeta({
-  title: () => (species.value === null ? 'Pokédex — Holo Deck' : `${species.value.displayName} — Pokédex — Holo Deck`),
+  title: () => (species.value === null
+    ? t('species.seo.titleFallback')
+    : t('species.seo.title', { name: species.value.displayName })),
   description: () => (species.value === null
-    ? 'Pokédex do Holo Deck.'
-    : `${species.value.displayName}, ${dexNumber(species.value.id)} do dex nacional. Tipos, base stats, linha evolutiva e relações de dano.`),
+    ? t('species.seo.descriptionFallback')
+    : t('species.seo.description', {
+        name: species.value.displayName,
+        number: dexNumber(species.value.id),
+      })),
 })
 </script>
 
@@ -182,13 +188,13 @@ useSeoMeta({
       <div class="hero__nav">
         <nav
           class="hero__crumbs"
-          aria-label="Trilha"
+          :aria-label="t('species.crumbs')"
         >
-          <NuxtLink to="/pokedex">
-            Pokédex
+          <NuxtLink :to="localePath('/pokedex')">
+            {{ t('nav.pokedex') }}
           </NuxtLink>
           <span aria-hidden="true">/</span>
-          <NuxtLink :to="`/pokedex/${region?.generation ?? 1}`">
+          <NuxtLink :to="localePath(`/pokedex/${region?.generation ?? 1}`)">
             {{ region?.label }}
           </NuxtLink>
           <span aria-hidden="true">/</span>
@@ -221,7 +227,7 @@ useSeoMeta({
         -->
         <img
           :src="artworkUrl(species.id)"
-          :alt="`Arte oficial de ${species.displayName}`"
+          :alt="t('species.artwork', { name: species.displayName })"
           width="475"
           height="475"
           loading="eager"
@@ -246,19 +252,19 @@ useSeoMeta({
 
       <dl class="hero__facts">
         <div>
-          <dt>Altura</dt>
+          <dt>{{ t('species.height') }}</dt>
           <dd class="numeric">
             {{ height }}
           </dd>
         </div>
         <div>
-          <dt>Peso</dt>
+          <dt>{{ t('species.weight') }}</dt>
           <dd class="numeric">
             {{ weight }}
           </dd>
         </div>
         <div>
-          <dt>Raridade</dt>
+          <dt>{{ t('species.rarity') }}</dt>
           <dd
             class="numeric hero__rarity"
             :data-rarity="rarity"
@@ -294,7 +300,7 @@ useSeoMeta({
           <div class="panel__section about">
             <div class="about__flavor">
               <h2 class="panel__label">
-                Sobre
+                {{ t('species.tabs.about') }}
               </h2>
               <!-- Em inglês, e assumido: a PokeAPI não tem descrição em português.
                  Traduzir de ouvido 1025 textos seria inventar dado. -->
@@ -309,7 +315,7 @@ useSeoMeta({
                 v-else
                 class="panel__flavor panel__flavor--missing"
               >
-                A PokeAPI não traz descrição para esta espécie.
+                {{ t('species.about.missing') }}
               </p>
             </div>
 
@@ -323,22 +329,24 @@ useSeoMeta({
                      usam nesta página. A troca está na seção de divergências do
                      README, com o valor exato.
 
-                     E por `HABITAT_LABELS`, não pelo `rough-terrain` da PokeAPI
-                     com o hífen trocado por espaço: `--accent` faz dele o valor
-                     mais destacado do painel, e um documento `lang="pt-BR"` não
-                     destaca ROUGH TERRAIN. É o mesmo argumento que trocou os
-                     chips de tipo de FLYING para VOADOR. -->
+                     E por `t(habitatKey(...))`, não pelo `rough-terrain` da
+                     PokeAPI com o hífen trocado por espaço: `--accent` faz dele
+                     o valor mais destacado do painel, e um documento não destaca
+                     uma palavra de outro idioma. É o mesmo argumento que trocou
+                     os chips de tipo de FLYING para VOADOR. Desde a Fase 8 o
+                     rótulo vem do locale, então são dois — *Montanha* e
+                     *Mountain* — e nenhum deles é o identificador. -->
                 <div class="facts__row">
                   <dt class="numeric">
-                    Habitat
+                    {{ t('species.about.habitat') }}
                   </dt>
                   <dd class="numeric facts__habitat">
-                    {{ species.habitat === null ? '—' : HABITAT_LABELS[species.habitat] }}
+                    {{ species.habitat === null ? '—' : t(habitatKey(species.habitat)) }}
                   </dd>
                 </div>
                 <div class="facts__row">
                   <dt class="numeric">
-                    Taxa de captura
+                    {{ t('species.about.captureRate') }}
                   </dt>
                   <dd class="numeric">
                     {{ species.captureRate }}<span class="facts__max">/255</span>
@@ -346,16 +354,23 @@ useSeoMeta({
                 </div>
                 <div class="facts__row">
                   <dt class="numeric">
-                    Felicidade base
+                    {{ t('species.about.baseHappiness') }}
                   </dt>
                   <dd class="numeric">
                     {{ species.baseHappiness }}
                   </dd>
                 </div>
               </dl>
-              <p class="facts__note">
-                Os três vinham da aba <em>Training</em> da Pokédex antiga. Não têm papel no jogo — são referência.
-              </p>
+              <i18n-t
+                class="facts__note"
+                keypath="species.about.note"
+                scope="global"
+                tag="p"
+              >
+                <template #training>
+                  <em>{{ t('species.about.training') }}</em>
+                </template>
+              </i18n-t>
             </div>
           </div>
         </template>
@@ -386,7 +401,7 @@ useSeoMeta({
               v-else
               class="panel__flavor panel__flavor--missing"
             >
-              Esta espécie não está em nenhuma cadeia de evolução do dex.
+              {{ t('species.chain.missing') }}
             </p>
           </div>
         </template>

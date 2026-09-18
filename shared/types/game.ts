@@ -56,6 +56,27 @@ export function isRarity(value: string): value is Rarity {
 }
 
 /**
+ * How a caller hands a sentence back to the layer that has no language.
+ *
+ * `shared/` addresses text and never resolves it, so the two functions here that
+ * build a *sentence* rather than a key — `describeEvolution` is the one left —
+ * take the translator as a parameter. Reaching for `useI18n()` would not work
+ * anyway: these are plain functions with no component around them, and `t()`
+ * outside a setup scope is either undefined or the wrong locale.
+ *
+ * **Required wherever it is asked for, never optional with a default.** A
+ * default would have to be something, and anything plausible enough to compile
+ * — the key itself, the humanized slug — is plausible enough on screen to ship
+ * a half-translated sentence nobody notices.
+ *
+ * It lives here rather than in `app/utils/battle-narration.ts`, which declared
+ * it first: that file is one of the two callers, and `shared/` may not import
+ * from `app/`. The narrator now re-exports this one, so the contract has a
+ * single definition and the existing importers did not move.
+ */
+export type Translate = (key: string, values?: Readonly<Record<string, string | number>>) => string
+
+/**
  * The locale key of a rarity label — `rarity.common`, never `Comum`.
  *
  * The label itself left `shared/` in Phase 8. The game speaks two languages and
@@ -104,6 +125,15 @@ export function isRegionName(value: string): value is RegionName {
  * sem ele o cabeçalho escreveria `kanto` em caixa baixa, e a alternativa seria
  * capitalizar o slug em runtime, que funciona para estas nove e quebra na
  * primeira região de nome composto.
+ *
+ * **It is the one label map that stays, and the nine gym leaders are the
+ * reason.** `Kanto` and `Brock` are the same kind of word — a proper noun that
+ * reads identically in both languages — and `GYM_LEADERS` carries nine of them
+ * two files away. Sending the regions to the locale would write eighteen
+ * identical translations to keep a gate quiet, or else leave the cast here with
+ * nothing watching it. `test/unit/shared-text-gate.spec.ts` names both lists as
+ * its exception, built from these very values, so a tenth region is exempt the
+ * day it is written.
  */
 export const REGION_LABELS: Record<RegionName, string> = {
   kanto: 'Kanto',
@@ -138,29 +168,25 @@ export function generationNumeral(generation: number): string {
 }
 
 /**
- * Os 9 habitats em português. Mesma razão que `typeKey`, e o mesmo caso: o
- * painel *Sobre* põe o habitat em `--accent`, o que faz dele o valor mais
- * destacado de um documento `lang="pt-BR"` — `ROUGH TERRAIN` ali é exatamente o
- * `FLYING` que o canvas trocou por `VOADOR`.
+ * The locale key of a habitat — `habitat.cave`, never *Caverna*.
  *
- * `rare` não é "raro" no sentido da escada de raridade: na PokeAPI é o habitat
- * dos que não moram em lugar nenhum comum, e "incomum" mediria a mesma coisa que
- * `rarity.uncommon`. "Ermo" nomeia o lugar, que é o que a coluna diz.
+ * The *About* panel paints this value with `--accent`, which makes it the most
+ * prominent word of the panel, and that is why it is translated at all: the
+ * PokeAPI sends `rough-terrain`, and a highlighted `ROUGH TERRAIN` is exactly
+ * the `FLYING` the canvas replaced with `VOADOR` on the type chips. The board
+ * writes the identifier and the code writes the word — a divergence, and the
+ * README records it.
  *
- * **Ainda é `Record` e ainda é só português.** Habitat é um dos produtores de
- * texto que a issue #38 lista e que este PR não leva; ele sai daqui no PR do
- * Detalhe, junto das condições de evolução.
+ * `rare` is the one that needed a decision rather than a dictionary: in the
+ * PokeAPI it is the habitat of what lives nowhere common, so *raro* would
+ * measure the same thing as `rarity.uncommon` and mean something else. Both
+ * locales name the place instead — *Ermo*, *Wilds*.
+ *
+ * It was the last complete `Record` of labels in `shared/`, and issue #38 is
+ * what it closes.
  */
-export const HABITAT_LABELS: Record<Habitat, string> = {
-  'cave': 'Caverna',
-  'forest': 'Floresta',
-  'grassland': 'Campo',
-  'mountain': 'Montanha',
-  'rare': 'Ermo',
-  'rough-terrain': 'Terreno acidentado',
-  'sea': 'Mar',
-  'urban': 'Urbano',
-  'waters-edge': 'Beira d\'água',
+export function habitatKey(habitat: Habitat): string {
+  return `habitat.${habitat}`
 }
 
 /**

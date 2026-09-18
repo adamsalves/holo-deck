@@ -1,21 +1,7 @@
-import type { EvolutionCondition, EvolutionNode, TypeName } from '../types/dex.ts'
+import type { EvolutionCondition, EvolutionNode } from '../types/dex.ts'
+import type { Translate } from '../types/game.ts'
 import { isTypeName } from '../types/dex.ts'
-
-/**
- * How a caller turns a type id into the word the player reads.
- *
- * The label used to be read straight from `TYPE_LABELS`, which is gone: the game
- * speaks two languages now and `shared/` cannot call `t()` without dragging the
- * i18n runtime across the purity boundary. So the sentence is still built here
- * and the two type-shaped holes in it are filled by whoever is rendering — the
- * same inversion the label maps themselves went through.
- *
- * Required rather than optional-with-a-default on purpose. A default would have
- * to be `humanizeSlug`, and `Electric` reads close enough to right that a caller
- * that forgot to pass a resolver would ship a half-translated sentence nobody
- * notices.
- */
-export type TypeLabelOf = (type: TypeName) => string
+import { typeKey } from '../types/game.ts'
 
 /**
  * A condição de uma aresta de evolução, escrita para o jogador ler.
@@ -31,50 +17,144 @@ export type TypeLabelOf = (type: TypeName) => string
  * em inglês nos dois idiomas, assumido em vez de fingido* — e ela vale aqui por
  * um motivo a mais: são 36 itens, 10 golpes e 5 lugares cujo nome canônico em
  * português eu não tenho como conferir. Traduzir de ouvido seria inventar
- * vocabulário e chamar de dado. A moldura da frase é portuguesa; o nome próprio,
- * não.
+ * vocabulário e chamar de dado. A moldura da frase vem do locale; o nome
+ * próprio, não.
+ *
+ * **What this module stopped doing is composing.** It used to hold four maps of
+ * *fragments* and glue them into a sentence — `Nível` + ` ` + the number,
+ * `sabendo um golpe do tipo ` + the type — which only works while every
+ * language puts the pieces in the same order and joins them the same way.
+ * English does not: `de noite` is a tail and *at night* is one too, but
+ * `Subir de nível` is a verb phrase where *Level up* is two words that take no
+ * article, and `Girar segurando` is a gerund that dangles when the dex gives no
+ * item — which it never does, measured over all 1025 chains. So each condition
+ * is now **one whole message with named placeholders**, and the only thing left
+ * here is which message to ask for. It is the same move `battle-narration.ts`
+ * made for the turn log, one PR earlier.
  */
 
 /**
  * O que dispara a evolução. As 15 chaves são as que o dex gerado contém — a
  * lista saiu de varrer `chains.json`, não da documentação da API.
+ *
+ * Bare forms: what each trigger says when the field that would complete it is
+ * missing. Measured over the 483 edges of today's dex, the gap is not the rare
+ * case — it is the only case for two of the three: `use-item` always carries its
+ * item (52 of 52), but `use-move` occurs **once and carries no move at all**,
+ * and `spin` occurs once and carries no item. The 13 edges that do spell a
+ * `knownMove` are all `level-up`, where it reads as a qualifier and not as the
+ * main clause.
+ *
+ * So these are the forms the screen actually renders, not a defensive branch —
+ * which is why `test/unit/evolution.spec.ts` asserts that none of them is its
+ * valued twin with the object cut off.
  */
-const TRIGGER_LABELS: Record<string, string> = {
-  'level-up': 'Nível',
-  'use-item': 'Usar',
-  'use-move': 'Usar golpe',
-  'trade': 'Troca',
-  'shed': 'Vaga na equipe e uma Poké Ball',
-  'spin': 'Girar segurando',
-  'three-critical-hits': 'Três golpes críticos numa batalha',
-  'strong-style-move': 'Golpe em estilo forte',
-  'agile-style-move': 'Golpe em estilo ágil',
-  'recoil-damage': 'Dano de recuo acumulado',
-  'take-damage': 'Levar dano',
-  'three-defeated-bisharp': 'Derrotar três Bisharp',
-  'tower-of-darkness': 'Torre das Trevas',
-  'gimmighoul-coins': '999 moedas de Gimmighoul',
-  'other': 'Condição especial',
+const TRIGGER_KEYS: Record<string, string> = {
+  'level-up': 'evolution.trigger.levelUp',
+  'use-item': 'evolution.trigger.useItem',
+  'use-move': 'evolution.trigger.useMove',
+  'trade': 'evolution.trigger.trade',
+  'shed': 'evolution.trigger.shed',
+  'spin': 'evolution.trigger.spin',
+  'three-critical-hits': 'evolution.trigger.threeCriticalHits',
+  'strong-style-move': 'evolution.trigger.strongStyleMove',
+  'agile-style-move': 'evolution.trigger.agileStyleMove',
+  'recoil-damage': 'evolution.trigger.recoilDamage',
+  'take-damage': 'evolution.trigger.takeDamage',
+  'three-defeated-bisharp': 'evolution.trigger.threeDefeatedBisharp',
+  'tower-of-darkness': 'evolution.trigger.towerOfDarkness',
+  'gimmighoul-coins': 'evolution.trigger.gimmighoulCoins',
+  'other': 'evolution.trigger.other',
 }
 
-const TIME_LABELS: Record<string, string> = {
-  'day': 'de dia',
-  'night': 'de noite',
-  'full-moon': 'na lua cheia',
+/**
+ * The four triggers that take a value, as one message each.
+ *
+ * Separate from the bare forms above rather than glued to them: `Nível {level}`
+ * is not `Nível` plus a number in English — *Level 16* happens to work, but
+ * *Use Water Stone* against a bare *Use an item* does not survive concatenation,
+ * and `Girar segurando {item}` against a bare *Spin* survives it even less.
+ */
+const VALUED_KEYS = {
+  level: 'evolution.main.level',
+  item: 'evolution.main.useItem',
+  move: 'evolution.main.useMove',
+  spin: 'evolution.main.spinItem',
+} as const
+
+const TIME_KEYS: Record<string, string> = {
+  'day': 'evolution.time.day',
+  'night': 'evolution.time.night',
+  'full-moon': 'evolution.time.fullMoon',
 }
 
 /** `1` e `2` são os códigos de gênero da PokeAPI — fêmea e macho, nessa ordem. */
-const GENDER_LABELS: Record<number, string> = {
-  1: 'fêmea',
-  2: 'macho',
+const GENDER_KEYS: Record<number, string> = {
+  1: 'evolution.gender.female',
+  2: 'evolution.gender.male',
 }
 
 /** O trio de Tyrogue, comparando Ataque com Defesa. */
-const PHYSICAL_STATS_LABELS: Record<number, string> = {
-  [-1]: 'Defesa maior que Ataque',
-  0: 'Ataque igual à Defesa',
-  1: 'Ataque maior que Defesa',
+const PHYSICAL_STATS_KEYS: Record<number, string> = {
+  [-1]: 'evolution.stats.defenseHigher',
+  0: 'evolution.stats.equal',
+  1: 'evolution.stats.attackHigher',
 }
+
+/**
+ * The qualifiers, each a whole clause.
+ *
+ * `genderOther` is the **only** fallback with a message of its own: a third
+ * gender code would otherwise print a bare number under the arrow, so it gets
+ * one. The other two unknowns degrade without a key, and differently — a fourth
+ * time of day prints its raw slug, and a `relativePhysicalStats` outside
+ * `{-1, 0, 1}` drops its clause silently. Only a dex change reaches any of the
+ * three.
+ *
+ * Writing the two missing messages is a board decision, not a gate decision:
+ * inventing player-visible copy to close a branch nothing reaches would be
+ * putting words on screen that no prancha ever specified. What covers the raw
+ * slug meanwhile is the sweep in `test/unit/evolution.spec.ts`, which reruns
+ * every edge in the dex and fails on a lowercase-whole word; the dropped clause
+ * has no such net, and that asymmetry is the argument for closing both at once
+ * when the dex ever earns it.
+ */
+const QUALIFIER_KEYS = {
+  heldItem: 'evolution.with.heldItem',
+  item: 'evolution.with.item',
+  happiness: 'evolution.with.happiness',
+  affection: 'evolution.with.affection',
+  beauty: 'evolution.with.beauty',
+  location: 'evolution.with.location',
+  knownMove: 'evolution.with.knownMove',
+  knownMoveType: 'evolution.with.knownMoveType',
+  tradeSpecies: 'evolution.with.tradeSpecies',
+  partySpecies: 'evolution.with.partySpecies',
+  partyType: 'evolution.with.partyType',
+  rain: 'evolution.with.rain',
+  upsideDown: 'evolution.with.upsideDown',
+  multiplayer: 'evolution.with.multiplayer',
+  specialRock: 'evolution.with.specialRock',
+  genderOther: 'evolution.gender.other',
+} as const
+
+/**
+ * Every key this module can ask for — the one list the gates read.
+ *
+ * Built from the same constants the sentence is built from, for the reason
+ * `NARRATION_KEY_LIST` exists: `i18n-gate` cannot see a key that is assembled at
+ * runtime, so without this it reports all 43 translations as orphans and has
+ * them deleted. A hand-kept copy would drift in that same direction — silently,
+ * and toward deleting text that is on screen.
+ */
+export const EVOLUTION_KEY_LIST: readonly string[] = [
+  ...Object.values(TRIGGER_KEYS),
+  ...Object.values(VALUED_KEYS),
+  ...Object.values(TIME_KEYS),
+  ...Object.values(GENDER_KEYS),
+  ...Object.values(PHYSICAL_STATS_KEYS),
+  ...Object.values(QUALIFIER_KEYS),
+]
 
 /**
  * `fire-stone` → `Fire Stone`.
@@ -96,85 +176,125 @@ export function humanizeSlug(slug: string): string {
  * A ordem importa para a leitura: *Nível 16, de noite* é uma frase; *De noite,
  * nível 16* é uma lista. As ressalvas entram todas, porque cada uma delas é a
  * diferença entre a espécie evoluir e não evoluir.
+ *
+ * The comma is the one piece of composition left, and it survives the crossing:
+ * *Level 16, at night* and *Trade, holding Metal Coat* read in English the way
+ * the Portuguese ones read in Portuguese. What does not survive — and what each
+ * message now carries whole — is everything inside a clause.
  */
-export function describeEvolution(via: EvolutionCondition, typeLabelOf: TypeLabelOf): string {
-  const clauses = [mainClause(via), ...qualifiers(via, typeLabelOf)]
+export function describeEvolution(via: EvolutionCondition, translate: Translate): string {
+  const clauses = [mainClause(via, translate), ...qualifiers(via, translate)]
   return clauses.filter(clause => clause !== '').join(', ')
 }
 
-function mainClause(via: EvolutionCondition): string {
-  const trigger = TRIGGER_LABELS[via.trigger] ?? humanizeSlug(via.trigger)
+function mainClause(via: EvolutionCondition, translate: Translate): string {
+  // An unknown trigger has no key, so the humanized slug is what it falls back
+  // to — the same fallback `typeLabel` makes, and for the same reason: a key
+  // built from an id nobody translated reaches the screen as `evolution.trigger.x`.
+  const bare = TRIGGER_KEYS[via.trigger]
+  const trigger = bare === undefined ? humanizeSlug(via.trigger) : translate(bare)
 
   if (via.trigger === 'level-up') {
     // Sem `minLevel` a subida de nível não tem número: quem manda é a ressalva
     // — felicidade, hora do dia, item segurado. Escrever `Nível` sozinho
     // prometeria um número que não existe.
-    return via.minLevel === undefined ? 'Subir de nível' : `${trigger} ${via.minLevel}`
+    return via.minLevel === undefined ? trigger : translate(VALUED_KEYS.level, { level: via.minLevel })
   }
 
-  if (via.trigger === 'use-item' || via.trigger === 'spin') {
-    return via.item === undefined ? trigger : `${trigger} ${humanizeSlug(via.item)}`
+  if (via.trigger === 'use-item') {
+    return via.item === undefined ? trigger : translate(VALUED_KEYS.item, { item: humanizeSlug(via.item) })
+  }
+
+  if (via.trigger === 'spin') {
+    return via.item === undefined ? trigger : translate(VALUED_KEYS.spin, { item: humanizeSlug(via.item) })
   }
 
   if (via.trigger === 'use-move') {
-    return via.knownMove === undefined ? trigger : `Usar ${humanizeSlug(via.knownMove)}`
+    return via.knownMove === undefined
+      ? trigger
+      : translate(VALUED_KEYS.move, { move: humanizeSlug(via.knownMove) })
   }
 
   return trigger
 }
 
-function qualifiers(via: EvolutionCondition, typeLabelOf: TypeLabelOf): string[] {
+function qualifiers(via: EvolutionCondition, translate: Translate): string[] {
   const parts: string[] = []
 
   // `heldItem` no `use-item` seria o mesmo item duas vezes; nos outros gatilhos
   // ele é uma condição à parte — trocar segurando Metal Coat, subir de nível
   // segurando Razor Fang.
-  if (via.heldItem !== undefined) parts.push(`segurando ${humanizeSlug(via.heldItem)}`)
+  if (via.heldItem !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.heldItem, { item: humanizeSlug(via.heldItem) }))
+  }
   if (via.item !== undefined && via.trigger !== 'use-item' && via.trigger !== 'spin') {
-    parts.push(`com ${humanizeSlug(via.item)}`)
+    parts.push(translate(QUALIFIER_KEYS.item, { item: humanizeSlug(via.item) }))
   }
 
-  if (via.minHappiness !== undefined) parts.push(`felicidade ${via.minHappiness}`)
-  if (via.minAffection !== undefined) parts.push(`afeição ${via.minAffection}`)
-  if (via.minBeauty !== undefined) parts.push(`beleza ${via.minBeauty}`)
+  if (via.minHappiness !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.happiness, { value: via.minHappiness }))
+  }
+  if (via.minAffection !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.affection, { value: via.minAffection }))
+  }
+  if (via.minBeauty !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.beauty, { value: via.minBeauty }))
+  }
 
-  if (via.timeOfDay !== undefined) parts.push(TIME_LABELS[via.timeOfDay] ?? via.timeOfDay)
-  if (via.location !== undefined) parts.push(`em ${humanizeSlug(via.location)}`)
+  if (via.timeOfDay !== undefined) {
+    const key = TIME_KEYS[via.timeOfDay]
+    parts.push(key === undefined ? via.timeOfDay : translate(key))
+  }
+  if (via.location !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.location, { place: humanizeSlug(via.location) }))
+  }
 
   if (via.knownMove !== undefined && via.trigger !== 'use-move') {
-    parts.push(`sabendo ${humanizeSlug(via.knownMove)}`)
+    parts.push(translate(QUALIFIER_KEYS.knownMove, { move: humanizeSlug(via.knownMove) }))
   }
   if (via.knownMoveType !== undefined) {
-    parts.push(`sabendo um golpe do tipo ${typeLabel(via.knownMoveType, typeLabelOf)}`)
+    parts.push(translate(QUALIFIER_KEYS.knownMoveType, { type: typeLabel(via.knownMoveType, translate) }))
   }
 
-  if (via.tradeSpecies !== undefined) parts.push(`por ${humanizeSlug(via.tradeSpecies)}`)
-  if (via.partySpecies !== undefined) parts.push(`com ${humanizeSlug(via.partySpecies)} na equipe`)
-  if (via.partyType !== undefined) parts.push(`com um ${typeLabel(via.partyType, typeLabelOf)} na equipe`)
+  if (via.tradeSpecies !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.tradeSpecies, { species: humanizeSlug(via.tradeSpecies) }))
+  }
+  if (via.partySpecies !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.partySpecies, { species: humanizeSlug(via.partySpecies) }))
+  }
+  if (via.partyType !== undefined) {
+    parts.push(translate(QUALIFIER_KEYS.partyType, { type: typeLabel(via.partyType, translate) }))
+  }
 
-  if (via.gender !== undefined) parts.push(GENDER_LABELS[via.gender] ?? `gênero ${via.gender}`)
+  if (via.gender !== undefined) {
+    const key = GENDER_KEYS[via.gender]
+    parts.push(key === undefined
+      ? translate(QUALIFIER_KEYS.genderOther, { code: via.gender })
+      : translate(key))
+  }
   if (via.relativePhysicalStats !== undefined) {
-    parts.push(PHYSICAL_STATS_LABELS[via.relativePhysicalStats] ?? '')
+    const key = PHYSICAL_STATS_KEYS[via.relativePhysicalStats]
+    parts.push(key === undefined ? '' : translate(key))
   }
 
-  if (via.needsOverworldRain !== undefined) parts.push('com chuva')
-  if (via.turnUpsideDown !== undefined) parts.push('com o console de cabeça para baixo')
-  if (via.needsMultiplayer !== undefined) parts.push('em modo multijogador')
-  if (via.nearSpecialRock !== undefined) parts.push('perto da pedra especial')
+  if (via.needsOverworldRain !== undefined) parts.push(translate(QUALIFIER_KEYS.rain))
+  if (via.turnUpsideDown !== undefined) parts.push(translate(QUALIFIER_KEYS.upsideDown))
+  if (via.needsMultiplayer !== undefined) parts.push(translate(QUALIFIER_KEYS.multiplayer))
+  if (via.nearSpecialRock !== undefined) parts.push(translate(QUALIFIER_KEYS.specialRock))
 
   return parts
 }
 
 /**
- * The caller's word for one of the 18 types; the humanized slug when the API
+ * The player's word for one of the 18 types; the humanized slug when the API
  * invents a nineteenth.
  *
- * The fallback is what keeps `TypeLabelOf` narrow: a resolver typed on `TypeName`
- * cannot be handed `stellar`, and a key built from it would reach the screen as
- * `type.stellar`.
+ * The fallback is why this is not `translate(typeKey(name))` at the call site:
+ * `typeKey` is typed on `TypeName`, and a key built from `stellar` would reach
+ * the screen as `type.stellar`.
  */
-function typeLabel(name: string, typeLabelOf: TypeLabelOf): string {
-  return isTypeName(name) ? typeLabelOf(name) : humanizeSlug(name)
+function typeLabel(name: string, translate: Translate): string {
+  return isTypeName(name) ? translate(typeKey(name)) : humanizeSlug(name)
 }
 
 /**

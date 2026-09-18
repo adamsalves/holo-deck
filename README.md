@@ -299,13 +299,13 @@ A medição achou **dez** produtores de texto de tela, e é a lista de dez que v
 | produtor | o que escreve | quando sai |
 | --- | --- | --- |
 | `rarityKey` / `typeKey` | `Comum`, `Elétrico` | **entregue** |
-| `REGION_LABELS` | `Kanto` — nome próprio, igual nos dois idiomas | fica |
-| `HABITAT_LABELS` | `Caverna`, `Ermo` | PR do Detalhe |
+| `REGION_LABELS` | `Kanto` — nome próprio, igual nos dois idiomas | **fica**, e é exceção nomeada do portão |
+| `HABITAT_LABELS` → `habitatKey` | `Caverna`, `Ermo` | **entregue** |
 | `AILMENT_LABELS` → `ailmentKey` | `paralisia` | **entregue** |
 | `CONDITION_LABELS` → `conditionKey` | `PAR`, `QUE`, `ENV`, `SON` | **entregue** |
 | `generationLabel` → `generationNumeral` | `Geração IV` | **entregue** |
-| `shared/game/evolution.ts` | ~40 condições (`Subir de nível`, `de dia`) | PR do Detalhe |
-| `gameNumber` / `gamePercent` (`shared/game/progress.ts`) | `1.600`, `0,4%` | PR do Detalhe |
+| `shared/game/evolution.ts` | 43 condições (`Subir de nível`, `de dia`) | **entregue** |
+| `gameNumber` / `gamePercent` (`shared/game/progress.ts`) | `1.600`, `0,4%` | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
 
 As três primeiras `entregue` saíram no PR das telas de batalha, e as duas do
 meio pela mesma troca: a função devolve o **endereço** e quem resolve o `t()` é a
@@ -313,6 +313,15 @@ tela. `generationLabel` foi a exceção — dele sobrou só o algarismo, porque 
 estrutura de regiões viaja num payload de pré-render sem locale dentro e não pode
 carregar a palavra. `CONDITION_LABELS` mudou de arquivo junto: `status.ts` guarda
 a regra, `game.ts` guarda o texto que o jogo inventa.
+
+**`REGION_LABELS` é o único que fica, e os nove nomes de líder são a razão.**
+`Kanto` e `Brock` são a mesma classe de palavra — nome próprio, idêntico nos dois
+idiomas —, e `GYM_LEADERS` carrega nove deles dois arquivos adiante. Mandar as
+regiões para o locale escreveria dezoito traduções iguais para calar um portão, ou
+então deixaria o elenco do jogo aqui sem nada vigiando. As duas listas são
+**exceção nomeada** de [`test/unit/shared-text-gate.spec.ts`](test/unit/shared-text-gate.spec.ts),
+montada a partir dos próprios valores: uma décima região é exceção no dia em que
+for escrita.
 
 Os dois últimos são os que a issue não via, e são de outra classe: eles não
 escrevem palavra nenhuma — escrevem **número com o separador de `pt-BR` fixo**,
@@ -362,7 +371,9 @@ está aqui é só o que sobrou de propósito.
 | barras de stat pelo teto do dex | o mockup escala por ~165; 255 é o HP da Blissey, e uma barra acima de 100% da trilha não é uma barra |
 | `DexTypeBadge` sem chanfro | nenhuma prancha chanfra o chip de tipo, e a 11px do grid um chanfro de 9px come a última letra de VENENOSO |
 | habitat em `--accent` | a prancha *Detalhe* pinta o valor com o verde de planta (`#5FE07A`), que não tem papel no sistema. `--accent` é o semântico que existe para "este valor se destaca" |
-| habitat em português | a prancha escreve `ROUGH TERRAIN`, o identificador da PokeAPI. `--accent` faz dele o valor mais destacado do painel, e um documento `lang="pt-BR"` não destaca uma palavra em inglês — é o mesmo argumento que trocou `FLYING` por `VOADOR` nos chips. `HABITAT_LABELS` traduz os 9 |
+| habitat traduzido, não `HABITAT MOUNTAIN` | a prancha *Detalhe* escreve o habitat em inglês e maiúsculas, que é o identificador da PokeAPI. `--accent` faz dele o valor mais destacado do painel, e um documento não destaca uma palavra de outro idioma — o mesmo argumento que trocou `FLYING` por `VOADOR` nos chips. Desde a Fase 8 ele tem **dois** valores (`Montanha` / `Mountain`), resolvidos por `habitatKey` no locale |
+| busca no herói do Detalhe | a prancha *Detalhe* não desenha o `Buscar Pokémon ⌘K` no topo da coluna da arte. Estas são 1025 das 1036 páginas do site e é para cá que a própria busca leva: sem ela, sair da tela só pela trilha, e o `Cmd/Ctrl+K` que o resto da Pokédex promete não responderia justamente onde o jogador passa mais tempo |
+| relações de dano completas | a prancha desenha **4** resistências e o Charizard tem **7**. O painel mostra quem foge do neutro, e truncar esconderia relação que decide batalha — o mockup escolheu o número que coube bonito nele |
 | marca-d'água em `--text` a 3% | a prancha usa branco a **2,8%**. `color-mix` aceita o fracionário; o 3% é o passo redondo, e a diferença é invisível no papel que a própria prancha dá ao número (identidade, não leitura) |
 | marca-d'água em `min(46cqw, 230px)` e `max(-30px, -5%)` | a prancha fixa `230px` e `left:-30px` numa coluna de 560. A página não tem `max-width`, então a coluna vai de 100% do viewport a 5/12 dele — os valores fixos só reproduziriam o desenho em 1440. A conta acompanha a coluna e para nos números da prancha |
 | `hero__facts dd` a 20px só acima de 420px de conteúdo na coluna | os 20px são a escala da prancha, medida a 1440. Entre 900 e ~1080 a coluna cai para 310–375px e o bloco de fatos dobra de altura (131px contra 44px) — a escala da prancha aplicada a uma largura que não é a dela |
@@ -500,31 +511,36 @@ e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situaç�
 A Fase 8 leva o jogo para dois idiomas em oito PRs, uma fatia vertical por PR.
 Entre o primeiro e o último, `/en` mostra telas **meio traduzidas** — e isso é
 estado conhecido e datado, não defeito solto. Em inglês hoje: a barra global, o
-painel de conta, o pular-para-o-conteúdo e o **vocabulário do jogo** (as 6
-raridades e os 18 tipos).
+painel de conta, o pular-para-o-conteúdo, o **vocabulário do jogo** (as 6
+raridades, os 18 tipos, as 6 siglas de stat e os 9 habitats), o Hub, `/packs`,
+`/collection`, `/deck`, `/league`, `/battle/N` e a tela de **Detalhe** de espécie.
 
 O que ainda sai em português dentro de `/en`, com o PR que o leva:
 
 | onde | o que se lê em `/en` | leva |
 | --- | --- | --- |
-| condição de evolução | *sabendo um golpe do tipo **Electric*** — moldura pt-BR com o substantivo já traduzido | PR do Detalhe |
-| `/rules` | a página inteira, menos a escada de raridade | PR 4 |
-| `aria-label` de carta, slot e grid | `número 25`, `uma cópia`, `não capturado` | PRs 2 e 4 |
-| Hub, `/packs`, `/collection`, `/deck` | a prosa das quatro telas | PR 2 |
-| `/league`, `/battle/N` | prosa e narração do turno | PR 3 |
-| número | `1.600`, `0,4%` — separador de `pt-BR` fixo | PR do Detalhe |
+| `/pokedex` e `/pokedex/N` | a prosa das duas telas, o rodapé do grid e os filtros | PR das telas da Pokédex |
+| `aria-label` da carta do grid | `número 25`, `não capturado` | PR das telas da Pokédex |
+| `/rules` | a página inteira, menos a escada de raridade | PR de `/rules` |
+| `/settings` | a página inteira | PR de `/settings` |
+| número | `1.600`, `0,4%`, `6,9 kg` — separador de `pt-BR` fixo | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
 
 A ordem é deliberada: o vocabulário é **transversal** — 26 pontos de uso
 espalhados por telas de três PRs diferentes —, então ele vai antes das telas. Uma
 tela traduzida com `Comum` e `Elétrico` dentro seria pior que uma tela inteira em
 português, porque o defeito passa despercebido.
 
-**A frase de evolução é a que mais chama atenção**, e o desenho a escolheu de
-olhos abertos: `describeEvolution` monta a moldura em `shared/`, que não tem
-`t()`, e **recebe** o resolvedor de tipo em parâmetro obrigatório. O parâmetro é
-obrigatório porque o padrão teria de ser `humanizeSlug`, e `Electric` lê perto o
-bastante do certo para uma frase meio traduzida passar batida. A moldura só sai
-do português quando as ~40 condições virarem chave, no PR do Detalhe.
+**A frase de evolução era a que mais chamava atenção**, e saiu no PR do Detalhe —
+não por troca de chave, mas por **remontagem**. Ela era colada de fragmentos
+(`Nível` + o número, `sabendo um golpe do tipo` + o tipo), e isso só funciona
+enquanto os dois idiomas põem as peças na mesma ordem: `Subir de nível` é locução
+verbal onde *Level up* são duas palavras sem artigo. Cada condição virou **uma
+mensagem inteira** com placeholder nomeado, e `describeEvolution` recebe o
+tradutor em parâmetro obrigatório — obrigatório porque qualquer padrão plausível
+o bastante para compilar é plausível o bastante para entregar meia frase.
+
+A vírgula entre cláusulas é a única composição que sobrou, e ela atravessa:
+*Level 16, at night* lê em inglês como *Nível 16, de noite* lê em português.
 
 ### `/en` não é pré-renderizada por inteiro
 
@@ -1225,7 +1241,7 @@ não alcança — o link que existe no dado e não chega à tela — é
 `test/e2e/collection.spec.ts`, que **itera sobre os mesmos destinos** e clica em
 cada um.
 
-### Os dois portões de idioma
+### Os três portões de idioma
 
 [`test/unit/i18n-gate.spec.ts`](test/unit/i18n-gate.spec.ts) cobra que os locales
 combinem chave por chave e que nenhuma chave fique órfã dos dois lados — rótulo
@@ -1260,7 +1276,29 @@ caminho. O da Liga é o que mede o **log de turno**: o registro tem de casar com
 frase do idioma da URL e com nenhuma do outro, descontadas as mensagens que os
 dois idiomas escrevem igual.
 
-E há um terceiro portão unitário, do lado do narrador:
+[`test/unit/shared-text-gate.spec.ts`](test/unit/shared-text-gate.spec.ts) é o
+terceiro, e ele guarda a fronteira em vez do texto: **`shared/` não escreve
+palavra que o jogador leia.** Ele não podia existir antes de o último mapa de
+rótulo sair — a [issue #38](https://github.com/adamsalves/holo-deck/issues/38)
+escreve isso —, porque portão que nasce vermelho não se distingue de portão
+quebrado. Três coisas que ele aprendeu medindo a árvore, e que falham em silêncio:
+
+- **O leitor de literal é caractere a caractere, não regex.** O óbvio
+  `/'([^'\n]*)'/` parte `'Beira d\'água'` na aspa escapada: o literal real sai da
+  varredura e um fantasma (`água`) entra no lugar. Sete dos nove habitats eram
+  invisíveis para o primeiro rascunho, e o único ofensor que ele reportava era um
+  pedaço que não existe em arquivo nenhum.
+- **`[A-Za-zÀ-ÿ]` chama `×½` de texto**, porque o Latin-1 põe `×` em U+00D7, no
+  meio das acentuadas. Seriam seis exceções, e exceção é onde um rótulo de
+  verdade se esconde depois.
+- **Mensagem de `throw` é de quem lê stack trace, não de quem joga.** São 20 em
+  `shared/`, perdoadas por estarem dentro do `throw` — traduzi-las poria as
+  invariantes do motor na frente de quem traduz.
+
+E ele erra do lado certo: um `'Caverna'` plantado em `typechart.ts` — arquivo
+contra o qual ele não foi escrito — reprova nomeando arquivo e palavra.
+
+E há um quarto portão unitário, do lado do narrador:
 [`test/unit/battle-narration.spec.ts`](test/unit/battle-narration.spec.ts) roda
 `narrate()` nos dois idiomas contra todo `kind` de evento, compara o conjunto de
 chaves pedidas com o publicado, e lê a própria fonte para garantir que nenhuma
@@ -1290,7 +1328,7 @@ parágrafo argumenta.
 
 E a paridade entre os locales ganhou as duas asserções que faltavam, em
 `test/unit/i18n-gate.spec.ts`: **toda** chave tem de diferir entre os idiomas ou
-estar nomeada em `IDENTICAL_LABELS` (são 27 hoje, quase todas vocabulário do
+estar nomeada em `IDENTICAL_LABELS` (são 35 hoje, quase todas vocabulário do
 jogo), e toda mensagem tem de pedir os mesmos `{placeholder}` e o mesmo número de
 formas plurais nos dois arquivos. Antes delas, 152 das 174 chaves de então podiam
 ser coladas sem traduzir com todo o resto verde — a varredura da tela não pega isso,

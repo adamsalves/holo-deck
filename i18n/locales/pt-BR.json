@@ -67,6 +67,17 @@
       "speed": "Velocidade"
     }
   },
+  "habitat": {
+    "cave": "Caverna",
+    "forest": "Floresta",
+    "grassland": "Campo",
+    "mountain": "Montanha",
+    "rare": "Ermo",
+    "rough-terrain": "Terreno acidentado",
+    "sea": "Mar",
+    "urban": "Urbano",
+    "waters-edge": "Beira d'água"
+  },
   "hub": {
     "advantage": "{card} contra {type} {multiplier}",
     "shiny": "Shiny",
@@ -437,6 +448,120 @@
         "won": "Você venceu o ginásio.",
         "lost": "Seu time caiu."
       }
+    }
+  },
+  "evolution": {
+    "trigger": {
+      "levelUp": "Subir de nível",
+      "useItem": "Usar um item",
+      "useMove": "Usar um golpe",
+      "trade": "Troca",
+      "shed": "Vaga na equipe e uma Poké Ball",
+      "spin": "Girar",
+      "threeCriticalHits": "Três golpes críticos numa batalha",
+      "strongStyleMove": "Golpe em estilo forte",
+      "agileStyleMove": "Golpe em estilo ágil",
+      "recoilDamage": "Dano de recuo acumulado",
+      "takeDamage": "Levar dano",
+      "threeDefeatedBisharp": "Derrotar três Bisharp",
+      "towerOfDarkness": "Torre das Trevas",
+      "gimmighoulCoins": "999 moedas de Gimmighoul",
+      "other": "Condição especial"
+    },
+    "main": {
+      "level": "Nível {level}",
+      "useItem": "Usar {item}",
+      "useMove": "Usar {move}",
+      "spinItem": "Girar segurando {item}"
+    },
+    "time": {
+      "day": "de dia",
+      "night": "de noite",
+      "fullMoon": "na lua cheia"
+    },
+    "gender": {
+      "female": "fêmea",
+      "male": "macho",
+      "other": "gênero {code}"
+    },
+    "stats": {
+      "defenseHigher": "Defesa maior que Ataque",
+      "equal": "Ataque igual à Defesa",
+      "attackHigher": "Ataque maior que Defesa"
+    },
+    "with": {
+      "heldItem": "segurando {item}",
+      "item": "com {item}",
+      "happiness": "felicidade {value}",
+      "affection": "afeição {value}",
+      "beauty": "beleza {value}",
+      "location": "em {place}",
+      "knownMove": "sabendo {move}",
+      "knownMoveType": "sabendo um golpe do tipo {type}",
+      "tradeSpecies": "por {species}",
+      "partySpecies": "com {species} na equipe",
+      "partyType": "com um {type} na equipe",
+      "rain": "com chuva",
+      "upsideDown": "com o console de cabeça para baixo",
+      "multiplayer": "em modo multijogador",
+      "specialRock": "perto da pedra especial"
+    }
+  },
+  "dex": {
+    "bst": "BST",
+    "search": {
+      "trigger": "Buscar Pokémon",
+      "description": "Procure por nome, número ou tipo entre as 1025 espécies.",
+      "placeholder": "Nome, número ou tipo…",
+      "group": "Espécies"
+    },
+    "stats": {
+      "title": "Base stats",
+      "ofMax": "/ {max} máx"
+    },
+    "relations": {
+      "title": "Relações de dano",
+      "note": "— calculadas na matriz 18×18, tipo duplo multiplicativo",
+      "weak": "Recebe mais dano",
+      "resistant": "Recebe menos / nada"
+    },
+    "chain": {
+      "title": "Linha evolutiva",
+      "note": "— resolvida do JSON local, zero requisições"
+    }
+  },
+  "species": {
+    "crumbs": "Trilha",
+    "artwork": "Arte oficial de {name}",
+    "height": "Altura",
+    "weight": "Peso",
+    "rarity": "Raridade",
+    "tabs": {
+      "about": "Sobre",
+      "stats": "Stats",
+      "evolution": "Evolução"
+    },
+    "about": {
+      "missing": "A PokeAPI não traz descrição para esta espécie.",
+      "habitat": "Habitat",
+      "captureRate": "Taxa de captura",
+      "baseHappiness": "Felicidade base",
+      "note": "Os três vinham da aba {training} da Pokédex antiga. Não têm papel no jogo — são referência.",
+      "training": "Training"
+    },
+    "chain": {
+      "missing": "Esta espécie não está em nenhuma cadeia de evolução do dex."
+    },
+    "error": {
+      "notFound": "Espécie fora do dex",
+      "load": "Não foi possível carregar a espécie",
+      "partial": "{slug} está no índice e não em gen-{generation}.json"
+    },
+    "seo": {
+      "title": "{name} — Pokédex — Holo Deck",
+      "titleFallback": "Pokédex — Holo Deck",
+      "description": "{name}, {number} do dex nacional. Tipos, base stats, linha evolutiva e relações de dano.",
+      "descriptionFallback": "Pokédex do Holo Deck."
     }
   }
 }

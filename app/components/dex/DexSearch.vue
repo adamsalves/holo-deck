@@ -52,7 +52,7 @@ watch(open, async (isOpen) => {
  */
 const groups = computed(() => [{
   id: 'species',
-  label: 'Espécies',
+  label: t('dex.search.group'),
   items: (index.value ?? []).map(entry => ({
     label: entry.displayName,
     suffix: `${dexNumber(entry.id)} · ${entry.types.map(type => t(typeKey(type))).join(' · ')}`,
@@ -71,8 +71,8 @@ defineShortcuts({
 <template>
   <UModal
     v-model:open="open"
-    title="Buscar Pokémon"
-    description="Procure por nome, número ou tipo entre as 1025 espécies."
+    :title="t('dex.search.trigger')"
+    :description="t('dex.search.description')"
     :ui="{ content: 'max-w-xl' }"
   >
     <button
@@ -100,7 +100,7 @@ defineShortcuts({
           stroke-linecap="round"
         />
       </svg>
-      <span class="dex-search__label">Buscar Pokémon</span>
+      <span class="dex-search__label">{{ t('dex.search.trigger') }}</span>
       <!-- O atalho é anunciado no `aria-label` do botão, não aqui: a tecla é
            dica visual, e um leitor de tela lendo "meta K" no meio do rótulo
            atrapalha mais do que ajuda. -->
@@ -115,7 +115,7 @@ defineShortcuts({
         close
         :groups="groups"
         :loading="loading"
-        placeholder="Nome, número ou tipo…"
+        :placeholder="t('dex.search.placeholder')"
         class="h-96"
         @update:open="open = $event"
       />
