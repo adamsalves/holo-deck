@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { extname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { GYM_LEADERS } from '~~/shared/game/gyms'
 import { GENERATION_COUNT } from '~~/shared/types/dex'
@@ -28,6 +28,23 @@ import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/so
 
 const SCANNED = 'shared'
 const SKIP = new Set(['node_modules'])
+
+/**
+ * What under `shared/` the sweep deliberately does not read — enumerated,
+ * because the extension it *does* read is a list of who gets in.
+ *
+ * `hasExtension(['.ts'])` alone is that shape, and it fails the way an entry
+ * list always fails: silently. A `planted.vue` or a `planted.mts` holding
+ * `'Caverna Escura'` is not an offender to it, it is not a file at all. The
+ * layer is `.ts` today and a `.vue` here would break other rules first — but
+ * "would break something else first" is what an unguarded rule always says.
+ *
+ * So the walk below reads everything and this list says what is allowed to be
+ * skipped. A tenth extension under `shared/` fails the assertion until someone
+ * decides which side it belongs on, which is the decision the entry list was
+ * making by omission.
+ */
+const NOT_SOURCE: readonly string[] = ['.json', '.md', '.snap']
 
 /**
  * A string literal, as the file spells it, with where it starts.
@@ -340,10 +357,21 @@ describe('shared/ writes no screen text', () => {
     expect(thrown).not.toEqual([])
   })
 
+  it('leaves no file under shared/ outside the sweep', () => {
+    const everything = walkFiles(join(REPO_ROOT, SCANNED), SKIP, () => true)
+    const read = new Set(sources().map(one => one.file))
+
+    expect(everything).not.toEqual([])
+
+    const unread = everything.filter(file => !read.has(file) && !NOT_SOURCE.includes(extname(file)))
+
+    expect(unread, 'a file under shared/ the sweep never opened').toEqual([])
+  })
+
   it('no module under shared/ writes a word the player reads', () => {
     const { offenders } = sweep()
 
-    expect([...new Set(offenders)].sort(), 'texto de tela em `shared/`').toEqual([])
+    expect([...new Set(offenders)].sort(), 'screen text under `shared/`').toEqual([])
   })
 
   /**

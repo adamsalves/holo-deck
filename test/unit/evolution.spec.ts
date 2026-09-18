@@ -2,7 +2,7 @@ import type { Translate } from '~~/shared/types/game'
 import { describe, expect, it } from 'vitest'
 import { describeEvolution, EVOLUTION_KEY_LIST, flattenChain, humanizeSlug, toStages } from '~~/shared/game/evolution'
 import { readAllSpecies, readChains } from '../support/generated-dex'
-import { defaultLocale, localeCodes, message } from '../support/locales'
+import { defaultLocale, label, localeCodes, message } from '../support/locales'
 
 /**
  * O rótulo da aresta de evolução, medido contra as 483 condições reais.
@@ -43,8 +43,24 @@ const conditions = Object.values(chains)
 /** Both languages, so the absence assertions below compare something. */
 const LOCALES = localeCodes()
 
+/**
+ * The triggers whose message has a valued twin, and the placeholder that twin
+ * spells.
+ *
+ * These three are the whole class the dangling gerund belongs to: a trigger the
+ * dex sometimes carries an object for and sometimes does not. `spin` is the one
+ * that shipped broken, and it is also the only one whose **bare** form the dex
+ * actually reaches — `use-move` occurs once and without its move, `use-item`
+ * always carries its item.
+ */
+const BARE_AND_VALUED: readonly (readonly [string, string, string])[] = [
+  ['evolution.trigger.spin', 'evolution.main.spinItem', 'item'],
+  ['evolution.trigger.useItem', 'evolution.main.useItem', 'item'],
+  ['evolution.trigger.useMove', 'evolution.main.useMove', 'move'],
+]
+
 describe('rótulo da condição', () => {
-  it('mede mais de um idioma', () => {
+  it('measures more than one language', () => {
     expect(LOCALES.length).toBeGreaterThan(1)
   })
 
@@ -97,10 +113,11 @@ describe('rótulo da condição', () => {
   })
 
   it('acumula as ressalvas na ordem em que se lê a frase', () => {
-    // A vírgula separa toda ressalva, sem exceção por gatilho: uma regra de
-    // pontuação por caso daria frases que só um `switch` explica. Ela sobrevive
-    // à travessia — *Level 16, at night* lê em inglês como *Nível 16, de noite*
-    // lê em português —, e é a única composição que restou neste módulo.
+    // The comma separates every qualifier, with no exception per trigger: a
+    // punctuation rule per case would give sentences only a `switch` explains.
+    // It survives the crossing — *Level 16, at night* reads in English the way
+    // *Nível 16, de noite* reads in Portuguese — and it is the only composition
+    // left in this module.
     for (const code of LOCALES) {
       const t = translator(code)
 
@@ -125,13 +142,35 @@ describe('rótulo da condição', () => {
    * preposition with no object, on a real page, in the language the game
    * shipped in. Splitting the bare trigger from the one that takes an item is
    * what fixes it, and the bare form is the one the dex actually reaches.
+   *
+   * **The second half measures shape, not the locale against itself.** Asking
+   * `describeEvolution` to equal `message('evolution.trigger.spin')` agrees with
+   * any file where both sides moved together: put *Girar segurando* back and
+   * that comparison stays green with the preposition on the page, because the
+   * expectation reads the same broken string the code does. What can never be
+   * true of a healthy locale is the bare form being the valued message with its
+   * object cut off — so that is what the three pairs assert.
+   *
+   * `startsWith` is the wrong shape for it, and tempting: *Girar* is a prefix of
+   * *Girar segurando {item}* in a file that is perfectly correct, so a gate
+   * written that way would fail on good input instead — the defect the stat
+   * labels paid for one PR ago.
    */
-  it('não deixa preposição pendurada quando o dex não traz o item', () => {
+  it('leaves no preposition dangling when the dex carries no object', () => {
     for (const code of LOCALES) {
-      const phrase = describeEvolution({ trigger: 'spin' }, translator(code))
+      expect(describeEvolution({ trigger: 'spin' }, translator(code)))
+        .toBe(message('evolution.trigger.spin', code))
 
-      expect(phrase).toBe(message('evolution.trigger.spin', code))
-      expect(phrase.trimEnd(), 'gerúndio sem objeto na tela').toBe(phrase)
+      for (const [bare, valued, placeholder] of BARE_AND_VALUED) {
+        const token = `{${placeholder}}`
+        const template = label(valued, code)
+
+        expect(template, `${valued} spells no ${token} in ${code}`).toContain(token)
+
+        const stem = template.slice(0, template.indexOf(token)).trim()
+
+        expect(label(bare, code), `${bare} is ${valued} with its object cut off`).not.toBe(stem)
+      }
     }
   })
 
@@ -155,24 +194,24 @@ describe('rótulo da condição', () => {
    * sob uma seta é tão silencioso quanto uma frase vazia. Nada no disco vê isso;
    * aqui vê, porque a saída é comparada contra a forma de uma chave.
    */
-  it('produz frase para cada uma das arestas do dex, nos dois idiomas', () => {
+  it('produces a sentence for every edge in the dex, in both languages', () => {
     expect(conditions.length).toBeGreaterThan(400)
 
     for (const code of LOCALES) {
       const t = translator(code)
       const phrases = conditions.map(via => describeEvolution(via, t))
 
-      expect(phrases.filter(phrase => phrase.trim() === ''), 'aresta sem rótulo é seta sem explicação na tela')
+      expect(phrases.filter(phrase => phrase.trim() === ''), 'an edge with no label is an arrow with no explanation')
         .toEqual([])
-      // O hífen sozinho não é slug, e foi o inglês que mostrou isso: o detector
-      // antigo (`/[a-z]-[a-z]/`) acusava *knowing a Fairy-type move* de vazar
-      // `fairy-type` da API. Um slug que escapou do humanizador é minúsculo
-      // **inteiro** — `water-stone` —, então o que identifica é a palavra
-      // começar em caixa baixa, não o hífen existir. Escrito como estava, a
-      // única saída seria reescrever a frase inglesa para caber no detector.
-      expect(phrases.filter(phrase => /(?:^|[\s(])[a-z]+-[a-z]/.test(phrase)), 'slug cru vazando para a tela')
+      // A lone hyphen is not a slug, and English is what showed it: the old
+      // detector (`/[a-z]-[a-z]/`) accused *knowing a Fairy-type move* of
+      // leaking `fairy-type` from the API. A slug that escaped the humanizer is
+      // lowercase **whole** — `water-stone` — so what identifies it is the word
+      // starting in lower case, not the hyphen existing. Written as it was, the
+      // only way out would be rewriting the English sentence to fit the detector.
+      expect(phrases.filter(phrase => /(?:^|[\s(])[a-z]+-[a-z]/.test(phrase)), 'a raw slug leaking to the screen')
         .toEqual([])
-      expect(phrases.filter(phrase => /(?:^|[\s,])[a-z]+\.[a-z]+[\w.]*/.test(phrase)), 'chave crua na tela')
+      expect(phrases.filter(phrase => /(?:^|[\s,])[a-z]+\.[a-z]+[\w.]*/.test(phrase)), 'a raw key on the screen')
         .toEqual([])
     }
   })
@@ -184,7 +223,7 @@ describe('rótulo da condição', () => {
     const withoutLabel = [...new Set(conditions.map(via => via.trigger))]
       .filter(trigger => describeEvolution({ trigger }, t) === humanizeSlug(trigger) && trigger.includes('-'))
 
-    expect(withoutLabel, 'gatilho sem rótulo no locale').toEqual([])
+    expect(withoutLabel, 'a trigger with no label in the locale').toEqual([])
   })
 
   /**
@@ -196,7 +235,7 @@ describe('rótulo da condição', () => {
    * in it to resolve in every locale is the cheap half of that, and it fails
    * here — naming the key — instead of in a gate that names the locale file.
    */
-  it('endereça só chaves que os dois locales traduzem', () => {
+  it('addresses only keys that both locales translate', () => {
     expect(EVOLUTION_KEY_LIST).not.toEqual([])
     expect(new Set(EVOLUTION_KEY_LIST).size).toBe(EVOLUTION_KEY_LIST.length)
 
@@ -212,7 +251,7 @@ describe('rótulo da condição', () => {
         }
       })
 
-      expect(missing, `o locale ${code} não traduz chave de evolução`).toEqual([])
+      expect(missing, `locale ${code} does not translate an evolution key`).toEqual([])
     }
   })
 })

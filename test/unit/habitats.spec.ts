@@ -23,40 +23,40 @@ import { defaultLocale, label, localeCodes } from '../support/locales'
 const SPECIES = readAllSpecies()
 
 describe('habitats', () => {
-  it('são os nove, e todos com rótulo em cada idioma', () => {
+  it('are the nine, each with a label in every language', () => {
     expect(HABITAT_NAMES).toHaveLength(9)
 
     const codes = localeCodes()
-    expect(codes.length, 'nenhum locale para comparar').toBeGreaterThan(1)
+    expect(codes.length, 'no locale to compare').toBeGreaterThan(1)
 
     for (const code of codes) {
       for (const name of HABITAT_NAMES) {
-        expect(label(habitatKey(name), code), `${habitatKey(name)} não tem rótulo em ${code}`).not.toBe('')
+        expect(label(habitatKey(name), code), `${habitatKey(name)} has no label in ${code}`).not.toBe('')
       }
     }
 
-    // Nenhum rótulo pode ser o próprio identificador: é exatamente o
-    // `ROUGH TERRAIN` que a varredura tirou da tela. **Só no locale padrão**,
-    // pela razão que `i18n-gate` já escreve na mesma asserção sobre o
-    // vocabulário: em inglês o rótulo *é* o identificador com inicial maiúscula,
-    // e `cave` → *Cave* está certo. Cobrar isso dos dois reprovaria seis dos
-    // nove habitats por estarem traduzidos corretamente.
+    // No label may be the identifier itself: that is exactly the `ROUGH TERRAIN`
+    // the sweep took off the screen. **In the default locale only**, for the
+    // reason `i18n-gate` already spells in the same assertion over the
+    // vocabulary: in English the label *is* the identifier with a capital, and
+    // `cave` → *Cave* is right. Asking it of both would fail six of the nine
+    // habitats for being correctly translated.
     for (const name of HABITAT_NAMES) {
       const written = label(habitatKey(name), defaultLocale())
 
-      expect(written.toLowerCase(), `o locale padrão escreve o identificador em ${name}`).not.toBe(name)
+      expect(written.toLowerCase(), `the default locale writes the identifier in ${name}`).not.toBe(name)
     }
   })
 
   /**
-   * `rare` é o que precisou de decisão em vez de dicionário.
+   * `rare` is the one that needed a decision rather than a dictionary.
    *
-   * Na PokeAPI ele é o habitat de quem não mora em lugar nenhum comum, então
-   * *raro* mediria a mesma coisa que `rarity.uncommon` e diria outra. Os dois
-   * idiomas nomeiam o lugar — *Ermo*, *Wilds* —, e esta asserção existe para que
-   * uma tradução futura não o devolva à escada de raridade.
+   * In the PokeAPI it is the habitat of whoever lives in no common place, so
+   * *raro* would measure the same thing `rarity.uncommon` does and say another.
+   * Both languages name the place instead — *Ermo*, *Wilds* — and this assertion
+   * exists so a future translation does not hand it back to the rarity ladder.
    */
-  it('não empresta a palavra da escada de raridade para o habitat `rare`', () => {
+  it('does not borrow the rarity ladder word for the `rare` habitat', () => {
     for (const code of localeCodes()) {
       const habitat = label(habitatKey('rare'), code).toLowerCase()
 

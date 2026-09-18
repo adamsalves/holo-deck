@@ -38,9 +38,16 @@ import { typeKey } from '../types/game.ts'
  * lista saiu de varrer `chains.json`, não da documentação da API.
  *
  * Bare forms: what each trigger says when the field that would complete it is
- * missing. `use-item` always carries its item in today's dex (52 of 52) and
- * `use-move` carries its move in 13 of 14, but the type allows the gap and a
- * clause with nothing in it is worse than a vague one.
+ * missing. Measured over the 483 edges of today's dex, the gap is not the rare
+ * case — it is the only case for two of the three: `use-item` always carries its
+ * item (52 of 52), but `use-move` occurs **once and carries no move at all**,
+ * and `spin` occurs once and carries no item. The 13 edges that do spell a
+ * `knownMove` are all `level-up`, where it reads as a qualifier and not as the
+ * main clause.
+ *
+ * So these are the forms the screen actually renders, not a defensive branch —
+ * which is why `test/unit/evolution.spec.ts` asserts that none of them is its
+ * valued twin with the object cut off.
  */
 const TRIGGER_KEYS: Record<string, string> = {
   'level-up': 'evolution.trigger.levelUp',
@@ -95,11 +102,22 @@ const PHYSICAL_STATS_KEYS: Record<number, string> = {
 }
 
 /**
- * The ressalvas, each a whole clause.
+ * The qualifiers, each a whole clause.
  *
- * `genderOther` and `unknownTime` are the two that only a dex change can reach:
- * a third gender code or a fourth time of day would otherwise print a bare
- * number or a raw slug under the arrow.
+ * `genderOther` is the **only** fallback with a message of its own: a third
+ * gender code would otherwise print a bare number under the arrow, so it gets
+ * one. The other two unknowns degrade without a key, and differently — a fourth
+ * time of day prints its raw slug, and a `relativePhysicalStats` outside
+ * `{-1, 0, 1}` drops its clause silently. Only a dex change reaches any of the
+ * three.
+ *
+ * Writing the two missing messages is a board decision, not a gate decision:
+ * inventing player-visible copy to close a branch nothing reaches would be
+ * putting words on screen that no prancha ever specified. What covers the raw
+ * slug meanwhile is the sweep in `test/unit/evolution.spec.ts`, which reruns
+ * every edge in the dex and fails on a lowercase-whole word; the dropped clause
+ * has no such net, and that asymmetry is the argument for closing both at once
+ * when the dex ever earns it.
  */
 const QUALIFIER_KEYS = {
   heldItem: 'evolution.with.heldItem',

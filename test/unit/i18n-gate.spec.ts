@@ -464,11 +464,18 @@ describe('as chaves e quem as usa', () => {
    * passam sem medir nada. Exigir mais chaves do que a barra tem é o que torna
    * isso visível — a barra resolve as dela por variável, então toda chave
    * literal encontrada veio mesmo da varredura.
+   *
+   * **Every source that feeds `USED_KEYS` without going through the scan has to
+   * be on the right-hand side too.** Each one that is not is that many keys of
+   * slack, and slack is what lets a dead scan look healthy: the 43 evolution
+   * keys arrived in `USED_KEYS` and not here, and with them the assertion went
+   * from failing on a broken `LITERAL_KEY` to passing on one.
    */
   it('acha chave literal além das da barra', () => {
     expect(NAV_KEYS.length).toBeGreaterThan(0)
     expect(USED_KEYS.size).toBeGreaterThan(
-      NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length,
+      NAV_KEYS.length + VOCABULARY_KEYS.length + NARRATION_KEYS_USED.length
+      + EVOLUTION_KEYS_USED.length,
     )
   })
 
