@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { RECOVERY_REASONS, recoveryMessageKey } from '../../app/utils/recovery-reason.ts'
+import type { RecoveryReason } from '../../shared/save/schema.ts'
+import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
 import { foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
-import { fakeSync, saveWith, seedLocalSave, seedSynced } from './support.ts'
+import { fakeSync, saveWith, screenText, seedLocalSave, seedSynced } from './support.ts'
 
 /**
  * `/settings` in the language of the URL — and the two texts on it that render
@@ -20,7 +22,7 @@ import { fakeSync, saveWith, seedLocalSave, seedSynced } from './support.ts'
  * something the server did not render.
  */
 
-/** Six species on the account, three on the server's previous version. */
+/** Three species, and the server's previous version holds the same save. */
 const CURRENT = saveWith({
   dust: 100,
   collection: { 1: { c: 1, s: 0 }, 4: { c: 1, s: 0 }, 7: { c: 1, s: 0 } },
@@ -54,9 +56,10 @@ test('every panel speaks the language of the URL, read from the other one', asyn
     // loading line and passes over a page that never rendered.
     await expect(page.locator('.settings__panel--danger')).toBeVisible()
 
-    // `textContent` and not `innerText`: the CSS uppercases the small labels,
-    // and the rendered text would not match the locale's sentence case.
-    const text = (await page.locator('.settings').textContent()) ?? ''
+    // `screenText` and neither of the two obvious readings: `innerText` loses
+    // the labels the CSS uppercases, `textContent` loses the word borders that
+    // `spells` matches on. Its docblock carries the measurement.
+    const text = await screenText(page.locator('.settings'))
 
     expect(
       foreignPhrases(text, foreign),
@@ -103,10 +106,60 @@ test('the sync chip speaks the language of the URL, on a screen that is not sett
     // keeps an empty chip from passing the sweep below.
     await expect(chip, `sync chip in ${code}`).not.toBeEmpty()
 
-    const text = (await chip.textContent()) ?? ''
+    const text = await screenText(chip)
     expect(foreignPhrases(text, foreign), `sync chip in ${code} wrote another language`)
       .toEqual([])
   }
+})
+
+/**
+ * The instant stamped on a backup — the only thing this screen writes that is
+ * neither a key nor a number.
+ *
+ * `backupLabel` formatted with `'pt-BR'` written by hand, and inside `/en` the
+ * same backup read `05/09, 14:22` where English reads `09/05, 02:22 PM`: not an
+ * odd-looking date, a **wrong** one. Nothing measured it — no unit test calls
+ * the function, and no suite seeded a backup, so the whole panel never rendered
+ * and putting the hard-coded locale back stayed green everywhere.
+ *
+ * **Measured as shape, in the other language.** Reading the stamp and comparing
+ * it against `Intl` with the same locale would agree with the hard-coded string
+ * just as happily — both sides would move together. What tells them apart is
+ * that the two URLs have to disagree. Not *all* locales pairwise: a third
+ * language may legitimately share a date format with one of these, and a gate
+ * that cries on a correct page is a gate someone switches off.
+ */
+test('a backup is stamped in the date format of the URL, not one language for both', async ({ page }) => {
+  const codes = localeCodes()
+  expect(codes.length).toBeGreaterThan(1)
+
+  const stamps: string[] = []
+
+  for (const code of codes) {
+    await page.goto(localeUrl('/', code))
+    await page.evaluate((raw) => {
+      window.localStorage.setItem('holodeck:backup:1757085720000', raw)
+    }, JSON.stringify(CURRENT))
+    await page.goto(localeUrl('/settings', code))
+
+    const panel = page
+      .locator('.settings__panel')
+      .filter({ hasText: label('settings.backups.title', code) })
+
+    await expect(panel, `no backups panel in ${code}`).toBeVisible()
+
+    const stamp = ((await panel.locator('.settings__row-title').first().textContent()) ?? '').trim()
+
+    // The other side: an empty stamp would make every language agree, and the
+    // assertion below would call that a pass.
+    expect(stamp, `the backup in ${code} is stamped with nothing`).not.toBe('')
+    stamps.push(stamp)
+  }
+
+  expect(
+    new Set(stamps).size,
+    `the backup reads ${stamps.join(' and ')} — the same in every language`,
+  ).toBeGreaterThan(1)
 })
 
 /**
@@ -114,26 +167,49 @@ test('the sync chip speaks the language of the URL, on a screen that is not sett
  *
  * It renders from `app.vue` for a save the game refused to load, so it is the
  * one screen text a player meets **before** choosing a screen. Driven by
- * seeding an unreadable save rather than by calling the component, because what
- * is being measured is that the plugin, the component and the locale agree.
+ * seeding a save the loader refuses rather than by calling the component,
+ * because what is being measured is that the plugin, the component and the
+ * locale agree.
+ *
+ * **All three reasons, and the first version drove one.** It seeded `{ not
+ * json` and asserted the `corrupt` sentence, looping over the locales only —
+ * the `RECOVERY_REASONS.length` it checked was a count beside the loop, not
+ * the other side of it, so a notice that always wrote `save.recovery.corrupt`
+ * kept it green. The seeds come from `migrate()`: over `SCHEMA_VERSION` is a
+ * save from a newer build, and a v1 save runs the chain and fails the guard at
+ * the end of it.
  */
+const REFUSED: Record<RecoveryReason, string> = {
+  // Not a record at all — the driver's own `JSON.parse` is what refuses this.
+  'corrupt': '{ not json',
+  'unknown-version': JSON.stringify({ schemaVersion: SCHEMA_VERSION + 1 }),
+  'failed-migration': JSON.stringify({ schemaVersion: 1 }),
+}
+
 test('the recovery notice speaks the language of the URL, for every reason', async ({ page }) => {
-  // The other side of the loop: a dropped reason would leave this asserting
-  // over a shorter list without saying so.
-  expect(RECOVERY_REASONS.length).toBe(3)
+  // The other side of the loop: an empty list would assert nothing and say so
+  // by passing. `REFUSED` is a `Record` over the enum, so a fourth reason stops
+  // the compiler here rather than quietly going unmeasured.
+  expect(RECOVERY_REASONS.length).toBeGreaterThan(0)
 
-  for (const code of localeCodes()) {
-    await page.addInitScript(() => {
-      window.localStorage.setItem('holodeck:save', '{ not json')
-    })
-    await page.goto(localeUrl('/', code))
+  for (const reason of RECOVERY_REASONS) {
+    for (const code of localeCodes()) {
+      // Seeded by navigating first and reloading, not by `addInitScript`: init
+      // scripts stack for the life of the page, and six of them setting the
+      // same key would leave the run depending on the order they were added.
+      await page.goto(localeUrl('/', code))
+      await page.evaluate((raw) => {
+        window.localStorage.setItem('holodeck:save', raw)
+      }, REFUSED[reason])
+      await page.reload()
 
-    const notice = page.locator('.save-notice')
-    await expect(notice).toBeVisible()
+      const notice = page.locator('.save-notice')
+      await expect(notice, `no recovery notice for ${reason} in ${code}`).toBeVisible()
 
-    await expect(notice, `recovery notice in ${code}`)
-      .toContainText(message(recoveryMessageKey('corrupt'), code))
-    await expect(notice, `dismiss button in ${code}`)
-      .toContainText(label('save.recovery.dismiss', code))
+      await expect(notice, `recovery notice for ${reason} in ${code}`)
+        .toContainText(message(recoveryMessageKey(reason), code))
+      await expect(notice, `dismiss button in ${code}`)
+        .toContainText(label('save.recovery.dismiss', code))
+    }
   }
 })

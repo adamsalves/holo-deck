@@ -43,7 +43,7 @@ function asks(value: SyncStatus): { key: string, values: Record<string, unknown>
   }
 
   syncLabel(value, NOW, spy)
-  if (seen === null) throw new Error('syncLabel não pediu chave nenhuma')
+  if (seen === null) throw new Error('syncLabel asked for no key at all')
 
   return seen
 }
@@ -89,13 +89,13 @@ describe('o que o indicador de sync escreve', () => {
       const one = rendered(status({ phase: 'queued', pending: 1 }), code)
       const many = rendered(status({ phase: 'queued', pending: 3 }), code)
 
-      expect(one, `singular em ${code}`).toContain('1')
-      expect(many, `plural em ${code}`).toContain('3')
-      expect(one, `as duas formas coincidem em ${code}`).not.toBe(many.replace('3', '1'))
+      expect(one, `the singular in ${code}`).toContain('1')
+      expect(many, `the plural in ${code}`).toContain('3')
+      expect(one, `the two forms coincide in ${code}`).not.toBe(many.replace('3', '1'))
 
       // A message rendered with its pipe intact is the defect this guards.
-      expect(one, `pipe na tela em ${code}`).not.toContain('|')
-      expect(many, `pipe na tela em ${code}`).not.toContain('|')
+      expect(one, `a pipe reached the screen in ${code}`).not.toContain('|')
+      expect(many, `a pipe reached the screen in ${code}`).not.toContain('|')
     }
   })
 
@@ -129,15 +129,15 @@ describe('o que o indicador de sync escreve', () => {
     ]
 
     const [first, ...rest] = localeCodes()
-    if (first === undefined) throw new Error('sem locale para comparar')
+    if (first === undefined) throw new Error('no locale to compare against')
 
     for (const value of cases) {
       const mine = rendered(value, first)
 
-      expect(mine, `${value.phase} em ${first} saiu vazio`).not.toBe('')
+      expect(mine, `${value.phase} came out empty in ${first}`).not.toBe('')
 
       for (const other of rest) {
-        expect(rendered(value, other), `${value.phase} igual em ${first} e ${other}`)
+        expect(rendered(value, other), `${value.phase} reads the same in ${first} and ${other}`)
           .not.toBe(mine)
       }
     }

@@ -4,6 +4,7 @@ import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
 import { gamePercent } from '../../shared/game/progress.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
 import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels } from '../support/locales.ts'
+import { screenText } from './support.ts'
 
 /**
  * `/rules` in a browser, which is the half no gate on disk can reach.
@@ -96,9 +97,10 @@ test('every panel speaks the language of the URL, read from the other one', asyn
       .toBeGreaterThan(20)
 
     await page.goto(localeUrl('/rules', code))
-    // `textContent` and not `innerText`: the CSS uppercases the small labels,
-    // and the rendered text would not match the locale's sentence case.
-    const text = (await page.locator('.rules').textContent()) ?? ''
+    // `screenText` and neither of the two obvious readings: `innerText` loses
+    // the labels the CSS uppercases, `textContent` loses the word borders that
+    // `spells` matches on. Its docblock carries the measurement.
+    const text = await screenText(page.locator('.rules'))
 
     expect(
       foreignPhrases(text, foreign),

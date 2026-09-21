@@ -94,9 +94,9 @@ describe('quanto tempo desde a última sincronização', () => {
       const one = rendered(after(DAY), code)
       const many = rendered(after(3 * DAY), code)
 
-      expect(one, `um dia em ${code}`).not.toBeNull()
-      expect(one, `as duas formas coincidem em ${code}`).not.toBe(many?.replace('3', '1'))
-      expect(one, `pipe na tela em ${code}`).not.toContain('|')
+      expect(one, `one day in ${code}`).not.toBeNull()
+      expect(one, `the two forms coincide in ${code}`).not.toBe(many?.replace('3', '1'))
+      expect(one, `a pipe reached the screen in ${code}`).not.toContain('|')
     }
   })
 
@@ -110,14 +110,14 @@ describe('quanto tempo desde a última sincronização', () => {
   /** And the other language, which is where a sentence left inside would show. */
   it('writes a different sentence in each language, at every scale', () => {
     const [first, ...rest] = localeCodes()
-    if (first === undefined) throw new Error('sem locale para comparar')
+    if (first === undefined) throw new Error('no locale to compare against')
 
     for (const at of [after(0), after(2 * MINUTE), after(HOUR), after(3 * DAY)]) {
       const mine = rendered(at, first)
-      expect(mine, `${at.toISOString()} em ${first} saiu vazio`).toBeTruthy()
+      expect(mine, `${at.toISOString()} came out empty in ${first}`).toBeTruthy()
 
       for (const other of rest) {
-        expect(rendered(at, other), `${at.toISOString()} igual em ${first} e ${other}`)
+        expect(rendered(at, other), `${at.toISOString()} reads the same in ${first} and ${other}`)
           .not.toBe(mine)
       }
     }

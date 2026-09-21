@@ -214,9 +214,7 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * stamps it beside `crit` and `random`, which do differ (*crítico*,
  * *aleatório*) and are therefore not here.
  */
-const IDENTICAL_LABELS: readonly string[
-
-] = [
+const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
   'collection.card.shiny',
   'collection.card.shinyBadge',
@@ -568,12 +566,20 @@ describe('as chaves e quem as usa', () => {
    */
   it('derives two keys per recovery reason, one per place that explains it', () => {
     expect(RECOVERY_REASONS.length).toBeGreaterThan(0)
-    expect(RECOVERY_KEYS).toEqual([
-      ...RECOVERY_REASONS.map(reasonKey),
-      ...RECOVERY_REASONS.map(recoveryMessageKey),
-    ])
     expect(RECOVERY_KEYS.length).toBe(RECOVERY_REASONS.length * 2)
     expect(new Set(RECOVERY_KEYS).size).toBe(RECOVERY_KEYS.length)
+
+    // **The namespace, spelled out, and not the derivation restated.** Asking
+    // whether `RECOVERY_KEYS` equals the two `map`s that define it is the two
+    // sides reading the same expression: renaming the prefix moved both at
+    // once and this stayed green — measured, with `settings.reason.` turned
+    // into `settings.motivo.`, where the tests that went red were the orphan
+    // and the coverage ones two screens down. A literal prefix is the half
+    // that cannot move with it.
+    expect(RECOVERY_REASONS.map(reasonKey).filter(key => !key.startsWith('settings.reason.')))
+      .toEqual([])
+    expect(RECOVERY_REASONS.map(recoveryMessageKey).filter(key => !key.startsWith('save.recovery.')))
+      .toEqual([])
   })
 
   /**

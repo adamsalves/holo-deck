@@ -358,8 +358,12 @@ export function messagePattern(
  * matching leaves the value hidden in every other one. An ASCII-only border
  * finds `VEL` inside `NÍVEL`.
  *
- * Case is the caller's business — `innerText` is compared already folded, while
- * a badge on screen is compared as it renders.
+ * **Case is the caller's business, and the callers do not agree.**
+ * `collection.spec.ts` folds both sides because it sweeps `body`, where
+ * `innerText` is the only reading that does not drag the Nuxt payload along;
+ * the stat badges of `deck`, `league` and `pokedex` compare as they render,
+ * because a badge is drawn in the case the locale writes. The language sweeps
+ * compare case sensitive, over `screenText()` — see `foreignPhrases` below.
  */
 export function spells(text: string, token: string): boolean {
   const escaped = token.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -368,29 +372,27 @@ export function spells(text: string, token: string): boolean {
 }
 
 /**
- * Which of `phrases` the screen spells — fed `textContent`, never `innerText`.
+ * Which of `phrases` the screen spells — fed `screenText()`, nothing else.
  *
- * **The two differ, and the difference silently emptied this sweep.**
- * `innerText` returns the text as *rendered*, and this design uppercases a lot
- * of small labels in CSS (`.settings__eyebrow`, `.rules__eyebrow`, every
- * `--small` key). So a hard-coded `Zona de perigo` left in `/en/settings` reads
- * back as `ZONA DE PERIGO`, `spells` is case sensitive by contract, and the
- * defect was reported by nobody — measured, with it planted.
+ * **The two obvious readings are both wrong, and the repository shipped each
+ * one in turn.** `innerText` returns the text as the CSS draws it, and this
+ * design uppercases a lot of small labels, so a case sensitive comparison
+ * walked past every transformed one. `textContent` fixes that and silently
+ * costs more than it saves: Vue drops the whitespace node between two
+ * elements, the phrases come back glued, and the word border stops matching.
+ * `screenText()` in `test/e2e/support.ts` reads one text node per line, which
+ * keeps the case and gives the borders back; its docblock carries the numbers
+ * and the reason the second reading looked proven.
  *
- * **Folding the case is the fix that looks right and is not.** Measured too:
- * with both sides lowercased, `/rules` in pt-BR started failing over `Rarity`
- * and `Economy`, because the panel notes name their modules — `rarity.ts`,
- * `economy.ts` — and a word border treats the dot as a border. That is a gate
- * crying on a correct page, which is how a gate gets switched off; the token set
- * and the screen text simply are not the same kind of string once case is gone.
+ * **Folding the case instead is the fix that looks right and is not.**
+ * Measured: with both sides lowercased, `/rules` in pt-BR started failing over
+ * `Rarity` and `Economy`, because the panel notes name their modules —
+ * `rarity.ts`, `economy.ts` — and a word border treats the dot as a border.
+ * That is a gate crying on a correct page, which is how a gate gets switched
+ * off.
  *
- * `textContent` gives what the template and the locale actually wrote, so the
- * comparison stays case sensitive and both problems disappear at once. It also
- * reads text inside hidden elements, which is the right side to err on: a
- * Portuguese sentence behind a closed panel is still a Portuguese sentence.
- *
- * It lives here so the screens that sweep cannot disagree about any of this,
- * which is how the first of them shipped reading `innerText`.
+ * The comparison itself stays here so the screens that sweep cannot disagree
+ * about it, which is how the first of them shipped reading `innerText`.
  */
 export function foreignPhrases(text: string, phrases: readonly string[]): string[] {
   return phrases.filter(phrase => spells(text, phrase))
