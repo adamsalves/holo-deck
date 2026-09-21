@@ -213,6 +213,11 @@ const SHARED_WORDS: readonly string[] = ['rarity.ultra', 'type.normal', 'move.cl
  * that is not a word at all: STAB is the series' own acronym, and the page
  * stamps it beside `crit` and `random`, which do differ (*crítico*,
  * *aleatório*) and are therefore not here.
+ *
+ * The boot panels brought two, and both are the borrowing again: `shiny` is the
+ * unit under a count in the account invite and in the two-collections choice,
+ * spelled in lowercase there because the panel draws it in capitals. Every other
+ * unit beside them — *cartas*, *insígnias* — does differ, and inflects.
  */
 const IDENTICAL_LABELS: readonly string[] = [
   'collection.card.scrap',
@@ -229,6 +234,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'dex.card.shiny',
   'dex.stats.title',
   'hub.shiny',
+  'invite.stakes.shiny',
   'league.next.teamSize',
   'move.class.status',
   'move.detail.damage',
@@ -252,6 +258,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'rules.packs.pity',
   'rules.packs.shiny',
   'rules.packs.title',
+  'save.choice.shiny',
   'settings.save.title',
   'settings.stats.size',
   'settings.version',

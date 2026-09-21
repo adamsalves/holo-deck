@@ -27,6 +27,8 @@ const { requested, open } = useInvite()
 const { account, known } = useAccount()
 const collection = useCollectionStore()
 const progress = useProgressStore()
+const { t } = useI18n()
+const localePath = useLocalePath()
 
 watch([requested, known, account, () => collection.ownedCount], () => {
   if (!requested.value || open.value || !known.value) return
@@ -46,14 +48,18 @@ watch([requested, known, account, () => collection.ownedCount], () => {
  * Cartas e shiny contam espécie, como a *Duas coleções* depois do review do PR 1:
  * a store soma cópias em `shinyCount`, e "3 cartas / 5 shiny" lado a lado se lê
  * como contradição.
+ *
+ * The count picks the form of the unit and not only the number above it: the
+ * `=== 1` ternary this replaced was Portuguese grammar written in a component,
+ * and the plural form is the locale's business.
  */
 const stakes = computed(() => {
   const shiny = Object.values(collection.entries).filter(entry => entry.s > 0).length
 
   return [
-    { key: 'cards', value: gameNumber(collection.ownedCount), label: collection.ownedCount === 1 ? 'carta' : 'cartas' },
-    { key: 'shiny', value: gameNumber(shiny), label: 'shiny' },
-    { key: 'badges', value: gameNumber(progress.badges), label: progress.badges === 1 ? 'insígnia' : 'insígnias' },
+    { key: 'cards', value: gameNumber(collection.ownedCount), label: t('invite.stakes.cards', {}, collection.ownedCount) },
+    { key: 'shiny', value: gameNumber(shiny), label: t('invite.stakes.shiny') },
+    { key: 'badges', value: gameNumber(progress.badges), label: t('invite.stakes.badges', {}, progress.badges) },
   ]
 })
 
@@ -155,22 +161,32 @@ function dismiss(): void {
             />
           </svg>
           <p class="invite__eyebrow">
-            Proteger coleção
+            {{ t('invite.eyebrow') }}
           </p>
         </div>
 
-        <!-- `h2` e não `h1`: a página por baixo continua montada com o dela. -->
+        <!-- `h2` e não `h1`: a página por baixo continua montada com o dela.
+             The line break belongs to the translator: it is a newline inside the
+             message, drawn by `white-space: pre-line`. A `<br>` in the template
+             would split the title into two messages, and every language would
+             break where the Portuguese did. -->
         <h2
           id="invite-title"
           class="invite__title"
         >
-          Sua coleção existe<br>só neste navegador
+          {{ t('invite.title') }}
         </h2>
 
         <p class="invite__lede">
-          O Safari apaga dados de sites depois de <strong>7 dias sem visita</strong>.
-          Limpar o navegador também apaga. Uma conta guarda seu progresso fora
-          daqui — e libera jogar no celular e no computador com a mesma coleção.
+          <i18n-t
+            keypath="invite.lede"
+            scope="global"
+            tag="span"
+          >
+            <template #days>
+              <strong>{{ t('invite.days') }}</strong>
+            </template>
+          </i18n-t>
         </p>
 
         <!-- `dt` antes de `dd`, que é o que o HTML permite; o número em cima é
@@ -194,25 +210,39 @@ function dismiss(): void {
         </dl>
 
         <div class="invite__actions">
+          <!-- `localePath`: the invite opens on any route, and from inside `/en`
+               a raw `NAV_ACCOUNT.to` sent the player to the Portuguese sign-in
+               screen. One of the last two links of issue #37; the other is the
+               sign-in screen's own way out. -->
           <NuxtLink
-            :to="NAV_ACCOUNT.to"
+            :to="localePath(NAV_ACCOUNT.to)"
             class="invite__create bevel-control"
             @click="dismiss()"
           >
-            CRIAR CONTA
+            {{ t('invite.create') }}
           </NuxtLink>
           <button
             type="button"
             class="invite__later"
             @click="dismiss()"
           >
-            Agora não
+            {{ t('invite.later') }}
           </button>
         </div>
 
+        <!-- The path is built from the labels of the places it names — the
+             gear's name and the export row's title — so renaming either cannot
+             leave this sentence pointing at a door that says something else. -->
         <p class="numeric invite__foot">
-          Dá para continuar jogando sem conta — nada trava. Também dá para baixar o
-          save em <strong>Ajustes → Exportar</strong>.
+          <i18n-t
+            keypath="invite.foot"
+            scope="global"
+            tag="span"
+          >
+            <template #path>
+              <strong>{{ t('nav.settings') }} → {{ t('settings.save.exportTitle') }}</strong>
+            </template>
+          </i18n-t>
         </p>
       </div>
     </div>
@@ -285,6 +315,7 @@ function dismiss(): void {
   line-height: 1.12;
   letter-spacing: -0.015em;
   color: var(--text);
+  white-space: pre-line;
 }
 
 .invite__lede {

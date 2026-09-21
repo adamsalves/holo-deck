@@ -700,6 +700,12 @@
     "synced": "sincronizado",
     "syncedAgo": "sincronizado {ago}"
   },
+  "conflict": {
+    "title": "Outro aparelho gravou antes",
+    "won": "A mudança deste aparelho venceu e já subiu. | As {count} mudanças deste aparelho venceram e já subiram.",
+    "kept": "O que o outro aparelho gravou está guardado em {path}.",
+    "dismiss": "ENTENDI"
+  },
   "time": {
     "now": "agora",
     "minutes": "há {count} min",
@@ -817,6 +823,88 @@
       "failed-migration": "Seu save não pôde ser atualizado para o formato atual, e o jogo começou limpo.",
       "backup": "A cópia original continua no seu navegador, em uma chave {key}",
       "dismiss": "ENTENDI"
+    },
+    "choice": {
+      "eyebrow": "Duas coleções encontradas",
+      "title": "Qual delas você quer continuar?",
+      "lede": "Você já jogava neste navegador, e a conta que acabou de entrar também tem progresso. Escolha uma — {kept}, fica guardada na cópia de segurança deste aparelho.",
+      "kept": "a outra não é apagada",
+      "battle": "Há uma batalha em andamento neste aparelho. Escolher {account} a encerra sem pagar a recompensa — a batalha nunca sobe para o servidor.",
+      "indexFailed": "Não deu para ler os dados das cartas agora, e sem eles as duas colunas não podem ser comparadas. Recarregue a página — {unchanged}, e a pergunta volta.",
+      "unchanged": "nada foi alterado",
+      "loading": "Lendo as cartas das duas coleções…",
+      "local": {
+        "title": "Neste aparelho",
+        "region": "Coleção deste aparelho",
+        "when": "Última gravação"
+      },
+      "remote": {
+        "title": "Na sua conta",
+        "region": "Coleção da sua conta",
+        "when": "Última sincronização"
+      },
+      "unknownWhen": "não se sabe",
+      "cards": "carta | cartas",
+      "badges": "insígnia | insígnias",
+      "shiny": "shiny",
+      "best": "Melhores cartas",
+      "noCards": "nenhuma carta",
+      "dust": "Pó acumulado",
+      "use": "USAR ESTA",
+      "useSide": "USAR ESTA — {side}",
+      "applying": "APLICANDO…",
+      "applyFailed": "Não deu para aplicar a escolha agora — nada foi apagado. Tente de novo.",
+      "footnote": "A coleção não escolhida vai para a cópia de segurança deste aparelho e volta por {path}. Nada é apagado por esta escolha."
     }
+  },
+  "login": {
+    "seo": {
+      "title": "Entrar — Holo Deck",
+      "description": "A conta guarda a coleção fora deste navegador e sincroniza entre aparelhos. Jogar não exige conta."
+    },
+    "title": "A conta guarda o que você juntou",
+    "lede": "Sem ela o jogo funciona igual — só que a coleção vive apenas neste navegador.",
+    "reasons": {
+      "browser": {
+        "title": "Sobrevive à limpeza do navegador",
+        "note": "E aos 7 dias de inatividade que o Safari apaga."
+      },
+      "devices": {
+        "title": "Mesma coleção em todo aparelho",
+        "note": "Abre o pack no celular, monta o deck no computador."
+      },
+      "export": {
+        "title": "O save continua seu",
+        "note": "Exportável em JSON a qualquer momento, com ou sem conta."
+      }
+    },
+    "panel": {
+      "title": "Entrar",
+      "note": "Sem senha, sem formulário. Um clique."
+    },
+    "github": {
+      "action": "CONTINUAR COM GITHUB",
+      "opening": "ABRINDO O GITHUB…",
+      "scope": "Pedimos só sua identidade — nenhum repositório, nenhum dado seu do GitHub.",
+      "failed": "Não deu para abrir o GitHub agora. Tente de novo — o jogo continua funcionando sem conta."
+    },
+    "skip": {
+      "action": "CONTINUAR SEM CONTA",
+      "note": "O jogo é o mesmo. A coleção fica só neste navegador."
+    }
+  },
+  "invite": {
+    "eyebrow": "Proteger coleção",
+    "title": "Sua coleção existe\nsó neste navegador",
+    "lede": "O Safari apaga dados de sites depois de {days}. Limpar o navegador também apaga. Uma conta guarda seu progresso fora daqui — e libera jogar no celular e no computador com a mesma coleção.",
+    "days": "7 dias sem visita",
+    "stakes": {
+      "cards": "carta | cartas",
+      "shiny": "shiny",
+      "badges": "insígnia | insígnias"
+    },
+    "create": "CRIAR CONTA",
+    "later": "Agora não",
+    "foot": "Dá para continuar jogando sem conta — nada trava. Também dá para baixar o save em {path}."
   }
 }

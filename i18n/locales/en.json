@@ -700,6 +700,12 @@
     "synced": "synced",
     "syncedAgo": "synced {ago}"
   },
+  "conflict": {
+    "title": "Another device saved first",
+    "won": "This device's change won and is already uploaded. | This device's {count} changes won and are already uploaded.",
+    "kept": "What the other device saved is kept in {path}.",
+    "dismiss": "GOT IT"
+  },
   "time": {
     "now": "just now",
     "minutes": "{count} min ago",
@@ -817,6 +823,88 @@
       "failed-migration": "Your save could not be updated to the current format, and the game started clean.",
       "backup": "The original copy is still in your browser, under a key {key}",
       "dismiss": "GOT IT"
+    },
+    "choice": {
+      "eyebrow": "Two collections found",
+      "title": "Which one do you want to keep playing?",
+      "lede": "You were already playing in this browser, and the account you just signed in to has progress too. Pick one — {kept}; it stays in this device's backups.",
+      "kept": "the other one is not deleted",
+      "battle": "There is a battle in progress on this device. Picking {account} ends it without paying the reward — a battle never goes up to the server.",
+      "indexFailed": "The card data could not be read right now, and without it the two columns cannot be compared. Reload the page — {unchanged}, and the question comes back.",
+      "unchanged": "nothing was changed",
+      "loading": "Reading the cards of both collections…",
+      "local": {
+        "title": "On this device",
+        "region": "Collection on this device",
+        "when": "Last saved"
+      },
+      "remote": {
+        "title": "In your account",
+        "region": "Collection in your account",
+        "when": "Last synced"
+      },
+      "unknownWhen": "unknown",
+      "cards": "card | cards",
+      "badges": "badge | badges",
+      "shiny": "shiny",
+      "best": "Best cards",
+      "noCards": "no cards",
+      "dust": "Dust collected",
+      "use": "USE THIS ONE",
+      "useSide": "USE THIS ONE — {side}",
+      "applying": "APPLYING…",
+      "applyFailed": "The choice could not be applied right now — nothing was deleted. Try again.",
+      "footnote": "The collection you do not pick goes to this device's backups and comes back through {path}. Nothing is deleted by this choice."
     }
+  },
+  "login": {
+    "seo": {
+      "title": "Sign in — Holo Deck",
+      "description": "An account keeps your collection outside this browser and syncs it across devices. Playing never requires one."
+    },
+    "title": "An account keeps what you have collected",
+    "lede": "Without one the game works the same — except that the collection lives only in this browser.",
+    "reasons": {
+      "browser": {
+        "title": "Survives clearing the browser",
+        "note": "And the wipe Safari runs after 7 days without a visit."
+      },
+      "devices": {
+        "title": "The same collection on every device",
+        "note": "Open a pack on your phone, build the deck on your computer."
+      },
+      "export": {
+        "title": "The save stays yours",
+        "note": "Exportable as JSON at any time, with or without an account."
+      }
+    },
+    "panel": {
+      "title": "Sign in",
+      "note": "No password, no form. One click."
+    },
+    "github": {
+      "action": "CONTINUE WITH GITHUB",
+      "opening": "OPENING GITHUB…",
+      "scope": "We only ask who you are — no repositories, none of your GitHub data.",
+      "failed": "GitHub could not be opened right now. Try again — the game keeps working without an account."
+    },
+    "skip": {
+      "action": "CONTINUE WITHOUT AN ACCOUNT",
+      "note": "The game is the same. The collection stays in this browser only."
+    }
+  },
+  "invite": {
+    "eyebrow": "Protect your collection",
+    "title": "Your collection exists\nonly in this browser",
+    "lede": "Safari deletes site data after {days}. Clearing the browser deletes it too. An account keeps your progress outside this browser — and lets you play on your phone and your computer with the same collection.",
+    "days": "7 days without a visit",
+    "stakes": {
+      "cards": "card | cards",
+      "shiny": "shiny",
+      "badges": "badge | badges"
+    },
+    "create": "CREATE ACCOUNT",
+    "later": "Not now",
+    "foot": "You can keep playing without an account — nothing locks. You can also download the save in {path}."
   }
 }
