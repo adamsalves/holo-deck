@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { defaultLocale, label, messagePattern } from '../support/locales'
 import { PACK_SIZE } from '../../shared/game/packs.ts'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
@@ -389,6 +389,55 @@ export function localDust(page: Page): Promise<number | null> {
     return typeof save === 'object' && save !== null && 'dust' in save && typeof save.dust === 'number'
       ? save.dust
       : null
+  })
+}
+
+/**
+ * The text of a screen, one text node per line — what a language sweep reads.
+ *
+ * **Neither `innerText` nor `textContent` can be handed to `foreignPhrases`,
+ * and both were, one after the other.** `innerText` returns the text as drawn,
+ * and this design uppercases small labels in CSS, so `spells` — case sensitive
+ * by contract — walked past every transformed one. `textContent` fixes the case
+ * and loses the borders instead: Vue's `condense` drops the whitespace node
+ * between two elements, so `/en/settings` reads back as
+ * `…offDanger zoneDelete the save on this device…` and the `(?<![\p{L}\p{N}])`
+ * border of `spells` never matches. Measured on the built page, over the 33
+ * phrases the screen actually writes:
+ *
+ * ```
+ * innerText, case sensitive .... 23
+ * innerText, case folded ....... 29
+ * textContent .................. 9
+ * one line per text node ....... 33
+ * ```
+ *
+ * **The `textContent` reading looked proven, and that is the part worth
+ * writing down.** The defect planted to prove it was a literal typed into the
+ * template, and a literal is the one shape that survives: the compiler emits
+ * `" Zona de perigo "`, spaces and all, while `{{ t('…') }}` emits the value
+ * bare through `_toDisplayString`. So the proof used the only defect the gate
+ * could still see, and every real one — a wrong key, a message left
+ * untranslated — arrives by the path it cannot. A plant that proves this gate
+ * has to go in the `<script>`.
+ *
+ * Reading node by node keeps the case (which is the real gain over `innerText`)
+ * and gives the borders back, because the join is a newline the border matches.
+ * Text inside hidden elements comes along, which is the right side to err on: a
+ * Portuguese sentence behind a closed panel is still a Portuguese sentence.
+ *
+ * It lives here and not beside `foreignPhrases` because the body runs in the
+ * browser, and `test/support/` is the one project compiled without `lib: dom` —
+ * see the note in `tsconfig.tools.json`.
+ */
+export function screenText(scope: Locator): Promise<string> {
+  return scope.evaluate((element) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    const parts: string[] = []
+
+    while (walker.nextNode()) parts.push(walker.currentNode.nodeValue ?? '')
+
+    return parts.join('\n')
   })
 }
 

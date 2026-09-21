@@ -523,26 +523,46 @@ e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situaç�
 ### Meio traduzido, enquanto a Fase 8 roda
 
 A Fase 8 leva o jogo para dois idiomas em oito PRs, uma fatia vertical por PR.
-Entre o primeiro e o último, `/en` mostra telas **meio traduzidas** — e isso é
-estado conhecido e datado, não defeito solto. Em inglês hoje: a barra global, o
-painel de conta, o pular-para-o-conteúdo, o **vocabulário do jogo** (as 6
-raridades, os 18 tipos, as 6 siglas de stat e os 9 habitats), o Hub, `/packs`,
-`/collection`, `/deck`, `/league`, `/battle/N`, a tela de **Detalhe** de espécie,
-as duas telas da **Pokédex** e `/rules`.
+Entre o primeiro e o último, `/en` mostrou telas **meio traduzidas** — estado
+conhecido e datado, nunca defeito solto. **Com `/settings`, toda tela do jogo fala
+os dois idiomas**: a barra global, o painel de conta, o pular-para-o-conteúdo, o
+**vocabulário do jogo** (as 6 raridades, os 18 tipos, as 6 siglas de stat e os 9
+habitats), o Hub, `/packs`, `/collection`, `/deck`, `/league`, `/battle/N`, o
+**Detalhe** de espécie, as duas telas da **Pokédex**, `/rules` e `/settings` — mais
+o **chip de sync** e o **aviso de save recuperado**, que não são de tela nenhuma e
+aparecem em todas.
 
-O que ainda sai em português dentro de `/en`, com o PR que o leva:
+**Tela não é tudo que o jogador lê, e os painéis de boot provam isso.** O `app.vue`
+monta quatro coisas fora do layout, e o aviso de save recuperado é só a primeira:
+`SaveChoice`, `SyncConflictNotice` e `AccountInvite` desenham sobre **qualquer**
+rota e seguem em português. Elas não são telas, não estavam no corte de nenhum PR
+da fase, e foi por isso que a medição por tela não as viu.
+
+O que ainda sai em português dentro de `/en`:
 
 | onde | o que se lê em `/en` | leva |
 | --- | --- | --- |
-| `/settings` | a página inteira | PR de `/settings` |
+| `AccountInvite` | o convite de conta inteiro — vitória, fim de pack e Hub | PR do seletor de idioma (4d) |
+| `SaveChoice` | a escolha entre duas coleções, no primeiro login com save local | PR do seletor de idioma (4d) |
+| `SyncConflictNotice` | *Outro aparelho gravou antes*, quando o servidor responde 409 | PR do seletor de idioma (4d) |
 | número | `1.600`, `0,4%`, `6,9 kg` — separador de `pt-BR` fixo | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
 
-**`/rules` é a tela mais densa em número do jogo, e entrou traduzida com os
-números ainda em pt-BR** — `4,5%`, `×0,5`, `1/16`. Enquanto a página estava em
-português isso era coerente; em inglês é o caso que a #49 descreve como o pior
-dos dois: o jogador não vê que é outro idioma, ele lê um número errado. Fechar a
-origem certa reabre os onze consumidores dos dois helpers de `shared/`, o que não
-cabia neste PR — está registrado lá, com estas duas telas nomeadas.
+O `AccountInvite` é o que mais pesa dos três: ele não espera caso raro, dispara na
+vitória, no fim de um pack e no Hub. Os outros dois são caminhos que dependem de
+duas coleções ou de um 409.
+
+**Sobra o número, e ele fica.** `/rules` é a tela mais densa em número do jogo e
+entrou traduzida com `4,5%` e `×0,5`; `/settings` estampa `20,6 KB`. Enquanto as
+páginas estavam em português isso era coerente; em inglês é o caso que a #49
+descreve como o pior dos dois — o jogador não vê que é outro idioma, ele lê um
+número errado. Fechar a origem certa reabre os onze consumidores dos dois helpers
+de `shared/`, e a issue avisa que meio conserto sai parecendo fechado.
+
+**A data era um quinto caso, e esse foi consertado**, porque não é número:
+`backupLabel` formatava com `'pt-BR'` cravado, e `05/09, 14:22` lido em en-US é
+**cinco de setembro virando nove de maio**. A #49 lista quatro origens e nenhuma
+alcança essa — ela formata data, então uma varredura por `toLocaleString` sobre
+número passa ao lado.
 
 A ordem é deliberada: o vocabulário é **transversal** — 26 pontos de uso
 espalhados por telas de três PRs diferentes —, então ele vai antes das telas. Uma
@@ -1199,6 +1219,26 @@ sustenta: idioma (o i18n chegou na Fase 8 e o seletor é o PR 4 dela), som (não
 *Ainda não*, em vez de virarem controles cinzas: um botão desligado promete uma
 coisa que o jogo não faz.
 
+**O idioma desta tela alcança duas coisas que não são desta tela.** O chip de
+sync ([`app/utils/sync-label.ts`](app/utils/sync-label.ts)) mora na barra global e
+o aviso de save recuperado ([`SaveRecoveryNotice`](app/components/SaveRecoveryNotice.vue))
+é montado no `app.vue` — os dois renderizam em **toda** tela do jogo, então
+deixá-los para depois espalharia *3 mudanças na fila* pelo `/en` inteiro enquanto
+cada tela individual parecia pronta. As duas funções puras (`syncLabel`,
+`agoLabel`) recebem o tradutor em parâmetro, como `narrate`, e `Translate` ganhou
+um terceiro parâmetro para o plural: a contagem **escolhe** a frase e não só a
+preenche, e passar só o valor renderiza o pipe e as duas metades na tela.
+
+Ele também é o que deixa a contagem viajar **duas vezes**, com metades
+diferentes: `gameNumber` preenche a frase e o número cru escolhe a forma. Entregar
+o número para os dois papéis derrubava o separador do pt-BR — `1600 cartas` sob um
+bloco de estatísticas ainda escrevendo `1.600` —, porque interpolação nomeada do
+vue-i18n converte para texto e nunca formata.
+
+Os outros dois painéis de boot do `app.vue` **não** vieram junto, e a seção
+*Meio traduzido* acima os nomeia: a medição desta fase é por tela, e nenhum deles
+é uma.
+
 **Importar e apagar guardam o texto original antes de escrever por cima.** É a
 regra inegociável do plano — save que não se entende vai para backup, nunca para
 o lixo — aplicada ao caminho voluntário: sem conta não existe segunda cópia em
@@ -1305,11 +1345,14 @@ mandaria **apagar a tradução de uma frase que está na tela**.
 derivadas de tupla (`ailment`, `condition`, `affected`, `move.class`,
 `effectiveness`) entram pelas próprias funções que as telas chamam, as 24 do log
 de turno por `NARRATION_KEY_LIST`, que
-[`app/utils/battle-narration.ts`](app/utils/battle-narration.ts) publica, e os
-seis passos da ordem do turno por `TURN_STEP_KEYS`, de
-[`app/utils/turn-order.ts`](app/utils/turn-order.ts). É uma lista só, lida pelos
-dois portões: escrita duas vezes, bastava um esquecimento de um lado para o outro
-acusar a tradução de órfã e mandar apagá-la.
+[`app/utils/battle-narration.ts`](app/utils/battle-narration.ts) publica, os seis
+passos da ordem do turno por `TURN_STEP_KEYS`, de
+[`app/utils/turn-order.ts`](app/utils/turn-order.ts), e as duas famílias sobre
+`RecoveryReason` por `RECOVERY_KEYS`, de
+[`app/utils/recovery-reason.ts`](app/utils/recovery-reason.ts) — o parágrafo que o
+aviso de boot escreve e a oração que Ajustes encaixa em *"não pôde ser lido: …"*.
+É uma lista só, lida pelos dois portões: escrita duas vezes, bastava um
+esquecimento de um lado para o outro acusar a tradução de órfã e mandar apagá-la.
 
 **Toda fonte que entra no conjunto medido entra também no piso, pelo nome.** Esse
 é o defeito que este portão repetiu em três PRs seguidos — fonte nova no conjunto

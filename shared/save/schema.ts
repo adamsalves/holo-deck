@@ -209,7 +209,23 @@ export interface LoadResult {
   readonly recovered: RecoveryReason | null
 }
 
-export type RecoveryReason = 'corrupt' | 'unknown-version' | 'failed-migration'
+/**
+ * Por que um save foi recusado — a lista é a fonte, e o tipo sai dela.
+ *
+ * **Nesta direção, e não na contrária, porque a lista é lida por quem traduz.**
+ * `app/utils/recovery-reason.ts` monta duas chaves de locale por motivo e é
+ * assim que o `i18n-gate` enxerga endereços montados por variável. Escrito como
+ * união, com a lista à parte anotada `readonly RecoveryReason[]`, um quarto
+ * motivo compilava: a lista ficava curta em silêncio, as duas traduções novas
+ * nunca eram pedidas a locale nenhum, e a tela mostrava a chave crua. Medido —
+ * `lint`, `typecheck` e os 761 unitários passavam com um quarto motivo.
+ *
+ * Derivado do `as const`, acrescentar um motivo **é** acrescentá-lo à lista. É o
+ * mesmo arranjo de `TURN_STEPS`, pelo mesmo motivo.
+ */
+export const RECOVERY_REASONS = ['corrupt', 'unknown-version', 'failed-migration'] as const
+
+export type RecoveryReason = typeof RECOVERY_REASONS[number]
 
 /**
  * Traz um save cru para a versão atual.

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { BACKUP_PREFIX } from '~~/app/utils/save-driver'
 import type { RecoveryReason } from '~~/shared/save/schema'
+import { recoveryMessageKey } from '~~/app/utils/recovery-reason'
 
 /**
  * O aviso de save recuperado — a outra metade da regra de nunca apagar.
@@ -28,21 +29,9 @@ import type { RecoveryReason } from '~~/shared/save/schema'
 const { $saveRecovery } = useNuxtApp()
 const reason = computed<RecoveryReason | null>(() => $saveRecovery ?? null)
 
-const dismissed = ref(false)
+const { t } = useI18n()
 
-/**
- * Uma frase por motivo, e nenhuma delas fala em "erro".
- *
- * Os três casos são situações diferentes para quem está do outro lado — arquivo
- * corrompido, jogo mais novo, formato que não subiu — e a única reação errada
- * seria mostrar a mesma mensagem genérica para todos, que é o que faz o jogador
- * parar de ler avisos.
- */
-const MESSAGES: Readonly<Record<RecoveryReason, string>> = {
-  'corrupt': 'Seu save anterior não pôde ser lido e o jogo começou limpo.',
-  'unknown-version': 'Seu save foi gravado por uma versão mais nova do jogo, e esta não sabe lê-lo. O jogo começou limpo.',
-  'failed-migration': 'Seu save não pôde ser atualizado para o formato atual, e o jogo começou limpo.',
-}
+const dismissed = ref(false)
 </script>
 
 <template>
@@ -52,10 +41,17 @@ const MESSAGES: Readonly<Record<RecoveryReason, string>> = {
     role="status"
   >
     <p class="save-notice__text">
-      <strong>Nada foi apagado.</strong>
-      {{ MESSAGES[reason] }}
-      A cópia original continua no seu navegador, em uma chave
-      <code class="numeric save-notice__key">{{ BACKUP_PREFIX }}…</code>
+      <strong>{{ t('save.recovery.kept') }}</strong>
+      {{ t(recoveryMessageKey(reason)) }}
+      <i18n-t
+        keypath="save.recovery.backup"
+        scope="global"
+        tag="span"
+      >
+        <template #key>
+          <code class="numeric save-notice__key">{{ BACKUP_PREFIX }}…</code>
+        </template>
+      </i18n-t>
     </p>
 
     <button
@@ -63,7 +59,7 @@ const MESSAGES: Readonly<Record<RecoveryReason, string>> = {
       class="numeric save-notice__dismiss"
       @click="dismissed = true"
     >
-      ENTENDI
+      {{ t('save.recovery.dismiss') }}
     </button>
   </div>
 </template>

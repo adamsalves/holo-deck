@@ -23,10 +23,12 @@ import { syncLabel } from '~~/app/utils/sync-label'
  */
 const { status } = useSync()
 
+const { t } = useI18n()
+
 /** Um minuto é o passo do rótulo; o relógio de segundo é o que o jogo já tem. */
 const now = useGameClock()
 
-const label = computed(() => (status.value === null ? '' : syncLabel(status.value, now.value)))
+const label = computed(() => (status.value === null ? '' : syncLabel(status.value, now.value, t)))
 </script>
 
 <template>

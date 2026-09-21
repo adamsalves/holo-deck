@@ -358,13 +358,44 @@ export function messagePattern(
  * matching leaves the value hidden in every other one. An ASCII-only border
  * finds `VEL` inside `NÍVEL`.
  *
- * Case is the caller's business — `innerText` is compared already folded, while
- * a badge on screen is compared as it renders.
+ * **Case is the caller's business, and the callers do not agree.**
+ * `collection.spec.ts` folds both sides because it sweeps `body`, where
+ * `innerText` is the only reading that does not drag the Nuxt payload along;
+ * the stat badges of `deck`, `league` and `pokedex` compare as they render,
+ * because a badge is drawn in the case the locale writes. The language sweeps
+ * compare case sensitive, over `screenText()` — see `foreignPhrases` below.
  */
 export function spells(text: string, token: string): boolean {
   const escaped = token.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(text)
+}
+
+/**
+ * Which of `phrases` the screen spells — fed `screenText()`, nothing else.
+ *
+ * **The two obvious readings are both wrong, and the repository shipped each
+ * one in turn.** `innerText` returns the text as the CSS draws it, and this
+ * design uppercases a lot of small labels, so a case sensitive comparison
+ * walked past every transformed one. `textContent` fixes that and silently
+ * costs more than it saves: Vue drops the whitespace node between two
+ * elements, the phrases come back glued, and the word border stops matching.
+ * `screenText()` in `test/e2e/support.ts` reads one text node per line, which
+ * keeps the case and gives the borders back; its docblock carries the numbers
+ * and the reason the second reading looked proven.
+ *
+ * **Folding the case instead is the fix that looks right and is not.**
+ * Measured: with both sides lowercased, `/rules` in pt-BR started failing over
+ * `Rarity` and `Economy`, because the panel notes name their modules —
+ * `rarity.ts`, `economy.ts` — and a word border treats the dot as a border.
+ * That is a gate crying on a correct page, which is how a gate gets switched
+ * off.
+ *
+ * The comparison itself stays here so the screens that sweep cannot disagree
+ * about it, which is how the first of them shipped reading `innerText`.
+ */
+export function foreignPhrases(text: string, phrases: readonly string[]): string[] {
+  return phrases.filter(phrase => spells(text, phrase))
 }
 
 /**

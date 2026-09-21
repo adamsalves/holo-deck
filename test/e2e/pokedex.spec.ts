@@ -4,6 +4,7 @@ import { statKey, statNameKey, typeKey } from '../../shared/types/game.ts'
 import {
   defaultLocale,
   foreignBadges,
+  foreignPhrases,
   label,
   localeCodes,
   localeUrl,
@@ -11,6 +12,7 @@ import {
   messagePattern,
   spells,
 } from '../support/locales.ts'
+import { screenText } from './support.ts'
 
 /** The six stat badges of one locale, as that locale spells them. */
 function badgesOf(code: string): string[] {
@@ -461,10 +463,17 @@ test('the Pokédex screens read in the language of the URL, links included', asy
 
     expect(foreign.length, `no wording left that tells ${locale} apart`).toBeGreaterThan(0)
 
-    const header = await page.locator('header').first().innerText()
+    // **`main > header` and not `header`, and `screenText` and not `innerText`
+    // — this assertion was dead on both counts, found while fixing the sweep of
+    // `/settings`.** `locator('header').first()` is the global bar, which never
+    // writes `pokedex.overline` at all; and the overline is a Tailwind
+    // `uppercase`, so `innerText` returned `COMPLETE REFERENCE` against a token
+    // spelled `Complete reference`, which `spells` compares case sensitive.
+    // Either one alone made this pass over a page stuck in one language.
+    const header = await screenText(page.locator('main > header'))
 
     expect(
-      foreign.filter(text => spells(header, text)),
+      foreignPhrases(header, foreign),
       `/pokedex in ${locale} wrote the other language`,
     ).toEqual([])
 
