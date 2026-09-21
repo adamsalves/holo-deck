@@ -53,7 +53,7 @@ const now = useGameClock()
 const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
 const { appVersion, gitSha } = useRuntimeConfig().public
 
-const { t, locale } = useI18n()
+const { t, localeProperties } = useI18n()
 
 /**
  * *3 cartas*, and *1 carta* — the noun inflects, so the count picks the form.
@@ -63,9 +63,20 @@ const { t, locale } = useI18n()
  * The sentences receive it already spelled: a message that interpolates another
  * message keeps each of them a whole sentence in both languages, which is what
  * the evolution chain and the turn order each had to be rebuilt to do.
+ *
+ * **The count travels twice, and the two halves are not the same value.**
+ * `gameNumber` fills the sentence, the raw number picks the form — which is
+ * exactly what the third argument is for. Handing vue-i18n the bare number for
+ * both dropped the pt-BR grouping: `1600 cartas`, three lines under a stat tile
+ * still reading `1.600`, because named interpolation stringifies and never
+ * formats. Issue #49 owns the locale of these numbers, and until it closes they
+ * are pt-BR — which is what `gameNumber` keeps them.
+ *
+ * Not `cardCount`: the collection store already exports one, and that one counts
+ * copies where this counts species.
  */
-function cardCount(count: number): string {
-  return t('settings.cardCount', { count }, count)
+function cardsLabel(count: number): string {
+  return t('settings.cardCount', { count: gameNumber(count) }, count)
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -201,7 +212,7 @@ async function importSave(event: Event): Promise<void> {
     refreshBackups()
     notice.value = {
       tone: 'done',
-      text: t('settings.notice.imported', { cards: cardCount(collection.ownedCount) }),
+      text: t('settings.notice.imported', { cards: cardsLabel(collection.ownedCount) }),
     }
   }
   finally {
@@ -271,7 +282,7 @@ async function clearSave(): Promise<void> {
   notice.value = {
     tone: 'done',
     text: collection.ownedCount > 0
-      ? t('settings.notice.clearedRestored', { cards: cardCount(collection.ownedCount) })
+      ? t('settings.notice.clearedRestored', { cards: cardsLabel(collection.ownedCount) })
       : t('settings.notice.clearedPending'),
   }
 }
@@ -312,11 +323,16 @@ function refreshBackups(): void {
  * formats a date rather than a number, so a sweep for `toLocaleString('pt-BR')`
  * on numbers would have walked past it.
  *
+ * `localeProperties.language` and not `locale`: the first is the BCP-47 tag the
+ * config declares — `en-US`, not the `en` that names the route — and it is the
+ * same one `app.vue` writes into `<html lang>`. `Intl` reads the two alike
+ * today, so this is one source rather than two agreeing by luck.
+ *
  * The numbers on this screen — `20,6 KB`, the card counts — are the origins the
  * issue does name, and they stay pt-BR until it is closed.
  */
 function backupLabel(at: number): string {
-  return new Date(at).toLocaleString(locale.value, {
+  return new Date(at).toLocaleString(localeProperties.value.language, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -364,7 +380,7 @@ function restoreBackup(key: string): void {
   refreshBackups()
   notice.value = {
     tone: 'done',
-    text: t('settings.notice.backupRestored', { cards: cardCount(collection.ownedCount) }),
+    text: t('settings.notice.backupRestored', { cards: cardsLabel(collection.ownedCount) }),
   }
 }
 
@@ -438,7 +454,7 @@ async function restorePrevious(): Promise<void> {
     await $sync.restore()
     notice.value = {
       tone: 'done',
-      text: t('settings.notice.previousRestored', { cards: cardCount(collection.ownedCount) }),
+      text: t('settings.notice.previousRestored', { cards: cardsLabel(collection.ownedCount) }),
     }
   }
   catch (error) {
@@ -678,11 +694,11 @@ useSeoMeta({
                   <span class="numeric settings__when">{{ previousAgo }}</span>
                 </template>
                 <template #cards>
-                  {{ cardCount(previous.cards) }}
+                  {{ cardsLabel(previous.cards) }}
                 </template>
               </i18n-t>
               <template v-else>
-                {{ t('settings.save.previousHolds', { cards: cardCount(previous.cards) }) }}
+                {{ t('settings.save.previousHolds', { cards: cardsLabel(previous.cards) }) }}
               </template>
               <template v-if="!idle">
                 {{ t('settings.save.previousWaiting') }}

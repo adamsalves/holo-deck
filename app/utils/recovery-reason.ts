@@ -1,4 +1,5 @@
 import type { RecoveryReason } from '~~/shared/save/schema'
+import { RECOVERY_REASONS } from '~~/shared/save/schema'
 
 /**
  * The two sentences a refused save produces, addressed by key.
@@ -17,21 +18,30 @@ import type { RecoveryReason } from '~~/shared/save/schema'
  * and report them as orphans, where the obvious fix is deleting text that is on
  * screen. The gate unions these lists instead.
  *
- * A `Record` over the enum and not a template, so a fourth reason fails to
- * compile rather than failing to be translated.
+ * **The list itself lives in `shared/save/schema.ts`, with the enum derived
+ * from it.** It was declared here as `readonly RecoveryReason[]` against a
+ * union written by hand, and this docblock claimed a fourth reason would fail
+ * to compile — it did not: `lint`, `typecheck` and the 761 unit tests all
+ * passed with one added, and the notice would have drawn a raw key on screen.
+ * A list that the type is derived from cannot be short.
  */
-export const RECOVERY_REASONS: readonly RecoveryReason[] = [
-  'corrupt',
-  'unknown-version',
-  'failed-migration',
-]
+export { RECOVERY_REASONS }
 
 /** The clause Settings drops into *"could not be read: …"*. */
 export function reasonKey(reason: RecoveryReason): string {
   return `settings.reason.${reason}`
 }
 
-/** The paragraph the boot notice writes when a save was refused. */
+/**
+ * The paragraph the boot notice writes when a save was refused.
+ *
+ * One sentence per reason, and none of them says *error*. The three are
+ * different situations for whoever is on the other side — a corrupt file, a
+ * newer game, a format that did not migrate — and the one wrong reaction is the
+ * same generic line for all three, which is what teaches a player to stop
+ * reading notices. The second of them is also the only one with a way out:
+ * update the game.
+ */
 export function recoveryMessageKey(reason: RecoveryReason): string {
   return `save.recovery.${reason}`
 }

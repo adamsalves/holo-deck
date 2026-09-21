@@ -26,25 +26,12 @@ import { recoveryMessageKey } from '~~/app/utils/recovery-reason'
  * save no servidor. Ler com `??` e não com asserção mantém o componente
  * montável em qualquer contexto, inclusive num teste que não subiu o plugin.
  */
-const { t } = useI18n()
-
 const { $saveRecovery } = useNuxtApp()
 const reason = computed<RecoveryReason | null>(() => $saveRecovery ?? null)
 
-const dismissed = ref(false)
+const { t } = useI18n()
 
-/**
- * Uma frase por motivo, e nenhuma delas fala em "erro".
- *
- * Os três casos são situações diferentes para quem está do outro lado — arquivo
- * corrompido, jogo mais novo, formato que não subiu — e a única reação errada
- * seria mostrar a mesma mensagem genérica para todos, que é o que faz o jogador
- * parar de ler avisos.
- *
- * The sentences live in the locales and the addresses in
- * `app/utils/recovery-reason.ts`, which is also what `i18n-gate` unions: the key
- * is built from the enum, so no sweep of this file can see it.
- */
+const dismissed = ref(false)
 </script>
 
 <template>

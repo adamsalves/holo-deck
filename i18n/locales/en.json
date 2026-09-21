@@ -694,129 +694,129 @@
         "description": "Rarity, packs, forge, damage formula, conditions, the League and the economy. Every number on this page is read from shared/game/ — the same module the engine uses."
       }
     },
-    "sync": {
-      "sending": "sending…",
-      "queued": "{count} change queued | {count} changes queued",
-      "synced": "synced",
-      "syncedAgo": "synced {ago}"
+  "sync": {
+    "sending": "sending…",
+    "queued": "{count} change queued | {count} changes queued",
+    "synced": "synced",
+    "syncedAgo": "synced {ago}"
+  },
+  "time": {
+    "now": "just now",
+    "minutes": "{count} min ago",
+    "hours": "{count} h ago",
+    "days": "{count} day ago | {count} days ago"
+  },
+  "settings": {
+    "title": {
+      "account": "Your account and your save",
+      "device": "Your save and this device"
     },
-    "time": {
-      "now": "just now",
-      "minutes": "{count} min ago",
-      "hours": "{count} h ago",
-      "days": "{count} day ago | {count} days ago"
+    "cardCount": "{count} card | {count} cards",
+    "stats": {
+      "cards": "cards",
+      "badges": "badges",
+      "schema": "save version",
+      "size": "KB"
     },
-    "settings": {
-      "title": {
-        "account": "Your account and your save",
-        "device": "Your save and this device"
-      },
-      "cardCount": "{count} card | {count} cards",
-      "stats": {
-        "cards": "cards",
-        "badges": "badges",
-        "schema": "save version",
-        "size": "KB"
-      },
-      "via": "via GitHub",
-      "loading": "Loading…",
-      "save": {
-        "title": "Save",
-        "exportTitle": "Export",
-        "exportNote": "Downloads a JSON with your collection, deck and progress.",
-        "exportAction": "DOWNLOAD",
-        "importTitle": "Import",
-        "importNote": "The current save goes to a backup before being replaced — nothing is deleted.",
-        "importAction": "CHOOSE FILE",
-        "previousTitle": "Restore previous version",
-        "previousNote": "The server keeps the write immediately before this one.",
-        "previousMade": "Made {when}, with {cards}.",
-        "previousHolds": "It holds {cards}.",
-        "previousWaiting": "Waiting for the queue to go up before restoring.",
-        "previousAria": "Restore the previous version from the server",
-        "previousAction": "RESTORE",
-        "previousBusy": "RESTORING…"
-      },
-      "backups": {
-        "title": "Backups",
-        "scope": "THIS DEVICE ONLY",
-        "note": "Kept before deleting, importing or recovering. Restoring sends the current save to the most recent backup — nothing is lost.",
-        "action": "RESTORE",
-        "aria": "Restore the backup from {when}"
-      },
-      "prefs": {
-        "title": "Preferences",
-        "motionTitle": "Reduce motion",
-        "motionNote": "Turns off the foil that follows the pointer and the pack flip. If your system already asks for less motion, the game obeys without this.",
-        "motionOn": "on",
-        "motionOff": "off"
-      },
-      "danger": {
-        "title": "Danger zone",
-        "clearTitle": "Delete the save on this device",
-        "clearWithAccount": "With an account, it comes back on the next sync.",
-        "clearDevice": "Collection, deck and progress go back to zero. A backup stays in the browser — export first if you want to take it with you.",
-        "clearAction": "DELETE LOCAL",
-        "accountTitle": "Delete account and server save",
-        "accountNote": "Permanent. Export first if you want to keep it.",
-        "accountAction": "DELETE EVERYTHING",
-        "accountBusy": "DELETING…"
-      },
-      "held": {
-        "title": "Not yet",
-        "note": "The board for this screen draws three more things, and none of them has data to draw on yet: {language}, {sound} and {offline} arrive with whatever supports them. They are absent on purpose — a switch that does nothing promises something the game does not do.",
-        "language": "language",
-        "sound": "sound",
-        "offline": "download everything for offline"
-      },
-      "version": "v{app} · {sha} · save v{schema}",
-      "footAnimation": "Motion is a device preference and does not sync, on purpose.",
-      "footSyncs": "Collection, progress and deck sync.",
-      "footSyncsNoAccount": "Collection, progress and deck sync — once there is an account.",
-      "confirm": {
-        "clearWithAccount": "Delete the save on this device? The one on your account comes back right after, and a copy of this device's stays kept.",
-        "clearDevice": "Delete the save on this device? A backup stays kept.",
-        "deleteAccount": "Delete the account and the save on the server? This is permanent. The save on this device stays here."
-      },
-      "reason": {
-        "corrupt": "is not shaped like a save",
-        "unknown-version": "is from a newer version of the game",
-        "failed-migration": "did not survive the migration"
-      },
-      "notice": {
-        "exported": "Save exported.",
-        "tooBig": "That file is too large to be a save for this game.",
-        "notJson": "The file is not valid JSON.",
-        "unreadable": "That file could not be read: it {reason}.",
-        "imported": "Save imported — {cards}. The previous one went to the backups.",
-        "cleared": "Save deleted. The backup is still in the browser — you can come back through it down here.",
-        "clearedOffline": "The save on this device was deleted, and the copy went to the backups. The one on your account could not be read just now — it comes back when there is a network, and nothing goes up from this device until then.",
-        "clearedRestored": "The save on this device was deleted, and the account's came back — {cards}. What was here went to the backups.",
-        "clearedPending": "The save on this device was deleted. The account's comes back on the next sync, and what was here went to the backups.",
-        "backupGone": "That backup is no longer in the browser.",
-        "backupShape": "That backup is not shaped like a save.",
-        "backupUnreadable": "That backup could not be read: it {reason}.",
-        "backupRestored": "Backup restored — {cards}. The save from before became the most recent backup.",
-        "previousRestored": "Previous version restored — {cards}. The one that was live became the previous one: restoring again undoes this.",
-        "previousMissing": "The server has no previous version left to restore.",
-        "previousConflict": "Another device wrote first, and its collection is the one that counts now. Nothing was restored — check the previous version again.",
-        "previousFailed": "Could not restore just now. Nothing was changed.",
-        "accountRecent": "For safety, deleting the account asks for a recent sign-in. Sign out, sign in again and come back — nothing was deleted.",
-        "accountFailed": "Could not delete the account just now. Nothing was deleted."
-      },
-      "seo": {
-        "title": "Settings — Holo Deck",
-        "description": "The account and syncing, exporting and importing the save, the backups, the motion switch and the version of the game."
-      }
-    },
+    "via": "via GitHub",
+    "loading": "Loading…",
     "save": {
-      "recovery": {
-        "kept": "Nothing was deleted.",
-        "corrupt": "Your previous save could not be read, and the game started clean.",
-        "unknown-version": "Your save was written by a newer version of the game, and this one cannot read it. The game started clean.",
-        "failed-migration": "Your save could not be updated to the current format, and the game started clean.",
-        "backup": "The original copy is still in your browser, under a key {key}",
-        "dismiss": "GOT IT"
-      }
+      "title": "Save",
+      "exportTitle": "Export",
+      "exportNote": "Downloads a JSON with your collection, deck and progress.",
+      "exportAction": "DOWNLOAD",
+      "importTitle": "Import",
+      "importNote": "The current save goes to a backup before being replaced — nothing is deleted.",
+      "importAction": "CHOOSE FILE",
+      "previousTitle": "Restore previous version",
+      "previousNote": "The server keeps the write immediately before this one.",
+      "previousMade": "Made {when}, with {cards}.",
+      "previousHolds": "It holds {cards}.",
+      "previousWaiting": "Waiting for the queue to go up before restoring.",
+      "previousAria": "Restore the previous version from the server",
+      "previousAction": "RESTORE",
+      "previousBusy": "RESTORING…"
+    },
+    "backups": {
+      "title": "Backups",
+      "scope": "THIS DEVICE ONLY",
+      "note": "Kept before deleting, importing or recovering. Restoring sends the current save to the most recent backup — nothing is lost.",
+      "action": "RESTORE",
+      "aria": "Restore the backup from {when}"
+    },
+    "prefs": {
+      "title": "Preferences",
+      "motionTitle": "Reduce motion",
+      "motionNote": "Turns off the foil that follows the pointer and the pack flip. If your system already asks for less motion, the game obeys without this.",
+      "motionOn": "on",
+      "motionOff": "off"
+    },
+    "danger": {
+      "title": "Danger zone",
+      "clearTitle": "Delete the save on this device",
+      "clearWithAccount": "With an account, it comes back on the next sync.",
+      "clearDevice": "Collection, deck and progress go back to zero. A backup stays in the browser — export first if you want to take it with you.",
+      "clearAction": "DELETE LOCAL",
+      "accountTitle": "Delete account and server save",
+      "accountNote": "Permanent. Export first if you want to keep it.",
+      "accountAction": "DELETE EVERYTHING",
+      "accountBusy": "DELETING…"
+    },
+    "held": {
+      "title": "Not yet",
+      "note": "The board for this screen draws three more things, and none of them has data to draw on yet: {language}, {sound} and {offline} arrive with whatever supports them. They are absent on purpose — a switch that does nothing promises something the game does not do.",
+      "language": "language",
+      "sound": "sound",
+      "offline": "download everything for offline"
+    },
+    "version": "v{app} · {sha} · save v{schema}",
+    "footAnimation": "Motion is a device preference and does not sync, on purpose.",
+    "footSyncs": "Collection, progress and deck sync.",
+    "footSyncsNoAccount": "Collection, progress and deck sync — once there is an account.",
+    "confirm": {
+      "clearWithAccount": "Delete the save on this device? The one on your account comes back right after, and a copy of this device's stays kept.",
+      "clearDevice": "Delete the save on this device? A backup stays kept.",
+      "deleteAccount": "Delete the account and the save on the server? This is permanent. The save on this device stays here."
+    },
+    "reason": {
+      "corrupt": "is not shaped like a save",
+      "unknown-version": "is from a newer version of the game",
+      "failed-migration": "did not survive the migration"
+    },
+    "notice": {
+      "exported": "Save exported.",
+      "tooBig": "That file is too large to be a save for this game.",
+      "notJson": "The file is not valid JSON.",
+      "unreadable": "That file could not be read: it {reason}.",
+      "imported": "Save imported — {cards}. The previous one went to the backups.",
+      "cleared": "Save deleted. The backup is still in the browser — you can come back through it down here.",
+      "clearedOffline": "The save on this device was deleted, and the copy went to the backups. The one on your account could not be read just now — it comes back when there is a network, and nothing goes up from this device until then.",
+      "clearedRestored": "The save on this device was deleted, and the account's came back — {cards}. What was here went to the backups.",
+      "clearedPending": "The save on this device was deleted. The account's comes back on the next sync, and what was here went to the backups.",
+      "backupGone": "That backup is no longer in the browser.",
+      "backupShape": "That backup is not shaped like a save.",
+      "backupUnreadable": "That backup could not be read: it {reason}.",
+      "backupRestored": "Backup restored — {cards}. The save from before became the most recent backup.",
+      "previousRestored": "Previous version restored — {cards}. The one that was live became the previous one: restoring again undoes this.",
+      "previousMissing": "The server has no previous version left to restore.",
+      "previousConflict": "Another device wrote first, and its collection is the one that counts now. Nothing was restored — check the previous version again.",
+      "previousFailed": "Could not restore just now. Nothing was changed.",
+      "accountRecent": "For safety, deleting the account asks for a recent sign-in. Sign out, sign in again and come back — nothing was deleted.",
+      "accountFailed": "Could not delete the account just now. Nothing was deleted."
+    },
+    "seo": {
+      "title": "Settings — Holo Deck",
+      "description": "The account and syncing, exporting and importing the save, the backups, the motion switch and the version of the game."
     }
+  },
+  "save": {
+    "recovery": {
+      "kept": "Nothing was deleted.",
+      "corrupt": "Your previous save could not be read, and the game started clean.",
+      "unknown-version": "Your save was written by a newer version of the game, and this one cannot read it. The game started clean.",
+      "failed-migration": "Your save could not be updated to the current format, and the game started clean.",
+      "backup": "The original copy is still in your browser, under a key {key}",
+      "dismiss": "GOT IT"
+    }
+  }
 }
