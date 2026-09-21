@@ -524,32 +524,34 @@ e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situaç�
 
 A Fase 8 leva o jogo para dois idiomas em oito PRs, uma fatia vertical por PR.
 Entre o primeiro e o último, `/en` mostrou telas **meio traduzidas** — estado
-conhecido e datado, nunca defeito solto. **Com `/settings`, toda tela do jogo fala
+conhecido e datado, nunca defeito solto. **Com o 4d-1, tudo que o jogador lê fala
 os dois idiomas**: a barra global, o painel de conta, o pular-para-o-conteúdo, o
 **vocabulário do jogo** (as 6 raridades, os 18 tipos, as 6 siglas de stat e os 9
 habitats), o Hub, `/packs`, `/collection`, `/deck`, `/league`, `/battle/N`, o
-**Detalhe** de espécie, as duas telas da **Pokédex**, `/rules` e `/settings` — mais
-o **chip de sync** e o **aviso de save recuperado**, que não são de tela nenhuma e
-aparecem em todas.
+**Detalhe** de espécie, as duas telas da **Pokédex**, `/rules`, `/settings` e
+`/login` — mais o **chip de sync** e os **quatro painéis de boot** do `app.vue`,
+que não são de tela nenhuma e aparecem em todas.
+
+**Esta frase já disse "com `/settings`, toda tela do jogo", e era falsa.** `/login`
+nasceu na Fase 7, antes da tradução, e não estava no corte de nenhum PR da fase
+nem na tabela que ficava aqui: a medição ia pelas telas do jogo propriamente
+dito, e a tela de entrar ficou fora das duas listas ao mesmo tempo. Foi achada
+medindo o 4d, com zero `useI18n` e 19 textos.
 
 **Tela não é tudo que o jogador lê, e os painéis de boot provam isso.** O `app.vue`
-monta quatro coisas fora do layout, e o aviso de save recuperado é só a primeira:
-`SaveChoice`, `SyncConflictNotice` e `AccountInvite` desenham sobre **qualquer**
-rota e seguem em português. Elas não são telas, não estavam no corte de nenhum PR
-da fase, e foi por isso que a medição por tela não as viu.
+monta quatro coisas fora do layout — o aviso de save recuperado, `SaveChoice`,
+`SyncConflictNotice` e `AccountInvite` —, e elas desenham sobre **qualquer** rota.
+O primeiro entrou com `/settings`; os outros três seguiram em português até o
+4d-1, porque não são telas e não estavam no corte de nenhum PR: a medição por
+tela não os via. Dois deles carregavam o mesmo defeito que `backupLabel` tinha em
+Ajustes — as datas do `SaveChoice` formatadas com `'pt-BR'` cravado, o que em
+`/en` escreve nove de maio no lugar de cinco de setembro.
 
 O que ainda sai em português dentro de `/en`:
 
 | onde | o que se lê em `/en` | leva |
 | --- | --- | --- |
-| `AccountInvite` | o convite de conta inteiro — vitória, fim de pack e Hub | PR do seletor de idioma (4d) |
-| `SaveChoice` | a escolha entre duas coleções, no primeiro login com save local | PR do seletor de idioma (4d) |
-| `SyncConflictNotice` | *Outro aparelho gravou antes*, quando o servidor responde 409 | PR do seletor de idioma (4d) |
 | número | `1.600`, `0,4%`, `6,9 kg` — separador de `pt-BR` fixo | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
-
-O `AccountInvite` é o que mais pesa dos três: ele não espera caso raro, dispara na
-vitória, no fim de um pack e no Hub. Os outros dois são caminhos que dependem de
-duas coleções ou de um 409.
 
 **Sobra o número, e ele fica.** `/rules` é a tela mais densa em número do jogo e
 entrou traduzida com `4,5%` e `×0,5`; `/settings` estampa `20,6 KB`. Enquanto as
@@ -1368,8 +1370,10 @@ localizado pelo módulo**: de dentro de `/en`, `to="/deck"` devolve o jogador ao
 português sem caminho de volta. Quem localiza é `localePath()` ou
 `<NuxtLinkLocale>`. Ele lê a fonte, ao contrário do `nav-gate`, porque um template
 literal — `` :to="`/battle/${gym}`" `` — não existe em lista nenhuma, e enumera
-quem **sai**: link novo é infrator por omissão, e a lista de exceções esvazia com
-a issue #37.
+quem **sai**: link novo é infrator por omissão. A lista de exceções que a issue
+#37 manteve ali — um link por PR da fase que ainda devia o prefixo — esvaziou no
+4d-1 com `/login` e o convite de conta, e foi **apagada em vez de ficar vazia**:
+lista vazia com teste provando que cada entrada ainda vale é asserção sobre nada.
 
 E há uma terceira metade, que nenhum navegador alcança:
 [`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts) compara
