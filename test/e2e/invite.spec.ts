@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { fakeSync, navLabel, saveWith, seedLocalSave, seedSynced } from './support'
+import {
+  defaultLocale,
+  foreignPhrases,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+  namespaceLabels,
+} from '../support/locales'
+import { fakeSync, navLabel, pathPattern, saveWith, screenText, seedLocalSave, seedSynced } from './support'
 
 /**
  * O convite de conta — a prancha *Convite de conta*, num navegador de verdade.
@@ -25,8 +34,15 @@ async function anonymous(page: Page): Promise<void> {
   })
 }
 
-function invite(page: Page) {
-  return page.getByRole('dialog', { name: /Sua coleção existe/ })
+/**
+ * The dialog, found by the first line of its title in the language asked for.
+ *
+ * The first line and not the whole title: the break between the two is a
+ * newline inside the message, and what an accessible name does with it is the
+ * browser's business, not this suite's.
+ */
+function invite(page: Page, code: string = defaultLocale()) {
+  return page.getByRole('dialog', { name: label('invite.title', code).split('\n')[0] })
 }
 
 test('quem já venceu um ginásio vê o convite no Hub, com o que está em jogo', async ({ page }) => {
@@ -47,7 +63,7 @@ test('recusado, ele não volta — uma vez por aparelho', async ({ page }) => {
   await seedLocalSave(page, WINNER)
   await page.goto('/')
 
-  await invite(page).getByRole('button', { name: 'Agora não' }).click()
+  await invite(page).getByRole('button', { name: label('invite.later', defaultLocale()) }).click()
   await expect(invite(page)).toHaveCount(0)
   expect(await page.evaluate(() => window.localStorage.getItem('holodeck:invite'))).not.toBeNull()
 
@@ -81,17 +97,64 @@ test('Escape recusa, como o Agora não', async ({ page }) => {
   await expect(invite(page)).toHaveCount(0)
 })
 
-test('CRIAR CONTA leva à tela de entrar', async ({ page }) => {
-  await anonymous(page)
-  await seedLocalSave(page, WINNER)
-  await page.goto('/')
+/**
+ * The invite in the language of the URL — and its way out stays in it.
+ *
+ * The invite is not a screen: it opens over whichever route asked for it, which
+ * is why the per-screen measurement of this phase never reached it. From the Hub
+ * of each locale it has to speak that language **and** send CREATE ACCOUNT to
+ * the sign-in screen of the same language. That link was one of the last two of
+ * issue #37: the disk gate reads that it goes through `localePath`, and this
+ * reads where the rendered one actually lands.
+ *
+ * One test per locale rather than a loop inside one: the invite shows **once
+ * per device**, and a second language in the same browser context would find it
+ * already seen and measure its absence.
+ *
+ * **Absence of the other language and presence of this one, both.** The sweep
+ * only sees the labels a translator wrote plainly — the lede and the footnote
+ * interpolate, and the units are plural — so those are asserted as the sentence
+ * this locale renders. The units carry the plural rule too: three cards and one
+ * badge, the two forms side by side.
+ */
+for (const code of localeCodes()) {
+  test(`the invite speaks ${code}, and CREATE ACCOUNT stays in ${code}`, async ({ page }) => {
+    const foreign = localeCodes()
+      .filter(other => other !== code)
+      .flatMap(other => namespaceLabels('invite.', code, other))
 
-  await invite(page).getByRole('link', { name: 'CRIAR CONTA' }).click()
+    // The other side of the subtraction: an empty list would sweep for nothing.
+    expect(foreign.length, `nothing foreign to look for against ${code}`).toBeGreaterThan(0)
 
-  await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('A conta guarda')
-  await expect(invite(page)).toHaveCount(0)
-})
+    await anonymous(page)
+    await seedLocalSave(page, WINNER)
+    await page.goto(localeUrl('/', code))
+
+    const dialog = invite(page, code)
+    await expect(dialog, `no invite in ${code}`).toBeVisible()
+
+    await expect(dialog.locator('.invite__unit')).toHaveText([
+      message('invite.stakes.cards', code, {}, 3),
+      label('invite.stakes.shiny', code),
+      message('invite.stakes.badges', code, {}, 1),
+    ])
+    await expect(dialog).toContainText(message('invite.lede', code, { days: label('invite.days', code) }))
+    await expect(dialog).toContainText(message('invite.foot', code, {
+      path: `${label('nav.settings', code)} → ${label('settings.save.exportTitle', code)}`,
+    }))
+
+    expect(
+      foreignPhrases(await screenText(dialog), foreign),
+      `the invite in ${code} wrote a sentence from another language`,
+    ).toEqual([])
+
+    await dialog.getByRole('link', { name: label('invite.create', code) }).click()
+
+    await expect(page).toHaveURL(pathPattern(localeUrl('/login', code)))
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(label('login.title', code))
+    await expect(invite(page, code)).toHaveCount(0)
+  })
+}
 
 /**
  * O convite só existe para quem não tem conta — e um aparelho que já viu uma
@@ -104,7 +167,9 @@ test('com conta, o convite não aparece — e o aparelho fica marcado', async ({
   await seedSynced(page, { base: 1 })
   await page.goto('/')
 
-  await expect(page.locator('.nav').getByText('Conectada como Treinadora Ash')).toBeAttached()
+  await expect(page.locator('.nav').getByText(
+    message('account.signedInAs', defaultLocale(), { name: 'Treinadora Ash' }),
+  )).toBeAttached()
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem('holodeck:invite'))).not.toBeNull()
   await expect(invite(page)).toHaveCount(0)
 })

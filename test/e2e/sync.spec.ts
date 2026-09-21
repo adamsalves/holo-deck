@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import { ENGINE_VERSION } from '../../shared/game/battle.ts'
-import { fakeSync, navLabel, saveWith, seedLocalSave } from './support'
+import {
+  defaultLocale,
+  foreignPhrases,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+  namespaceLabels,
+} from '../support/locales'
+import { fakeSync, navLabel, pathPattern, saveWith, screenText, seedLocalSave } from './support'
 
 /**
  * A decisão do primeiro login num navegador de verdade.
@@ -79,7 +88,7 @@ test('com os dois lados cheios, pergunta — e a escolha local sobe o local', as
   await expect(choice).toBeVisible()
   // `level: 2` e não 1: a página por baixo continua montada com o `h1` dela, e
   // dois `h1` na mesma árvore é sumário quebrado para quem navega por cabeçalho.
-  await expect(choice.getByRole('heading', { level: 2 })).toHaveText('Qual delas você quer continuar?')
+  await expect(choice.getByRole('heading', { level: 2 })).toHaveText(label('save.choice.title', defaultLocale()))
 
   // Os dois lados, com os números de cada save — é o que torna a escolha uma
   // escolha, e não um botão de roleta.
@@ -95,7 +104,7 @@ test('com os dois lados cheios, pergunta — e a escolha local sobe o local', as
   // Sem batalha em andamento, o aviso não aparece — ele não é decoração fixa.
   await expect(choice.locator('.choice__warning')).toHaveCount(0)
 
-  await sides.first().getByRole('button', { name: 'USAR ESTA' }).click()
+  await sides.first().getByRole('button', { name: label('save.choice.use', defaultLocale()) }).click()
 
   // A tela some, e o que subiu foi o **local**.
   await expect(choice).toHaveCount(0)
@@ -109,7 +118,9 @@ test('a escolha não reaparece no boot seguinte', async ({ page }) => {
   await seedLocalSave(page, LOCAL)
 
   await page.goto('/')
-  await page.locator('.choice__side').first().getByRole('button', { name: 'USAR ESTA' }).click()
+  await page.locator('.choice__side').first()
+    .getByRole('button', { name: label('save.choice.use', defaultLocale()) })
+    .click()
   await expect(page.locator('.choice')).toHaveCount(0)
 
   // O defeito que isto tranca: escolher o local sobe o local, e no boot seguinte
@@ -190,7 +201,7 @@ test('a batalha em andamento é avisada antes da escolha', async ({ page }) => {
 
   const warning = page.locator('.choice__warning')
   await expect(warning).toBeVisible()
-  await expect(warning).toContainText('Na sua conta')
+  await expect(warning).toContainText(label('save.choice.remote.title', defaultLocale()))
 })
 
 /**
@@ -232,10 +243,10 @@ test('sem sessão, a barra oferece entrar — e leva à tela de entrar', async (
   await expect(enter, 'a conta precisa ter entrada pela interface').toBeVisible()
 
   await enter.click()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('A conta guarda')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(label('login.title', defaultLocale()))
 
   // E a tela vende em vez de barrar: a saída é tão visível quanto a entrada.
-  await expect(page.getByRole('link', { name: 'CONTINUAR SEM CONTA' })).toBeVisible()
+  await expect(page.getByRole('link', { name: label('login.skip.action', defaultLocale()) })).toBeVisible()
 })
 
 test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', async ({ page }) => {
@@ -245,7 +256,7 @@ test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', a
   await page.goto('/')
 
   const nav = page.locator('.nav')
-  await expect(nav.getByText('Conectada como Treinadora Ash')).toBeAttached()
+  await expect(nav.getByText(message('account.signedInAs', defaultLocale(), { name: 'Treinadora Ash' }))).toBeAttached()
   await expect(nav.getByRole('link', { name: navLabel('nav.account') })).toHaveCount(0)
 
   // O acerto do primeiro login ficou marcado; sair precisa desfazê-lo, senão
@@ -261,7 +272,7 @@ test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', a
    */
   await Promise.all([
     page.waitForEvent('load'),
-    nav.getByRole('button', { name: 'SAIR' }).click(),
+    nav.getByRole('button', { name: label('account.signOut', defaultLocale()) }).click(),
   ])
 
   await expect(nav.getByRole('link', { name: navLabel('nav.account') })).toBeVisible()
@@ -270,3 +281,138 @@ test('com sessão, a barra mostra a conta — e sair volta a oferecer entrar', a
   // Sair não é apagar o save deste aparelho: a coleção continua aqui.
   expect(await page.evaluate(() => window.localStorage.getItem('holodeck:save'))).not.toBeNull()
 })
+
+/**
+ * The two-collections choice in the language of the URL.
+ *
+ * It is a boot panel, not a screen: it draws over whichever route the first
+ * sign-in lands on, so no per-screen measurement of this phase reached it. Of
+ * everything the player reads, it is the one that asks for an irreversible
+ * decision — a sentence left in the wrong language here is a sentence the
+ * player has to guess at before choosing which collection survives.
+ *
+ * The sweep reads the panel only after both columns have their miniatures: the
+ * dex index arrives after the panel does, and before it the columns hold dashes
+ * and a loading line — a sweep there would measure the loading state and call
+ * the columns translated.
+ */
+for (const code of localeCodes()) {
+  test(`the two-collections choice speaks ${code}`, async ({ page }) => {
+    const foreign = localeCodes()
+      .filter(other => other !== code)
+      .flatMap(other => namespaceLabels('save.choice.', code, other))
+
+    // The other side of the subtraction: an empty list would sweep for nothing.
+    expect(foreign.length, `nothing foreign to look for against ${code}`).toBeGreaterThan(0)
+
+    await fakeSync(page, REMOTE)
+    await seedLocalSave(page, LOCAL)
+    await page.goto(localeUrl('/', code))
+
+    const choice = page.locator('.choice')
+    await expect(choice.getByRole('heading', { level: 2 })).toHaveText(label('save.choice.title', code))
+    await expect(choice.locator('.choice__side--account .choice__mini')).toHaveCount(3)
+
+    // The units inflect with the count each column shows: two cards and one
+    // badge here, three cards and four badges on the account side.
+    const [local, remote] = [choice.locator('.choice__side').first(), choice.locator('.choice__side--account')]
+    await expect(local.locator('.choice__numbers .choice__unit')).toHaveText([
+      message('save.choice.cards', code, {}, 2),
+      message('save.choice.badges', code, {}, 1),
+      label('save.choice.shiny', code),
+    ])
+    await expect(remote.locator('.choice__numbers .choice__unit')).toHaveText([
+      message('save.choice.cards', code, {}, 3),
+      message('save.choice.badges', code, {}, 4),
+      label('save.choice.shiny', code),
+    ])
+
+    await expect(choice).toContainText(message('save.choice.footnote', code, {
+      path: `${label('nav.settings', code)} → ${label('settings.backups.title', code)}`,
+    }))
+
+    expect(
+      foreignPhrases(await screenText(choice), foreign),
+      `the two-collections choice in ${code} wrote a sentence from another language`,
+    ).toEqual([])
+  })
+}
+
+/**
+ * The instant each column was last written, in the date format of the URL.
+ *
+ * The component formatted both with `'pt-BR'` written by hand, and inside `/en`
+ * the server's copy read `01/09/2026` — the ninth of January to an English
+ * reader, on the screen where the player picks a collection by how recent it
+ * is. Nothing measured it: every suite drove the choice in pt-BR, where the
+ * hard-coded locale is also the right one.
+ *
+ * **Measured as shape, in the other language**, the way the backup stamp of
+ * Settings is. Comparing the stamp against `Intl` with the same locale would
+ * agree with a hard-coded string just as happily, since both sides move
+ * together. What tells them apart is that the URLs have to disagree. The
+ * account side is the one read, because its instant comes from the fake server
+ * and is always there; the device side can legitimately say it does not know.
+ */
+test('the choice stamps the server copy in the date format of the URL', async ({ page }) => {
+  const codes = localeCodes()
+  expect(codes.length).toBeGreaterThan(1)
+
+  const stamps: string[] = []
+
+  for (const code of codes) {
+    await fakeSync(page, REMOTE)
+    await seedLocalSave(page, LOCAL)
+    await page.goto(localeUrl('/', code))
+
+    const when = page.locator('.choice__side--account .choice__facts dd').first()
+    await expect(when, `no server stamp in ${code}`).toBeVisible()
+
+    const stamp = ((await when.textContent()) ?? '').trim()
+
+    // The other side: an empty or placeholder stamp would make every language
+    // agree, and the assertion below would call that a pass.
+    expect(stamp, `the server copy in ${code} is stamped with nothing`).not.toMatch(/^(—)?$/)
+    stamps.push(stamp)
+  }
+
+  expect(
+    new Set(stamps).size,
+    `the server copy reads ${stamps.join(' and ')} — the same in every language`,
+  ).toBeGreaterThan(1)
+})
+
+/**
+ * The sign-in screen in the language of the URL, and its way out stays in it.
+ *
+ * `/login` was the one screen of the game that no list named: it was built in
+ * Phase 7, before the translation, and the per-screen cut of Phase 8 went by the
+ * screens of the game proper. Its *continue without an account* link was one of
+ * the last two of issue #37 — from `/en/login`, a literal `/` sent the player to
+ * the Portuguese Hub.
+ */
+for (const code of localeCodes()) {
+  test(`the sign-in screen speaks ${code}, and continuing without an account stays in ${code}`, async ({ page }) => {
+    const foreign = localeCodes()
+      .filter(other => other !== code)
+      .flatMap(other => namespaceLabels('login.', code, other))
+
+    // The other side of the subtraction: an empty list would sweep for nothing.
+    expect(foreign.length, `nothing foreign to look for against ${code}`).toBeGreaterThan(0)
+
+    await page.goto(localeUrl('/login', code))
+
+    const screen = page.locator('.login')
+    await expect(screen.getByRole('heading', { level: 1 })).toHaveText(label('login.title', code))
+    await expect(page).toHaveTitle(label('login.seo.title', code))
+
+    expect(
+      foreignPhrases(await screenText(screen), foreign),
+      `the sign-in screen in ${code} wrote a sentence from another language`,
+    ).toEqual([])
+
+    await screen.getByRole('link', { name: label('login.skip.action', code) }).click()
+    await expect(page).toHaveURL(pathPattern(localeUrl('/', code)))
+    await expect(page.locator('.hub')).toBeVisible()
+  })
+}
