@@ -482,7 +482,7 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | a loja tem **três** cartões, e não dois | os packs de boas-vindas existem desde a Fase 5 e precisam de onde ser abertos. Virá-los o primeiro da fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário; a alternativa — a loja só aparecer depois deles — esconderia saldo e preço de quem está começando |
 | sublinhado ativo em `--accent` em toda página | a prancha *Hub* o desenha azul e a *Loja* roxo, para o mesmo papel. É variação de mockup desenhado à mão, como o `2px`/`3px` que a Fase 2 normalizou num `--radius` só |
 | ~~sem o avatar de 32px no canto da barra~~ | **Entregue na Fase 7**, e com um papel a mais do que a prancha desenhava: sem sessão, o mesmo canto é o link *Entrar*. Ver a linha correspondente em *Decidido na Fase 7* |
-| `/settings` sem os painéis de conta, idioma, som e offline | mesma razão, e eles aparecem **nomeados** num painel *Ainda não* em vez de virarem controles cinzas: um botão desligado promete uma coisa que o jogo não faz |
+| `/settings` sem o painel de offline — ~~e sem os de conta, idioma e som~~ | mesma razão, e ele aparece **nomeado** num painel *Ainda não* em vez de virar controle cinza: um botão desligado promete uma coisa que o jogo não faz. **Os outros três saíram da linha:** a conta entrou na Fase 7, o idioma no 4d-2 da Fase 8, e o som deixou de estar na prancha na versão 16, quando a fase o aposentou |
 | apagar o save guarda uma cópia | a prancha põe *apagar local* na zona de perigo e não diz o que sobra. Sem conta não existe segunda cópia em lugar nenhum, e a regra inegociável do plano existe para a coleção de meses não depender de um clique não ter sido acidental. A tela avisa que a cópia fica |
 
 ### Estados sem prancha, escritos neste PR
@@ -615,17 +615,20 @@ chega antes, com a issue #37. Foi por isso que a tela de Detalhe foi traduzida
 O custo é menor do que "dobrar" sugere: o build foi de 36s para 44s, porque as
 páginas novas são o mesmo render com outro locale, e o dex já está em memória.
 
-**O que sobra são nove rotas, e elas são nomeadas.** `/en/battle/1..9` continuam
-fora: o corpo da Liga é um `<ClientOnly>`, então os links para `/battle/N` não
-existem em HTML nenhum, e as nove em português só são pré-renderizadas porque
-`nitro.prerender.routes` as lista **à mão, sem prefixo de idioma**. Enquanto isso
-não mudar, o docblock do `nuxt.config.ts` que promete "toda rota válida é
-pré-renderizada" vale para 1.043 rotas de 1.052 em `/en`. A decisão cabe ao PR do
-seletor e do SEO — e a lacuna não depende mais de ninguém se lembrar dela: a
-asserção de paridade de rotas em
-[`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts)
-enumera as nove como exceção, montada de `GYM_COUNT`, e reprova no dia em que
-sobrar uma décima.
+**Sobravam nove rotas, e o 4d-2 as fechou.** `/en/battle/1..9` ficavam fora: o
+corpo da Liga é um `<ClientOnly>`, então os links para `/battle/N` não existem em
+HTML nenhum, e as nove em português só eram pré-renderizadas porque
+`nitro.prerender.routes` as listava **à mão, sem prefixo de idioma**. A lista agora
+nasce da lista de idiomas, e o build foi a **2.104 páginas — 1.052 em cada idioma —
+e 140 MB**. A asserção de paridade de rotas em
+[`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts), que as
+carregava como exceção, ficou **sem lista nenhuma**: rota que o build escreve num
+idioma só reprova, nomeada.
+
+**E ligar o `hreflang` não dobrou nada**, ao contrário do que o plano da fase
+temia. Com `baseUrl`, as tags `alternate` saem **absolutas**, e o rastreador do
+Nitro não segue link com esquema ou host — as 2.104 são as 2.095 de antes mais as
+nove batalhas.
 
 ### Segurado até a fase que cria o dado
 
@@ -648,10 +651,10 @@ progresso que ninguém pode mover.
   tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
   de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
   *Ainda não* ficou com três coisas, e as três são da Fase 8.
-- **Sem a peça que os sustenta:** o seletor de **idioma** (o i18n chegou na Fase
-  8; o seletor é do PR 4 dela), o interruptor de **som** (não há áudio) e *baixar
-  tudo para offline* (o PWA é o PR 5 da Fase 8). Os três estão na prancha
-  *Ajustes*.
+- **Sem a peça que o sustenta:** *baixar tudo para offline* (o PWA é o PR 5 da
+  Fase 8). ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
+  *Preferências*, onde a prancha *Ajustes* o desenha; ~~o interruptor de
+  **som**~~ **aposentado** em 12/09 — a prancha deixou de desenhá-lo na versão 16.
 - ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
   constante de `useDeck` virou `progress.nextGym`, que foi exatamente a troca de
   uma linha que o comentário dela prometia.
@@ -1229,11 +1232,12 @@ fileira de números, o interruptor de animação e a versão com o sha. **A Fase
 trouxe a metade que dependia de conta**: o painel da conta com e-mail e estado do
 sync, *Restaurar versão anterior* e *Excluir conta e save do servidor* — e o
 título passa a dizer de quem é a tela (*Sua conta e seu save* com sessão, *Seu
-save e este aparelho* sem). Ficam segurados só os três que não têm a peça que os
-sustenta: idioma (o i18n chegou na Fase 8 e o seletor é o PR 4 dela), som (não há
-áudio) e *baixar tudo para offline* (o PWA é o PR 5 da Fase 8). **Eles aparecem nomeados na própria tela**, num painel
-*Ainda não*, em vez de virarem controles cinzas: um botão desligado promete uma
-coisa que o jogo não faz.
+save e este aparelho* sem). Fica segurado só o que não tem a peça que o sustenta:
+*baixar tudo para offline*, que é o PWA do PR 5 da Fase 8. **Ele aparece nomeado na
+própria tela**, num painel *Ainda não*, em vez de virar controle cinza: um botão
+desligado promete uma coisa que o jogo não faz. O painel já nomeou três coisas: o
+idioma saiu dele chegando — o seletor é a primeira linha de *Preferências* desde o
+4d-2 —, e o som saiu da prancha, que deixou de desenhá-lo na versão 16.
 
 **O idioma desta tela alcança duas coisas que não são desta tela.** O chip de
 sync ([`app/utils/sync-label.ts`](app/utils/sync-label.ts)) mora na barra global e
@@ -1469,6 +1473,86 @@ O que sustenta as duas metades é o leitor de locale, e ele tem portão próprio
 reafirmar a regra. É reimplementação de código alheio dentro da infraestrutura de
 ~40 asserções de e2e — e uma cópia que deriva reprova nomeando a tela, não a si
 mesma.
+
+### O seletor de idioma, a raiz e o `hreflang`
+
+O seletor é a primeira linha de *Preferências*, onde a prancha *Ajustes* o desenha
+(`PT-BR | EN`). Cada segmento é um **link** para a mesma página no outro idioma
+(`switchLocalePath`), e não um botão: escolher um idioma **é** ir para esta página
+nele. O ativo é o que aponta para a página aberta, então o roteador o marca com
+`aria-current="page"`, e o estilo segue o atributo.
+
+**A escolha fica neste aparelho e vale só na raiz** — decisão 2 do plano do 4d. O
+clique grava `holodeck:locale`; quem abre `/` (o domínio, um atalho, o app instalado
+do PR 5) cai no idioma escolhido, e **link direto fica no idioma da URL**: quem
+escolheu inglês e recebe `/pokemon/pikachu` lê português, porque foi essa a página
+enviada. A preferência não viaja no save, pelo motivo que a prancha carimba em
+*Preferências*: `SÓ NESTE APARELHO`.
+
+**A raiz troca de idioma antes de pintar, por um script inline no `<head>`**, e não
+por plugin. Um plugin roda depois de o Hub pré-renderizado ter sido pintado em
+português — o jogador veria a tela trocar de idioma, que é o defeito do
+`detectBrowserLanguage` que o PR 1 desligou. O script sai com prioridade
+`critical`, antes das folhas de estilo (script inline depois de folha pendente
+espera ela carregar), e chama `location.replace` — o que **para o parser onde ele
+está**: medido com a resposta de `/en` segurada 800 ms, a raiz fica com
+`document.body` nulo e nenhuma pintura. Esconder o documento antes de sair foi
+escrito, medido e deixado de fora, porque não havia Hub para esconder. Ele existe
+**só** no HTML de `/`, registrado no servidor: registrado numa página, o gerenciador
+de `<head>` o inseriria a cada visita a `/` pelo cliente, e script inserido roda —
+quem chegou por um link em português seria jogado ao inglês clicando em *Base*.
+
+[`test/e2e/language.spec.ts`](test/e2e/language.spec.ts) **mede** o "antes de
+pintar", em vez de inferi-lo da posição do script: cada documento anota que começou
+e, se chegar lá, que pintou texto, e a raiz tem de começar e nunca pintar. Com a
+guarda escrita como plugin — o desenho que o plano recusou —, a trilha sai
+`["/", "/en"]` em vez de `["/en"]`. A resposta de `/en` é segurada 600 ms, como
+numa rede de verdade: com a guarda no fim do `<body>`, o `localhost` deixava o
+defeito passar 5 vezes em 5, e segurada ele reprova 5 em 5.
+
+A volta à raiz por dentro do app é medida com uma barreira de ordenação: o título
+da rota nova e um script novo saem da mesma chamada síncrona do gerenciador de
+`<head>`, e a espera e a leitura acontecem num `evaluate` só — lida de fora, uma
+volta depois, a contagem podia cair no documento seguinte e não achar nada.
+
+**O `hreflang` voltou, com `baseUrl`** — a
+[issue #39](https://github.com/adamsalves/holo-deck/issues/39). O `useLocaleHead`
+do `app.vue` escreve `lang` e `dir` no `<html>`, uma `alternate` por idioma mais
+`x-default`, o `canonical`, `og:url` e `og:locale`. O `baseUrl` é a origem de
+produção em **todo** deploy — `VERCEL_PROJECT_PRODUCTION_URL`, que a Vercel preenche
+também nos previews, com `https://holo-deck.vercel.app` fora dela —, de propósito:
+preview é cópia do site num host descartável, e o canonical dele deve nomear a
+página que copia. A origem do pedido seria pior: toda página é pré-renderizada, e o
+pedido é o `localhost` da máquina de build.
+
+[`test/e2e/locale-head.spec.ts`](test/e2e/locale-head.spec.ts) lê o `<head>` das
+2.104 páginas do `.output` e pergunta a **forma** de cada link, não a presença:
+absoluto, `https` e uma origem só; cada `alternate` apontando para esta página no
+idioma que ela nomeia — o caminho esperado sai de `localeUrl`, do `test/support/`,
+e não do código que escreveu o link —; todo idioma da lista com a sua; `canonical` e
+`og:url` como esta página no idioma dela; `lang`, `dir` e `og:locale` no idioma da
+URL; e a guarda da raiz **na raiz e em mais nenhuma**, por conjunto. Sem `baseUrl`,
+ele lista 12.626 links relativos; com a guarda em toda página, 2.103 páginas a mais.
+
+**A lista de idiomas virou módulo** — [`app/utils/locales.ts`](app/utils/locales.ts),
+`as const`, com o tipo derivado dela —, e o `nuxt.config.ts`, o seletor, a guarda e
+os portões leem a mesma. Mora em `app/utils/` e não em `shared/`: o
+`shared-text-gate` lê todo literal de lá como texto de tela, e o `pt-BR` que ele
+isenta é o marcador da #49 — um segundo `pt-BR` escrito lá manteria a exceção viva
+depois de a #49 fechar. O mapa dos primitivos do Nuxt UI saiu do `app.vue` para
+[`app/utils/ui-locales.ts`](app/utils/ui-locales.ts) como `Record` sobre os códigos
+da lista, e isso fecha a [issue #40](https://github.com/adamsalves/holo-deck/issues/40):
+um terceiro idioma sem primitivos não compila mais. O que o tipo não vê —
+`'pt-BR': en`, mapa completo e errado — é
+[`test/unit/ui-locales.spec.ts`](test/unit/ui-locales.spec.ts); o que só a tela vê
+— o `UApp` preso num idioma — é o botão de fechar da busca da Pokédex, medido nos
+dois idiomas contra o rótulo que o próprio Nuxt UI escreve.
+
+E o portão de link ganhou uma segunda regra: `switchLocalePath` não é perdoado como
+link localizado, porque ele **sai** do idioma de quem joga — certo no seletor, e o
+defeito em qualquer outro lugar. Os arquivos que trocam de idioma são comparados,
+como conjunto, com `LANGUAGE_SELECTORS`, e a entrada reprova no dia em que o seletor
+deixar de trocar.
 
 ### A seção atual, e um mecanismo que nunca existiu
 
