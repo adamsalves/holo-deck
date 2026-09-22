@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
+import { DEFAULT_LOCALE, LOCALES, pathInLocale } from './app/utils/locales.ts'
 import { GYM_COUNT } from './shared/types/brand.ts'
 
 /**
@@ -24,6 +25,29 @@ function resolveGitSha(): string {
   catch {
     return 'unknown'
   }
+}
+
+/**
+ * The site's own origin, for the links the i18n module writes into every head —
+ * `hreflang`, `canonical` and `og:url`.
+ *
+ * **Production's, on every deploy, previews included.** Vercel sets
+ * `VERCEL_PROJECT_PRODUCTION_URL` on preview builds too, and that is the point
+ * of reading it: a preview is a copy of the site under a throwaway host, and its
+ * canonical should name the page it copies. The variable carries no scheme, so
+ * the `https://` is added here. The fallback is the same origin written out, for
+ * every build that is not Vercel's — CI, `yarn build` on a laptop.
+ *
+ * **It is not the request's origin, on purpose.** Every page is prerendered, so
+ * the request is the prerenderer's own `localhost` — an origin baked into 2.104
+ * files that nobody outside the build machine can open. The module's fallback
+ * without a `baseUrl` is worse: relative links, which Google ignores in an
+ * `hreflang` annotation, and one warning per page (issue #39).
+ */
+function resolveSiteUrl(): string {
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL
+
+  return host ? `https://${host}` : 'https://holo-deck.vercel.app'
 }
 
 export default defineNuxtConfig({
@@ -135,12 +159,25 @@ export default defineNuxtConfig({
        * porque a sessão não existe no servidor: o rastreador não o vê. Sem esta
        * linha, a única tela estática do jogo que renderiza a cada pedido seria
        * justamente a que mais gente abre sem ter nada no `localStorage`.
+       *
+       * **The gyms are listed in every language, and the other routes are not.**
+       * `@nuxtjs/i18n` adds the other-language twin of every listed route whose
+       * page has no parameter left in its path — `/login` gets `/en/login` for
+       * free. `/battle/:gymId` still has one, so the module adds nothing, and
+       * until this list named the nine `/en/battle/N` the build wrote them in
+       * Portuguese only: the English battle was served by the function, and
+       * `test/e2e/prerender-payload.spec.ts` carried them as its one exception.
+       * Built from `LOCALES`, so a third language gets its nine the day it is
+       * declared.
        */
       routes: [
         '/pokedex',
         '/league',
         '/login',
-        ...Array.from({ length: GYM_COUNT }, (_, index) => `/battle/${index + 1}`),
+        ...LOCALES.flatMap(({ code }) => Array.from(
+          { length: GYM_COUNT },
+          (_, index) => pathInLocale(`/battle/${index + 1}`, code),
+        )),
       ],
     },
 
@@ -216,14 +253,15 @@ export default defineNuxtConfig({
    * O módulo também passa a ser o dono do atributo `lang` do `<html>` e das
    * tags `hreflang` — ver a nota em `app.head.htmlAttrs` acima.
    *
-   * `language` é a etiqueta BCP 47 que vai para o `lang` e para o `hreflang`, e
-   * não é redundante com `code`: `code` é a chave interna que nomeia o arquivo e
-   * o prefixo da rota, e os dois divergem no inglês (`en` contra `en-US`).
+   * The languages themselves come from `app/utils/locales.ts`, and the file of
+   * each one is named after its code — see that module for why the list left
+   * this file.
    */
   i18n: {
     strategy: 'prefix_except_default',
-    defaultLocale: 'pt-BR',
+    defaultLocale: DEFAULT_LOCALE,
     langDir: 'locales',
+    baseUrl: resolveSiteUrl(),
 
     /**
      * **Desligada, e isto conserta um defeito medido.**
@@ -245,10 +283,7 @@ export default defineNuxtConfig({
      * cabeçalho do navegador contradiz as duas coisas.
      */
     detectBrowserLanguage: false,
-    locales: [
-      { code: 'pt-BR', language: 'pt-BR', name: 'Português', file: 'pt-BR.json' },
-      { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },
-    ],
+    locales: LOCALES.map(({ code, language }) => ({ code, language, file: `${code}.json` })),
   },
 
 })

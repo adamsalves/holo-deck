@@ -752,6 +752,7 @@
     },
     "prefs": {
       "title": "Preferences",
+      "languageTitle": "Language",
       "motionTitle": "Reduce motion",
       "motionNote": "Turns off the foil that follows the pointer and the pack flip. If your system already asks for less motion, the game obeys without this.",
       "motionOn": "on",
@@ -770,13 +771,11 @@
     },
     "held": {
       "title": "Not yet",
-      "note": "The board for this screen draws three more things, and none of them has data to draw on yet: {language}, {sound} and {offline} arrive with whatever supports them. They are absent on purpose — a switch that does nothing promises something the game does not do.",
-      "language": "language",
-      "sound": "sound",
+      "note": "The board for this screen draws one more thing, and it has no data to draw on yet: {offline} arrives with whatever supports it. It is absent on purpose — a switch that does nothing promises something the game does not do.",
       "offline": "download everything for offline"
     },
     "version": "v{app} · {sha} · save v{schema}",
-    "footAnimation": "Motion is a device preference and does not sync, on purpose.",
+    "footDevice": "Language and motion do not sync, on purpose — they are device preferences.",
     "footSyncs": "Collection, progress and deck sync.",
     "footSyncsNoAccount": "Collection, progress and deck sync — once there is an account.",
     "confirm": {

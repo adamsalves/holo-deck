@@ -9,8 +9,12 @@ import type { PreviousSummary } from '~~/shared/save/sync'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { initialsOf } from '~~/app/utils/initials'
+import { LOCALE_KEY } from '~~/app/utils/locale-preference'
+import type { LocaleCode } from '~~/app/utils/locales'
+import { LOCALES } from '~~/app/utils/locales'
 import { agoLabel } from '~~/app/utils/relative-time'
 import { composeSave, hydrateSave } from '~~/app/utils/save-document'
+import { browserStorage } from '~~/app/utils/save-driver'
 import { NoPreviousVersion, SaveConflict } from '~~/app/utils/save-remote'
 import { reasonKey } from '~~/app/utils/recovery-reason'
 import { syncLabel } from '~~/app/utils/sync-label'
@@ -27,11 +31,12 @@ import { useSync } from '~/composables/useSync'
  * conta e save do servidor*. Sem conta a tela continua sendo a do aparelho — o
  * título diz isso —, e as três coisas somem em vez de aparecer desligadas.
  *
- * O que continua segurado é o que não tem a peça que o sustenta: idioma pede
- * i18n, som pede áudio, e *baixar tudo para offline* pede PWA. Decidido em 05/09:
- * entra só o que tem dado, e o resto fica **nomeado** num painel *Ainda não* e
- * registrado no README. Inventar um zero desenha um progresso que ninguém pode
- * mover.
+ * What is still held back is what has nothing to stand on: *download
+ * everything for offline* needs the PWA of Phase 8's PR 5. Decided on 05/09:
+ * only what has data goes in, and the rest is **named** in a *Not yet* panel and
+ * in the README. Sound left that panel without arriving — the phase retired it
+ * on 12/09 and the board stopped drawing it in version 16 — and the language
+ * selector left it by arriving, in the first row of *Preferences*.
  */
 const collection = useCollectionStore()
 const progress = useProgressStore()
@@ -54,6 +59,25 @@ const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
 const { appVersion, gitSha } = useRuntimeConfig().public
 
 const { t, localeProperties } = useI18n()
+const switchLocalePath = useSwitchLocalePath()
+
+/**
+ * Records the language the player just chose, for the next visit to the root —
+ * see `LOCALE_KEY` for who reads it and why nobody else does.
+ *
+ * Called on the click and not on arrival: landing on `/en/settings` from a link
+ * is not a choice, and remembering it would turn every English link someone was
+ * sent into a preference they never made.
+ */
+function rememberLocale(code: LocaleCode): void {
+  try {
+    browserStorage()?.setItem(LOCALE_KEY, code)
+  }
+  catch {
+    // Quota, or storage blocked for this tab: the language still changes, since
+    // the selector is a link. Only the next visit to the root does not follow.
+  }
+}
 
 /**
  * *3 cartas*, and *1 carta* — the noun inflects, so the count picks the form.
@@ -766,6 +790,50 @@ useSeoMeta({
           </span>
         </div>
 
+        <!-- LANGUAGE — the board's first row, with no note.
+
+             A link per language and not a button: choosing one **is** going
+             to this page in it, and a link says so — it opens in a new tab
+             like any other, and a screen reader calls it what it is. Not to a
+             crawler, though: this panel is inside `<ClientOnly>`, and what
+             tells a search engine about the other language is the `hreflang`
+             of the head. The active one needs no state of its own — it links
+             to the page already open, so the router marks it
+             `aria-current="page"`, and the style follows that attribute.
+
+             The label is the code in capitals, which is what the board
+             prints; a code reads the same in every language, like `Kanto`, so
+             it is not a message. `lang` makes a screen reader say `EN` with an
+             English voice. Clicking records the choice for the root — see
+             `rememberLocale`. -->
+        <div class="settings__row">
+          <div>
+            <p
+              id="settings-language"
+              class="settings__row-title"
+            >
+              {{ t('settings.prefs.languageTitle') }}
+            </p>
+          </div>
+          <div
+            role="group"
+            aria-labelledby="settings-language"
+            class="settings__segmented"
+          >
+            <NuxtLink
+              v-for="option in LOCALES"
+              :key="option.code"
+              :to="switchLocalePath(option.code)"
+              :hreflang="option.language"
+              :lang="option.language"
+              class="numeric settings__segment"
+              @click="rememberLocale(option.code)"
+            >
+              {{ option.code.toUpperCase() }}
+            </NuxtLink>
+          </div>
+        </div>
+
         <div class="settings__row">
           <div>
             <p class="settings__row-title">
@@ -874,12 +942,6 @@ useSeoMeta({
           scope="global"
           tag="span"
         >
-          <template #language>
-            <b>{{ t('settings.held.language') }}</b>
-          </template>
-          <template #sound>
-            <b>{{ t('settings.held.sound') }}</b>
-          </template>
           <template #offline>
             <b>{{ t('settings.held.offline') }}</b>
           </template>
@@ -892,7 +954,7 @@ useSeoMeta({
     </p>
 
     <p class="numeric settings__foot">
-      {{ t('settings.footAnimation') }}
+      {{ t('settings.footDevice') }}
       <!-- Two whole sentences and not one with a tail: the em-dash clause is
            glued to the end in Portuguese, and English wants the whole sentence
            rewritten around *once there is an account*. -->
@@ -1175,6 +1237,49 @@ useSeoMeta({
 
 .settings__action:focus-visible,
 .settings__action:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/**
+ * The language selector, as the board draws it: two segments in mono 11/700,
+ * `7px 13px`, six apart, the active one filled.
+ *
+ * The board's colours are the tokens they already are elsewhere: `#4FA8FF` is
+ * `--accent`, the `#0B0D14` written on it is `--bg` (the motion switch's knob
+ * on accent), `#252B42` is `--border`. The inactive label is `--text-muted` and
+ * not the board's `#5C6484`, which fails AA as text — 3.34:1, see the note on
+ * the four text levels in `main.css`. The 2px corner is `--radius`, which
+ * Phase 2 normalized the board's `2px`/`3px` into.
+ */
+.settings__segmented {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.settings__segment {
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.settings__segment:hover {
+  color: var(--text-body);
+}
+
+.settings__segment[aria-current='page'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.settings__segment:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }

@@ -2,7 +2,6 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
-import { GYM_COUNT } from '../../shared/types/brand.ts'
 import { defaultLocale, localeCodes } from '../support/locales.ts'
 
 /**
@@ -146,47 +145,6 @@ test('o dado pré-renderizado é JSON, e a mesma chave vale o mesmo em toda pág
 })
 
 /**
- * Every route the build writes in the default language, it also writes in the
- * other one — or the gap is named here.
- *
- * **This is the half of issue #37 that no browser can take.** The links are what
- * the crawler follows, so a screen whose `NuxtLink` still carries a literal path
- * does not fail a rendered assertion — it fails to **produce pages**, silently,
- * and `/en/pokemon/charizard` goes on being served by the function while every
- * gate stays green. Before the Pokédex screens were translated the crawler
- * stopped after nine `/en` pages, and the only symptom was a number nobody was
- * asserting.
- *
- * It enumerates who is OUT. The nine `/en/battle/N` are the whole exception, and
- * they are not a crawler failure: the League body is a `<ClientOnly>`, so the
- * links to `/battle/N` exist in no served HTML, and the pt-BR ones are only
- * prerendered because `nitro.prerender.routes` lists them by hand.
- *
- * **Being on that list by hand is not what keeps them out of `/en`** — `/login`
- * and `/league` sit in the same list with no prefix and get `/en` twins anyway,
- * and nothing served links to `/en/login` at all. What emits the twins is
- * `@nuxtjs/i18n`, which hooks `prerender:routes` and adds one route per locale
- * for every **page whose path has no parameter left** in it
- * (`collectCompactPrerenderRoutes`, guarded by `remainingParamRE = /:[A-Z_]/i`).
- * `/battle/:gymId` still carries one, so the module emits nothing for it and the
- * hand-written list — which spells nine concrete paths, in one language — is all
- * there is. Measured against this build, not read off the config.
- *
- * The fix is the same either way: whoever adds the locale prefix to those nine
- * deletes this exception. The mechanism matters because the other reading —
- * "a route listed by hand only comes out in one language" — is a general rule,
- * and it is false. Until then the `nuxt.config.ts` docblock that promises "every
- * valid route is prerendered" is true for 1.043 routes out of 1.052.
- *
- * Built from `GYM_COUNT`, so a tenth gym is exempt the day it is written and a
- * gym removed stops being forgiven.
- */
-const ROUTES_ONLY_IN_DEFAULT: readonly string[] = Array.from(
-  { length: GYM_COUNT },
-  (_, index) => `/battle/${index + 1}`,
-)
-
-/**
  * Every route the build wrote, as a path with no locale prefix, by locale.
  *
  * The locale **root** is the case worth spelling out: `/en` is the home page of
@@ -214,7 +172,35 @@ async function routesByLocale(): Promise<Map<string, Set<string>>> {
   return byLocale
 }
 
-test('every prerendered route exists in each language, or is written down as an exception', async () => {
+/**
+ * Every route the build writes in the default language, it also writes in the
+ * other one — with no exception left.
+ *
+ * **This is the half of issue #37 that no browser can take.** The links are what
+ * the crawler follows, so a screen whose `NuxtLink` still carries a literal path
+ * does not fail a rendered assertion — it fails to **produce pages**, silently,
+ * and `/en/pokemon/charizard` goes on being served by the function while every
+ * gate stays green. Before the Pokédex screens were translated the crawler
+ * stopped after nine `/en` pages, and the only symptom was a number nobody was
+ * asserting.
+ *
+ * **The nine `/en/battle/N` were the one exception, and it was deleted rather
+ * than kept empty.** They were not a crawler failure: the League body is a
+ * `<ClientOnly>`, so the links to `/battle/N` exist in no served HTML, and the
+ * pt-BR nine were prerendered only because `nitro.prerender.routes` listed them
+ * by hand. Being on that list is not what kept them out of `/en` — `/login` and
+ * `/league` sit on the same list and get `/en` twins, emitted by `@nuxtjs/i18n`
+ * for every **page whose path has no parameter left** in it
+ * (`collectCompactPrerenderRoutes`). `/battle/:gymId` still carries one, so the
+ * module emitted nothing for it. The config now spells the nine in every
+ * language, built from the language list, and the build went from 2.095 pages
+ * to 2.104 — 1.052 in each language.
+ *
+ * With the list gone, a route the build writes in one language only is a
+ * failure here, named, whatever the reason. The day one genuinely has to be,
+ * the argument belongs in the review that brings the list back.
+ */
+test('every prerendered route exists in each language', async () => {
   const byLocale = await routesByLocale()
   const base = byLocale.get(defaultLocale()) ?? new Set<string>()
 
@@ -228,17 +214,7 @@ test('every prerendered route exists in each language, or is written down as an 
 
     const missing = [...base].filter(route => !routes.has(route)).sort()
 
-    expect(
-      missing.filter(route => !ROUTES_ONLY_IN_DEFAULT.includes(route)),
-      `the prerender never reached these routes in ${code}`,
-    ).toEqual([])
-
-    // And the other side: an exception that stopped applying leaves the list,
-    // or it outlives the route it forgave and hides the next one.
-    expect(
-      ROUTES_ONLY_IN_DEFAULT.filter(route => routes.has(route)),
-      `these routes already exist in ${code} and need no exception`,
-    ).toEqual([])
+    expect(missing, `the prerender never reached these routes in ${code}`).toEqual([])
 
     // No route only in `/en`: a prefix leaking into the path itself
     // (`/en/en/deck`) would show up here, and nowhere above.
