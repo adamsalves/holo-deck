@@ -31,6 +31,14 @@ import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/so
  * link genuinely must not carry the locale, the argument belongs in the review
  * that brings the list back.
  *
+ * **One link leaves the language on purpose, and it is not an exception to the
+ * rule — it is a second rule.** The language selector links the page the player
+ * is on to the same page in every other language (`switchLocalePath`). That link
+ * is localized by the module, into the language it names; used anywhere else
+ * it is the very defect above, a way out of the player's language. So a switch
+ * is its own class, and the class has an address: `LANGUAGE_SELECTORS`, the one
+ * place the board draws the selector.
+ *
  * Disk does not reach the screen, so this is half of the measurement.
  * `test/e2e/collection.spec.ts` walks `/en` and reads the rendered `href`.
  */
@@ -125,6 +133,31 @@ function isLocalized(link: Link): boolean {
   return link.tag === 'NuxtLinkLocale' || /\blocalePath\s*\(/.test(link.to)
 }
 
+/**
+ * Whether the link goes to this page in another language — `switchLocalePath`.
+ *
+ * `isLocalized` does not forgive it — its pattern is a lower-case `localePath`
+ * starting a word, and here it is capitalised, mid-word — and that is kept on
+ * purpose. A switch is right in exactly one place and wrong everywhere else — a
+ * `switchLocalePath('pt-BR')` used as a way home drops the player into
+ * Portuguese as surely as `to="/"` — so it is asked separately, and where it is
+ * written is asked too.
+ */
+function isLanguageSwitch(link: Link): boolean {
+  return /\bswitchLocalePath\s*\(/.test(link.to)
+}
+
+/**
+ * Where the language selector lives: *Settings*, the first row of
+ * *Preferences*, which is where the board draws it.
+ *
+ * Written by hand because it is a decision and not a derivation. The day a
+ * second place switches language, the argument belongs in its review, and this
+ * list is where it has to be made. The test that reads it also fails when an
+ * entry stops holding a switch, so it cannot outlive the selector it names.
+ */
+const LANGUAGE_SELECTORS: readonly string[] = ['app/pages/settings.vue']
+
 /** Every link in one file's source, comments erased. */
 function linksIn(file: string, source: string): Link[] {
   return [...stripComments(source).matchAll(LINK_TAG)].flatMap((match) => {
@@ -165,10 +198,12 @@ describe('locale link gate', () => {
   /**
    * The reader sees all three shapes, and tells them from a localized link.
    *
-   * These four samples are the proof by reintroduction, kept as input instead of
-   * as an edit to a real screen: a `grep` for `to="/[a-z/-]*"` finds the first
-   * one and misses the other two, which is how a gate written from the obvious
-   * shape would have passed with five of the seven links still broken.
+   * These samples are the proof by reintroduction, kept as input instead of as
+   * an edit to a real screen: a `grep` for `to="/[a-z/-]*"` finds the first one
+   * and misses the other two, which is how a gate written from the obvious
+   * shape would have passed with five of the seven links still broken. The last
+   * one is the language switch, which neither side may swallow: not forgiven as
+   * localized, and not reported as a link that drops the language.
    */
   it('reads a static path, a query, a template literal — and a localized link', () => {
     const source = [
@@ -177,6 +212,7 @@ describe('locale link gate', () => {
       '<NuxtLink :to="`/battle/${gym}`">c</NuxtLink>',
       '<NuxtLink :to="localePath(\'/deck\')">d</NuxtLink>',
       '<NuxtLinkLocale to="/rules">e</NuxtLinkLocale>',
+      '<NuxtLink :to="switchLocalePath(option.code)">f</NuxtLink>',
     ].join('\n')
 
     const links = linksIn('sample.vue', source)
@@ -187,11 +223,16 @@ describe('locale link gate', () => {
       '`/battle/${gym}`',
       'localePath(\'/deck\')',
       '/rules',
+      'switchLocalePath(option.code)',
     ])
     expect(links.filter(link => !isLocalized(link)).map(link => link.to)).toEqual([
       '/packs',
       '/packs?open=daily',
       '`/battle/${gym}`',
+      'switchLocalePath(option.code)',
+    ])
+    expect(links.filter(isLanguageSwitch).map(link => link.to)).toEqual([
+      'switchLocalePath(option.code)',
     ])
   })
 
@@ -254,8 +295,8 @@ describe('locale link gate', () => {
    * `isLocalized` turns every real link into an offender and the assertion below
    * names all of them. **Broken to always-true it used to be caught by every
    * exception ceasing to match, and with no exceptions left that half fell to
-   * the samples:** the first test of this file asks for exactly three
-   * non-localized links out of five, so an `isLocalized` that forgives
+   * the samples:** the first test of this file asks for exactly four
+   * non-localized links out of six, so an `isLocalized` that forgives
    * everything returns none and fails there. A count of localized links here
    * would only have been a weaker copy of that.
    */
@@ -272,9 +313,26 @@ describe('locale link gate', () => {
   })
 
   it('every link carries the locale', () => {
-    const offenders = allLinks().filter(link => !isLocalized(link)).map(nameOf)
+    const offenders = allLinks()
+      .filter(link => !isLocalized(link) && !isLanguageSwitch(link))
+      .map(nameOf)
 
     expect([...new Set(offenders)].sort(), 'these links drop the player back into the default locale')
       .toEqual([])
+  })
+
+  /**
+   * And the links that change it live where the selector is — both ways.
+   *
+   * A set and not "no switch outside the list": a selector that stopped
+   * switching, or moved to a component, would leave its entry naming a file
+   * with nothing in it, and the next switch written there would be forgiven
+   * without anyone having decided it.
+   */
+  it('and only the language selector changes it', () => {
+    const switching = new Set(allLinks().filter(isLanguageSwitch).map(link => link.file))
+
+    expect([...switching].sort(), 'these files switch the player\'s language, and only the selector may')
+      .toEqual([...LANGUAGE_SELECTORS].sort())
   })
 })
