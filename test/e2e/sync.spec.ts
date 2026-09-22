@@ -313,9 +313,18 @@ for (const code of localeCodes()) {
     await expect(choice.getByRole('heading', { level: 2 })).toHaveText(label('save.choice.title', code))
     await expect(choice.locator('.choice__side--account .choice__mini')).toHaveCount(3)
 
+    // Each column is found by the name a screen reader announces for it. That
+    // name is an attribute, and no sweep reads attributes: `screenText` walks
+    // text nodes, so a column labelled in the wrong language would pass it.
+    const [local, remote] = [
+      choice.getByRole('region', { name: label('save.choice.local.region', code), exact: true }),
+      choice.getByRole('region', { name: label('save.choice.remote.region', code), exact: true }),
+    ]
+    await expect(local, `the device column is not named in ${code}`).toBeVisible()
+    await expect(remote, `the account column is not named in ${code}`).toBeVisible()
+
     // The units inflect with the count each column shows: two cards and one
     // badge here, three cards and four badges on the account side.
-    const [local, remote] = [choice.locator('.choice__side').first(), choice.locator('.choice__side--account')]
     await expect(local.locator('.choice__numbers .choice__unit')).toHaveText([
       message('save.choice.cards', code, {}, 2),
       message('save.choice.badges', code, {}, 1),
@@ -353,34 +362,51 @@ for (const code of localeCodes()) {
  * together. What tells them apart is that the URLs have to disagree. The
  * account side is the one read, because its instant comes from the fake server
  * and is always there; the device side can legitimately say it does not know.
+ *
+ * **And once with the browser in each language**, because the browser's
+ * language is an input here. A locale that loses its `language` sends `stamp()`
+ * to the browser's own format, and the two URLs still disagree whenever the
+ * browser speaks the language that lost it: a browser in pt-BR hides a pt-BR
+ * without `language`, a browser in English hides an `en` without it. With no
+ * `locale` set, the runner opens every page in en-US — Playwright's fixtures
+ * default it — so this test used to pass over an `en` without `language`,
+ * measured by planting one. Each run below catches the other language's
+ * fallback, and both catch a hard-coded tag and a `stamp()` that stopped
+ * passing any.
  */
-test('the choice stamps the server copy in the date format of the URL', async ({ page }) => {
-  const codes = localeCodes()
-  expect(codes.length).toBeGreaterThan(1)
+for (const browserLocale of localeCodes()) {
+  test.describe(`with the browser in ${browserLocale}`, () => {
+    test.use({ locale: browserLocale })
 
-  const stamps: string[] = []
+    test('the choice stamps the server copy in the date format of the URL', async ({ page }) => {
+      const codes = localeCodes()
+      expect(codes.length).toBeGreaterThan(1)
 
-  for (const code of codes) {
-    await fakeSync(page, REMOTE)
-    await seedLocalSave(page, LOCAL)
-    await page.goto(localeUrl('/', code))
+      const stamps: string[] = []
 
-    const when = page.locator('.choice__side--account .choice__facts dd').first()
-    await expect(when, `no server stamp in ${code}`).toBeVisible()
+      for (const code of codes) {
+        await fakeSync(page, REMOTE)
+        await seedLocalSave(page, LOCAL)
+        await page.goto(localeUrl('/', code))
 
-    const stamp = ((await when.textContent()) ?? '').trim()
+        const when = page.locator('.choice__side--account .choice__facts dd').first()
+        await expect(when, `no server stamp in ${code}`).toBeVisible()
 
-    // The other side: an empty or placeholder stamp would make every language
-    // agree, and the assertion below would call that a pass.
-    expect(stamp, `the server copy in ${code} is stamped with nothing`).not.toMatch(/^(—)?$/)
-    stamps.push(stamp)
-  }
+        const stamp = ((await when.textContent()) ?? '').trim()
 
-  expect(
-    new Set(stamps).size,
-    `the server copy reads ${stamps.join(' and ')} — the same in every language`,
-  ).toBeGreaterThan(1)
-})
+        // The other side: an empty or placeholder stamp would make every language
+        // agree, and the assertion below would call that a pass.
+        expect(stamp, `the server copy in ${code} is stamped with nothing`).not.toMatch(/^(—)?$/)
+        stamps.push(stamp)
+      }
+
+      expect(
+        new Set(stamps).size,
+        `the server copy reads ${stamps.join(' and ')} — the same in every language`,
+      ).toBeGreaterThan(1)
+    })
+  })
+}
 
 /**
  * The sign-in screen in the language of the URL, and its way out stays in it.

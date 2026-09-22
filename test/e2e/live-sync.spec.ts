@@ -57,7 +57,8 @@ async function syncedDevice(page: Page): Promise<FakeSync> {
 }
 
 /**
- * Abre o deck e espera o boot ter lido o servidor — o sync contínuo de pé.
+ * Opens the deck and waits for the boot to have read the server — the
+ * continuous sync up and running.
  *
  * The locale is a parameter so the conflict notice can be driven from inside
  * each language; the other callers keep the default one.
@@ -137,26 +138,33 @@ for (const code of localeCodes()) {
     const sync = await syncedDevice(page)
     await openDeck(page, sync, code)
 
-    // O outro aparelho grava no meio da sessão — depois do boot, antes da jogada.
+    // The other device writes mid-session — after the boot, before the move.
     sync.elsewhere(OTHER)
-    await pickCard(page)
 
-    // O primeiro `PUT` colide (base 1, servidor na 2) e o segundo vence (base 2).
+    // Two cards inside one idle window, so the one `PUT` carries two changes. A
+    // count that never reached `t()` renders the singular sentence, and at one
+    // change the right call and the broken one would agree. The second pick is
+    // a plain click: `pickCard` already waited for hydration.
+    await pickCard(page)
+    await page.locator('.deck__pick').first().click()
+    await expect(page.locator('.deck-slot--empty')).toHaveCount(4)
+
+    // The first `PUT` collides (base 1, server at 2) and the second wins (base 2).
     await expect.poll(() => sync.puts.length, { timeout: 12_000 }).toBe(2)
     expect(sync.puts.map(put => put.baseVersion)).toEqual([1, 2])
-    expect(JSON.stringify(sync.current()?.data), 'o local venceu').toContain('"dust":100')
+    expect(JSON.stringify(sync.current()?.data), 'this device won').toContain('"dust":100')
 
-    // Nada foi destruído: o que o outro aparelho gravou está no anel deste.
+    // Nothing was destroyed: what the other device wrote is in this one's ring.
     const saved = await backups(page)
     expect(saved.some(raw => raw.includes('"dust":777'))).toBe(true)
 
-    // O aviso, com a porta que devolve a cópia do outro aparelho nomeada nele — e
-    // um botão só, porque não há o que decidir. One card was picked, so one
-    // change won: the singular sentence, which in Portuguese is a different verb
-    // and article and not only a different number.
+    // The notice names the door that gives the other device's copy back, and has
+    // a single button, because there is nothing to decide. Two changes won: the
+    // plural sentence, which in Portuguese is a different verb and article and
+    // not only a different number.
     const notice = page.locator('.conflict')
     await expect(notice).toContainText(label('conflict.title', code))
-    await expect(notice).toContainText(message('conflict.won', code, { count: 1 }, 1))
+    await expect(notice).toContainText(message('conflict.won', code, { count: 2 }, 2))
     await expect(notice).toContainText(message('conflict.kept', code, {
       path: `${label('nav.settings', code)} → ${label('settings.backups.title', code)}`,
     }))

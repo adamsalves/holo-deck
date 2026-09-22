@@ -27,6 +27,18 @@ const WINNER = saveWith({
   progress: { pity: 0, welcomeClaimed: 3, coins: 300, badges: 1, dailyClaimed: null },
 })
 
+/**
+ * No badge, and a single card that is legendary.
+ *
+ * It is the invite at the end of a pack that brought ultra or above, which can
+ * come before any gym — and the Hub offers it to this save too: `index.vue`
+ * asks for a badge **or** a top-tier card. Mewtwo is legendary in the dex.
+ */
+const LEGENDARY_ONLY = saveWith({
+  collection: { 150: { c: 1, s: 0 } },
+  progress: { pity: 0, welcomeClaimed: 3, coins: 300, badges: 0, dailyClaimed: null },
+})
+
 /** Sem sessão, de propósito e sem depender do servidor de verdade. */
 async function anonymous(page: Page): Promise<void> {
   await page.route('**/api/auth/get-session', async (route) => {
@@ -115,7 +127,8 @@ test('Escape recusa, como o Agora não', async ({ page }) => {
  * only sees the labels a translator wrote plainly — the lede and the footnote
  * interpolate, and the units are plural — so those are asserted as the sentence
  * this locale renders. The units carry the plural rule too: three cards and one
- * badge, the two forms side by side.
+ * badge. One is also what a count that never reached `t()` renders, so the
+ * badge's plural is held by the test below, at zero.
  */
 for (const code of localeCodes()) {
   test(`the invite speaks ${code}, and CREATE ACCOUNT stays in ${code}`, async ({ page }) => {
@@ -153,6 +166,31 @@ for (const code of localeCodes()) {
     await expect(page).toHaveURL(pathPattern(localeUrl('/login', code)))
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(label('login.title', code))
     await expect(invite(page, code)).toHaveCount(0)
+  })
+}
+
+/**
+ * The units at counts where a lost count shows.
+ *
+ * A plural message rendered without its count falls to the singular — vue-i18n
+ * reads the missing count as -1 and takes its absolute value — so a unit
+ * asserted at 1 agrees with a call that never passed one. The test above holds
+ * the badge at 1; this one holds it at 0, the invite of a player with no gym
+ * yet, and renders the card's singular, which the test above never does.
+ */
+for (const code of localeCodes()) {
+  test(`the invite's units follow the count in ${code}: one card, no badges`, async ({ page }) => {
+    await anonymous(page)
+    await seedLocalSave(page, LEGENDARY_ONLY)
+    await page.goto(localeUrl('/', code))
+
+    const dialog = invite(page, code)
+    await expect(dialog, `no invite in ${code}`).toBeVisible()
+    await expect(dialog.locator('.invite__unit')).toHaveText([
+      message('invite.stakes.cards', code, {}, 1),
+      label('invite.stakes.shiny', code),
+      message('invite.stakes.badges', code, {}, 0),
+    ])
   })
 }
 
