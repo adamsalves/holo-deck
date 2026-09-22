@@ -165,7 +165,7 @@ function dismiss(): void {
           </p>
         </div>
 
-        <!-- `h2` e não `h1`: a página por baixo continua montada com o dela.
+        <!-- `h2` and not `h1`: the page underneath stays mounted with its own.
              The line break belongs to the translator: it is a newline inside the
              message, drawn by `white-space: pre-line`. A `<br>` in the template
              would split the title into two messages, and every language would

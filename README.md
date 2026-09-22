@@ -525,7 +525,8 @@ e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situaç�
 A Fase 8 leva o jogo para dois idiomas em oito PRs, uma fatia vertical por PR.
 Entre o primeiro e o último, `/en` mostrou telas **meio traduzidas** — estado
 conhecido e datado, nunca defeito solto. **Com o 4d-1, tudo que o jogador lê fala
-os dois idiomas, com uma exceção nomeada abaixo — a página de erro**: a barra global, o painel de conta, o pular-para-o-conteúdo, o
+os dois idiomas, com duas exceções nomeadas abaixo — o separador dos números e a
+página de erro**: a barra global, o painel de conta, o pular-para-o-conteúdo, o
 **vocabulário do jogo** (as 6 raridades, os 18 tipos, as 6 siglas de stat e os 9
 habitats), o Hub, `/packs`, `/collection`, `/deck`, `/league`, `/battle/N`, o
 **Detalhe** de espécie, as duas telas da **Pokédex**, `/rules`, `/settings` e
@@ -543,9 +544,9 @@ monta quatro coisas fora do layout — o aviso de save recuperado, `SaveChoice`,
 `SyncConflictNotice` e `AccountInvite` —, e elas desenham sobre **qualquer** rota.
 O primeiro entrou com `/settings`; os outros três seguiram em português até o
 4d-1, porque não são telas e não estavam no corte de nenhum PR: a medição por
-tela não os via. Dois deles carregavam o mesmo defeito que `backupLabel` tinha em
-Ajustes — as datas do `SaveChoice` formatadas com `'pt-BR'` cravado, o que em
-`/en` escreve nove de maio no lugar de cinco de setembro.
+tela não os via. Um deles carregava, duas vezes, o mesmo defeito que `backupLabel`
+tinha em Ajustes — as duas datas do `SaveChoice` formatadas com `'pt-BR'`
+cravado, o que em `/en` escreve nove de maio no lugar de cinco de setembro.
 
 O que ainda sai em português dentro de `/en`:
 
@@ -555,12 +556,16 @@ O que ainda sai em português dentro de `/en`:
 
 **A página de erro fica fora da frase de cima, e não por ser tradução pendente.**
 Rota inválida renderiza a página **padrão do Nuxt**, porque `app/error.vue` não
-existe: a mensagem sai traduzida — o Detalhe lança `createError` com a frase do
-locale —, mas *Go back home* e o `| Nuxt` do título ficam em inglês nos dois
-idiomas, o `<html>` sai **sem `lang`** (ela substitui o `app.vue`, que é quem o
-escreve), e o link de volta é `href="/"`, que de dentro de `/en` leva ao Hub em
-português. O canvas não desenha página de erro, então ela ganha prancha antes de
-virar código: [issue #63](https://github.com/adamsalves/holo-deck/issues/63).
+existe. A mensagem só sai traduzida quando é a espécie ou a região que não existe
+— o Detalhe e a Pokédex lançam `createError` com a frase do locale. Rota sem
+página nenhuma (`/en/qualquer-coisa`) cai no *Page not found* do roteador do
+Nuxt, em inglês nos dois idiomas; e quando o guarda do dex reprova, a frase dele,
+escrita em português em `useDex.ts`, passa na frente da tradução nessas mesmas
+duas telas. Em todos os casos, *Go back home* e o `| Nuxt` do título ficam em
+inglês nos dois idiomas, o `<html>` sai **sem `lang`** (ela substitui o `app.vue`,
+que é quem o escreve), e o link de volta é `href="/"`, que de dentro de `/en` leva
+ao Hub em português. O canvas não desenha página de erro, então ela ganha prancha
+antes de virar código: [issue #63](https://github.com/adamsalves/holo-deck/issues/63).
 
 **Sobra o número, e ele fica.** `/rules` é a tela mais densa em número do jogo e
 entrou traduzida com `4,5%` e `×0,5`; `/settings` estampa `20,6 KB`. Enquanto as
