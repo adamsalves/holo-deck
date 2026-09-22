@@ -441,6 +441,21 @@ export function screenText(scope: Locator): Promise<string> {
   })
 }
 
+/**
+ * A URL whose path is exactly `path`, on whatever origin the suite runs against.
+ *
+ * Anchored at both ends on purpose. `/login$` alone also matches `/en/login`, so
+ * asserting the default locale's destination that way passes on the very defect
+ * it is there to catch — a link that kept the wrong prefix. The first draft of
+ * the sign-in test did exactly that for the Hub, where `/?$` matches every URL
+ * there is.
+ */
+export function pathPattern(path: string): RegExp {
+  const escaped = path.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  return new RegExp(`^https?://[^/]+${escaped}$`)
+}
+
 /** O texto de cada cópia de segurança deste navegador. */
 export function backups(page: Page): Promise<string[]> {
   return page.evaluate(() => Object.keys(window.localStorage)

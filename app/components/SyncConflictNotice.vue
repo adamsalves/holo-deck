@@ -22,12 +22,20 @@ import { useSync } from '~/composables/useSync'
  * região precisa estar no documento antes de o conteúdo chegar.
  */
 const { conflict, dismiss } = useSync()
+const { t } = useI18n()
 
+/**
+ * How many local changes won, as a sentence.
+ *
+ * The count travels twice, as in `syncLabel`: once to fill `{count}` and once to
+ * pick the form. The two forms are whole sentences and not one sentence with a
+ * number swapped in — Portuguese inflects the verb and the article with the
+ * count (*A mudança … venceu* against *As 3 mudanças … venceram*), which a
+ * placeholder alone cannot carry.
+ */
 const lede = computed(() => {
   const won = conflict.value?.won ?? 0
-  return won === 1
-    ? 'A mudança deste aparelho venceu e já subiu.'
-    : `As ${won} mudanças deste aparelho venceram e já subiram.`
+  return t('conflict.won', { count: won }, won)
 })
 </script>
 
@@ -41,18 +49,29 @@ const lede = computed(() => {
       class="conflict bevel-tile"
     >
       <p class="conflict__title">
-        Outro aparelho gravou antes
+        {{ t('conflict.title') }}
       </p>
+      <!-- The panel is named from its own labels — the gear's name and the
+           backups panel's title — so the notice cannot promise a door that the
+           screen calls something else. -->
       <p class="conflict__text">
-        {{ lede }} O que o outro aparelho gravou está guardado em
-        <strong>Ajustes → Cópias de segurança</strong>.
+        {{ lede }}
+        <i18n-t
+          keypath="conflict.kept"
+          scope="global"
+          tag="span"
+        >
+          <template #path>
+            <strong>{{ t('nav.settings') }} → {{ t('settings.backups.title') }}</strong>
+          </template>
+        </i18n-t>
       </p>
       <button
         type="button"
         class="conflict__ok bevel-control"
         @click="dismiss()"
       >
-        ENTENDI
+        {{ t('conflict.dismiss') }}
       </button>
     </div>
   </div>

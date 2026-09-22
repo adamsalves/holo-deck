@@ -1,7 +1,16 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import {
+  defaultLocale,
+  foreignPhrases,
+  label,
+  localeCodes,
+  localeUrl,
+  message,
+  namespaceLabels,
+} from '../support/locales'
 import type { FakeSync } from './support'
-import { backups, fakeSync, localDust, saveWith, seedLocalSave, seedSynced } from './support'
+import { backups, fakeSync, localDust, saveWith, screenText, seedLocalSave, seedSynced } from './support'
 
 /**
  * O sync contínuo num navegador de verdade — depois do primeiro login.
@@ -47,9 +56,15 @@ async function syncedDevice(page: Page): Promise<FakeSync> {
   return sync
 }
 
-/** Abre o deck e espera o boot ter lido o servidor — o sync contínuo de pé. */
-async function openDeck(page: Page, sync: FakeSync): Promise<void> {
-  await page.goto('/deck')
+/**
+ * Opens the deck and waits for the boot to have read the server — the
+ * continuous sync up and running.
+ *
+ * The locale is a parameter so the conflict notice can be driven from inside
+ * each language; the other callers keep the default one.
+ */
+async function openDeck(page: Page, sync: FakeSync, code: string = defaultLocale()): Promise<void> {
+  await page.goto(localeUrl('/deck', code))
   await expect.poll(() => page.locator('.deck__pick').count()).toBeGreaterThan(0)
   await expect.poll(() => sync.gets(), 'o boot acertado lê o servidor').toBe(1)
 }
@@ -104,32 +119,65 @@ test('esconder a aba sobe na hora, sem esperar o ócio', async ({ page }) => {
   await expect.poll(() => sync.puts.length, { timeout: 2000 }).toBe(1)
 })
 
-test('outro aparelho gravou antes: o local vence e a cópia dele fica no backup', async ({ page }) => {
-  const sync = await syncedDevice(page)
-  await openDeck(page, sync)
+/**
+ * One test per locale, and the reason is the notice and not the sync: it is a
+ * boot-time surface that draws over any route, the one sentence of the sync
+ * that is not in the chip, and no per-screen measurement of this phase reached
+ * it. The sync half runs in both languages because the notice only exists at the
+ * end of it.
+ */
+for (const code of localeCodes()) {
+  test(`another device saved first: this one wins, the other copy is backed up, and the notice speaks ${code}`, async ({ page }) => {
+    const foreign = localeCodes()
+      .filter(other => other !== code)
+      .flatMap(other => namespaceLabels('conflict.', code, other))
 
-  // O outro aparelho grava no meio da sessão — depois do boot, antes da jogada.
-  sync.elsewhere(OTHER)
-  await pickCard(page)
+    // The other side of the subtraction: an empty list would sweep for nothing.
+    expect(foreign.length, `nothing foreign to look for against ${code}`).toBeGreaterThan(0)
 
-  // O primeiro `PUT` colide (base 1, servidor na 2) e o segundo vence (base 2).
-  await expect.poll(() => sync.puts.length, { timeout: 12_000 }).toBe(2)
-  expect(sync.puts.map(put => put.baseVersion)).toEqual([1, 2])
-  expect(JSON.stringify(sync.current()?.data), 'o local venceu').toContain('"dust":100')
+    const sync = await syncedDevice(page)
+    await openDeck(page, sync, code)
 
-  // Nada foi destruído: o que o outro aparelho gravou está no anel deste.
-  const saved = await backups(page)
-  expect(saved.some(raw => raw.includes('"dust":777'))).toBe(true)
+    // The other device writes mid-session — after the boot, before the move.
+    sync.elsewhere(OTHER)
 
-  // O aviso, com a porta que devolve a cópia do outro aparelho nomeada nele — e
-  // um botão só, porque não há o que decidir.
-  const notice = page.locator('.conflict')
-  await expect(notice).toContainText('Outro aparelho gravou antes')
-  await expect(notice).toContainText('Ajustes → Cópias de segurança')
+    // Two cards inside one idle window, so the one `PUT` carries two changes. A
+    // count that never reached `t()` renders the singular sentence, and at one
+    // change the right call and the broken one would agree. The second pick is
+    // a plain click: `pickCard` already waited for hydration.
+    await pickCard(page)
+    await page.locator('.deck__pick').first().click()
+    await expect(page.locator('.deck-slot--empty')).toHaveCount(4)
 
-  await notice.getByRole('button', { name: 'ENTENDI' }).click()
-  await expect(notice).toHaveCount(0)
-})
+    // The first `PUT` collides (base 1, server at 2) and the second wins (base 2).
+    await expect.poll(() => sync.puts.length, { timeout: 12_000 }).toBe(2)
+    expect(sync.puts.map(put => put.baseVersion)).toEqual([1, 2])
+    expect(JSON.stringify(sync.current()?.data), 'this device won').toContain('"dust":100')
+
+    // Nothing was destroyed: what the other device wrote is in this one's ring.
+    const saved = await backups(page)
+    expect(saved.some(raw => raw.includes('"dust":777'))).toBe(true)
+
+    // The notice names the door that gives the other device's copy back, and has
+    // a single button, because there is nothing to decide. Two changes won: the
+    // plural sentence, which in Portuguese is a different verb and article and
+    // not only a different number.
+    const notice = page.locator('.conflict')
+    await expect(notice).toContainText(label('conflict.title', code))
+    await expect(notice).toContainText(message('conflict.won', code, { count: 2 }, 2))
+    await expect(notice).toContainText(message('conflict.kept', code, {
+      path: `${label('nav.settings', code)} → ${label('settings.backups.title', code)}`,
+    }))
+
+    expect(
+      foreignPhrases(await screenText(notice), foreign),
+      `the conflict notice in ${code} wrote a sentence from another language`,
+    ).toEqual([])
+
+    await notice.getByRole('button', { name: label('conflict.dismiss', code) }).click()
+    await expect(notice).toHaveCount(0)
+  })
+}
 
 test('boot com outro aparelho à frente: o aparelho limpo adota o servidor', async ({ page }) => {
   const sync = await syncedDevice(page)

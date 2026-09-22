@@ -17,6 +17,7 @@ import { authClient } from '~/utils/auth-client'
  */
 
 const localePath = useLocalePath()
+const { t } = useI18n()
 
 const signingIn = ref(false)
 const failed = ref(false)
@@ -43,8 +44,8 @@ async function signIn(): Promise<void> {
 }
 
 useSeoMeta({
-  title: 'Entrar — Holo Deck',
-  description: 'A conta guarda a coleção fora deste navegador e sincroniza entre aparelhos. Jogar não exige conta.',
+  title: () => t('login.seo.title'),
+  description: () => t('login.seo.description'),
 })
 </script>
 
@@ -55,36 +56,35 @@ useSeoMeta({
         Holo Deck
       </p>
       <h1 class="login__title">
-        A conta guarda o que você juntou
+        {{ t('login.title') }}
       </h1>
       <p class="login__lede">
-        Sem ela o jogo funciona igual — só que a coleção vive apenas neste
-        navegador.
+        {{ t('login.lede') }}
       </p>
 
       <ul class="login__reasons">
         <li>
           <p class="login__reason-title">
-            Sobrevive à limpeza do navegador
+            {{ t('login.reasons.browser.title') }}
           </p>
           <p class="login__reason-note">
-            E aos 7 dias de inatividade que o Safari apaga.
+            {{ t('login.reasons.browser.note') }}
           </p>
         </li>
         <li>
           <p class="login__reason-title">
-            Mesma coleção em todo aparelho
+            {{ t('login.reasons.devices.title') }}
           </p>
           <p class="login__reason-note">
-            Abre o pack no celular, monta o deck no computador.
+            {{ t('login.reasons.devices.note') }}
           </p>
         </li>
         <li>
           <p class="login__reason-title">
-            O save continua seu
+            {{ t('login.reasons.export.title') }}
           </p>
           <p class="login__reason-note">
-            Exportável em JSON a qualquer momento, com ou sem conta.
+            {{ t('login.reasons.export.note') }}
           </p>
         </li>
       </ul>
@@ -92,10 +92,10 @@ useSeoMeta({
 
     <section class="login__panel">
       <p class="login__eyebrow">
-        Entrar
+        {{ t('login.panel.title') }}
       </p>
       <p class="login__panel-note">
-        Sem senha, sem formulário. Um clique.
+        {{ t('login.panel.note') }}
       </p>
 
       <button
@@ -115,11 +115,11 @@ useSeoMeta({
             d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.93.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"
           />
         </svg>
-        {{ signingIn ? 'ABRINDO O GITHUB…' : 'CONTINUAR COM GITHUB' }}
+        {{ signingIn ? t('login.github.opening') : t('login.github.action') }}
       </button>
 
       <p class="login__scope">
-        Pedimos só sua identidade — nenhum repositório, nenhum dado seu do GitHub.
+        {{ t('login.github.scope') }}
       </p>
 
       <p
@@ -127,20 +127,23 @@ useSeoMeta({
         class="login__failed"
         role="status"
       >
-        Não deu para abrir o GitHub agora. Tente de novo — o jogo continua
-        funcionando sem conta.
+        {{ t('login.github.failed') }}
       </p>
 
       <hr class="login__rule">
 
+      <!-- `localePath`, for the reason the callback above spells out: from
+           `/en/login` a literal `/` drops the player into the Portuguese Hub.
+           One of the last two links of issue #37; the other is the account
+           invite's. -->
       <NuxtLink
-        to="/"
+        :to="localePath('/')"
         class="login__skip bevel-control"
       >
-        CONTINUAR SEM CONTA
+        {{ t('login.skip.action') }}
       </NuxtLink>
       <p class="login__scope">
-        O jogo é o mesmo. A coleção fica só neste navegador.
+        {{ t('login.skip.note') }}
       </p>
     </section>
   </main>

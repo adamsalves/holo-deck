@@ -4,8 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
 
 /**
- * Every in-app link carries the language the player is in — or it is written
- * below as an exception.
+ * Every in-app link carries the language the player is in.
  *
  * **`NuxtLink` with a literal path is not localized by the module.** What
  * localizes is `localePath()` (or `<NuxtLinkLocale>`): with
@@ -22,11 +21,15 @@ import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/so
  * it exists. Two opposite methods inside one `describe` would hand the wrong
  * rule to whoever touches it next, so this lives in its own file.
  *
- * **It enumerates who is OUT.** A link added tomorrow is an offender by
- * omission. The exceptions are the links the following PRs of Phase 8 still own,
- * and they are asserted in both directions: an exception that stops matching
- * fails too, so the list can only shrink, and it empties at PR 4 — when the
- * language selector ships and issue #37 closes.
+ * **It enumerates who is OUT, and today nobody is.** A link added tomorrow is an
+ * offender by omission. Issue #37 was kept here as a list of exceptions, one per
+ * link a later PR of Phase 8 still owed, asserted in both directions so it could
+ * only shrink. It emptied with the last two — `/login` and the account invite,
+ * the two boot-time surfaces translated just before the language selector — and
+ * the list was **deleted, not kept empty**: an empty exception list with a test
+ * proving every entry still applies is an assertion about nothing. The day a
+ * link genuinely must not carry the locale, the argument belongs in the review
+ * that brings the list back.
  *
  * Disk does not reach the screen, so this is half of the measurement.
  * `test/e2e/collection.spec.ts` walks `/en` and reads the rendered `href`.
@@ -150,29 +153,13 @@ function allLinks(): Link[] {
   )
 }
 
-/** How an offender is named, in the exception list and in the failure message. */
+/**
+ * How an offender is named in the failure message — `file → destination`, never
+ * a line number, so the message says what to fix and not where it used to be.
+ */
 function nameOf(link: Link): string {
   return `${link.file} → ${link.to}`
 }
-
-/**
- * The links the following PRs of Phase 8 still own — issue #37.
- *
- * Written as `file → destination`, never as a line number: renumbering a file is
- * not a change of rule, and a list that broke on it would be edited without
- * being read.
- *
- * **Each PR that translates a screen empties its own entries**, and the
- * assertion that no exception is stale is what forces that. What this shape does
- * not catch is a *second* link to a destination already excepted in the same
- * file — `battle/[gymId].vue` reaches `/league` three times and is one entry.
- * The file is already on this list to be fixed, and the alternative, a line
- * number, ages against every edit.
- */
-const EXEMPT: readonly string[] = [
-  'app/components/AccountInvite.vue → NAV_ACCOUNT.to',
-  'app/pages/login.vue → /',
-]
 
 describe('locale link gate', () => {
   /**
@@ -262,11 +249,15 @@ describe('locale link gate', () => {
    * and the day one does, the gate should stop and let someone decide what it
    * means — the same shape as every other rule in this file.
    *
-   * There is no floor left on the localized side, and none is needed: both ways
-   * `isLocalized` can break are already caught two assertions below. Broken to
-   * always-false, the offender list gains thirteen names; broken to always-true,
-   * every exception stops matching. A number here would only have been a third,
-   * weaker copy of that.
+   * There is no floor on the localized side, and none is needed — but the reason
+   * moved when the exception list went away. Broken to always-false,
+   * `isLocalized` turns every real link into an offender and the assertion below
+   * names all of them. **Broken to always-true it used to be caught by every
+   * exception ceasing to match, and with no exceptions left that half fell to
+   * the samples:** the first test of this file asks for exactly three
+   * non-localized links out of five, so an `isLocalized` that forgives
+   * everything returns none and fails there. A count of localized links here
+   * would only have been a weaker copy of that.
    */
   it('reads every link tag on disk, and none of them truncated', () => {
     const openings = allTagOpenings()
@@ -280,22 +271,10 @@ describe('locale link gate', () => {
     expect(openings.filter(opening => !read.has(opening))).toEqual([])
   })
 
-  it('every link carries the locale, or is written as an exception', () => {
+  it('every link carries the locale', () => {
     const offenders = allLinks().filter(link => !isLocalized(link)).map(nameOf)
 
-    expect([...new Set(offenders)].filter(name => !EXEMPT.includes(name)).sort()).toEqual([])
-  })
-
-  /**
-   * And an exception that no longer applies is gone.
-   *
-   * This is the half that makes the list shrink instead of age: a screen fixed
-   * in a later PR fails here until its entry is deleted, and the list empties at
-   * PR 4 with issue #37.
-   */
-  it('and no exception outlives the link it forgives', () => {
-    const offenders = new Set(allLinks().filter(link => !isLocalized(link)).map(nameOf))
-
-    expect(EXEMPT.filter(name => !offenders.has(name))).toEqual([])
+    expect([...new Set(offenders)].sort(), 'these links drop the player back into the default locale')
+      .toEqual([])
   })
 })

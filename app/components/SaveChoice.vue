@@ -27,6 +27,7 @@ import type { SearchEntry } from '~~/shared/types/dex'
 
 const { pending, choose } = useFirstSync()
 const { loadIndex } = useDex()
+const { t, localeProperties } = useI18n()
 
 const index = ref<readonly SearchEntry[]>([])
 const applying = ref<ChoiceSide | null>(null)
@@ -83,19 +84,63 @@ const remote = computed(() =>
 /** A batalha em andamento é deste aparelho: a do servidor nunca sobe. */
 const hasBattle = computed(() => localSave.value?.battle != null)
 
+/**
+ * An instant in the date format of the route's language.
+ *
+ * **It was `'pt-BR'` written by hand, twice**, and inside `/en` a save from the
+ * fifth of September read `05/09/2026` — the ninth of May to an English reader.
+ * Not an odd-looking date, a wrong one, on the one screen where the player
+ * compares two collections by when each was last written. It is the defect
+ * `backupLabel` had in Settings, found again one component over.
+ *
+ * `localeProperties.language` and not `locale`, for the reason `backupLabel`
+ * gives: the first is the BCP-47 tag the config declares — `en-US`, not the `en`
+ * that names the route — and the same one `app.vue` writes into `<html lang>`.
+ * `Intl` reads the two alike today, so this is one source rather than two
+ * agreeing by luck.
+ */
+function stamp(at: string | number): string {
+  return new Date(at).toLocaleString(localeProperties.value.language, { dateStyle: 'short', timeStyle: 'short' })
+}
+
 const remoteWhen = computed(() => {
   const iso = pending.value?.remoteUpdatedAt
-  if (iso === undefined) return '—'
-
-  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  return iso === undefined ? '—' : stamp(iso)
 })
 
 const localWhen = computed(() => {
   const at = pending.value?.localAt
-  if (at === null || at === undefined) return 'não se sabe'
-
-  return new Date(at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  return at === null || at === undefined ? t('save.choice.unknownWhen') : stamp(at)
 })
+
+/**
+ * The two columns, each carrying the words that name it.
+ *
+ * A computed, and not the array the template used to spell inline: every label
+ * here is a direct `t('…')` call, which is the one shape `i18n-gate` can see. A
+ * key chosen through `side.key` would leave both translations looking orphaned,
+ * and the orphan assertion would ask for text that is on screen to be deleted.
+ */
+const sides = computed(() => [
+  {
+    key: 'local' as const,
+    title: t('save.choice.local.title'),
+    region: t('save.choice.local.region'),
+    whenLabel: t('save.choice.local.when'),
+    sum: local.value,
+    when: localWhen.value,
+    dust: localSave.value?.dust ?? 0,
+  },
+  {
+    key: 'remote' as const,
+    title: t('save.choice.remote.title'),
+    region: t('save.choice.remote.region'),
+    whenLabel: t('save.choice.remote.when'),
+    sum: remote.value,
+    when: remoteWhen.value,
+    dust: pending.value?.remote.dust ?? 0,
+  },
+])
 
 /**
  * O foco, preso dentro da folha enquanto ela está de pé.
@@ -173,7 +218,7 @@ async function pick(side: ChoiceSide): Promise<void> {
     >
       <header class="choice__head">
         <p class="choice__eyebrow">
-          Duas coleções encontradas
+          {{ t('save.choice.eyebrow') }}
         </p>
         <!-- `h2` e não `h1`: a página por baixo continua montada com o dela, e
              dois `h1` na mesma árvore é sumário quebrado para quem navega por
@@ -182,12 +227,18 @@ async function pick(side: ChoiceSide): Promise<void> {
           id="choice-title"
           class="choice__title"
         >
-          Qual delas você quer continuar?
+          {{ t('save.choice.title') }}
         </h2>
         <p class="choice__lede">
-          Você já jogava neste navegador, e a conta que acabou de entrar também
-          tem progresso. Escolha uma — <strong>a outra não é apagada</strong>,
-          fica guardada na cópia de segurança deste aparelho.
+          <i18n-t
+            keypath="save.choice.lede"
+            scope="global"
+            tag="span"
+          >
+            <template #kept>
+              <strong>{{ t('save.choice.kept') }}</strong>
+            </template>
+          </i18n-t>
         </p>
       </header>
 
@@ -195,9 +246,15 @@ async function pick(side: ChoiceSide): Promise<void> {
         v-if="hasBattle"
         class="choice__warning"
       >
-        Há uma batalha em andamento neste aparelho. Escolher
-        <strong>Na sua conta</strong> a encerra sem pagar a recompensa — a
-        batalha nunca sobe para o servidor.
+        <i18n-t
+          keypath="save.choice.battle"
+          scope="global"
+          tag="span"
+        >
+          <template #account>
+            <strong>{{ t('save.choice.remote.title') }}</strong>
+          </template>
+        </i18n-t>
       </p>
 
       <!-- Enquanto o índice não volta, nenhum número é confiável: a escolha fica
@@ -207,31 +264,34 @@ async function pick(side: ChoiceSide): Promise<void> {
         class="choice__failed"
         role="status"
       >
-        Não deu para ler os dados das cartas agora, e sem eles as duas colunas não
-        podem ser comparadas. Recarregue a página — <strong>nada foi
-          alterado</strong>, e a pergunta volta.
+        <i18n-t
+          keypath="save.choice.indexFailed"
+          scope="global"
+          tag="span"
+        >
+          <template #unchanged>
+            <strong>{{ t('save.choice.unchanged') }}</strong>
+          </template>
+        </i18n-t>
       </p>
       <p
         v-else-if="!ready"
         class="choice__loading"
         role="status"
       >
-        Lendo as cartas das duas coleções…
+        {{ t('save.choice.loading') }}
       </p>
 
       <div class="choice__sides">
         <section
-          v-for="side in ([
-            { key: 'local' as const, label: 'Neste aparelho', sum: local, when: localWhen, dust: localSave?.dust ?? 0 },
-            { key: 'remote' as const, label: 'Na sua conta', sum: remote, when: remoteWhen, dust: pending.remote.dust },
-          ])"
+          v-for="side in sides"
           :key="side.key"
           class="choice__side"
           :class="{ 'choice__side--account': side.key === 'remote' }"
-          :aria-label="`Coleção ${side.label}`"
+          :aria-label="side.region"
         >
           <p class="choice__eyebrow">
-            {{ side.label }}
+            {{ side.title }}
           </p>
 
           <!-- `dt` antes de `dd` em cada par: a ordem inversa não é HTML válido,
@@ -239,7 +299,7 @@ async function pick(side: ChoiceSide): Promise<void> {
           <dl class="choice__numbers">
             <div>
               <dt class="choice__unit">
-                cartas
+                {{ t('save.choice.cards', {}, side.sum?.cards ?? 0) }}
               </dt>
               <dd class="numeric choice__number">
                 {{ side.sum?.cards ?? '—' }}
@@ -247,7 +307,7 @@ async function pick(side: ChoiceSide): Promise<void> {
             </div>
             <div>
               <dt class="choice__unit">
-                insígnias
+                {{ t('save.choice.badges', {}, side.sum?.badges ?? 0) }}
               </dt>
               <dd class="numeric choice__number">
                 {{ side.sum?.badges ?? '—' }}
@@ -255,7 +315,7 @@ async function pick(side: ChoiceSide): Promise<void> {
             </div>
             <div>
               <dt class="choice__unit">
-                shiny
+                {{ t('save.choice.shiny') }}
               </dt>
               <dd class="numeric choice__number choice__number--shiny">
                 {{ side.sum?.shiny ?? '—' }}
@@ -264,7 +324,7 @@ async function pick(side: ChoiceSide): Promise<void> {
           </dl>
 
           <p class="choice__unit choice__minis-label">
-            Melhores cartas
+            {{ t('save.choice.best') }}
           </p>
           <ul class="choice__minis">
             <li
@@ -285,19 +345,19 @@ async function pick(side: ChoiceSide): Promise<void> {
               v-if="ready && (side.sum?.best.length ?? 0) === 0"
               class="choice__unit"
             >
-              nenhuma carta
+              {{ t('save.choice.noCards') }}
             </li>
           </ul>
 
           <dl class="choice__facts">
             <div>
-              <dt>{{ side.key === 'local' ? 'Última gravação' : 'Última sincronização' }}</dt>
+              <dt>{{ side.whenLabel }}</dt>
               <dd class="numeric">
                 {{ side.when }}
               </dd>
             </div>
             <div>
-              <dt>Pó acumulado</dt>
+              <dt>{{ t('save.choice.dust') }}</dt>
               <dd class="numeric">
                 {{ side.dust }}
               </dd>
@@ -309,10 +369,10 @@ async function pick(side: ChoiceSide): Promise<void> {
             class="choice__use bevel-control"
             :class="{ 'choice__use--account': side.key === 'remote' }"
             :disabled="applying !== null || !ready"
-            :aria-label="`USAR ESTA — ${side.label}`"
+            :aria-label="t('save.choice.useSide', { side: side.title })"
             @click="pick(side.key)"
           >
-            {{ applying === side.key ? 'APLICANDO…' : 'USAR ESTA' }}
+            {{ applying === side.key ? t('save.choice.applying') : t('save.choice.use') }}
           </button>
         </section>
       </div>
@@ -322,13 +382,22 @@ async function pick(side: ChoiceSide): Promise<void> {
         class="choice__failed"
         role="status"
       >
-        Não deu para aplicar a escolha agora — nada foi apagado. Tente de novo.
+        {{ t('save.choice.applyFailed') }}
       </p>
 
+      <!-- The path is built from the labels of the places it names, like the
+           conflict notice: the promise of a way back has to say what the screen
+           calls that way back. -->
       <p class="choice__footnote">
-        A coleção não escolhida vai para a cópia de segurança deste aparelho e
-        volta por <strong>Ajustes → Cópias de segurança</strong>. Nada é apagado
-        por esta escolha.
+        <i18n-t
+          keypath="save.choice.footnote"
+          scope="global"
+          tag="span"
+        >
+          <template #path>
+            <strong>{{ t('nav.settings') }} → {{ t('settings.backups.title') }}</strong>
+          </template>
+        </i18n-t>
       </p>
     </div>
   </div>
