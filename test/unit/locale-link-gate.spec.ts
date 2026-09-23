@@ -37,7 +37,8 @@ import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/so
  * is localized by the module, into the language it names; used anywhere else
  * it is the very defect above, a way out of the player's language. So a switch
  * is its own class, and the class has an address: `LANGUAGE_SELECTORS`, the one
- * place the board draws the selector.
+ * place the board draws the selector. **A switch is read wherever it is
+ * written, and not only in a link** — see `LANGUAGE_SWITCH`.
  *
  * Disk does not reach the screen, so this is half of the measurement.
  * `test/e2e/collection.spec.ts` walks `/en` and reads the rendered `href`.
@@ -82,7 +83,9 @@ const LINK_AREA = 'app'
  * `navigateTo`, `router.push`, and `to=` on a Nuxt UI component (`UButton`,
  * `ULink`, `UCard`), which render a `NuxtLink` underneath and would never be
  * spelled with this tag name. None of the four exists under `app/` today —
- * measured, not assumed — and each needs its own reader the day it does.
+ * measured, not assumed — and each needs its own reader the day it does. A
+ * language switch spelled through any of them is not among the blind spots:
+ * `LANGUAGE_SWITCH` reads the call, whatever carries it.
  *
  * There is a fifth, and it is not hypothetical: `window.location.assign`, in
  * `app/composables/useAccount.ts`. It navigates without a tag at all, and it is
@@ -157,6 +160,52 @@ function isLanguageSwitch(link: Link): boolean {
  * entry stops holding a switch, so it cannot outlive the selector it names.
  */
 const LANGUAGE_SELECTORS: readonly string[] = ['app/pages/settings.vue']
+
+/**
+ * Every way the code can change the player's language, as it is spelled.
+ *
+ * **Read as code, and not as links.** The rule below was first asked of the
+ * link reader, and a switch that is not a `NuxtLink` walked past it: a
+ * `<button @click="setLocale('en')">` planted in `AppVersion.vue` left this gate
+ * and the whole unit suite green — measured in the review of PR #65. Behind a
+ * button, a `navigateTo` or a composable, a switch drops the player into
+ * another language as surely as a link does.
+ *
+ * What `@nuxtjs/i18n` 10.6 offers, read in its runtime:
+ *
+ * - `switchLocalePath()`, and `useSwitchLocalePath()` that returns it — this
+ *   page in another language, as a path;
+ * - `setLocale()` — loads the language's messages and navigates to this page in
+ *   it (`composer.setLocale`, in the module's plugin);
+ * - `<SwitchLocalePathLink>` — a link built from `switchLocalePath`;
+ * - `<NuxtLinkLocale>` handed a `locale` — a link resolved in that language
+ *   instead of the player's.
+ *
+ * And one the module's documentation warns against, and that changes the
+ * language all the same: writing the locale ref by hand.
+ */
+const LANGUAGE_SWITCH: readonly RegExp[] = [
+  /\b(?:switchLocalePath|useSwitchLocalePath|setLocale)\s*\(/,
+  /<SwitchLocalePathLink\b/,
+  /<NuxtLinkLocale\b(?:"[^"]*"|'[^']*'|[^>])*?\s:?locale=/,
+  /\blocale\.value\s*=(?!=)/,
+]
+
+/** Whether a source, comments erased, changes the player's language. */
+function switchesLanguage(source: string): boolean {
+  const code = stripComments(source)
+
+  return LANGUAGE_SWITCH.some(pattern => pattern.test(code))
+}
+
+/**
+ * Every file under `LINK_AREA` that changes the language — scripts included: a
+ * composable or a util calling `setLocale` has no template at all.
+ */
+function filesThatSwitch(): string[] {
+  return walkFiles(join(REPO_ROOT, LINK_AREA), SKIP, hasExtension(['.vue', '.ts']))
+    .filter(file => switchesLanguage(readFileSync(join(REPO_ROOT, file), 'utf8')))
+}
 
 /** Every link in one file's source, comments erased. */
 function linksIn(file: string, source: string): Link[] {
@@ -322,7 +371,42 @@ describe('locale link gate', () => {
   })
 
   /**
-   * And the links that change it live where the selector is — both ways.
+   * Every form of switching is seen, and nothing that only resembles one.
+   *
+   * The proof by reintroduction, kept as input: the button calling `setLocale`
+   * is the shape that passed the whole suite while switches were read from
+   * links. The look-alikes are the neighbours each pattern has to tell apart — a
+   * localized link, the module's cookie setter, a comparison and a read of the
+   * locale ref, and a switch that only exists inside a comment.
+   */
+  it('reads every form of switching the language, and nothing that only resembles one', () => {
+    const switches = [
+      '<NuxtLink :to="switchLocalePath(option.code)">a</NuxtLink>',
+      '<button type="button" @click="setLocale(\'en\')">b</button>',
+      'await navigateTo($switchLocalePath(\'en\'))',
+      'const switchPath = useSwitchLocalePath()',
+      'await nuxtApp.$i18n.setLocale(code)',
+      '<SwitchLocalePathLink locale="en">c</SwitchLocalePathLink>',
+      '<NuxtLinkLocale to="/rules" locale="en">d</NuxtLinkLocale>',
+      '<NuxtLinkLocale v-if="count > 0" :locale="other" to="/">e</NuxtLinkLocale>',
+      'locale.value = \'en\'',
+    ]
+    const decoys = [
+      '<NuxtLink :to="localePath(\'/deck\')">a</NuxtLink>',
+      '<NuxtLinkLocale to="/rules" class="link">b</NuxtLinkLocale>',
+      'setLocaleCookie(\'en\')',
+      'if (locale.value === \'en\') return',
+      'const key = `teams:${locale.value}`',
+      '// setLocale(\'en\') is how a second selector would be written',
+      '<!-- <SwitchLocalePathLink locale="en" /> -->',
+    ]
+
+    expect(switches.filter(source => !switchesLanguage(source)), 'switches the reader misses').toEqual([])
+    expect(decoys.filter(switchesLanguage), 'look-alikes the reader takes for a switch').toEqual([])
+  })
+
+  /**
+   * And the files that change it are where the selector is — both ways.
    *
    * A set and not "no switch outside the list": a selector that stopped
    * switching, or moved to a component, would leave its entry naming a file
@@ -330,9 +414,7 @@ describe('locale link gate', () => {
    * without anyone having decided it.
    */
   it('and only the language selector changes it', () => {
-    const switching = new Set(allLinks().filter(isLanguageSwitch).map(link => link.file))
-
-    expect([...switching].sort(), 'these files switch the player\'s language, and only the selector may')
+    expect(filesThatSwitch().sort(), 'these files switch the player\'s language, and only the selector may')
       .toEqual([...LANGUAGE_SELECTORS].sort())
   })
 })
