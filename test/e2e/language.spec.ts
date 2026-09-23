@@ -91,6 +91,42 @@ test('the selector moves this page to each language, and the document goes with 
 })
 
 /**
+ * A click that opens the other language somewhere else is not a choice.
+ *
+ * With a modifier the segment opens the page in a new tab and leaves this one
+ * where it was — the player looked, and did not choose. Remembered, that look
+ * would become the language the root opens in from then on.
+ *
+ * **Two barriers, one on each side of the click.** Before it, hydration: the
+ * segment is served markup until then, a click on it runs no handler at all,
+ * and a modified click landing that early would remember nothing whatever the
+ * code says — this test would pass over the defect. A plain click on the
+ * language already on screen is a real choice that records only once the
+ * handler exists, so it is retried until it does. After the modified click,
+ * the new tab: the browser opens it once the click's handlers have run.
+ */
+test('a click that opens the other language in a new tab is not a choice', async ({ page, context }) => {
+  const root = defaultLocale()
+  const other = otherLanguage()
+
+  await page.goto(localeUrl('/settings', root))
+
+  await expect(async () => {
+    await segment(page, root, root).click()
+    expect(await remembered(page)).toBe(root)
+  }).toPass({ timeout: 15_000 })
+
+  const [opened] = await Promise.all([
+    context.waitForEvent('page'),
+    segment(page, root, other.code).click({ modifiers: ['ControlOrMeta'] }),
+  ])
+
+  await expect(opened).toHaveURL(pathPattern(localeUrl('/settings', other.code)))
+  await expect(page).toHaveURL(pathPattern(localeUrl('/settings', root)))
+  expect(await remembered(page), 'a look in a new tab is not a choice').toBe(root)
+})
+
+/**
  * Before it paints — measured, not inferred from the script being first in the
  * head.
  *

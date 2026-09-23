@@ -68,8 +68,18 @@ const switchLocalePath = useSwitchLocalePath()
  * Called on the click and not on arrival: landing on `/en/settings` from a link
  * is not a choice, and remembering it would turn every English link someone was
  * sent into a preference they never made.
+ *
+ * **And only on a click that navigates in place.** With a modifier the link
+ * opens the other language in a new tab or window and leaves this page where it
+ * is: the player looked, and did not choose. The modifiers are the ones
+ * `RouterLink` leaves to the browser (`guardEvent`, in vue-router). Its other
+ * test, `defaultPrevented`, cannot be asked here: the router's own handler runs
+ * first and prevents the default precisely when it navigates in place. A middle
+ * click fires `auxclick`, and never reaches this.
  */
-function rememberLocale(code: LocaleCode): void {
+function rememberLocale(code: LocaleCode, event: MouseEvent): void {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
   try {
     browserStorage()?.setItem(LOCALE_KEY, code)
   }
@@ -827,7 +837,7 @@ useSeoMeta({
               :hreflang="option.language"
               :lang="option.language"
               class="numeric settings__segment"
-              @click="rememberLocale(option.code)"
+              @click="rememberLocale(option.code, $event)"
             >
               {{ option.code.toUpperCase() }}
             </NuxtLink>
