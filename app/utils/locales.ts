@@ -40,11 +40,6 @@ export type LocaleCode = (typeof LOCALES)[number]['code']
 /** The language with no URL prefix: `/collection` is Portuguese, `/en/collection` is not. */
 export const DEFAULT_LOCALE: LocaleCode = 'pt-BR'
 
-/** Whether a value read from outside — storage, a query — names a language of the game. */
-export function isLocaleCode(value: unknown): value is LocaleCode {
-  return LOCALES.some(locale => locale.code === value)
-}
-
 /**
  * Where `path` lives in `code`: as it is for the default, under `/<code>` for
  * the rest — the `prefix_except_default` strategy the config declares.
