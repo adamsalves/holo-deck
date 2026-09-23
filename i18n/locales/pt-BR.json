@@ -752,6 +752,7 @@
     },
     "prefs": {
       "title": "Preferências",
+      "languageTitle": "Idioma",
       "motionTitle": "Reduzir animações",
       "motionNote": "Desliga o foil que segue o ponteiro e a virada dos packs. Se o seu sistema já pede menos movimento, o jogo obedece sem isto.",
       "motionOn": "ligado",
@@ -770,13 +771,11 @@
     },
     "held": {
       "title": "Ainda não",
-      "note": "A prancha desta tela desenha mais três coisas, e nenhuma delas tem de onde tirar dado ainda: {language}, {sound} e {offline} chegam com o que os sustenta. Elas não aparecem aqui de propósito — um controle desligado promete uma coisa que o jogo não faz.",
-      "language": "idioma",
-      "sound": "som",
+      "note": "A prancha desta tela desenha mais uma coisa, e ela ainda não tem de onde tirar dado: {offline} chega com o que o sustenta. Ela não aparece aqui de propósito — um controle desligado promete uma coisa que o jogo não faz.",
       "offline": "baixar tudo para offline"
     },
     "version": "v{app} · {sha} · save v{schema}",
-    "footAnimation": "Animação é preferência de aparelho e não sincroniza, de propósito.",
+    "footDevice": "Idioma e animação não sincronizam de propósito — são preferências de aparelho.",
     "footSyncs": "Coleção, progresso e deck sincronizam.",
     "footSyncsNoAccount": "Coleção, progresso e deck sincronizam — quando houver conta.",
     "confirm": {

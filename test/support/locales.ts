@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { DEFAULT_LOCALE } from '../../app/utils/locales'
 import { REPO_ROOT } from './source-tree'
 
 /**
@@ -117,21 +118,19 @@ function leavesOf(code: string): Map<string, unknown> {
 }
 
 /**
- * O locale que não leva prefixo de URL, lido do `nuxt.config.ts`.
+ * The locale with no URL prefix — imported from the list the config reads.
  *
- * Lido da configuração e não escrito aqui: com `prefix_except_default`, quem
- * decide a forma de toda URL do jogo é aquele campo. Uma cópia nesta pasta
- * envelheceria ao lado da regra que ela vigia, e o e2e passaria a visitar
- * endereços que não existem — dizendo que a tela sumiu quando o que mudou foi a
- * estratégia de rota.
+ * Not written here: with `prefix_except_default`, that field decides the shape
+ * of every URL in the game. A copy in this folder would age beside the rule it
+ * watches, and the e2e would start visiting addresses that do not exist — saying
+ * the screen is gone when what changed was the routing strategy.
+ *
+ * It used to read `nuxt.config.ts` as text, which was the only way to reach the
+ * value while it was written there. The config now takes it from
+ * `app/utils/locales.ts`, and the regex would have thrown on the identifier.
  */
 export function defaultLocale(): string {
-  const source = readFileSync(join(REPO_ROOT, 'nuxt.config.ts'), 'utf8')
-  const found = /defaultLocale:\s*'([^']+)'/.exec(source)?.[1]
-
-  if (found === undefined) throw new Error('`defaultLocale` não encontrado em nuxt.config.ts')
-
-  return found
+  return DEFAULT_LOCALE
 }
 
 /** O caminho de `path` no locale pedido — sem prefixo no padrão, `/<code>` no resto. */

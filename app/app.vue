@@ -1,88 +1,87 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import * as uiLocales from '@nuxt/ui/locale'
+import { ROOT_GUARD_ID, rootGuardScript } from '~~/app/utils/locale-preference'
+import { UI_LOCALES } from '~~/app/utils/ui-locales'
+
+const { locale } = useI18n()
 
 /**
- * Os primitivos do Nuxt UI falam o idioma ativo.
+ * The Nuxt UI primitives speak the active language — see `UI_LOCALES` for why
+ * the map is written out and what keeps it complete.
  *
- * Ele traz 128 locales prontos, então nada aqui se traduz à mão — o que falta é
- * o fio entre o locale do `@nuxtjs/i18n` e o `:locale` do `UApp`.
- *
- * **O mapa é explícito porque os dois lados nomeiam locale de forma diferente:**
- * o Nuxt UI exporta `pt_br` (snake_case, que é nome de identificador) e o código
- * do locale é `pt-BR` (hifenizado, que é etiqueta BCP 47). O
- * `locales[locale.value]` que a documentação mostra devolveria `undefined` para
- * o padrão deste projeto. Escrever o mapa deixa a discrepância visível, em vez de
- * esconder um `replace('-', '_')` que ninguém lembra de ler.
+ * No fallback any more. The old one existed because nothing guaranteed the map
+ * had every language, and it answered a missing one with Portuguese. `locale` is
+ * typed as the union of the configured codes, the config reads them from
+ * `app/utils/locales.ts`, and the map is a `Record` over that same list — so the
+ * missing case does not compile.
  */
-const UI_LOCALES = {
-  'pt-BR': uiLocales.pt_br,
-  'en': uiLocales.en,
-}
-
-const { locale, localeProperties } = useI18n()
+const uiLocale = computed(() => UI_LOCALES[locale.value])
 
 /**
- * O fallback não é defensividade solta: `locale` é `string` para o vue-i18n, e
- * este `computed` precisa devolver alguma coisa para todo valor possível.
+ * The document's language, and the links that tell a search engine where the
+ * page lives in the other one: `lang` and `dir` on `<html>`, two `hreflang`
+ * alternates per language — the regional tag, and the bare language the module
+ * adds as the catch-all for its other regions (`pt-BR` and `pt`) — plus
+ * `x-default`, the `canonical`, and `og:url`, `og:locale` and
+ * `og:locale:alternate`.
  *
- * **E ele não está guardado por portão nenhum — o comentário anterior dizia que
- * estava.** Ele creditava a garantia ao portão de paridade de chaves, que afirma
- * outra coisa: que existe mais de um arquivo em `i18n/locales/` e que os dois
- * trazem as mesmas chaves. Ele não conhece este mapa nem a lista de `locales` do
- * `nuxt.config.ts`. Um espanhol acrescentado ao config e ao diretório passa nos
- * sete testes e cai neste `else`: toda tela `/es/…` com os primitivos do Nuxt UI
- * — fechar modal, paginação, date picker — falando **português**.
+ * **Here because it holds for every route** — a page that forgot to declare its
+ * language would go out mute to a screen reader. Measured before, when the fixed
+ * `lang` left `nuxt.config.ts`: the prerendered HTML came out `<html
+ * class="dark">` in both languages.
  *
- * O portão que fecha isso precisa comparar `Object.keys(UI_LOCALES)` com os
- * `code` do config, e para isso o mapa tem de sair do `app.vue` para um módulo.
- * Fica para o PR 4, que é quando o seletor de idioma torna um terceiro locale
- * plausível. Até lá a lacuna está escrita, que é o mínimo que este repositório
- * cobra de si.
+ * **Held back from PR 1 to this one, for two measured reasons (issue #39).** The
+ * alternates are links, and with them on while the screens were still in
+ * Portuguese the build wrote a thousand `/en/…` pages declaring `en-US` over
+ * Portuguese text. And with no `baseUrl` the module writes every link relative,
+ * which Google ignores in an `hreflang` annotation, and warns once per page. Both
+ * are gone: every screen speaks both languages, and the config hands the module
+ * the site's origin. Absolute links do not grow the build either — the
+ * prerender crawler skips a link that carries a scheme or a host, so the page
+ * count only moved by the nine battles the config lists.
+ *
+ * The explicit `dir: 'ltr'` of the previous version is gone with it: the module
+ * falls back to its default direction, which is `ltr`, and
+ * `test/e2e/locale-head.spec.ts` asserts the attribute on every built page.
  */
-const uiLocale = computed(() => (
-  locale.value === 'en' ? UI_LOCALES.en : UI_LOCALES['pt-BR']
-))
+const localeHead = useLocaleHead()
 
-/**
- * O `lang` e o `dir` do `<html>`, do locale ativo.
- *
- * **Isto não é opcional, e a falta dele foi medida.** Ao tirar o
- * `htmlAttrs.lang: 'pt-BR'` fixo do `nuxt.config.ts`, o HTML pré-renderizado saiu
- * `<html class="dark">` nos dois idiomas: nenhum `lang`, que é pior do que o
- * valor fixo que havia antes. Conferido no `.output/public/index.html` e no
- * `en/index.html`. Mora no `app.vue` porque aqui vale para toda rota — uma
- * página que esquecesse de declarar idioma sairia muda para o leitor de tela.
- *
- * **Por que `localeProperties` e não `useLocaleHead`, que é o que a documentação
- * mostra.** Aquele composable resolve o `lang` e, no mesmo passo, emite
- * `hreflang`, `canonical` e `og:url` — e os três, aqui e agora, fazem mal:
- *
- * - O rastreador de pré-render **segue** as tags `alternate`. Com elas ligadas o
- *   build passava de 1.061 para 2.104 páginas, metade delas `/en/…` com
- *   `lang="en-US"` sobre corpo em **português** — as telas só são traduzidas nos
- *   PRs 2 a 4, e `main` publica em produção. Medido: 139 MB contra 76 MB.
- * - Sem `baseUrl` o módulo emite tudo **relativo** e avisa uma vez por página
- *   (*"I18n baseUrl is required to generate valid SEO tag links"*, 1.061 vezes
- *   num build). O Google ignora anotação `hreflang` relativa, então seriam
- *   marcação sem efeito — e o aviso enterraria qualquer outro.
- * - `seo: false` desliga as tags e **não** desliga o aviso: ele mora no
- *   `createHeadContext`, antes do ramo que olha a opção.
- *
- * `localeProperties` é a configuração de locale que o próprio módulo resolveu —
- * `code`, `language` e `dir` —, então o `lang` continua vindo dele e não de uma
- * cópia nossa. Os três itens de SEO entram juntos no PR 4, com `baseUrl` e com as
- * telas traduzidas, que é quando passam a dizer a verdade.
- */
 useHead(() => ({
-  htmlAttrs: {
-    lang: localeProperties.value.language,
-    // Hoje os dois locales são LTR e o módulo não declara `dir` para nenhum. O
-    // `ltr` explícito é o que impede o atributo de sumir — que é o defeito do
-    // `lang` acima, na outra metade do mesmo par.
-    dir: localeProperties.value.dir ?? 'ltr',
-  },
+  htmlAttrs: localeHead.value.htmlAttrs,
+  link: localeHead.value.link,
+  meta: localeHead.value.meta,
 }))
+
+/**
+ * The root opens in the language this device remembers — see `rootGuardScript`
+ * for why it is an inline script and not a plugin.
+ *
+ * **Server only, and only for `/`.** It belongs to the HTML the server writes
+ * for the root, and to nothing the client does afterwards: the client head
+ * manager leaves an element it never registered where the server put it, and
+ * never runs it again. What keeps it off client-side navigations is partly where
+ * it is written — this setup runs once on the client, at hydration, so the
+ * condition below is never asked again — and partly `import.meta.server`, which
+ * holds wherever it moves: in a page component, whose setup runs on every
+ * visit, a client registration would be inserted on each visit to `/`, and an
+ * inserted script runs. `test/e2e/language.spec.ts` measures the behaviour, and
+ * not this placement.
+ *
+ * `critical` — weight 42 in unhead's order — keeps it ahead of every other
+ * script in the `<head>`. It is not what puts it ahead of the stylesheets: an
+ * inline script weighs 50 and a stylesheet 60, so it would be there without
+ * it. Whatever does sit in front of it costs the redirect time — a blocking
+ * script to download, or a stylesheet an inline script has to wait for — and
+ * not a paint of the Hub: the parser is still in the `<head>`, with no `<body>`
+ * to draw.
+ */
+const route = useRoute()
+
+if (import.meta.server && route.path === '/') {
+  useHead({
+    script: [{ id: ROOT_GUARD_ID, innerHTML: rootGuardScript(), tagPriority: 'critical' }],
+  })
+}
 </script>
 
 <template>

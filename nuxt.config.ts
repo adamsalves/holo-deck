@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
+import { DEFAULT_LOCALE, LOCALES, pathInLocale } from './app/utils/locales.ts'
 import { GYM_COUNT } from './shared/types/brand.ts'
 
 /**
@@ -24,6 +25,29 @@ function resolveGitSha(): string {
   catch {
     return 'unknown'
   }
+}
+
+/**
+ * The site's own origin, for the links the i18n module writes into every head —
+ * `hreflang`, `canonical` and `og:url`.
+ *
+ * **Production's, on every deploy, previews included.** Vercel sets
+ * `VERCEL_PROJECT_PRODUCTION_URL` on preview builds too, and that is the point
+ * of reading it: a preview is a copy of the site under a throwaway host, and its
+ * canonical should name the page it copies. The variable carries no scheme, so
+ * the `https://` is added here. The fallback is the same origin written out, for
+ * every build that is not Vercel's — CI, `yarn build` on a laptop.
+ *
+ * **It is not the request's origin, on purpose.** Every page is prerendered, so
+ * the request is the prerenderer's own `localhost` — an origin baked into 2.104
+ * files that nobody outside the build machine can open. The module's fallback
+ * without a `baseUrl` is worse: relative links, which Google ignores in an
+ * `hreflang` annotation, and one warning per page (issue #39).
+ */
+function resolveSiteUrl(): string {
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL
+
+  return host ? `https://${host}` : 'https://holo-deck.vercel.app'
 }
 
 export default defineNuxtConfig({
@@ -116,32 +140,41 @@ export default defineNuxtConfig({
     prerender: {
       crawlLinks: true,
       /**
-       * A Liga e os nove ginásios entram à mão, e o rastreador não os alcança.
+       * **The nine gyms, in every language — and nothing else, because every
+       * other page comes out without a list.**
        *
-       * O corpo das duas telas é `<ClientOnly>` — insígnia e deck moram no
-       * `localStorage` —, então os links para `/battle/N` não existem no HTML
-       * servido. Sem esta lista, `/battle/3` seria a primeira rota válida do
-       * repositório a **não** ser pré-renderizada, e a premissa que sustenta o
-       * `useDex()` do servidor cairia junto: hoje a única classe de URL que
-       * chega à função é a inválida, que é quando ela precisa ler o índice para
-       * responder 404.
+       * What prerenders a page no link reaches is Nuxt's own prerender plugin
+       * (`nuxt/dist/pages/runtime/plugins/prerender.server.js`, loaded because
+       * `crawlLinks` is on): it queues every route of the router whose path has
+       * no parameter. The i18n module registers each page once per language —
+       * `/login` and `/en/login` are two routes — so every static screen comes
+       * out in both, linked or not. `/pokedex`, `/league` and `/login` sat on
+       * this list until the review of PR #65, on the belief that the crawler
+       * could not reach them; measured, the build without the three is the same
+       * 2.104 pages. Nor is it `@nuxtjs/i18n`, as this comment said for a PR:
+       * its prerender hook only runs with `nitro.static`, which `nuxt build`
+       * leaves off.
        *
-       * `GYM_COUNT` e não um `9` literal: o número é o mesmo contrato que a
-       * store, o guarda do save e a Liga leem, e uma cópia dele aqui só seria
-       * descoberta por um ginásio novo que ninguém consegue abrir em produção.
+       * `/battle/:gymId` has a parameter, so the plugin skips it, and no served
+       * page links to it: the League's body is a `<ClientOnly>` — badges and deck
+       * live in `localStorage` —, so the links to `/battle/N` exist in no served
+       * HTML. Without this list `/battle/3` would be the first valid route of the
+       * repository **not** prerendered, and the premise under the server's
+       * `useDex()` would fall with it: today the only class of URL that reaches
+       * the function is the invalid one, which is when it has to read the index
+       * to answer 404. Until the list named the nine `/en/battle/N`, the English
+       * battles were exactly that — served by the function, and carried by
+       * `test/e2e/prerender-payload.spec.ts` as its one exception.
        *
-       * **`/login` entra pela mesma razão, e não por ser especial.** A barra liga
-       * a rota — é o canto da conta —, mas o link mora dentro de `<ClientOnly>`,
-       * porque a sessão não existe no servidor: o rastreador não o vê. Sem esta
-       * linha, a única tela estática do jogo que renderiza a cada pedido seria
-       * justamente a que mais gente abre sem ter nada no `localStorage`.
+       * `GYM_COUNT` and not a literal `9`: the number is the same contract the
+       * store, the save guard and the League read, and a copy of it here would
+       * only be found out by a new gym nobody can open in production. And
+       * `LOCALES`, so a third language gets its nine the day it is declared.
        */
-      routes: [
-        '/pokedex',
-        '/league',
-        '/login',
-        ...Array.from({ length: GYM_COUNT }, (_, index) => `/battle/${index + 1}`),
-      ],
+      routes: LOCALES.flatMap(({ code }) => Array.from(
+        { length: GYM_COUNT },
+        (_, index) => pathInLocale(`/battle/${index + 1}`, code),
+      )),
     },
 
     /**
@@ -216,14 +249,15 @@ export default defineNuxtConfig({
    * O módulo também passa a ser o dono do atributo `lang` do `<html>` e das
    * tags `hreflang` — ver a nota em `app.head.htmlAttrs` acima.
    *
-   * `language` é a etiqueta BCP 47 que vai para o `lang` e para o `hreflang`, e
-   * não é redundante com `code`: `code` é a chave interna que nomeia o arquivo e
-   * o prefixo da rota, e os dois divergem no inglês (`en` contra `en-US`).
+   * The languages themselves come from `app/utils/locales.ts`, and the file of
+   * each one is named after its code — see that module for why the list left
+   * this file.
    */
   i18n: {
     strategy: 'prefix_except_default',
-    defaultLocale: 'pt-BR',
+    defaultLocale: DEFAULT_LOCALE,
     langDir: 'locales',
+    baseUrl: resolveSiteUrl(),
 
     /**
      * **Desligada, e isto conserta um defeito medido.**
@@ -245,10 +279,7 @@ export default defineNuxtConfig({
      * cabeçalho do navegador contradiz as duas coisas.
      */
     detectBrowserLanguage: false,
-    locales: [
-      { code: 'pt-BR', language: 'pt-BR', name: 'Português', file: 'pt-BR.json' },
-      { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },
-    ],
+    locales: LOCALES.map(({ code, language }) => ({ code, language, file: `${code}.json` })),
   },
 
 })

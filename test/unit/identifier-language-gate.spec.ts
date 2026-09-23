@@ -49,7 +49,7 @@ const DEX_NAMES = new Set([
  */
 const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'css', 'ctx', 'cwd',
-  'env', 'href', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
+  'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
   'namespace', 'nav', 'ok', 'onchange', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint', 'url',
 ]
 
