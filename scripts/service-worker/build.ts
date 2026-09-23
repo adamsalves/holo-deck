@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,7 +5,15 @@ import ts from 'typescript'
 import { ROOT_GUARD_ID, rootGuardScript } from '../../app/utils/locale-preference'
 import { LOCALES } from '../../app/utils/locales'
 import type { PrecacheEntry } from '../../app/utils/offline'
-import { OFFLINE_SHELL_PATH, PRECACHE_CACHE, SERVICE_WORKER_PATH, SPRITE_CACHE } from '../../app/utils/offline'
+import {
+  OFFLINE_SHELL_PATH,
+  PRECACHE_CACHE,
+  SERVICE_WORKER_PATH,
+  SPRITE_CACHE_PREFIX,
+  dexUrl,
+  spriteCacheName,
+} from '../../app/utils/offline'
+import { folderRevisionOf, revisionOf } from './revision'
 
 /**
  * Writes the service worker into the build's public output — called from
@@ -123,6 +130,17 @@ export function precachePaths(files: readonly string[], css: string): string[] {
 }
 
 /**
+ * The address a page asks for an installed file by — its path, except for the
+ * dex, whose address carries the dex's revision (see `dexUrl`). The worker
+ * answers by exact address, so this and the pages have to agree to the query.
+ */
+export function addressOf(path: string, dexRevision: string): string {
+  const dex = /^data\/([^/]+\.json)$/.exec(path)?.[1]
+
+  return dex === undefined ? `/${path}` : dexUrl(dex, dexRevision)
+}
+
+/**
  * The shell, with the root guard as the first thing in its head.
  *
  * Offline the shell is what `/` opens as, and it is rendered with no app on the
@@ -181,15 +199,17 @@ export function transpileWorker(source: string): string {
 /**
  * The worker as served: the names it shares with the pages, then its code.
  *
- * The entries go on a line of their own, as JSON — the gate over the build reads
- * them back from `/sw.js` by that line.
+ * The entries and the thumbnails' cache go on lines of their own, as JSON — the
+ * gate over the build and the offline suite read them back from `/sw.js` by
+ * those lines.
  */
-export function serviceWorkerScript(entries: readonly PrecacheEntry[], worker: string): string {
+export function serviceWorkerScript(entries: readonly PrecacheEntry[], spriteCache: string, worker: string): string {
   return [
     `// Written by scripts/service-worker/build.ts — an edit here is lost at the next build.`,
     `const PRECACHE = ${JSON.stringify(entries)};`,
     `const PRECACHE_CACHE = ${JSON.stringify(PRECACHE_CACHE)};`,
-    `const SPRITE_CACHE = ${JSON.stringify(SPRITE_CACHE)};`,
+    `const SPRITE_CACHE = ${JSON.stringify(spriteCache)};`,
+    `const SPRITE_CACHE_PREFIX = ${JSON.stringify(SPRITE_CACHE_PREFIX)};`,
     `const OFFLINE_SHELL = ${JSON.stringify(OFFLINE_SHELL_PATH)};`,
     worker,
   ].join('\n')
@@ -204,23 +224,22 @@ async function filesUnder(dir: string): Promise<string[]> {
     .map(entry => relative(dir, join(entry.parentPath, entry.name)).replaceAll(sep, '/'))
 }
 
-/**
- * A file's revision: the start of a hash of its content. Sixteen hex digits —
- * a collision between two builds' copies of one file is not a risk worth more.
- */
-function revisionOf(content: Buffer): string {
-  return createHash('sha256').update(content).digest('hex').slice(0, 16)
-}
-
 const WORKER_SOURCE = fileURLToPath(new URL('./worker.ts', import.meta.url))
+
+/** The thumbnails, as a folder of the public output. */
+const SPRITES = 'sprites'
 
 /**
  * Chooses the files, guards the shell, and writes the worker next to them.
  *
  * The shell is guarded **before** it is hashed, so the revision the worker
- * installs under is the one of the file the browser gets.
+ * installs under is the one of the file the browser gets — and the one the
+ * worker checks the download against.
+ *
+ * `dexRevision` comes from `nuxt.config.ts`, which gave the same one to every
+ * page: the addresses written here are the ones the pages ask for.
  */
-export async function writeServiceWorker(publicDir: string): Promise<{ entries: number, bytes: number }> {
+export async function writeServiceWorker(publicDir: string, dexRevision: string): Promise<{ entries: number, bytes: number }> {
   const files = await filesUnder(publicDir)
   const cssFiles = files.filter(path => path.startsWith('_nuxt/') && path.endsWith('.css'))
   const css = (await Promise.all(cssFiles.map(path => readFile(join(publicDir, path), 'utf8')))).join('\n')
@@ -235,11 +254,12 @@ export async function writeServiceWorker(publicDir: string): Promise<{ entries: 
     const content = await readFile(join(publicDir, path))
     bytes += content.length
 
-    return { url: `/${path}`, revision: revisionOf(content) }
+    return { url: addressOf(path, dexRevision), revision: revisionOf(content) }
   }))
 
+  const spriteCache = spriteCacheName(folderRevisionOf(join(publicDir, SPRITES)))
   const worker = transpileWorker(await readFile(WORKER_SOURCE, 'utf8'))
-  await writeFile(join(publicDir, SERVICE_WORKER_PATH.slice(1)), serviceWorkerScript(entries, worker))
+  await writeFile(join(publicDir, SERVICE_WORKER_PATH.slice(1)), serviceWorkerScript(entries, spriteCache, worker))
 
   return { entries: entries.length, bytes }
 }

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
-import { PRECACHE_CACHE, SPRITE_CACHE } from '../../app/utils/offline.ts'
+import { PRECACHE_CACHE, SPRITE_CACHE_PREFIX, type PrecacheEntry } from '../../app/utils/offline.ts'
 import { LOCALE_KEY } from '../../app/utils/locale-preference.ts'
 import { defaultLocale } from '../support/locales'
-import { navLabel, playTurn, saveWith, seedLocalSave } from './support'
+import { navLabel, pathPattern, playTurn, saveWith, seedLocalSave } from './support'
 
 /**
  * **The game with the network gone** — what the service worker is for, measured
@@ -38,11 +38,33 @@ test.use({ serviceWorkers: 'allow' })
 const REGISTERED_FROM = '/rules'
 
 /**
+ * One of the names the build writes in front of the worker, read from `/sw.js`
+ * as the browser gets it: `const NAME = <JSON>;`, on a line of its own (see
+ * `serviceWorkerScript`).
+ */
+function servedConstant(page: Page, name: string): Promise<unknown> {
+  return page.evaluate(async (constant) => {
+    const source = await (await fetch('/sw.js')).text()
+    const line = new RegExp(`^const ${constant} = (.*);$`, 'm').exec(source)?.[1]
+    const parsed: unknown = line === undefined ? undefined : JSON.parse(line)
+
+    return parsed
+  }, name)
+}
+
+function isEntry(value: unknown): value is PrecacheEntry {
+  return typeof value === 'object' && value !== null
+    && 'url' in value && typeof value.url === 'string'
+    && 'revision' in value && typeof value.revision === 'string'
+}
+
+/**
  * Opens a page and waits for the worker to have installed everything and to
  * control it — `clients.claim()` on its first activation is what makes a reload
- * unnecessary. The count is the other side of "installed": a worker whose
- * install failed on one entry never activates, and one that skipped entries
- * would show fewer.
+ * unnecessary. The cache read back is the other side of "installed": every
+ * listed address at its revision, and nothing else. A worker whose install
+ * failed on one entry never activates; one that skipped an entry, or kept one
+ * under another revision, shows it here.
  */
 async function underWorker(page: Page): Promise<void> {
   await page.goto(REGISTERED_FROM)
@@ -51,19 +73,20 @@ async function underWorker(page: Page): Promise<void> {
   })
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true)
 
-  const listed = await page.evaluate(async () => {
-    const source = await (await fetch('/sw.js')).text()
-    const line = /^const PRECACHE = (.*);$/m.exec(source)?.[1] ?? '[]'
-    const parsed: unknown = JSON.parse(line)
-
-    return Array.isArray(parsed) ? parsed.length : 0
-  })
+  const served = await servedConstant(page, 'PRECACHE')
+  const listed = (Array.isArray(served) ? served : []).filter(isEntry).map(entry => `${entry.url} ${entry.revision}`)
   const installed = await page.evaluate(async (name) => {
-    return (await (await caches.open(name)).keys()).length
+    return (await (await caches.open(name)).keys()).map((request) => {
+      const url = new URL(request.url)
+      const revision = url.searchParams.get('__revision') ?? ''
+      url.searchParams.delete('__revision')
+
+      return `${url.pathname}${url.search} ${revision}`
+    })
   }, PRECACHE_CACHE)
 
-  expect(listed).toBeGreaterThan(0)
-  expect(installed).toBe(listed)
+  expect(listed.length).toBeGreaterThan(0)
+  expect(installed.sort()).toEqual(listed.sort())
 }
 
 /**
@@ -120,9 +143,22 @@ test('offline, the root still opens in the language this device chose', async ({
 
   await page.goto('/')
 
-  await expect(page).toHaveURL(/\/en$/)
+  await expect(page).toHaveURL(pathPattern('/en'))
   await expect(page.locator('html')).toHaveAttribute('lang', 'en-US')
   expect(await fromShell(page)).toBe(true)
+})
+
+/**
+ * The worker leaves `/api/` to the browser (see `worker.ts`): offline, an address
+ * there fails as the network does, instead of opening the game on a route that
+ * does not exist. The page test above is the other side — the same navigation
+ * anywhere else is answered by the shell.
+ */
+test('offline, an address under /api/ is left to the network, and fails', async ({ page, context }) => {
+  await underWorker(page)
+  await context.setOffline(true)
+
+  await expect(page.goto('/api/auth/get-session')).rejects.toThrow(/ERR_INTERNET_DISCONNECTED/)
 })
 
 /**
@@ -165,11 +201,16 @@ test('offline, a battle runs to the end', async ({ page, context }) => {
  */
 test('a sprite a page showed is kept, and one never shown is not', async ({ page, context }) => {
   await underWorker(page)
+  // The name carries the revision of the art, so it is read from the worker the
+  // build wrote, not rebuilt here.
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+  expect(spriteCache).toMatch(new RegExp(`^${SPRITE_CACHE_PREFIX}-[0-9a-f]{16}$`))
+
   await page.goto('/pokedex/1')
   await expect(page.locator('img[src="/sprites/1.webp"]').first()).toBeVisible()
   await expect.poll(() => page.evaluate(async ([name, url]) => {
     return (await (await caches.open(name)).match(url)) !== undefined
-  }, [SPRITE_CACHE, '/sprites/1.webp'] as const)).toBe(true)
+  }, [spriteCache, '/sprites/1.webp'] as const)).toBe(true)
 
   await context.setOffline(true)
 

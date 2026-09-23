@@ -5,8 +5,8 @@ import { SERVICE_WORKER_PATH } from '~~/app/utils/offline'
  * Registers the worker that keeps the game playable offline — see
  * `scripts/service-worker/worker.ts` for what it keeps and how it answers.
  *
- * **After `load`.** The install downloads the whole first layer — 2.0 MB on
- * disk, about 540 KB over the wire — and starting it while the first page is
+ * **After `load`.** The install downloads the whole first layer — 2.1 MB on
+ * disk, about 680 KB over the wire — and starting it while the first page is
  * still arriving would make the two compete for the same connection.
  *
  * **Never in development.** The build writes the worker once the prerender is

@@ -1,3 +1,4 @@
+import { dexUrl } from '~~/app/utils/offline'
 import type { ChainsData, CoreData, FlavorData, GenerationData, IndexData, SearchEntry } from '~~/shared/types/dex'
 import { isChainsData, isCoreData, isFlavorData, isGenerationData, isIndexData } from '~~/shared/types/dex'
 
@@ -54,10 +55,18 @@ const generationPending = new Map<number, Promise<GenerationData>>()
 const flavorPending = new Map<number, Promise<FlavorData>>()
 
 export function useDex() {
+  /**
+   * The revision every browser request for the dex carries — see `dexUrl`.
+   *
+   * Read here, in the setup that calls `useDex`, and not inside the loaders: they
+   * run after an `await`, where Nuxt's context is already gone.
+   */
+  const revision = useRuntimeConfig().public.dexRevision
+
   async function loadCore(): Promise<CoreData> {
     if (core.value !== null) return core.value
 
-    const pending = corePending ?? fetchGuarded('core.json', isCoreData)
+    const pending = corePending ?? fetchGuarded('core.json', isCoreData, revision)
       .then((data) => {
         core.value = data
         return data
@@ -81,7 +90,7 @@ export function useDex() {
   async function loadIndex(): Promise<IndexData> {
     if (index.value !== null) return index.value
 
-    const pending = indexPending ?? fetchGuarded('index.json', isIndexData)
+    const pending = indexPending ?? fetchGuarded('index.json', isIndexData, revision)
       .then((data) => {
         index.value = data
         return data
@@ -97,7 +106,7 @@ export function useDex() {
   async function loadChains(): Promise<ChainsData> {
     if (chains.value !== null) return chains.value
 
-    const pending = chainsPending ?? fetchGuarded('chains.json', isChainsData)
+    const pending = chainsPending ?? fetchGuarded('chains.json', isChainsData, revision)
       .then((data) => {
         chains.value = data
         return data
@@ -118,7 +127,7 @@ export function useDex() {
     if (inFlight !== undefined) return inFlight
 
     const name = `gen-${generation}.json`
-    const pending = fetchGuarded(name, isGenerationData)
+    const pending = fetchGuarded(name, isGenerationData, revision)
       .then((data) => {
         generations.value = { ...generations.value, [generation]: data }
         return data
@@ -162,7 +171,7 @@ export function useDex() {
     if (inFlight !== undefined) return inFlight
 
     const name = `flavor-${generation}.json`
-    const pending = fetchGuarded(name, isFlavorData)
+    const pending = fetchGuarded(name, isFlavorData, revision)
       .then((data) => {
         flavors.value = { ...flavors.value, [generation]: data }
         return data
@@ -251,10 +260,11 @@ export function useDex() {
 async function fetchGuarded<T>(
   name: string,
   guard: (value: unknown) => value is T,
+  revision: string,
 ): Promise<T> {
   // Em servidor a rota interna; no navegador o arquivo estático da CDN. Os dois
   // devolvem o mesmo JSON e passam pelo mesmo guarda.
-  const raw = await $fetch<unknown>(import.meta.server ? `/__dex/${name}` : `/data/${name}`)
+  const raw = await $fetch<unknown>(import.meta.server ? `/__dex/${name}` : dexUrl(name, revision))
 
   if (!guard(raw)) {
     throw createError({

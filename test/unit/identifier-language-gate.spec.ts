@@ -48,7 +48,7 @@ const DEX_NAMES = new Set([
  * are here and not in `DOMAIN` because this project did not coin them.
  */
 const PLATFORM = [
-  'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'css', 'ctx', 'cwd',
+  'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'crypto', 'css', 'ctx', 'cwd',
   'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
   'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint',
   'url',

@@ -5,7 +5,7 @@ import type { PrecacheEntry } from '../../app/utils/offline'
  *
  * **Two layers, as the plan draws them.** The first is installed whole, before
  * the worker takes over: the code, the dex, both languages' messages, the Latin
- * fonts and the shell — 2.0 MB on disk, about 540 KB over the wire. The second
+ * fonts and the shell — 2.1 MB on disk, about 680 KB over the wire. The second
  * is the 1025 thumbnails, 6.3 MB, kept as the pages show them: installing them
  * up front would make the first visit download the whole dex's art before it is
  * usable. *Download everything for offline* fills the same cache on purpose.
@@ -25,11 +25,17 @@ import type { PrecacheEntry } from '../../app/utils/offline'
  * the newest build. Taking over mid-session would hand an open tab chunks from a
  * build it was not written against, or reload it in the middle of a battle.
  * Decided with the user on 23/09/2026, and why this worker needs no screen to
- * announce an update.
+ * announce an update. A page the network brings in the meantime is the new
+ * build's, and it asks for none of the old build's files: every installed
+ * address changes with its content — the dex's through `dexUrl`.
  *
  * **What it never touches:** other origins, any method but GET, and `/api/`.
- * Signing in is a navigation to `/api/auth/…` and back, and answering it with
- * the shell would break the login.
+ * Nothing under `/api/` is ever kept — the save answers per account, and
+ * signing in is a chain of redirects that sets the session cookie on the way
+ * back —, so the browser's own request is the whole answer. Left alone, the
+ * sign-in goes exactly as it would with no worker, and offline an address under
+ * `/api/` fails as the network does instead of opening the game on a route that
+ * does not exist.
  *
  * Served as a classic script: this file is transpiled on its own
  * (`transpileWorker`) and the names below are written in front of it by the
@@ -42,7 +48,19 @@ declare const self: ServiceWorkerGlobalScope
 declare const PRECACHE: readonly PrecacheEntry[]
 declare const PRECACHE_CACHE: string
 declare const SPRITE_CACHE: string
+declare const SPRITE_CACHE_PREFIX: string
 declare const OFFLINE_SHELL: string
+
+/**
+ * How long a navigation waits for the network before the shell answers it.
+ *
+ * A connection that is up and never answers — a captive portal, a train between
+ * stations — would otherwise keep the page blank for as long as the browser
+ * waits, which is minutes, while the shell boots the same game from what is
+ * installed. Three seconds: what the shell gives up is the prerendered page's
+ * first paint, which a connection that slow was not going to deliver sooner.
+ */
+const NAVIGATION_TIMEOUT = 3000
 
 /**
  * The key a file is kept under: its address with its revision appended.
@@ -76,7 +94,7 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
-  const response = respond(event.request)
+  const response = respond(event)
   if (response !== undefined) event.respondWith(response)
 })
 
@@ -103,15 +121,34 @@ async function install(): Promise<void> {
     if (!response.ok || response.redirected) {
       throw new Error(`${entry.url} answered ${response.status}${response.redirected ? ' through a redirect' : ''}`)
     }
+    // The revision is the hash of what the build shipped. A copy that hashes
+    // otherwise is another build's — the host moved on between the download of
+    // this worker and this one —, and kept under this revision it would answer
+    // this build's pages with the other build's content.
+    const revision = await revisionOf(await response.clone().arrayBuffer())
+    if (revision !== entry.revision) {
+      throw new Error(`${entry.url} is not the file this build listed: revision ${revision}, expected ${entry.revision}`)
+    }
     await cache.put(key, response)
   }))
 }
 
 /**
+ * The revision the build writes (`revisionOf` in `revision.ts`), computed the
+ * same way: SHA-256, its first eight bytes in hex.
+ */
+async function revisionOf(content: ArrayBuffer): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', content))
+
+  return [...digest.subarray(0, 8)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
  * Runs once no tab is left on the previous version — on a first install, right
- * away. Deletes the files of every build gone by, and takes the tabs open now:
- * on a first install, that is the page that registered the worker, which then
- * keeps what it shows from here on without a reload.
+ * away. Deletes the files of every build gone by and the thumbnails of every
+ * other revision of the art, and takes the tabs open now: on a first install,
+ * that is the page that registered the worker, which then keeps what it shows
+ * from here on without a reload.
  */
 async function activate(): Promise<void> {
   const cache = await caches.open(PRECACHE_CACHE)
@@ -119,11 +156,16 @@ async function activate(): Promise<void> {
   const stale = (await cache.keys()).filter(request => !current.has(request.url))
 
   await Promise.all(stale.map(request => cache.delete(request)))
+
+  const retired = (await caches.keys()).filter(name => name.startsWith(SPRITE_CACHE_PREFIX) && name !== SPRITE_CACHE)
+  await Promise.all(retired.map(name => caches.delete(name)))
+
   await self.clients.claim()
 }
 
 /** The answer to one request, or `undefined` to leave it to the browser. */
-function respond(request: Request): Promise<Response> | undefined {
+function respond(event: FetchEvent): Promise<Response> | undefined {
+  const { request } = event
   if (request.method !== 'GET') return undefined
 
   const url = new URL(request.url)
@@ -132,27 +174,38 @@ function respond(request: Request): Promise<Response> | undefined {
 
   const key = keyByUrl.get(url.href)
   if (key !== undefined) return installed(request, key)
-  if (url.pathname.startsWith('/sprites/')) return keptAsShown(request)
+  if (url.pathname.startsWith('/sprites/')) return keptAsShown(event)
 
   return undefined
 }
 
 /**
- * The network, and the shell only when there is no network at all. An answer
- * that arrives — a 404 for an address that does not exist, a 500 — goes to the
- * page as it came: the shell would render a page the server just said is not
- * there.
+ * The network, and the shell when there is no network — or when the network
+ * has not answered within `NAVIGATION_TIMEOUT`. An answer that arrives in time —
+ * a 404 for an address that does not exist, a 500 — goes to the page as it
+ * came: the shell would render a page the server just said is not there.
+ *
+ * With no shell to fall back on — a cache the browser cleared under a worker
+ * that is still running — the navigation waits for the network, however long.
  */
 async function navigate(request: Request): Promise<Response> {
-  try {
-    return await fetch(request)
-  }
-  catch (error) {
-    const shell = shellKey === undefined ? undefined : await (await caches.open(PRECACHE_CACHE)).match(shellKey)
-    if (shell === undefined) throw error
+  const network = fetch(request)
 
-    return shell
+  try {
+    return await Promise.race([network, timeout(NAVIGATION_TIMEOUT)])
   }
+  catch {
+    const shell = shellKey === undefined ? undefined : await (await caches.open(PRECACHE_CACHE)).match(shellKey)
+
+    return shell ?? network
+  }
+}
+
+/** A promise that rejects after `ms` — the losing side of a race, most of the time. */
+function timeout(ms: number): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`no answer in ${ms} ms`)), ms)
+  })
 }
 
 /**
@@ -164,17 +217,23 @@ async function installed(request: Request, key: string): Promise<Response> {
 }
 
 /**
- * A thumbnail: the one kept if there is one, else the network's, kept for next
- * time. Only a success is kept — a 404 stored here would outlive the file
- * being fixed.
+ * A thumbnail: the one kept if there is one, else the network's — kept for next
+ * time once the page has it, and only when it is an image sent as itself: a 404
+ * or a page kept here would outlive the file being fixed. Storage that refuses
+ * to keep it costs the next visit, never this one.
  */
-async function keptAsShown(request: Request): Promise<Response> {
+async function keptAsShown(event: FetchEvent): Promise<Response> {
   const cache = await caches.open(SPRITE_CACHE)
-  const kept = await cache.match(request)
+  const kept = await cache.match(event.request)
   if (kept !== undefined) return kept
 
-  const response = await fetch(request)
-  if (response.ok) await cache.put(request, response.clone())
+  const response = await fetch(event.request)
+  if (isThumbnail(response)) event.waitUntil(cache.put(event.request, response.clone()).catch(() => undefined))
 
   return response
+}
+
+/** Whether an answer is a thumbnail worth keeping: a success, an image, and not a redirect's. */
+function isThumbnail(response: Response): boolean {
+  return response.ok && !response.redirected && (response.headers.get('content-type') ?? '').startsWith('image/')
 }

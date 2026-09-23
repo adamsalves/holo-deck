@@ -1,8 +1,20 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import pkg from './package.json' with { type: 'json' }
 import { DEFAULT_LOCALE, LOCALES, pathInLocale } from './app/utils/locales.ts'
 import { OFFLINE_SHELL_PATH } from './app/utils/offline.ts'
+import { folderRevisionOf } from './scripts/service-worker/revision.ts'
 import { GYM_COUNT } from './shared/types/brand.ts'
+
+/**
+ * The dex's revision: every page asks for the dex by it (`dexUrl`), and the
+ * service worker installs the dex under the same addresses.
+ *
+ * Read once, here, from the files the build copies, and handed to both — the
+ * pages through `runtimeConfig`, the worker's builder in its hook — so there is
+ * no second reading to disagree with the first.
+ */
+const DEX_REVISION = folderRevisionOf(fileURLToPath(new URL('./public/data', import.meta.url)))
 
 /**
  * Sha curto do commit em produção. Num jogo com save local, "que versão você está
@@ -100,7 +112,7 @@ export default defineNuxtConfig({
     (_options, nuxt) => {
       nuxt.hook('nitro:build:public-assets', async (nitro) => {
         const { writeServiceWorker } = await import('./scripts/service-worker/build.ts')
-        const { entries, bytes } = await writeServiceWorker(nitro.options.output.publicDir)
+        const { entries, bytes } = await writeServiceWorker(nitro.options.output.publicDir, DEX_REVISION)
 
         console.info(`service worker: ${entries} files, ${Math.round(bytes / 1024)} KB installed on the first visit`)
       })
@@ -138,6 +150,7 @@ export default defineNuxtConfig({
     public: {
       appVersion: pkg.version,
       gitSha: resolveGitSha(),
+      dexRevision: DEX_REVISION,
     },
   },
 

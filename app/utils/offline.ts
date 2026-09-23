@@ -26,15 +26,46 @@ export const OFFLINE_SHELL_PATH = '/200.html'
 /** The first layer: code, dex, messages, fonts and the shell, installed whole. */
 export const PRECACHE_CACHE = 'holodeck-precache'
 
-/** The second layer: the 1025 thumbnails, kept as the pages show them. */
-export const SPRITE_CACHE = 'holodeck-sprites'
+/**
+ * The second layer: the 1025 thumbnails, kept as the pages show them — in a
+ * cache whose name ends in the revision of the art (`spriteCacheName`).
+ *
+ * A thumbnail keeps its address from build to build, and a kept one is answered
+ * without asking the network again. Under one name for good, art a build changed
+ * would never reach a device that kept the old one; under one name per revision,
+ * the worker of that build starts an empty cache and deletes the old one when it
+ * takes over. The build writes the whole name into the worker.
+ */
+export const SPRITE_CACHE_PREFIX = 'holodeck-sprites'
+
+/** The thumbnails' cache for one revision of the art. */
+export function spriteCacheName(revision: string): string {
+  return `${SPRITE_CACHE_PREFIX}-${revision}`
+}
+
+/**
+ * The address a page asks for one file of the dex by: the dex's revision rides
+ * along in it.
+ *
+ * The dex keeps its file names from build to build, and a page of a new build
+ * can be answered by the worker of an old one — a new worker waits for every tab
+ * on the old version to close, and a tab opened meanwhile is the old worker's
+ * too. With the revision in the address, a page asks for the dex it was built
+ * with: the old worker has no such address and leaves it to the network, and a
+ * page of the old build still gets the copy installed with it.
+ */
+export function dexUrl(name: string, revision: string): string {
+  return `/data/${name}?v=${revision}`
+}
 
 /**
  * One file the worker installs with.
  *
  * `url` is the address a page asks for; `revision` is a hash of the file's
  * content, so an unchanged file survives a new build without being downloaded
- * again, and a changed one never answers under its old content.
+ * again, and a changed one is downloaded under its new revision. What keeps an
+ * old worker from answering a new page with an old copy is the address: every
+ * installed file's changes with its content — the dex's through `dexUrl`.
  */
 export interface PrecacheEntry {
   readonly url: string
