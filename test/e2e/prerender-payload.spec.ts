@@ -188,13 +188,19 @@ async function routesByLocale(): Promise<Map<string, Set<string>>> {
  * than kept empty.** They were not a crawler failure: the League body is a
  * `<ClientOnly>`, so the links to `/battle/N` exist in no served HTML, and the
  * pt-BR nine were prerendered only because `nitro.prerender.routes` listed them
- * by hand. Being on that list is not what kept them out of `/en` — `/login` and
- * `/league` sit on the same list and get `/en` twins, emitted by `@nuxtjs/i18n`
- * for every **page whose path has no parameter left** in it
- * (`collectCompactPrerenderRoutes`). `/battle/:gymId` still carries one, so the
- * module emitted nothing for it. The config now spells the nine in every
- * language, built from the language list, and the build went from 2.095 pages
- * to 2.104 — 1.052 in each language.
+ * by hand. **What kept them out of `/en` was the parameter, not the list.** The
+ * twins of every other page come from Nuxt's own prerender plugin, which queues
+ * every route of the router with no parameter in its path — and the i18n module
+ * registers each page once per language. `/battle/:gymId` has one, so the plugin
+ * skipped it. The config now spells the nine in every language, built from the
+ * language list, and the build went from 2.095 pages to 2.104 — 1.052 in each
+ * language.
+ *
+ * This paragraph used to credit `@nuxtjs/i18n` and its
+ * `collectCompactPrerenderRoutes`, which only run with `nitro.static` — off in
+ * `nuxt build`. The review of PR #65 measured the difference: with `/login`,
+ * `/league` and `/pokedex` taken off the config's list, the build still wrote
+ * all six pages, in both languages.
  *
  * With the list gone, a route the build writes in one language only is a
  * failure here, named, whatever the reason. The day one genuinely has to be,

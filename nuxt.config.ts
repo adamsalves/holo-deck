@@ -140,45 +140,41 @@ export default defineNuxtConfig({
     prerender: {
       crawlLinks: true,
       /**
-       * A Liga e os nove ginásios entram à mão, e o rastreador não os alcança.
+       * **The nine gyms, in every language — and nothing else, because every
+       * other page comes out without a list.**
        *
-       * O corpo das duas telas é `<ClientOnly>` — insígnia e deck moram no
-       * `localStorage` —, então os links para `/battle/N` não existem no HTML
-       * servido. Sem esta lista, `/battle/3` seria a primeira rota válida do
-       * repositório a **não** ser pré-renderizada, e a premissa que sustenta o
-       * `useDex()` do servidor cairia junto: hoje a única classe de URL que
-       * chega à função é a inválida, que é quando ela precisa ler o índice para
-       * responder 404.
+       * What prerenders a page no link reaches is Nuxt's own prerender plugin
+       * (`nuxt/dist/pages/runtime/plugins/prerender.server.js`, loaded because
+       * `crawlLinks` is on): it queues every route of the router whose path has
+       * no parameter. The i18n module registers each page once per language —
+       * `/login` and `/en/login` are two routes — so every static screen comes
+       * out in both, linked or not. `/pokedex`, `/league` and `/login` sat on
+       * this list until the review of PR #65, on the belief that the crawler
+       * could not reach them; measured, the build without the three is the same
+       * 2.104 pages. Nor is it `@nuxtjs/i18n`, as this comment said for a PR:
+       * its prerender hook only runs with `nitro.static`, which `nuxt build`
+       * leaves off.
        *
-       * `GYM_COUNT` e não um `9` literal: o número é o mesmo contrato que a
-       * store, o guarda do save e a Liga leem, e uma cópia dele aqui só seria
-       * descoberta por um ginásio novo que ninguém consegue abrir em produção.
+       * `/battle/:gymId` has a parameter, so the plugin skips it, and no served
+       * page links to it: the League's body is a `<ClientOnly>` — badges and deck
+       * live in `localStorage` —, so the links to `/battle/N` exist in no served
+       * HTML. Without this list `/battle/3` would be the first valid route of the
+       * repository **not** prerendered, and the premise under the server's
+       * `useDex()` would fall with it: today the only class of URL that reaches
+       * the function is the invalid one, which is when it has to read the index
+       * to answer 404. Until the list named the nine `/en/battle/N`, the English
+       * battles were exactly that — served by the function, and carried by
+       * `test/e2e/prerender-payload.spec.ts` as its one exception.
        *
-       * **`/login` entra pela mesma razão, e não por ser especial.** A barra liga
-       * a rota — é o canto da conta —, mas o link mora dentro de `<ClientOnly>`,
-       * porque a sessão não existe no servidor: o rastreador não o vê. Sem esta
-       * linha, a única tela estática do jogo que renderiza a cada pedido seria
-       * justamente a que mais gente abre sem ter nada no `localStorage`.
-       *
-       * **The gyms are listed in every language, and the other routes are not.**
-       * `@nuxtjs/i18n` adds the other-language twin of every listed route whose
-       * page has no parameter left in its path — `/login` gets `/en/login` for
-       * free. `/battle/:gymId` still has one, so the module adds nothing, and
-       * until this list named the nine `/en/battle/N` the build wrote them in
-       * Portuguese only: the English battle was served by the function, and
-       * `test/e2e/prerender-payload.spec.ts` carried them as its one exception.
-       * Built from `LOCALES`, so a third language gets its nine the day it is
-       * declared.
+       * `GYM_COUNT` and not a literal `9`: the number is the same contract the
+       * store, the save guard and the League read, and a copy of it here would
+       * only be found out by a new gym nobody can open in production. And
+       * `LOCALES`, so a third language gets its nine the day it is declared.
        */
-      routes: [
-        '/pokedex',
-        '/league',
-        '/login',
-        ...LOCALES.flatMap(({ code }) => Array.from(
-          { length: GYM_COUNT },
-          (_, index) => pathInLocale(`/battle/${index + 1}`, code),
-        )),
-      ],
+      routes: LOCALES.flatMap(({ code }) => Array.from(
+        { length: GYM_COUNT },
+        (_, index) => pathInLocale(`/battle/${index + 1}`, code),
+      )),
     },
 
     /**
