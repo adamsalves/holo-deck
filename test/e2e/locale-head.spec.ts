@@ -24,21 +24,28 @@ import { defaultLocale, localeCodes, localeUrl } from '../support/locales.ts'
  * - **Absolute, `https`, and one origin across every page.** A relative link is
  *   the #39 defect; an `http://localhost` is what a `baseUrl` taken from the
  *   request would bake in, because every page is rendered by the prerenderer on
- *   the build machine. One origin, because a canonical pointing at a preview
- *   host would split the site in two for the index.
+ *   the build machine. One origin, because links split between two hosts would
+ *   split the site in two for the index. **Which origin is not asked**: a build
+ *   baked whole on a preview host has one origin too, and passes. This runs on
+ *   CI's build, where `VERCEL_PROJECT_PRODUCTION_URL` is unset and the config
+ *   takes its fallback; the Vercel branch only exists in a deploy, and is
+ *   checked there by hand.
  * - **Each alternate points at this page, in the language it names.** The
  *   expected path is built by `localeUrl` from `test/support/`, not by the
  *   module or by `pathInLocale`: an expectation from the code that wrote the
  *   link agrees with it when both are wrong.
- * - **Every language of the game has its alternate, plus `x-default`** — the
- *   list is `LOCALES`, so a third language is asked for the day it is declared,
- *   on every page. And an alternate naming a language the game does not have is
- *   a failure too, which is how a language registered in the config around the
- *   list would show up.
+ * - **Every language of the game has its two alternates, plus `x-default`** —
+ *   the regional tag, and the bare language the module adds as the catch-all
+ *   for the language's other regions (`pt-BR` and `pt`). The list is `LOCALES`,
+ *   so a third language is asked for the day it is declared, on every page. And
+ *   an alternate naming a language the game does not have is a failure too,
+ *   which is how a language registered in the config around the list would
+ *   show up.
  * - **The canonical and `og:url` are this page in its own language.**
- * - **`lang`, `dir` and `og:locale` declare the language of the URL.** `dir` was
- *   written by hand in `app.vue` until this PR; the module writes it now, and
- *   this is what says it still does.
+ * - **`lang`, `dir` and `og:locale` declare the language of the URL**, and
+ *   `og:locale:alternate` names every other language. `dir` was written by hand
+ *   in `app.vue` until this PR; the module writes it now, and this is what says
+ *   it still does.
  * - **The root guard is in the root and nowhere else** — see `rootGuardScript`.
  *   On any other page it would send a player who chose English out of a
  *   Portuguese link they were sent.
@@ -129,7 +136,17 @@ function languageOf(hreflang: string): string | undefined {
   if (hreflang === 'x-default') return defaultLocale()
 
   return LOCALES.find(locale => locale.language === hreflang)?.code
-    ?? LOCALES.find(locale => locale.language.split('-')[0] === hreflang)?.code
+    ?? LOCALES.find(locale => bareLanguage(locale.language) === hreflang)?.code
+}
+
+/** The language of a tag without its region — `pt` for `pt-BR`. */
+function bareLanguage(language: string): string {
+  return language.split('-')[0] ?? language
+}
+
+/** A BCP 47 tag the way Open Graph spells a locale — `pt_BR`. */
+function openGraphLocale(language: string): string {
+  return language.replace('-', '_')
 }
 
 test('every built page declares its language, and links to itself in every other', async () => {
@@ -179,8 +196,9 @@ test('every built page declares its language, and links to itself in every other
     }
 
     const declared = new Set(alternates.map(link => link.get('hreflang')))
-    for (const wanted of ['x-default', ...LOCALES.map(locale => locale.language)]) {
-      if (!declared.has(wanted)) missingAlternates.push(`${nameOf(page)} hreflang=${wanted}`)
+    const wanted = new Set(['x-default', ...LOCALES.flatMap(({ language }) => [language, bareLanguage(language)])])
+    for (const hreflang of wanted) {
+      if (!declared.has(hreflang)) missingAlternates.push(`${nameOf(page)} hreflang=${hreflang}`)
     }
 
     const canonicalLinks = page.links.filter(link => link.get('rel') === 'canonical')
@@ -195,12 +213,26 @@ test('every built page declares its language, and links to itself in every other
       wrongCanonical.push(`${nameOf(page)} og:url ${urlMetas.map(meta => meta.get('content')).join(', ') || '(none)'} ≠ canonical`)
     }
 
-    const openGraphLocale = page.metas.find(meta => meta.get('property') === 'og:locale')?.get('content')
-    const declaredLanguage = [page.html.get('lang'), page.html.get('dir'), openGraphLocale].join(' ')
-    const expectedLanguage = [own?.language, 'ltr', own?.language.replace('-', '_')].join(' ')
+    const ownOpenGraph = page.metas.find(meta => meta.get('property') === 'og:locale')?.get('content')
+    const declaredLanguage = [page.html.get('lang'), page.html.get('dir'), ownOpenGraph].join(' ')
+    const expectedLanguage = [own?.language, 'ltr', own && openGraphLocale(own.language)].join(' ')
 
     if (declaredLanguage !== expectedLanguage) {
       wrongLanguage.push(`${nameOf(page)}: lang dir og:locale = ${declaredLanguage}, not ${expectedLanguage}`)
+    }
+
+    // By set: every other language, and only those.
+    const declaredOthers = page.metas
+      .filter(meta => meta.get('property') === 'og:locale:alternate')
+      .map(meta => meta.get('content') ?? '(empty)')
+      .sort()
+    const expectedOthers = LOCALES
+      .filter(locale => locale.code !== page.code)
+      .map(locale => openGraphLocale(locale.language))
+      .sort()
+
+    if (declaredOthers.join(' ') !== expectedOthers.join(' ')) {
+      wrongLanguage.push(`${nameOf(page)}: og:locale:alternate = ${declaredOthers.join(', ') || '(none)'}, not ${expectedOthers.join(', ')}`)
     }
   }
 

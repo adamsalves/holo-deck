@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test'
 import * as uiLocales from '@nuxt/ui/locale'
 import { LOCALE_KEY, ROOT_GUARD_ID } from '../../app/utils/locale-preference.ts'
 import { LOCALES } from '../../app/utils/locales.ts'
-import { defaultLocale, label, localeUrl } from '../support/locales.ts'
-import { navLabel, pathPattern } from './support.ts'
+import { defaultLocale, label, localeUrl, message } from '../support/locales.ts'
+import { fakeSync, navLabel, pathPattern, saveWith, seedLocalSave } from './support.ts'
 
 /**
  * The language selector in *Settings*, the root that follows it, and what does
@@ -26,6 +26,14 @@ function selector(page: Page, code: string) {
 function segment(page: Page, from: string, to: string) {
   return selector(page, from).getByRole('link', { name: to.toUpperCase(), exact: true })
 }
+
+/**
+ * The selector as the board *Ajustes* draws it, left to right — written the way
+ * the board writes it, and not read from `LOCALES`: an expectation built from
+ * the list the template walks agrees with any order the list takes. A third
+ * language is a new segment on the board first, and a new entry here with it.
+ */
+const BOARD_SEGMENTS = ['PT-BR', 'EN']
 
 /** What this device remembers — `null` when nothing was chosen. */
 function remembered(page: Page): Promise<string | null> {
@@ -64,8 +72,7 @@ test('the selector moves this page to each language, and the document goes with 
   await page.goto(localeUrl('/settings', defaultLocale()))
 
   // Every language, in the order the board draws them — and nothing chosen yet.
-  await expect(selector(page, defaultLocale()).getByRole('link'))
-    .toHaveText(LOCALES.map(locale => locale.code.toUpperCase()))
+  await expect(selector(page, defaultLocale()).getByRole('link')).toHaveText(BOARD_SEGMENTS)
   expect(await remembered(page)).toBeNull()
 
   // Away through every other language, and back to the root's: every click is a
@@ -141,6 +148,12 @@ test('a click that opens the other language in a new tab is not a choice', async
  * of the body instead, the screen is already parsed when it runs — and on
  * localhost the answer still arrives before a paint, so that defect passed this
  * test five runs out of five. Held back 600 ms, it failed five out of five.
+ *
+ * **Chromium, Firefox and WebKit alike.** The suite runs Chromium only; the
+ * other two were measured once, in the review of PR #65, with Playwright's
+ * Firefox 153 and WebKit 26.5 — WebKit being the engine under every iOS
+ * browser. This test passed five out of five in each, and with the guard at the
+ * end of the body it failed three out of three in each of the three engines.
  */
 test('the root opens in the remembered language, without painting the other one', async ({ page }) => {
   const other = otherLanguage()
@@ -254,6 +267,51 @@ test('a link keeps the language of its URL, and so does the way back to the root
     path: localeUrl('/', root.code),
     guards: 0,
   })
+})
+
+/**
+ * A root opened as a document follows the choice — including the ones the app
+ * opens itself.
+ *
+ * Signing out, deleting the account and the way back from the GitHub login all
+ * load `/` as a new document, in the language of the page they left, and a root
+ * opened is a root opened: the guard runs, and someone who chose English lands
+ * in English even when they signed out from a Portuguese page. Decided in the
+ * review of PR #65 — the choice applies at the root however the root is opened,
+ * and only a client-side visit, *Base* above, keeps the language of the page.
+ * Signing out is the one of the three this suite can drive; the other two load
+ * the same `/`.
+ *
+ * The barrier is the language of the document, and not a `load`: the root is
+ * replaced while it parses, so the `load` that comes is the other language's,
+ * and the URL and `lang` below wait for it.
+ */
+test('signing out from a Portuguese page lands in the language this device remembers', async ({ page }) => {
+  const root = rootLanguage()
+  const other = otherLanguage()
+
+  const sync = await fakeSync(page, null)
+  await seedLocalSave(page, saveWith())
+  await choose(page, root.code, other.code)
+
+  await page.goto(localeUrl('/rules', root.code))
+  await expect(page.locator('html')).toHaveAttribute('lang', root.language)
+
+  // Signed in and settled, as in the sign-out test of `sync.spec.ts`: the first
+  // login marks this device, and signing out is what undoes it.
+  const nav = page.locator('.nav')
+  await expect(nav.getByText(message('account.signedInAs', root.code, { name: 'Treinadora Ash' }))).toBeAttached()
+  await expect.poll(() => sync.sessions()).toBeGreaterThan(0)
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('holodeck:syncedWith'))).toBe('e2e')
+
+  await nav.getByRole('button', { name: label('account.signOut', root.code) }).click()
+
+  await expect(page).toHaveURL(pathPattern(localeUrl('/', other.code)))
+  await expect(page.locator('html')).toHaveAttribute('lang', other.language)
+
+  // Signing out is not un-choosing: the language belongs to the device, and not
+  // to the account.
+  expect(await remembered(page)).toBe(other.code)
 })
 
 /**
