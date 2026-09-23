@@ -87,6 +87,11 @@ export class LocalStorageDriver implements SaveDriver {
   readonly #now: () => number
 
   /**
+   * Whether the save on disk was written by a newer build — see `holdsNewerSave`.
+   */
+  #newerSaveOnDisk = false
+
+  /**
    * `now` é injetado pelo mesmo motivo que `storage`: a chave de backup carrega
    * o instante, e um teste que não controla o relógio só pode afirmar que a
    * chave *começa* com o prefixo — o que deixaria passar um backup gravado com
@@ -133,13 +138,36 @@ export class LocalStorageDriver implements SaveDriver {
 
     const result = migrate(parsed)
     if (result.recovered !== null) this.#backup(raw)
+    this.#newerSaveOnDisk = result.recovered === 'unknown-version'
 
     return result
   }
 
+  /**
+   * Whether the save on disk was written by a newer build than this one — and so
+   * must not be written over.
+   *
+   * **The service worker made this a path every player can take.** A new worker
+   * waits for every tab on the old version to close, and until then a page the
+   * network brings runs the new build, which may migrate the save one version
+   * up, while a page opened offline gets the old build's shell. That old build
+   * reads the newer save as `unknown-version` and starts clean; writing its
+   * first move over the key would hand the new build, once it takes over, a save
+   * with nothing in it, and leave the player's own only in the backup ring. So
+   * the session plays in memory, and the next boot of the new build finds the
+   * save where it left it.
+   *
+   * Lifted by the paths that replace the save on purpose: deleting it
+   * (`clear`), and archiving the text on disk first, as every replace path in
+   * `/settings` does (`archive`).
+   */
+  get holdsNewerSave(): boolean {
+    return this.#newerSaveOnDisk
+  }
+
   async save(data: SaveData): Promise<void> {
     const storage = this.#storage
-    if (storage === null) return
+    if (storage === null || this.#newerSaveOnDisk) return
 
     try {
       storage.setItem(SAVE_KEY, JSON.stringify(data))
@@ -154,6 +182,8 @@ export class LocalStorageDriver implements SaveDriver {
   async clear(): Promise<void> {
     try {
       this.#storage?.removeItem(SAVE_KEY)
+      // Deleted on purpose: there is no newer save left to keep.
+      this.#newerSaveOnDisk = false
     }
     catch { /* mesmo raciocínio de `save` */ }
   }
@@ -188,6 +218,10 @@ export class LocalStorageDriver implements SaveDriver {
    */
   archive(raw: string): void {
     this.#backup(raw)
+    // The text on disk archived on purpose is the player replacing it: from here
+    // what goes over it is their choice. Archiving anything else — the server's
+    // copy, which the sync keeps before adopting its own — lifts nothing.
+    if (this.#newerSaveOnDisk && raw === this.readRaw()) this.#newerSaveOnDisk = false
   }
 
   /**
@@ -237,6 +271,12 @@ export class LocalStorageDriver implements SaveDriver {
 
   #backup(raw: string): void {
     try {
+      // A text the newest copy already holds is not copied again: a newer save
+      // the old build cannot read is read at every boot of that build, and a copy
+      // per boot would push every other one out of the ring.
+      const [newest] = this.listBackups()
+      if (newest !== undefined && this.readBackup(newest.key) === raw) return
+
       // A poda vem antes da escrita, e não depois: se a cota já estiver cheia, é
       // liberar espaço primeiro que faz esta cópia caber. Depois seria tentar
       // gravar, falhar, e podar para ninguém.

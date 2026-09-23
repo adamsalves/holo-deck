@@ -358,3 +358,95 @@ describe('o caminho voluntário de /settings', () => {
     expect(driver.readBackup(backupKey(100))).toBeNull()
   })
 })
+
+/**
+ * A save a newer build wrote, read by an older one.
+ *
+ * The service worker made this a path every player can take: a new worker waits
+ * for every tab on the old version to close, the new build may migrate the save
+ * one version up meanwhile, and a page opened offline gets the old build's
+ * shell. Writing the old build's first move over the key would hand the new
+ * build an empty save once it takes over.
+ */
+describe('a save from a newer build', () => {
+  const newer = JSON.stringify({ ...emptySave(), schemaVersion: SCHEMA_VERSION + 1, dust: 777 })
+
+  async function loaded(initial: Record<string, string>): Promise<{ driver: LocalStorageDriver, storage: ReturnType<typeof fakeStorage> }> {
+    const storage = fakeStorage(initial)
+    const driver = new LocalStorageDriver(storage, () => FROZEN)
+    await driver.load()
+
+    return { driver, storage }
+  }
+
+  it('is not written over by this build', async () => {
+    const { driver, storage } = await loaded({ [SAVE_KEY]: newer })
+
+    await driver.save({ ...emptySave(), dust: 5 })
+
+    expect(driver.holdsNewerSave).toBe(true)
+    expect(storage.data[SAVE_KEY]).toBe(newer)
+  })
+
+  // The other side: the same write goes through over a save this build reads,
+  // and over one it could not read for another reason.
+  it('while a save this build reads, or one it refused as corrupt, is written over as always', async () => {
+    for (const initial of [JSON.stringify(emptySave()), '{ not json']) {
+      const { driver, storage } = await loaded({ [SAVE_KEY]: initial })
+
+      await driver.save({ ...emptySave(), dust: 5 })
+
+      expect(driver.holdsNewerSave, initial).toBe(false)
+      expect(storage.data[SAVE_KEY], initial).toBe(JSON.stringify({ ...emptySave(), dust: 5 }))
+    }
+  })
+
+  it('is written over once the player archives it to replace it', async () => {
+    const { driver, storage } = await loaded({ [SAVE_KEY]: newer })
+
+    driver.archive(newer)
+    await driver.save({ ...emptySave(), dust: 5 })
+
+    expect(storage.data[SAVE_KEY]).toBe(JSON.stringify({ ...emptySave(), dust: 5 }))
+  })
+
+  it('is written over once the player deletes it', async () => {
+    const { driver, storage } = await loaded({ [SAVE_KEY]: newer })
+
+    await driver.clear()
+    await driver.save({ ...emptySave(), dust: 5 })
+
+    expect(storage.data[SAVE_KEY]).toBe(JSON.stringify({ ...emptySave(), dust: 5 }))
+  })
+
+  it('stays when what is archived is another text — the server\'s copy the sync keeps', async () => {
+    const { driver, storage } = await loaded({ [SAVE_KEY]: newer })
+
+    driver.archive(JSON.stringify(emptySave()))
+    await driver.save({ ...emptySave(), dust: 5 })
+
+    expect(storage.data[SAVE_KEY]).toBe(newer)
+  })
+
+  /**
+   * The old build reads the newer save at every boot. A copy per boot would push
+   * every other copy out of a ring of three by the third — including the ones a
+   * delete or an import in `/settings` left there.
+   */
+  it('is copied to the ring once, however many boots read it, and pushes no other copy out', async () => {
+    const storage = fakeStorage({
+      [SAVE_KEY]: newer,
+      [backupKey(FROZEN - 2)]: 'archived by a delete',
+      [backupKey(FROZEN - 1)]: 'archived by an import',
+    })
+
+    for (let boot = 0; boot < MAX_BACKUPS + 1; boot += 1) {
+      await new LocalStorageDriver(storage, () => FROZEN + boot).load()
+    }
+
+    const backups = Object.keys(storage.data).filter(key => key.startsWith(BACKUP_PREFIX)).sort()
+
+    expect(backups).toEqual([backupKey(FROZEN - 2), backupKey(FROZEN - 1), backupKey(FROZEN)].sort())
+    expect(storage.data[backupKey(FROZEN)]).toBe(newer)
+  })
+})

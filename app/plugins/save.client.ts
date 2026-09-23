@@ -72,6 +72,12 @@ export default defineNuxtPlugin({
         battle.log,
       ],
       () => {
+        // A save a newer build wrote is on disk, and this one could not read it:
+        // the session plays in memory, and neither the stamp nor the sync hears
+        // of it (see `holdsNewerSave`). Read at every write, because deleting or
+        // replacing the save in `/settings` lifts it mid-session.
+        if (driver.holdsNewerSave) return
+
         const doc = composeSave(nuxtApp.$pinia)
         void driver.save(doc)
         // O carimbo de "última partida", que a tela *Duas coleções* compara com

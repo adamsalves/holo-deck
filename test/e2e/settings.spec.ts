@@ -4,7 +4,7 @@ import { RECOVERY_REASONS, recoveryMessageKey } from '../../app/utils/recovery-r
 import type { RecoveryReason } from '../../shared/save/schema.ts'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
 import { foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
-import { fakeSync, saveWith, screenText, seedLocalSave, seedSynced } from './support.ts'
+import { fakeSync, openWelcomePack, saveWith, screenText, seedLocalSave, seedSynced } from './support.ts'
 
 /**
  * `/settings` in the language of the URL — and the two texts on it that render
@@ -210,6 +210,45 @@ test('the recovery notice speaks the language of the URL, for every reason', asy
         .toContainText(message(recoveryMessageKey(reason), code))
       await expect(notice, `dismiss button in ${code}`)
         .toContainText(label('save.recovery.dismiss', code))
+    }
+  }
+})
+
+/**
+ * A save a newer build wrote, and this build's first move after reading it. The
+ * service worker made this a path every player can take — offline, the old
+ * build's shell answers while the new build's worker waits for the old tabs to
+ * close —, and the session plays in memory: the save on disk stays the newer
+ * one, for the new build to find (see `holdsNewerSave`).
+ *
+ * The corrupt save is the other side: the same move over a save this build
+ * refused for any other reason is written and stamped, which is what shows the
+ * move reached the disk at all. The barrier is the opening on screen — the
+ * save's watcher runs before the render that shows it.
+ */
+test('a save from a newer build stays on disk as it was while this build plays', async ({ page }) => {
+  for (const [reason, keptAsItWas] of [['unknown-version', true], ['corrupt', false]] as const) {
+    const seed = REFUSED[reason]
+    await page.goto('/')
+    await page.evaluate((raw) => {
+      window.localStorage.setItem('holodeck:save', raw)
+      // The last-play stamp `markWrite` keeps beside the save.
+      window.localStorage.removeItem('holodeck:lastWrite')
+    }, seed)
+
+    await openWelcomePack(page)
+    const { onDisk, stamp } = await page.evaluate(() => ({
+      onDisk: window.localStorage.getItem('holodeck:save'),
+      stamp: window.localStorage.getItem('holodeck:lastWrite'),
+    }))
+
+    if (keptAsItWas) {
+      expect(onDisk, 'the newer save was written over').toBe(seed)
+      expect(stamp, 'a session that wrote nothing stamped a last play').toBeNull()
+    }
+    else {
+      expect(onDisk, 'the move never reached the disk').not.toBe(seed)
+      expect(stamp, 'the move was never stamped').not.toBeNull()
     }
   }
 })
