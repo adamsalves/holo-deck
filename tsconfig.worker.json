@@ -1,0 +1,11 @@
+{
+  "//": "Seventh project of the solution: the service worker. It runs in a worker, where `window` and `document` do not exist and `self` is a `ServiceWorkerGlobalScope` — so the tools project (`lib: esnext`, Node's types) cannot see `caches` or `FetchEvent`, and the app's (the DOM) would let it read `document` and compile. It covers one file on purpose: the builder next to it, `scripts/service-worker/build.ts`, runs in Node and stays with the tools.",
+  "extends": "./tsconfig.tools.json",
+  "compilerOptions": {
+    "lib": ["esnext", "webworker"],
+    "types": []
+  },
+  "//exclude": "Empty, and not by oversight: `exclude` is inherited through `extends`, and the tools project's own list excludes this very file — without this line the project would include and exclude it at once, come out empty, and the ESLint project service would refuse the worker. The same trap `tsconfig.e2e.json` fell into first.",
+  "exclude": [],
+  "include": ["scripts/service-worker/worker.ts"]
+}

@@ -21,8 +21,8 @@
       "@/*": ["./app/*"]
     }
   },
-  "//exclude": "test/nuxt/ é coberto pelo tsconfig.app.json do Nuxt, que traz os auto-imports (`useState`, `createError`). Incluí-lo aqui também faria este projeto type-checkar código de app/ sem esses ambientes, e o erro apontaria para o composable em vez de para a configuração. test/e2e/ sai por outro motivo: o corpo de `page.evaluate` roda no navegador e precisa da lib `dom`, que este projeto não tem — ver tsconfig.e2e.json.",
-  "exclude": ["test/nuxt/**/*", "test/e2e/**/*"],
+  "//exclude": "test/nuxt/ é coberto pelo tsconfig.app.json do Nuxt, que traz os auto-imports (`useState`, `createError`). Incluí-lo aqui também faria este projeto type-checkar código de app/ sem esses ambientes, e o erro apontaria para o composable em vez de para a configuração. test/e2e/ sai por outro motivo: o corpo de `page.evaluate` roda no navegador e precisa da lib `dom`, que este projeto não tem — ver tsconfig.e2e.json. The service worker leaves for the same kind of reason: it runs in a worker and needs the `webworker` library — see tsconfig.worker.json.",
+  "exclude": ["test/nuxt/**/*", "test/e2e/**/*", "scripts/service-worker/worker.ts"],
   "include": [
     "test/**/*",
     "scripts/**/*",

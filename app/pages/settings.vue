@@ -31,10 +31,11 @@ import { useSync } from '~/composables/useSync'
  * conta e save do servidor*. Sem conta a tela continua sendo a do aparelho — o
  * título diz isso —, e as três coisas somem em vez de aparecer desligadas.
  *
- * What is still held back is what has nothing to stand on: *download
- * everything for offline* needs the PWA of Phase 8's PR 5. Decided on 05/09:
- * only what has data goes in, and the rest is **named** in a *Not yet* panel and
- * in the README. Sound left that panel without arriving — the phase retired it
+ * What is still held back is *download everything for offline*. The worker it
+ * fills arrived in Phase 8's PR 5a; the button waits for the board of its states
+ * — downloading, done, failed —, drawn in the canvas cycle before PR 5b. Decided
+ * on 05/09: only what can be drawn and fed goes in, and the rest is **named** in
+ * a *Not yet* panel and in the README. Sound left that panel without arriving — the phase retired it
  * on 12/09 and the board stopped drawing it in version 16 — and the language
  * selector left it by arriving, in the first row of *Preferences*.
  */

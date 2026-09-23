@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process'
 import pkg from './package.json' with { type: 'json' }
 import { DEFAULT_LOCALE, LOCALES, pathInLocale } from './app/utils/locales.ts'
+import { OFFLINE_SHELL_PATH } from './app/utils/offline.ts'
 import { GYM_COUNT } from './shared/types/brand.ts'
 
 /**
@@ -79,6 +80,29 @@ export default defineNuxtConfig({
 
         const index = pages.findIndex(page => page.path === '/styleguide')
         if (index !== -1) pages.splice(index, 1)
+      })
+    },
+
+    /**
+     * **The service worker, written once the prerender is done** — see
+     * `scripts/service-worker/build.ts` for what it installs, and
+     * `scripts/service-worker/worker.ts` for how it answers.
+     *
+     * `nitro:build:public-assets` and not an earlier hook: it runs after the
+     * prerender has written every page and after `public/` has been copied in,
+     * so the shell the worker falls back on and the files it hashes are the ones
+     * that ship — in `.output/public` and in `.vercel/output/static` alike. It
+     * does not run in `yarn dev`, which has no worker.
+     *
+     * Imported inside the hook and not at the top of this file: the builder
+     * brings the TypeScript compiler, and every `nuxt` command reads this file.
+     */
+    (_options, nuxt) => {
+      nuxt.hook('nitro:build:public-assets', async (nitro) => {
+        const { writeServiceWorker } = await import('./scripts/service-worker/build.ts')
+        const { entries, bytes } = await writeServiceWorker(nitro.options.output.publicDir)
+
+        console.info(`service worker: ${entries} files, ${Math.round(bytes / 1024)} KB installed on the first visit`)
       })
     },
   ],
@@ -170,11 +194,22 @@ export default defineNuxtConfig({
        * store, the save guard and the League read, and a copy of it here would
        * only be found out by a new gym nobody can open in production. And
        * `LOCALES`, so a third language gets its nine the day it is declared.
+       *
+       * **And the offline shell, which no link reaches either.** `200.html` is
+       * one of the addresses Nuxt's renderer serves with no app on the server
+       * (`PRERENDER_NO_SSR_ROUTES`): an empty document that boots the game on the
+       * client for whatever address it is opened at. It is what the service
+       * worker answers every navigation with once the network is gone, so each
+       * of the 2,104 pages is playable offline without the worker installing any
+       * of them. `nuxt generate` adds it on its own; `nuxt build` only when told.
        */
-      routes: LOCALES.flatMap(({ code }) => Array.from(
-        { length: GYM_COUNT },
-        (_, index) => pathInLocale(`/battle/${index + 1}`, code),
-      )),
+      routes: [
+        OFFLINE_SHELL_PATH,
+        ...LOCALES.flatMap(({ code }) => Array.from(
+          { length: GYM_COUNT },
+          (_, index) => pathInLocale(`/battle/${index + 1}`, code),
+        )),
+      ],
     },
 
     /**
