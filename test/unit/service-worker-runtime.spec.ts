@@ -237,6 +237,24 @@ describe('the install', () => {
     await expect(worker.dispatch('install')).rejects.toThrow(`${DEX} is not the file this build listed`)
   })
 
+  /**
+   * The one exception, and a measured one: Vercel's previews append the feedback
+   * toolbar's script to every HTML document they serve, after `</html>`, so the
+   * shell never hashes to the file the build wrote. Checked like the rest, it
+   * kept the worker from ever installing on a preview.
+   */
+  it('keeps the shell as the host serves it, decorated or not', async () => {
+    const toolbar = '<script async src="https://vercel.live/_next-live/feedback/feedback.js"></script>'
+    const worker = boot(async url => (url.endsWith('/200.html')
+      ? new Response(`${SITE['/200.html'] ?? ''}${toolbar}`, { headers: { 'content-type': 'text/html' } })
+      : server(url)))
+
+    await worker.dispatch('install')
+
+    const shell = await (await worker.caches.open('holodeck-precache')).match(keyOf('/200.html', SITE['/200.html'] ?? ''))
+    expect(await shell?.text()).toBe(`${SITE['/200.html'] ?? ''}${toolbar}`)
+  })
+
   it('fails whole on a refusal, and on a redirect', async () => {
     const refused = boot(async url => (url.endsWith('/200.html') ? new Response('gone', { status: 404 }) : server(url)))
     await expect(refused.dispatch('install')).rejects.toThrow('/200.html answered 404')

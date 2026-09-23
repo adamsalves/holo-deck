@@ -125,9 +125,19 @@ async function install(): Promise<void> {
     // otherwise is another build's — the host moved on between the download of
     // this worker and this one —, and kept under this revision it would answer
     // this build's pages with the other build's content.
-    const revision = await revisionOf(await response.clone().arrayBuffer())
-    if (revision !== entry.revision) {
-      throw new Error(`${entry.url} is not the file this build listed: revision ${revision}, expected ${entry.revision}`)
+    //
+    // All but the shell. A host may decorate the HTML it serves, and Vercel's
+    // previews do: they append the feedback toolbar's script to every document,
+    // after `</html>`. Measured on the preview of this very check — the shell
+    // never hashed to the file the build wrote, and the worker never installed.
+    // The shell only answers offline, and another build's would name chunks
+    // this list does not have; a deploy landing mid-install mostly fails on
+    // those chunks' 404s first.
+    if (entry.url !== OFFLINE_SHELL) {
+      const revision = await revisionOf(await response.clone().arrayBuffer())
+      if (revision !== entry.revision) {
+        throw new Error(`${entry.url} is not the file this build listed: revision ${revision}, expected ${entry.revision}`)
+      }
     }
     await cache.put(key, response)
   }))

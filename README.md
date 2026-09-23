@@ -1623,7 +1623,9 @@ no hook `nitro:build:public-assets`). Em `yarn dev` não há worker.
 Cada arquivo instalado leva a revisão do conteúdo (SHA-256, 16 dígitos): um build novo
 baixa só o que mudou, e o worker confere o hash do que baixou — uma cópia de outro
 build, servida por um deploy que entrou no meio da instalação, aborta a instalação em
-vez de ficar guardada sob a revisão errada. As fontes são as faces cujo `unicode-range`
+vez de ficar guardada sob a revisão errada. Tudo menos o shell: o preview da Vercel
+acrescenta o script da barra de feedback a todo HTML que serve, depois do `</html>`, e
+com o shell conferido o worker nunca instalava num preview (medido). As fontes são as faces cujo `unicode-range`
 cobre o latim — 10 dos 36 arquivos que o `@nuxt/fonts` escreve; extensão latina,
 cirílico, grego e vietnamita nenhum dos dois idiomas pede, e o portão confere isso
 perguntando ao navegador, com todo caractere dos locales e do dex.
