@@ -341,6 +341,23 @@ function session(): unknown {
 }
 
 /**
+ * One turn of a battle, whatever the screen is asking for.
+ *
+ * After a faint the engine demands a switch and the moves go away — a `click` on
+ * the first `.move` would hang the suite waiting for a button the screen does not
+ * draw. Shared by the League's suite and the offline one, which plays a battle to
+ * the end with the network gone.
+ */
+export async function playTurn(page: Page): Promise<void> {
+  const forced = page.locator('.battle__forced')
+  if (await forced.isVisible()) {
+    await page.locator('.battle__pill:not([disabled])').first().click()
+    return
+  }
+  await page.locator('.move').first().click()
+}
+
+/**
  * Semeia o save deste navegador antes de a página abrir.
  *
  * Direto no `localStorage` e não abrindo packs pela tela: aqui o que se afirma é
