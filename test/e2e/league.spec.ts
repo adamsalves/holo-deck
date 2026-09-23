@@ -14,7 +14,7 @@ import {
   readLocale,
   spells,
 } from '../support/locales'
-import { openWelcomePack } from './support'
+import { openWelcomePack, playTurn } from './support'
 
 /**
  * A Liga e a batalha num navegador de verdade.
@@ -55,21 +55,6 @@ async function fillDeck(page: Page): Promise<void> {
 
   for (let slot = 0; slot < 6; slot += 1) await picks.first().click()
   await expect(page.locator('.deck-slot--empty')).toHaveCount(0)
-}
-
-/**
- * Um turno, seja qual for o que a tela está pedindo.
- *
- * Depois de um desmaio o motor exige troca e os golpes somem — um `click` no
- * primeiro `.move` travaria a suíte esperando um botão que a tela não desenha.
- */
-async function playTurn(page: Page): Promise<void> {
-  const forced = page.locator('.battle__forced')
-  if (await forced.isVisible()) {
-    await page.locator('.battle__pill:not([disabled])').first().click()
-    return
-  }
-  await page.locator('.move').first().click()
 }
 
 test('a Liga abre no primeiro ginásio e mantém os outros fechados', async ({ page }) => {

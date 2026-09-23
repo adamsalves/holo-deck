@@ -19,11 +19,11 @@ import { defaultLocale, localeCodes } from '../support/locales'
  */
 
 /**
- * Where the guard sent the root, given `stored` under its key — or given a
- * storage that throws, which is what a private window or blocked site data
- * looks like. Empty is "stayed".
+ * Where the guard sent the page at `pathname`, given `stored` under its key — or
+ * given a storage that throws, which is what a private window or blocked site
+ * data looks like. Empty is "stayed".
  */
-function runGuard(stored: string | null | 'throws'): readonly string[] {
+function runGuard(stored: string | null | 'throws', pathname = '/'): readonly string[] {
   const replacedWith: string[] = []
 
   runInNewContext(rootGuardScript(), {
@@ -35,6 +35,7 @@ function runGuard(stored: string | null | 'throws'): readonly string[] {
       },
     },
     location: {
+      pathname,
       search: '?from=home-screen',
       hash: '#daily',
       replace(to: string): void {
@@ -95,5 +96,27 @@ describe('the root guard', () => {
 
   it('and a storage that throws is the root in its own language, not an error', () => {
     expect(runGuard('throws')).toEqual([])
+  })
+
+  /**
+   * **The offline shell answers every path, and the guard goes with it.**
+   *
+   * Online, the script only exists in the root's own HTML, so where it runs is
+   * always `/`. Offline, the service worker answers any navigation with one
+   * document — `200.html`, with this same script in its head — and without the
+   * check a player who chose English and opens `/pokemon/pikachu` offline would
+   * be sent to the English home page instead of the page they asked for.
+   *
+   * The paths are the other language's root, a page with no prefix and a page
+   * with one: each is somewhere a shell can be opened, and none is the root.
+   */
+  it('leaves every other path alone, which is what the offline shell needs', () => {
+    const elsewhere = ['/pokemon/pikachu', '/collection', ...PREFIXED.flatMap(code => [`/${code}`, `/${code}/deck`])]
+
+    for (const pathname of elsewhere) {
+      for (const code of PREFIXED) {
+        expect(runGuard(code, pathname), `${pathname} with ${code} remembered`).toEqual([])
+      }
+    }
   })
 })

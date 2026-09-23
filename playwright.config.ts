@@ -30,6 +30,16 @@ export default defineConfig({
   use: {
     baseURL,
     trace: 'on-first-retry',
+    /**
+     * **Blocked everywhere but `offline.spec.ts`**, which lets them in.
+     *
+     * Once the worker takes a page, what it answers never reaches `page.route`:
+     * the suites that hold a request back or answer it themselves — the fake
+     * account, the delayed `/en` of the root guard — would be measuring the
+     * worker's cache instead of the page. And the game with no worker is the
+     * one every first visit gets, so it stays the one the suite plays.
+     */
+    serviceWorkers: 'block',
   },
 
   projects: [

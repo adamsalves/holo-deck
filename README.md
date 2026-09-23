@@ -448,6 +448,14 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | restaurar **troca** a versão atual e a anterior, e o servidor guarda o instante da anterior (`previous_updated_at`, migration `0002`) | o plano escreve "volta para `previousData`". Voltar sem trocar perderia a atual, e um restaurar sem querer não teria desfazer; com a troca, restaurar de novo desfaz. O instante é o que deixa a tela escrever "feita há 2 min", que a prancha *Ajustes* pede e a tabela do plano não guardava |
 | excluir a conta é o `deleteUser` do `better-auth`, e não uma rota `DELETE /api/account` nossa | o endpoint da biblioteca apaga o usuário e as sessões e limpa o cookie; o save e o contador de escritas vão pelo `onDelete: 'cascade'` do banco, que o plano já previa. O que decide é a trava que vem junto: conta sem senha — todas aqui — só se exclui com sessão de menos de um dia (`freshAge`), então um aparelho esquecido logado não apaga a coleção de ninguém num clique. **O save deste aparelho fica**: excluir a conta não é *Apagar save deste aparelho* |
 
+### Decidido no PR 5 da Fase 8, contra o que o plano fechava
+
+| divergência | por quê |
+|---|---|
+| **sem `routeRules`**, e sem `ssr: false` nas rotas de jogo | o pré-render que o plano pedia já acontece pelo rastreador. `ssr: false` serviria as ~30 páginas de jogo como o shell é servido — `<html>` sem `lang`, sem `hreflang` e sem a guarda da raiz, que o 4d-2 acabou de pôr lá. O motivo era o offline, e o shell o resolve |
+| **service worker nosso**, e não `@vite-pwa/nuxt` | o spike deste PR mediu o módulo (1.1.1, sem release para Nuxt 4): com o padrão, ele instalava os 2.104 `_payload.json` (7,5 MB) e nenhum JS; reescrevia `200.html` como `/200`, que responde 404, e o worker nunca ativava; e custava 1.932 linhas de lockfile e 211 pacotes. O que o jogo precisa é uma lista e três regras |
+| **2,1 MB instalados, ~680 KB na rede**, e não "~310 KB" | o número do plano é de antes de o jogo existir. A lista do plano também não tinha o `index.json` (busca e Detalhe), as mensagens de i18n (o shell as busca por rede) nem as fontes. O orçamento é por fonte, em `offline-precache.spec.ts` |
+
 ### Decidido na Fase 7, contra o que a prancha desenhava
 
 | divergência | por quê |
@@ -482,7 +490,7 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | a loja tem **três** cartões, e não dois | os packs de boas-vindas existem desde a Fase 5 e precisam de onde ser abertos. Virá-los o primeiro da fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário; a alternativa — a loja só aparecer depois deles — esconderia saldo e preço de quem está começando |
 | sublinhado ativo em `--accent` em toda página | a prancha *Hub* o desenha azul e a *Loja* roxo, para o mesmo papel. É variação de mockup desenhado à mão, como o `2px`/`3px` que a Fase 2 normalizou num `--radius` só |
 | ~~sem o avatar de 32px no canto da barra~~ | **Entregue na Fase 7**, e com um papel a mais do que a prancha desenhava: sem sessão, o mesmo canto é o link *Entrar*. Ver a linha correspondente em *Decidido na Fase 7* |
-| `/settings` sem o painel de offline — ~~e sem os de conta, idioma e som~~ | mesma razão, e ele aparece **nomeado** num painel *Ainda não* em vez de virar controle cinza: um botão desligado promete uma coisa que o jogo não faz. **Os outros três saíram da linha:** a conta entrou na Fase 7, o idioma no 4d-2 da Fase 8, e o som deixou de estar na prancha na versão 16, quando a fase o aposentou |
+| `/settings` sem o painel de offline — ~~e sem os de conta, idioma e som~~ | o worker que ele enche chegou no PR 5a da Fase 8 (ver *Offline*); o botão espera a prancha dos estados dele — baixando, pronto, falhou —, que o ciclo de canvas antes do 5b desenha. Até lá ele aparece **nomeado** num painel *Ainda não* em vez de virar controle cinza: um botão desligado promete uma coisa que o jogo não faz. **Os outros três saíram da linha:** a conta entrou na Fase 7, o idioma no 4d-2 da Fase 8, e o som deixou de estar na prancha na versão 16, quando a fase o aposentou |
 | apagar o save guarda uma cópia | a prancha põe *apagar local* na zona de perigo e não diz o que sobra. Sem conta não existe segunda cópia em lugar nenhum, e a regra inegociável do plano existe para a coleção de meses não depender de um clique não ter sido acidental. A tela avisa que a cópia fica |
 
 ### Estados sem prancha, escritos neste PR
@@ -657,8 +665,9 @@ progresso que ninguém pode mover.
   tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
   de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
   *Ainda não* ficou com três coisas, e as três são da Fase 8.
-- **Sem a peça que o sustenta:** *baixar tudo para offline* (o PWA é o PR 5 da
-  Fase 8). ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
+- **Sem prancha para os estados:** *baixar tudo para offline*. O worker que ele enche
+  chegou no PR 5a da Fase 8 (ver *Offline*); o botão espera a prancha de baixando,
+  pronto e falhou, e entra no 5b. ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
   *Preferências*, onde a prancha *Ajustes* o desenha; ~~o interruptor de
   **som**~~ **aposentado** em 12/09 — a prancha deixou de desenhá-lo na versão 16.
 - ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
@@ -1596,6 +1605,108 @@ aninhada saía com a barra inteira apagada — sem sublinhado e sem `aria-curren
 afirmava, e o mesmo booleano escreve a classe e o `aria-current` — os dois não têm
 como discordar. O `exact` da Base virou load-bearing pela primeira vez: `/` é
 prefixo de toda rota.
+
+## Offline
+
+O jogo roda sem rede depois da primeira visita, por um service worker nosso
+(`scripts/service-worker/worker.ts`), escrito pelo build no fim do pré-render
+(`scripts/service-worker/build.ts`, chamado de um módulo em linha do `nuxt.config.ts`,
+no hook `nitro:build:public-assets`). Em `yarn dev` não há worker.
+
+**Duas camadas, como o plano desenha:**
+
+| camada | o quê | peso | quando |
+|---|---|---|---|
+| instalada | o código (`_nuxt/`), o dex (`data/`), as mensagens dos dois idiomas (`_i18n/`), as fontes latinas e o shell `200.html` | 2,1 MB em disco, ~680 KB na rede (gzip; 144 KB são as fontes, que o woff2 já comprime) | inteira, antes de o worker assumir |
+| guardada como vista | as 1025 miniaturas (`sprites/`) | 6,3 MB | à medida que as telas as mostram; *baixar tudo para offline* (PR 5b) enche o mesmo cache |
+
+Cada arquivo instalado leva a revisão do conteúdo (SHA-256, 16 dígitos): um build novo
+baixa só o que mudou, e o worker confere o hash do que baixou — uma cópia de outro
+build, servida por um deploy que entrou no meio da instalação, aborta a instalação em
+vez de ficar guardada sob a revisão errada. Tudo menos o shell: o preview da Vercel
+acrescenta o script da barra de feedback a todo HTML que serve, depois do `</html>`, e
+com o shell conferido o worker nunca instalava num preview (medido). As fontes são as faces cujo `unicode-range`
+cobre o latim — 10 dos 36 arquivos que o `@nuxt/fonts` escreve; extensão latina,
+cirílico, grego e vietnamita nenhum dos dois idiomas pede, e o portão confere isso
+perguntando ao navegador, com todo caractere dos locales e do dex.
+
+**Todo endereço instalado muda com o conteúdo.** `_nuxt/`, `_fonts/` e `_i18n/` já
+levam hash no caminho; o dex não, e por isso a página o pede com a revisão dele na
+query (`dexUrl`: `/data/core.json?v=<revisão>`), calculada uma vez no `nuxt.config.ts`
+e entregue às páginas (`runtimeConfig`) e ao builder. As miniaturas guardadas ficam
+num cache cujo nome leva a revisão da arte (`holodeck-sprites-<revisão>`): um build que
+troca a arte começa um cache vazio, e o velho é apagado quando o worker novo assume.
+Só entra como miniatura uma imagem que veio sem redirect.
+
+**A navegação vai à rede primeiro, e ao shell quando não há rede.** A página
+pré-renderizada é a resposta melhor quando dá para tê-la. Offline, todo endereço
+recebe o mesmo documento: `200.html`, que o Nuxt renderiza sem app no servidor e que
+sobe o jogo no cliente para o endereço aberto, a partir do dex instalado. Instalar as
+2.104 páginas seriam 109 MB — e cada uma lê seus dados de um `_payload.json` próprio
+(~160 KB em `/`). Uma resposta que chega, inclusive 404 e 500, vai para a tela como
+veio. Uma rede que conecta e não responde em **3 s** também cai no shell — sem prazo,
+a página ficaria em branco pelo tempo que o navegador espera.
+
+**A guarda da raiz vai junto.** Offline, `/` abre como o shell, e o shell sai do build
+com a guarda do `app.vue` no topo do `<head>` — sem ela, quem escolheu inglês e abre o
+app instalado sem rede via o Hub em português (medido no spike). Por isso a guarda
+passou a conferir o caminho: no shell, todo endereço que não é `/` fica onde está.
+
+**Versão nova espera todas as abas fecharem** — decidido em 23/09/2026. Sem
+`skipWaiting`: até a última aba da versão velha fechar, o worker velho segue
+respondendo com os arquivos do build dele, as únicas cópias que sobram, já que a
+Vercel só serve o build mais novo. Assumir no meio da sessão entregaria a uma aba
+aberta chunks de outro build, ou a recarregaria no meio de uma batalha. Por isso não
+há aviso de atualização, nem prancha para ele.
+
+Nesse meio-tempo, uma página que a rede traz é do build novo — uma aba nova, um
+reload — e continua sob o worker velho. Ela não pede arquivo nenhum do build velho,
+porque todo endereço instalado muda com o conteúdo (acima). E o save que o build novo
+migrou não é sobrescrito pelo velho: offline, o shell velho lê um save de versão maior
+que a dele como `unknown-version`, e a sessão joga **em memória** — não grava, não
+carimba a última partida e não sincroniza (`holdsNewerSave`, em
+`app/utils/save-driver.ts`). O build novo, quando assume, encontra o save onde o
+deixou. Apagar ou importar em *Ajustes* é substituir de propósito, e libera a gravação.
+
+**O que o worker nunca toca:** outras origens, métodos que não sejam GET, e `/api/`.
+Nada ali se guarda — o save responde por conta, e entrar é uma cadeia de redirects que
+grava o cookie de sessão na volta —, então a requisição do navegador é a resposta
+inteira: o login corre como correria sem worker, e offline um endereço de `/api/` falha
+como a rede falha, em vez de abrir o jogo numa rota que não existe. *Navigation
+preload* ficou desligado de propósito: ele dispara a requisição de toda navegação antes
+de o worker decidir, inclusive as de `/api/auth/…` que o worker deixa ao navegador, e
+se o navegador reaproveita essa resposta ou pede de novo não foi medido — um callback
+de OAuth pedido duas vezes gastaria um código de uso único.
+
+**Os portões.** `test/e2e/offline-precache.spec.ts` lê a lista do `/sw.js` servido e a
+confronta com o que ela não gerou: o disco (todo arquivo de `.output/public` é
+instalado ou sai por uma regra nomeada), o que as 12 páginas carregam no navegador nos
+dois idiomas — servidas como página **e** subidas pelo shell, que é quem pede o dex —,
+as fontes que o texto pede ao navegador, o servidor (toda entrada responde 200, sem
+redirect) e um orçamento por fonte. `test/unit/service-worker-runtime.spec.ts` roda o
+worker que o build serve num sandbox: o que ele deixa ao navegador, a instalação que
+recusa cópia de outro build, o prazo da navegação, a miniatura que só entra como
+imagem, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o worker
+instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue a
+escolha, `/api/` falha como a rede, e uma batalha vai até o fim. O resto da suíte roda
+com service worker bloqueado (`playwright.config.ts`): o que o worker responde não
+passa pelo `page.route`.
+
+**Limites conhecidos, até o PR 5b:**
+
+- o herói de `/pokemon/[name]` é a arte oficial remota, sem fallback — offline a imagem
+  quebra. É estado sem prancha, e vai para o ciclo de canvas antes do 5b;
+- o GIF animado da batalha é remoto e cai na miniatura, como já caía;
+- o que a primeira página carregou antes de o worker assumir não fica guardado — dali
+  em diante, sim;
+- o jogo ainda não é instalável: manifesto e ícones entram no 5b, com o ícone
+  desenhado no ciclo de canvas.
+
+**Para conferir à mão:** `yarn build && yarn preview`, abrir `/rules` — não a raiz: o
+`yarn preview` serve `/` sem `cache-control`, o navegador a reaproveita do cache HTTP, e
+offline a raiz voltaria de lá e não do shell —, esperar o worker (*DevTools →
+Application → Service workers*, `activated`) e derrubar o servidor com `Ctrl+C` no
+`yarn preview`. Qualquer página, mesmo nunca aberta, sobe.
 
 ## O save
 

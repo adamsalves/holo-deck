@@ -118,6 +118,11 @@ async function reconcile(
   http: HttpDriver,
   sync: SyncDriver,
 ): Promise<void> {
+  // A session that could not read the save on disk plays in memory (see
+  // `holdsNewerSave`): what it holds is not the player's save, and none of it
+  // goes up. The next boot of the build that wrote that save syncs as usual.
+  if (nuxtApp.$saveDriver.holdsNewerSave) return
+
   /**
    * A sessão, e **nada aqui pode derrubar o boot**.
    *

@@ -56,14 +56,24 @@ export const ROOT_GUARD_ID = 'locale-root-guard'
  * object, so that a stored `__proto__` or `constructor` is just an unknown value.
  * Storage that throws — a private window, blocked site data — means Portuguese,
  * which is what the root is without a preference.
+ *
+ * **It checks where it is, because one of its two homes answers every
+ * address.** Online it only exists in the root's own HTML, so the check always
+ * passes. Offline the service worker answers every navigation with one document
+ * — the shell, which carries this same script (`withRootGuard`, in
+ * `scripts/service-worker/build.ts`) — and without the check a player who chose
+ * English and opens `/pokemon/pikachu` offline would land on the English home
+ * page instead of the page they asked for.
  */
 export function rootGuardScript(): string {
+  const root = pathInLocale('/', DEFAULT_LOCALE)
   const targets = LOCALES
     .filter(locale => locale.code !== DEFAULT_LOCALE)
     .map(locale => [locale.code, pathInLocale('/', locale.code)])
 
   return [
     '(function(){try{',
+    `if(location.pathname!==${JSON.stringify(root)})return;`,
     `var c=localStorage.getItem(${JSON.stringify(LOCALE_KEY)}),t=${JSON.stringify(targets)};`,
     'for(var i=0;i<t.length;i++)if(t[i][0]===c){',
     'location.replace(t[i][1]+location.search+location.hash);return}',

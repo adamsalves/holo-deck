@@ -48,15 +48,16 @@ const DEX_NAMES = new Set([
  * are here and not in `DOMAIN` because this project did not coin them.
  */
 const PLATFORM = [
-  'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'css', 'ctx', 'cwd',
+  'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'crypto', 'css', 'ctx', 'cwd',
   'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
-  'namespace', 'nav', 'ok', 'onchange', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint', 'url',
+  'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint',
+  'url',
 ]
 
 /** The tools, by their own names. */
 const TOOLING = [
   'deps', 'devtools', 'dirs', 'eslint', 'github', 'gunzip', 'gzip', 'nuxt', 'pinia', 'prerender',
-  'repo', 'teardown', 'tsconfig', 'untracked',
+  'repo', 'teardown', 'transpile', 'tsconfig', 'untracked',
 ]
 
 /**
@@ -81,7 +82,8 @@ const DOMAIN = [
  */
 const DERIVATIONS = [
   'backoff', 'cond', 'debounce', 'focusables', 'hrefs', 'namespaces', 'overscan', 'paralysed',
-  'pre', 'replayable', 'responder', 'resumable', 'virtualize', 'virtualized', 'virtualizer',
+  'pre', 'precache', 'replayable', 'responder', 'resumable', 'urls', 'virtualize', 'virtualized',
+  'virtualizer',
 ]
 
 const BY_HAND = [...PLATFORM, ...TOOLING, ...DOMAIN, ...DERIVATIONS]
