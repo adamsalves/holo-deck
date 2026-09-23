@@ -31,14 +31,18 @@ export const ROOT_GUARD_ID = 'locale-root-guard'
  * **Inline in the `<head>`, and not a plugin.** A plugin runs after the
  * prerendered Hub has been painted in Portuguese, so the player would watch the
  * screen switch language — the defect of the module's `detectBrowserLanguage`,
- * which PR 1 of this phase turned off for exactly that. Parsed before the
- * `<body>` and ahead of the stylesheets (it goes out `critical`, see `app.vue`),
- * this runs before there is anything to paint.
+ * which PR 1 of this phase turned off for exactly that. Parsed in the `<head>`,
+ * before the `<body>` exists, this runs before there is anything to paint — and
+ * it goes out `critical`, ahead of every other script there, so nothing in
+ * front of it delays the redirect (see `app.vue`).
  *
  * **And there never is anything: the navigation stops the parser where it
- * stands.** Measured with the answer for the other language held back 800 ms:
- * the root's document sat at `readyState` complete with `document.body` still
- * `null`, and no paint entry at all. Hiding the document before leaving — the
+ * stands.** Measured in Chromium with the answer for the other language held
+ * back 800 ms: the root's document sat at `readyState` complete with
+ * `document.body` still `null`, and no paint entry at all. The review of PR #65
+ * found the same in Firefox 153 and WebKit 26.5, the engine under every iOS
+ * browser, with the answer held back 2 s: seven elements, all of them the
+ * head's, and no paint. Hiding the document before leaving — the
  * obvious guard against the Hub painting while the answer travels — was written,
  * measured and left out: without it the paint test passed every run, delayed or
  * not, because there was no Hub to paint. A line whose reason cannot be measured

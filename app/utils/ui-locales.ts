@@ -5,7 +5,7 @@ import type { LocaleCode } from './locales'
  * The Nuxt UI primitives in each language of the game — closing a modal,
  * paging, the date picker.
  *
- * Nuxt UI ships 128 locales, so nothing here is translated by hand; what is
+ * Nuxt UI ships 63 locales, so nothing here is translated by hand; what is
  * missing is the wire between a locale of `@nuxtjs/i18n` and the `:locale` of
  * `UApp`.
  *
@@ -13,7 +13,7 @@ import type { LocaleCode } from './locales'
  * Nuxt UI exports `pt_br` — snake_case, an identifier — and the code of the
  * locale is `pt-BR`, a BCP 47 tag. The `locales[locale.value]` the documentation
  * shows returns `undefined` for this project's default. Named imports and not the
- * namespace, too: iterating `import * as` would pull all 128 into the bundle.
+ * namespace, too: iterating `import * as` would pull all 63 into the bundle.
  *
  * **A `Record` over `LocaleCode`, and that is the gate issue #40 asked for.**
  * The map used to live in `app.vue` as a plain object with a fallback to

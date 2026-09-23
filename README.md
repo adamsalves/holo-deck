@@ -620,7 +620,13 @@ corpo da Liga é um `<ClientOnly>`, então os links para `/battle/N` não existe
 HTML nenhum, e as nove em português só eram pré-renderizadas porque
 `nitro.prerender.routes` as listava **à mão, sem prefixo de idioma**. A lista agora
 nasce da lista de idiomas, e o build foi a **2.104 páginas — 1.052 em cada idioma —
-e 140 MB**. A asserção de paridade de rotas em
+e 140 MB**. Ela ficou **só com as batalhas**: toda rota sem parâmetro sai nos dois
+idiomas sem lista nenhuma, porque o plugin de pré-render do próprio Nuxt, carregado
+pelo `crawlLinks`, enfileira cada rota do roteador que não tem `:` — e o módulo de
+i18n registra `/login` e `/en/login` como duas rotas. Medido no review do PR #65:
+sem `/pokedex`, `/league` e `/login` na lista, o build escreve as mesmas 2.104
+páginas. O comentário que creditava os gêmeos ao `@nuxtjs/i18n` estava errado — o
+gancho de pré-render dele só roda com `nitro.static`, desligado no `nuxt build`. A asserção de paridade de rotas em
 [`test/e2e/prerender-payload.spec.ts`](test/e2e/prerender-payload.spec.ts), que as
 carregava como exceção, ficou **sem lista nenhuma**: rota que o build escreve num
 idioma só reprova, nomeada.
@@ -1489,14 +1495,26 @@ escolheu inglês e recebe `/pokemon/pikachu` lê português, porque foi essa a p
 enviada. A preferência não viaja no save, pelo motivo que a prancha carimba em
 *Preferências*: `SÓ NESTE APARELHO`.
 
+Só grava o clique que **navega no lugar**: Ctrl/Cmd/Shift+clique abre o outro idioma
+numa aba nova e deixa esta onde está — o jogador olhou, não escolheu. E a raiz segue
+a escolha **como quer que seja aberta**, inclusive quando quem a abre é o próprio
+app: sair, apagar a conta e a volta do login pelo GitHub carregam `/` como documento,
+então quem escolheu inglês e sai de uma página em português cai em `/en`. Decidido
+no review do PR #65, e medido pelo botão de sair de verdade. Só a volta por dentro
+do app — *Base* — fica no idioma da página, porque não recarrega nada.
+
 **A raiz troca de idioma antes de pintar, por um script inline no `<head>`**, e não
 por plugin. Um plugin roda depois de o Hub pré-renderizado ter sido pintado em
 português — o jogador veria a tela trocar de idioma, que é o defeito do
-`detectBrowserLanguage` que o PR 1 desligou. O script sai com prioridade
-`critical`, antes das folhas de estilo (script inline depois de folha pendente
-espera ela carregar), e chama `location.replace` — o que **para o parser onde ele
-está**: medido com a resposta de `/en` segurada 800 ms, a raiz fica com
-`document.body` nulo e nenhuma pintura. Esconder o documento antes de sair foi
+`detectBrowserLanguage` que o PR 1 desligou. O script sai antes das folhas de estilo
+— o unhead já põe script inline (peso 50) à frente de folha (60) — e com prioridade
+`critical` (42), à frente de qualquer outro script: o que ficasse na frente dele só
+atrasaria o redirecionamento, porque o parser ainda está no `<head>` e não há
+`<body>` para pintar. Ele chama `location.replace`, o que **para o parser onde ele
+está**: medido no Chromium com a resposta de `/en` segurada 800 ms, a raiz fica com
+`document.body` nulo e nenhuma pintura — e o review do PR #65 mediu o mesmo no
+Firefox 153 e no WebKit 26.5 do Playwright, o motor de todo navegador de iOS.
+Esconder o documento antes de sair foi
 escrito, medido e deixado de fora, porque não havia Hub para esconder. Ele existe
 **só** no HTML de `/`, registrado no servidor: registrado numa página, o gerenciador
 de `<head>` o inseriria a cada visita a `/` pelo cliente, e script inserido roda —
@@ -1508,7 +1526,9 @@ e, se chegar lá, que pintou texto, e a raiz tem de começar e nunca pintar. Com
 guarda escrita como plugin — o desenho que o plano recusou —, a trilha sai
 `["/", "/en"]` em vez de `["/en"]`. A resposta de `/en` é segurada 600 ms, como
 numa rede de verdade: com a guarda no fim do `<body>`, o `localhost` deixava o
-defeito passar 5 vezes em 5, e segurada ele reprova 5 em 5.
+defeito passar 5 vezes em 5, e segurada ele reprova 5 em 5. A suíte roda só o
+Chromium; no review, o mesmo teste passou 5 em 5 no Firefox e no WebKit, e com a
+guarda no fim do `<body>` reprovou 3 em 3 em cada um dos três motores.
 
 A volta à raiz por dentro do app é medida com uma barreira de ordenação: o título
 da rota nova e um script novo saem da mesma chamada síncrona do gerenciador de
@@ -1517,8 +1537,10 @@ volta depois, a contagem podia cair no documento seguinte e não achar nada.
 
 **O `hreflang` voltou, com `baseUrl`** — a
 [issue #39](https://github.com/adamsalves/holo-deck/issues/39). O `useLocaleHead`
-do `app.vue` escreve `lang` e `dir` no `<html>`, uma `alternate` por idioma mais
-`x-default`, o `canonical`, `og:url` e `og:locale`. O `baseUrl` é a origem de
+do `app.vue` escreve `lang` e `dir` no `<html>`, duas `alternate` por idioma — a
+etiqueta regional e a língua nua que o módulo acrescenta para as outras regiões dela
+(`pt-BR` e `pt`, `en-US` e `en`) — mais `x-default`, o `canonical`, `og:url`,
+`og:locale` e `og:locale:alternate`. O `baseUrl` é a origem de
 produção em **todo** deploy — `VERCEL_PROJECT_PRODUCTION_URL`, que a Vercel preenche
 também nos previews, com `https://holo-deck.vercel.app` fora dela —, de propósito:
 preview é cópia do site num host descartável, e o canonical dele deve nomear a
@@ -1529,10 +1551,14 @@ pedido é o `localhost` da máquina de build.
 2.104 páginas do `.output` e pergunta a **forma** de cada link, não a presença:
 absoluto, `https` e uma origem só; cada `alternate` apontando para esta página no
 idioma que ela nomeia — o caminho esperado sai de `localeUrl`, do `test/support/`,
-e não do código que escreveu o link —; todo idioma da lista com a sua; `canonical` e
-`og:url` como esta página no idioma dela; `lang`, `dir` e `og:locale` no idioma da
-URL; e a guarda da raiz **na raiz e em mais nenhuma**, por conjunto. Sem `baseUrl`,
-ele lista 12.626 links relativos; com a guarda em toda página, 2.103 páginas a mais.
+e não do código que escreveu o link —; todo idioma da lista com as duas; `canonical`
+e `og:url` como esta página no idioma dela; `lang`, `dir` e `og:locale` no idioma da
+URL, e `og:locale:alternate` com os outros; e a guarda da raiz **na raiz e em mais
+nenhuma**, por conjunto. Sem `baseUrl`, ele lista 12.624 links relativos (2.104
+páginas × 6); com a guarda em toda página, 2.103 páginas a mais. **Qual origem ele
+não pergunta**: um build inteiro no host do preview também tem uma origem só. O CI
+constrói sem `VERCEL_PROJECT_PRODUCTION_URL`, então o ramo da Vercel do `baseUrl` só
+existe num deploy, e se confere à mão no preview.
 
 **A lista de idiomas virou módulo** — [`app/utils/locales.ts`](app/utils/locales.ts),
 `as const`, com o tipo derivado dela —, e o `nuxt.config.ts`, o seletor, a guarda e
@@ -1550,9 +1576,13 @@ dois idiomas contra o rótulo que o próprio Nuxt UI escreve.
 
 E o portão de link ganhou uma segunda regra: `switchLocalePath` não é perdoado como
 link localizado, porque ele **sai** do idioma de quem joga — certo no seletor, e o
-defeito em qualquer outro lugar. Os arquivos que trocam de idioma são comparados,
-como conjunto, com `LANGUAGE_SELECTORS`, e a entrada reprova no dia em que o seletor
-deixar de trocar.
+defeito em qualquer outro lugar. A troca é lida como **código, e não como link**:
+`switchLocalePath` e `useSwitchLocalePath`, `setLocale`, `<SwitchLocalePathLink>`,
+`<NuxtLinkLocale>` com `locale`, e o `locale.value` escrito à mão, em todo `.vue` e
+`.ts` de `app/`. A primeira versão lia só `NuxtLink`, e um `setLocale` num botão
+passava pelo portão e pelos 771 unitários — medido no review. Os arquivos que trocam
+de idioma são comparados, como conjunto, com `LANGUAGE_SELECTORS`, e a entrada
+reprova no dia em que o seletor deixar de trocar.
 
 ### A seção atual, e um mecanismo que nunca existiu
 

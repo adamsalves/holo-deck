@@ -19,9 +19,11 @@ const uiLocale = computed(() => UI_LOCALES[locale.value])
 
 /**
  * The document's language, and the links that tell a search engine where the
- * page lives in the other one: `lang` and `dir` on `<html>`, one `hreflang`
- * alternate per language plus `x-default`, the `canonical`, and `og:url`,
- * `og:locale` and `og:locale:alternate`.
+ * page lives in the other one: `lang` and `dir` on `<html>`, two `hreflang`
+ * alternates per language — the regional tag, and the bare language the module
+ * adds as the catch-all for its other regions (`pt-BR` and `pt`) — plus
+ * `x-default`, the `canonical`, and `og:url`, `og:locale` and
+ * `og:locale:alternate`.
  *
  * **Here because it holds for every route** — a page that forgot to declare its
  * language would go out mute to a screen reader. Measured before, when the fixed
@@ -65,9 +67,13 @@ useHead(() => ({
  * inserted script runs. `test/e2e/language.spec.ts` measures the behaviour, and
  * not this placement.
  *
- * `critical` puts it ahead of the stylesheets in the `<head>`: an inline script
- * after a pending stylesheet waits for it to load, and that wait is time the
- * Hub could spend being painted.
+ * `critical` — weight 42 in unhead's order — keeps it ahead of every other
+ * script in the `<head>`. It is not what puts it ahead of the stylesheets: an
+ * inline script weighs 50 and a stylesheet 60, so it would be there without
+ * it. Whatever does sit in front of it costs the redirect time — a blocking
+ * script to download, or a stylesheet an inline script has to wait for — and
+ * not a paint of the Hub: the parser is still in the `<head>`, with no `<body>`
+ * to draw.
  */
 const route = useRoute()
 

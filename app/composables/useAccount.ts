@@ -148,9 +148,14 @@ export function useAccount(): {
     account.value = null
     known.value = true
 
-    // O destino guarda o idioma: sem `localePath`, sair de `/en/settings`
-    // devolvia o jogador ao Hub em português. `tryUseNuxtApp` pelo mesmo motivo
-    // do `$sync` acima — isto roda num handler de clique, fora do `setup`.
+    // The destination keeps the language of the page — without `localePath`,
+    // signing out of `/en/settings` returned the player to the Portuguese Hub —
+    // and then the root follows the device: this loads `/` as a document, and
+    // the root guard (`rootGuardScript`) runs. Someone who chose English in
+    // *Settings* and signs out from a Portuguese page lands in English. Decided
+    // in the review of PR #65, and measured in `test/e2e/language.spec.ts`.
+    // `tryUseNuxtApp` for the same reason as `$sync` above: this runs in a click
+    // handler, outside `setup`.
     const home = tryUseNuxtApp()?.$localePath('/') ?? '/'
 
     if (typeof window !== 'undefined') window.location.assign(home)
