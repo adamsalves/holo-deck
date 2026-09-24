@@ -366,11 +366,45 @@ test('downloading stops for space when the browser gives no more room, and the c
   await expect(row.getByRole('button', { name: 'CONTINUAR', exact: true })).toBeVisible()
 
   // The worker keeps what went through it as well, so the device may hold a
-  // few more than the page managed to write: the row counts the device.
+  // few more than the page managed to write: the row counts the device. Read
+  // after the reload — the page stops the moment its own write is refused,
+  // while the worker's writes of the same answers may still be landing.
+  await page.reload()
+  await expect(row).toContainText('já estão neste aparelho')
   const kept = (await keptSprites(page, spriteCache)).length
   expect(kept).toBeGreaterThanOrEqual(10)
 
-  await page.reload()
   await expect(row).toContainText(`${kept} de 1025 já estão neste aparelho — o jogo guarda o que você vê. Baixar traz as outras ${1025 - kept}.`)
   await expect(row.getByRole('button', { name: 'BAIXAR', exact: true })).toBeVisible()
+})
+
+/**
+ * *Leaving the screen does not stop it*, as the board writes over state 02.
+ * The page's writes hang after 412, which holds the download there, and the
+ * game is left and come back to without a reload: a row whose state lived in
+ * the component would come back at rest, having counted the same 412.
+ */
+test('leaving settings does not stop the download', async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = Cache.prototype.put
+    let calls = 0
+    Cache.prototype.put = function (this: Cache, request: RequestInfo | URL, response: Response): Promise<void> {
+      calls += 1
+
+      return calls > 412 ? new Promise<void>(() => undefined) : put.call(this, request, response)
+    }
+  })
+  await underWorker(page)
+
+  await page.goto('/settings')
+  const row = offlineRow(page, 'pt-BR')
+  await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
+  await expect(row).toContainText('412 de 1025')
+
+  await page.getByRole('link', { name: 'HOLO/DECK', exact: true }).click()
+  await expect(page).toHaveURL(pathPattern('/'))
+  await page.goBack()
+
+  await expect(row).toContainText('412 de 1025')
+  await expect(row.getByText('baixando…', { exact: true })).toBeVisible()
 })
