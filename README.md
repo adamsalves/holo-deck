@@ -1743,6 +1743,10 @@ Application → Service workers*, `activated`) e derrubar o servidor com `Ctrl+C
 `yarn preview`. Qualquer página, mesmo nunca aberta, sobe. Com *Baixar tudo* feito em
 *Ajustes* antes de derrubar, o Pokédex de qualquer geração abre com as miniaturas.
 
+**Instalar não se confere no preview da Vercel**, como o login: o navegador pede o
+manifesto sem credenciais, e a proteção do preview o redireciona para o SSO, junto com os
+ícones (medido no #70: `302` e `ERR_FAILED`). Só em `localhost` e em produção.
+
 ## O save
 
 Um documento só, versionado, em `holodeck:save`.
