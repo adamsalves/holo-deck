@@ -59,6 +59,14 @@ useHead(() => ({
  * browser that does not read an SVG icon; and the 180 px square, with its
  * background, that iOS puts on a home screen and in its favourites.
  *
+ * And the manifest, which makes the game installable: the board's name,
+ * colours and icons (192 and 512, the same master). Each icon is listed once
+ * as `any` and once as `maskable`, not as `"any maskable"`, which Chrome warns
+ * against — the master can be both because the deck sits inside the circle a
+ * mask keeps and the background runs to the edge. `start_url` is the root,
+ * which the board leaves unsaid: without it, a player who installs from a
+ * Pokémon's page would have the app open on that page every time.
+ *
  * Here and not in the bar because two routes render without it — the battle
  * and the style guide.
  *
@@ -72,6 +80,7 @@ useHead({
     { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
     { rel: 'icon', href: appIcon, type: 'image/svg+xml', key: 'app-icon' },
     { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+    { rel: 'manifest', href: '/manifest.webmanifest' },
   ],
 })
 

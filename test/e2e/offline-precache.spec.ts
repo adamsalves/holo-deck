@@ -110,6 +110,10 @@ const LEAVES: readonly { name: string, matches: (path: string, fontsAskedFor: Re
   // the tab and the bar share is installed with the code.
   { name: 'favicon', matches: path => path === 'favicon.ico' },
   { name: 'home screen icon', matches: path => path === 'apple-touch-icon.png' },
+  // The manifest and the icons it lists: read by the browser to install the
+  // game, outside any page, and kept by the system once it is installed.
+  { name: 'manifest', matches: path => path === 'manifest.webmanifest' },
+  { name: 'install icons', matches: path => /^icon-\d+\.png$/.test(path) },
 ]
 
 /** Where an installed URL comes from — each source has to be there by name. */
