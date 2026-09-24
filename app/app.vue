@@ -61,11 +61,16 @@ useHead(() => ({
  *
  * Here and not in the bar because two routes render without it — the battle
  * and the style guide.
+ *
+ * The `key` keeps the SVG's link one tag. The server writes its address from
+ * the root and the client from the bundle's own URL, absolute — two hrefs for
+ * one file, and unhead tells links apart by the href: without the key, the
+ * booted page carried the icon twice (measured on the preview of PR #68).
  */
 useHead({
   link: [
     { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
-    { rel: 'icon', href: appIcon, type: 'image/svg+xml' },
+    { rel: 'icon', href: appIcon, type: 'image/svg+xml', key: 'app-icon' },
     { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
   ],
 })
