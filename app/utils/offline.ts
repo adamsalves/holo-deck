@@ -61,11 +61,13 @@ export function dexUrl(name: string, revision: string): string {
 /**
  * One file the worker installs with.
  *
- * `url` is the address a page asks for; `revision` is a hash of the file's
- * content, so an unchanged file survives a new build without being downloaded
- * again, and a changed one is downloaded under its new revision. What keeps an
- * old worker from answering a new page with an old copy is the address: every
- * installed file's changes with its content — the dex's through `dexUrl`.
+ * `url` is the file's address; `revision` is a hash of its content, so an
+ * unchanged file survives a new build without being downloaded again, and a
+ * changed one is downloaded under its new revision. What keeps an old worker
+ * from answering a new page with an old copy is the address: every installed
+ * file a page asks for changes it with its content — the dex's through
+ * `dexUrl`. The one fixed name is the shell, which no page asks for: the
+ * worker answers navigations with it.
  */
 export interface PrecacheEntry {
   readonly url: string

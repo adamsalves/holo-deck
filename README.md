@@ -1700,8 +1700,9 @@ passa pelo `page.route`.
 - o que a primeira página carregou antes de o worker assumir não fica guardado — dali
   em diante, sim;
 - o jogo ainda não é instalável: o manifesto e os ícones de 192 e 512 entram no 5b. O
-  ícone em si já é o do site — a barra, a aba (SVG e o `favicon.ico` de 32 e 16) e o
-  `apple-touch-icon` de 180 —, rasterizados da prancha *O ícone do app* no Chromium.
+  ícone em si já é o do site: a barra e a aba usam o SVG da prancha *O ícone do app*, e o
+  `favicon.ico` de 32 e 16 e o `apple-touch-icon` de 180 foram rasterizados dela no
+  Chromium.
 
 **Para conferir à mão:** `yarn build && yarn preview`, abrir `/rules` — não a raiz: o
 `yarn preview` serve `/` sem `cache-control`, o navegador a reaproveita do cache HTTP, e
