@@ -122,7 +122,7 @@ function isCurrent(link: NavLink): boolean {
               stroke-width="6"
             />
           </svg>
-          HOLO<span>/</span>DECK
+          <span class="nav__name">HOLO<span>/</span>DECK</span>
         </a>
       </NuxtLink>
 
@@ -288,7 +288,10 @@ function isCurrent(link: NavLink): boolean {
   color: var(--text);
 }
 
-.nav__brand span {
+/* One flex item for the whole name: loose, `HOLO`, the slash and `DECK` were
+   three, and the gap above went in between them — `HOLO / DECK`, where every
+   board writes `HOLO/DECK`. */
+.nav__name span {
   color: var(--text-muted);
 }
 
