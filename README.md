@@ -164,7 +164,7 @@ vez de manter um sistema paralelo:
 | | |
 |---|---|
 | **Primitivos** | a escada `ink` de 16 degraus, as 18 cores de tipo, as 5 de raridade, o verde de progresso, os 4 chanfros, o raio e as duas famílias |
-| **Semânticos** | superfície e fio: `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` · texto: `--text` `--text-body` `--text-muted` `--text-faint` · papel: `--accent` `--focus` `--shiny` `--forge` `--deficit` `--progress-high` `--progress-mid` `--progress-low` `--progress-track` `--coin` `--hp` `--brand` `--synced` `--caution` `--conflict` |
+| **Semânticos** | superfície e fio: `--bg` `--surface` `--surface-raised` `--surface-sunken` `--surface-cell` `--border` `--border-strong` · texto: `--text` `--text-body` `--text-muted` `--text-faint` · papel: `--accent` `--focus` `--shiny` `--forge` `--deficit` `--progress-high` `--progress-mid` `--progress-low` `--progress-track` `--coin` `--hp` `--synced` `--caution` `--conflict` |
 
 Dois deles — `--surface-sunken` e `--text-faint` — estão declarados à frente do
 consumidor, e o portão de tema reprova qualquer terceiro que apareça: token sem
@@ -186,13 +186,13 @@ Os três degraus de progresso e os cinco papéis entraram também na matriz de
 contraste, que hoje cobra `--accent`, `--focus` e os `--text-*` sobre **todas** as
 superfícies descobertas no tema.
 
-A Fase 6 acrescentou `--coin`, `--hp` e `--brand` pelo mesmo caminho, e a Fase 7
+A Fase 6 acrescentou `--coin`, `--hp` e `--brand` pelo mesmo caminho — o `--brand`, miolo
+vermelho do emblema da barra, saiu na Fase 8, quando o ícone do app virou a marca —, e a Fase 7
 os três do sync ao vivo: `--synced` (o verde do *sincronizado há 2 min*),
 `--caution` (o amarelo que a prancha dá à fila offline, ao *SÓ NESTE APARELHO* e ao
 *Restaurar versão anterior* — isto não está no servidor, ou vai substituir o que
-está) e `--conflict` (o roxo do único estado que fala com o jogador). Os seis
-estão na matriz de contraste; a linha dos semânticos acima não tinha os três da
-Fase 6 e passou a ter os seis.
+está) e `--conflict` (o roxo do único estado que fala com o jogador). Os cinco que
+seguem no tema estão na matriz de contraste e na linha dos semânticos acima.
 
 **Regra dura: componente consome semântico. Nunca primitivo, nunca hex cru.** As
 pranchas do canvas usam hex inline porque são mockup, e copiar da prancha para o
@@ -1617,7 +1617,7 @@ no hook `nitro:build:public-assets`). Em `yarn dev` não há worker.
 
 | camada | o quê | peso | quando |
 |---|---|---|---|
-| instalada | o código (`_nuxt/`), o dex (`data/`), as mensagens dos dois idiomas (`_i18n/`), as fontes latinas e o shell `200.html` | 2,1 MB em disco, ~680 KB na rede (gzip; 144 KB são as fontes, que o woff2 já comprime) | inteira, antes de o worker assumir |
+| instalada | o código e o ícone da barra (`_nuxt/`), o dex (`data/`), as mensagens dos dois idiomas (`_i18n/`), as fontes latinas e o shell `200.html` | 2,1 MB em disco, ~680 KB na rede (gzip; 144 KB são as fontes, que o woff2 já comprime) | inteira, antes de o worker assumir |
 | guardada como vista | as 1025 miniaturas (`sprites/`) | 6,3 MB | à medida que as telas as mostram; *baixar tudo para offline* (PR 5b) enche o mesmo cache |
 
 Cada arquivo instalado leva a revisão do conteúdo (SHA-256, 16 dígitos): um build novo
@@ -1699,8 +1699,9 @@ passa pelo `page.route`.
 - o GIF animado da batalha é remoto e cai na miniatura, como já caía;
 - o que a primeira página carregou antes de o worker assumir não fica guardado — dali
   em diante, sim;
-- o jogo ainda não é instalável: manifesto e ícones entram no 5b, com o ícone
-  desenhado no ciclo de canvas.
+- o jogo ainda não é instalável: o manifesto e os ícones de 192 e 512 entram no 5b. O
+  ícone em si já é o do site — a barra, a aba (SVG e o `favicon.ico` de 32 e 16) e o
+  `apple-touch-icon` de 180 —, rasterizados da prancha *O ícone do app* no Chromium.
 
 **Para conferir à mão:** `yarn build && yarn preview`, abrir `/rules` — não a raiz: o
 `yarn preview` serve `/` sem `cache-control`, o navegador a reaproveita do cache HTTP, e
