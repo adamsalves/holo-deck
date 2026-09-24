@@ -147,11 +147,13 @@ const saveText = computed(() => JSON.stringify(composeSave($pinia), null, 2))
  * `length` conta unidades UTF-16, e o save carrega nome de espécie: `Nidoran♀`
  * ocupa mais bytes do que letras. A prancha estampa `20,6 KB` ao lado da
  * contagem de cartas, e o número que importa é o que atravessa a rede na Fase 7.
+ *
+ * **In the page's language**: `20.6` inside `/en`. It was `toFixed(1)` with
+ * the comma swapped in by hand — one of the origins issue #49 lists, and PR 5b
+ * put a second figure on this screen, the thumbnails' `6.0 MB`, which the board
+ * writes per language.
  */
-const sizeKb = computed(() => {
-  const bytes = new TextEncoder().encode(saveText.value).length
-  return (bytes / 1024).toFixed(1).replace('.', ',')
-})
+const sizeKb = computed(() => oneDecimal(new TextEncoder().encode(saveText.value).length / 1024))
 
 /**
  * A figure with one decimal, as the language of the page writes it. The
@@ -376,8 +378,8 @@ function refreshBackups(): void {
  * same one `app.vue` writes into `<html lang>`. `Intl` reads the two alike
  * today, so this is one source rather than two agreeing by luck.
  *
- * The numbers on this screen — `20,6 KB`, the card counts — are the origins the
- * issue does name, and they stay pt-BR until it is closed.
+ * The card counts on this screen are origins the issue does name, and they
+ * stay pt-BR until it is closed; the save's size follows the page (`sizeKb`).
  */
 function backupLabel(at: number): string {
   return new Date(at).toLocaleString(localeProperties.value.language, {

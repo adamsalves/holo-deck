@@ -163,6 +163,33 @@ test('a backup is stamped in the date format of the URL, not one language for bo
 })
 
 /**
+ * The save's size in the number format of the URL — `20,6` and `20.6`. It was
+ * `toFixed(1)` with the comma swapped in by hand, one of the origins issue #49
+ * lists.
+ *
+ * Measured as shape, by the separator each language writes, and not against
+ * `Intl`: the page formats with it, and a test asking `Intl` the same question
+ * would agree with whatever the page did. The separators are written here
+ * because they are the answer, not the question.
+ */
+const DECIMAL_SEPARATOR: Readonly<Record<string, string>> = { 'pt-BR': ',', 'en': '.' }
+
+test('the save\'s size is written in the number format of the URL', async ({ page }) => {
+  const codes = localeCodes()
+  expect(new Set(codes)).toEqual(new Set(Object.keys(DECIMAL_SEPARATOR)))
+
+  for (const code of codes) {
+    await seedLocalSave(page, CURRENT)
+    await page.goto(localeUrl('/settings', code))
+
+    const size = page.locator('.settings__stats > div').filter({ hasText: label('settings.stats.size', code) }).locator('dd')
+    const separator = DECIMAL_SEPARATOR[code] ?? ''
+
+    await expect(size, `the save's size in ${code}`).toHaveText(new RegExp(`^\\d+${separator === '.' ? '\\.' : separator}\\d$`))
+  }
+})
+
+/**
  * The board *Offline*: with no service worker the download row does not
  * exist — it vanishes rather than show switched off. This suite blocks workers
  * (see `playwright.config.ts`), which is that case; `offline.spec.ts` is the
