@@ -105,9 +105,11 @@ const LEAVES: readonly { name: string, matches: (path: string, fontsAskedFor: Re
   // read from the CSS — see `fontsTheTextAsksFor`.
   { name: 'fonts no text asks for', matches: (path, fontsAskedFor) => path.startsWith('_fonts/') && !fontsAskedFor.has(path) },
   { name: 'the worker itself', matches: path => path === 'sw.js' },
-  // Asked for by the browser, outside the page; offline the tab shows its
-  // default icon. 110 KB, and it is not what the installed app will use.
+  // The app's icon for a browser that reads no SVG one, and the square iOS puts
+  // on a home screen: both asked for by the browser, outside the page. The SVG
+  // the tab and the bar share is installed with the code.
   { name: 'favicon', matches: path => path === 'favicon.ico' },
+  { name: 'home screen icon', matches: path => path === 'apple-touch-icon.png' },
 ]
 
 /** Where an installed URL comes from — each source has to be there by name. */
@@ -116,7 +118,7 @@ const SOURCE_NAMES = ['code', 'dex', 'messages', 'fonts', 'shell'] as const
 type Source = typeof SOURCE_NAMES[number]
 
 const SOURCES: Readonly<Record<Source, (url: string) => boolean>> = {
-  code: url => url.startsWith('/_nuxt/') && /\.(?:js|css)$/.test(url),
+  code: url => url.startsWith('/_nuxt/') && /\.(?:js|css|svg)$/.test(url),
   dex: url => url.startsWith('/data/'),
   messages: url => url.startsWith('/_i18n/'),
   fonts: url => url.startsWith('/_fonts/'),

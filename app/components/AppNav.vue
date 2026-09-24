@@ -4,6 +4,7 @@ import { useProgressStore } from '~~/app/stores/progress'
 import { useRoute } from 'nuxt/app'
 import type { NavLink } from '~~/app/utils/nav-links'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
+import appIcon from '~~/app/assets/images/app-icon.svg?no-inline'
 
 // Os rótulos da barra são chave de i18n desde a Fase 8, não texto — ver o
 // docblock de `NavLink`. Quem resolve é este `t`.
@@ -95,33 +96,20 @@ function isCurrent(link: NavLink): boolean {
           class="nav__brand"
           @click="navigate"
         >
-          <svg
+          <!-- The app's icon, in the cut the board "O ícone do app" draws for
+               the tab and the bar: 26 px, where the emblem alone used to be. The
+               emblem stays on the card backs. `?no-inline` on the import keeps it
+               a file — under Vite's 4 KB threshold it would be a data URL in the
+               markup of every page — and the tab's icon link in `app.vue` points
+               at that same file. The service worker installs it with the code,
+               so the bar draws it offline. -->
+          <img
             class="nav__mark"
-            viewBox="0 0 100 100"
-            fill="none"
-            aria-hidden="true"
+            :src="appIcon"
+            alt=""
+            width="26"
+            height="26"
           >
-            <circle
-              cx="50"
-              cy="50"
-              r="38"
-              stroke="currentColor"
-              stroke-width="6"
-            />
-            <path
-              d="M12 50h26M62 50h26"
-              stroke="currentColor"
-              stroke-width="6"
-              stroke-linecap="round"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="12"
-              stroke="var(--brand)"
-              stroke-width="6"
-            />
-          </svg>
           <span class="nav__name">HOLO<span>/</span>DECK</span>
         </a>
       </NuxtLink>

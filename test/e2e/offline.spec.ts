@@ -101,6 +101,14 @@ function fromShell(page: Page): Promise<boolean> {
   return page.evaluate(() => document.getElementById('__NUXT_DATA__')?.dataset.ssr === 'false')
 }
 
+/**
+ * Whether the app's icon in the bar came out — `decode()` settles once the image
+ * has loaded or failed, so there is nothing to poll.
+ */
+function barIconLoads(page: Page): Promise<boolean> {
+  return page.getByRole('link', { name: 'HOLO/DECK', exact: true }).locator('img').evaluate(async image => image instanceof HTMLImageElement && await image.decode().then(() => true, () => false))
+}
+
 test('the worker installs everything it lists and takes the page it was registered from', async ({ page }) => {
   await underWorker(page)
 })
@@ -108,11 +116,16 @@ test('the worker installs everything it lists and takes the page it was register
 test('offline, a page nobody opened comes up from the shell', async ({ page, context }) => {
   await underWorker(page)
   await context.setOffline(true)
+  // Routing turns the HTTP cache off. Without it, the icon the online visit
+  // left there would draw the bar with nothing installed; with it, whatever the
+  // worker does not answer reaches the route and fails.
+  await page.route('**/_nuxt/*.svg', route => route.abort())
 
   await page.goto('/pokemon/pikachu')
 
   await expect(page.getByRole('heading', { level: 1, name: 'Pikachu' })).toBeVisible()
   expect(await fromShell(page)).toBe(true)
+  expect(await barIconLoads(page), 'the bar\'s icon offline').toBe(true)
 })
 
 test('offline, English comes from the messages the worker installed', async ({ page, context }) => {
