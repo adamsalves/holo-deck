@@ -769,10 +769,19 @@
       "accountAction": "DELETE EVERYTHING",
       "accountBusy": "DELETING…"
     },
-    "held": {
-      "title": "Not yet",
-      "note": "The board for this screen draws one more thing, and it has no data to draw on yet: {offline} arrives with whatever supports it. It is absent on purpose — a switch that does nothing promises something the game does not do.",
-      "offline": "download everything for offline"
+    "offline": {
+      "title": "Download everything for offline",
+      "rest": "All {total} thumbnails, {size}. The game already works offline with what you have seen — this covers the rest.",
+      "partialKept": "{count} is already on this device — the game keeps what you see. | {count} are already on this device — the game keeps what you see.",
+      "partialMissing": "Downloading brings the last one. | Downloading brings the other {missing}.",
+      "count": "{kept} of {total}",
+      "downloading": "downloading…",
+      "kept": "All {total} thumbnails are on this device, {size}.",
+      "onDevice": "on this device",
+      "stoppedNetwork": "Stopped at {count} — the connection dropped. What already came stays.",
+      "stoppedSpace": "Stopped at {count} — the browser gave no more room.",
+      "start": "DOWNLOAD",
+      "resume": "CONTINUE"
     },
     "version": "v{app} · {sha} · save v{schema}",
     "footDevice": "Language and motion do not sync, on purpose — they are device preferences.",

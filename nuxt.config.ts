@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import pkg from './package.json' with { type: 'json' }
 import { DEFAULT_LOCALE, LOCALES, pathInLocale } from './app/utils/locales.ts'
 import { OFFLINE_SHELL_PATH } from './app/utils/offline.ts'
-import { folderRevisionOf } from './scripts/service-worker/revision.ts'
+import { folderBytesOf, folderRevisionOf } from './scripts/service-worker/revision.ts'
 import { GYM_COUNT } from './shared/types/brand.ts'
 
 /**
@@ -15,6 +15,17 @@ import { GYM_COUNT } from './shared/types/brand.ts'
  * no second reading to disagree with the first.
  */
 const DEX_REVISION = folderRevisionOf(fileURLToPath(new URL('./public/data', import.meta.url)))
+
+/**
+ * The thumbnails' revision and weight, read once for the same reason.
+ *
+ * The revision names the cache the worker keeps them in (`spriteCacheName`),
+ * and *Download everything for offline* fills that same cache from the page;
+ * the weight is the figure the page prints before anything is downloaded.
+ */
+const SPRITES = fileURLToPath(new URL('./public/sprites', import.meta.url))
+const SPRITE_REVISION = folderRevisionOf(SPRITES)
+const SPRITE_BYTES = folderBytesOf(SPRITES)
 
 /**
  * Sha curto do commit em produção. Num jogo com save local, "que versão você está
@@ -112,7 +123,7 @@ export default defineNuxtConfig({
     (_options, nuxt) => {
       nuxt.hook('nitro:build:public-assets', async (nitro) => {
         const { writeServiceWorker } = await import('./scripts/service-worker/build.ts')
-        const { entries, bytes } = await writeServiceWorker(nitro.options.output.publicDir, DEX_REVISION)
+        const { entries, bytes } = await writeServiceWorker(nitro.options.output.publicDir, DEX_REVISION, SPRITE_REVISION)
 
         console.info(`service worker: ${entries} files, ${Math.round(bytes / 1024)} KB installed on the first visit`)
       })
@@ -151,6 +162,8 @@ export default defineNuxtConfig({
       appVersion: pkg.version,
       gitSha: resolveGitSha(),
       dexRevision: DEX_REVISION,
+      spriteRevision: SPRITE_REVISION,
+      spriteBytes: SPRITE_BYTES,
     },
   },
 

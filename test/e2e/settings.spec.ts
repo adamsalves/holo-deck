@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { RECOVERY_REASONS, recoveryMessageKey } from '../../app/utils/recovery-reason.ts'
 import type { RecoveryReason } from '../../shared/save/schema.ts'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
-import { foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
+import { defaultLocale, foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
 import { fakeSync, openWelcomePack, saveWith, screenText, seedLocalSave, seedSynced } from './support.ts'
 
 /**
@@ -160,6 +160,31 @@ test('a backup is stamped in the date format of the URL, not one language for bo
     new Set(stamps).size,
     `the backup reads ${stamps.join(' and ')} — the same in every language`,
   ).toBeGreaterThan(1)
+})
+
+/**
+ * The board *Offline*: with no service worker the download row does not
+ * exist — it vanishes rather than show switched off. This suite blocks workers
+ * (see `playwright.config.ts`), which is that case; `offline.spec.ts` is the
+ * other side, where the row is there.
+ *
+ * **The barrier is a trip to the cache storage.** A row gated on anything short
+ * of a worker in charge would open the cache on mount and count it; by the
+ * time this page's own trip there comes back, that count has come back too.
+ * And the browser still has the API — only the worker is missing —, or a gate
+ * on `'serviceWorker' in navigator` alone would pass here as well.
+ */
+test('with no service worker, the download row does not exist', async ({ page }) => {
+  await page.goto('/settings')
+  await expect(page.locator('.settings__panel--danger')).toBeVisible()
+
+  expect(await page.evaluate(async () => {
+    await caches.keys()
+
+    return 'serviceWorker' in navigator
+  })).toBe(true)
+
+  await expect(page.getByText(label('settings.offline.title', defaultLocale()), { exact: true })).toHaveCount(0)
 })
 
 /**
