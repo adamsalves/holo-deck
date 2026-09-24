@@ -17,7 +17,9 @@ test('the head names each of the app\'s icons once, after the app boots', async 
   // the head over, and a second tag would have arrived with it.
   await expect(page.locator('link[rel="icon"][type="image/svg+xml"][href^="http"]')).toHaveCount(1)
 
-  const named = await page.locator('link[rel="icon"], link[rel="apple-touch-icon"]').evaluateAll(links => links.map((link) => {
+  // Every link whose rel names an icon, not only the two rels `app.vue` writes:
+  // a third kind — `shortcut icon`, `mask-icon` — would slip past a list of two.
+  const named = await page.locator('link[rel*="icon" i]').evaluateAll(links => links.map((link) => {
     const path = new URL(link.getAttribute('href') ?? '', location.href).pathname
 
     return `${link.getAttribute('rel') ?? ''} ${path.replace(/\.[\w-]+\.svg$/, '.svg')}`
@@ -28,4 +30,17 @@ test('the head names each of the app\'s icons once, after the app boots', async 
     'icon /_nuxt/app-icon.svg',
     'icon /favicon.ico',
   ])
+})
+
+/**
+ * The bar's brand reads `HOLO/DECK`, one word, as every board writes it. The
+ * link is a flex row with an 11 px gap, and the name loose in it was three
+ * items — `HOLO`, the slash and `DECK` — with the gap between them, on screen
+ * and in the link's accessible name. `offline.spec.ts` finds the link by this
+ * name too, but inside the worker's suite, where losing it reads as a timeout.
+ */
+test('the bar writes HOLO/DECK as one word, as the boards do', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.locator('.nav__brand')).toHaveAccessibleName('HOLO/DECK')
 })
