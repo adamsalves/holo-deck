@@ -37,8 +37,8 @@ const STYLEGUIDE = 'app/pages/styleguide.vue'
 const SCANNED_ROOTS = ['app', 'shared', 'server']
 
 /**
- * `.svg` fica de fora: arte carrega a própria cor, e um Pokébola vermelha não é
- * decisão de tema. O que vale para ela vale para as miniaturas do dex.
+ * `.svg` stays out: art carries its own color, and the app's icon is not a
+ * theme decision. What holds for it holds for the dex's thumbnails.
  */
 const SOURCE_EXTENSIONS = ['.vue', '.ts', '.css']
 

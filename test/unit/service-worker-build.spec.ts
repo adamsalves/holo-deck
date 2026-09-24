@@ -73,6 +73,7 @@ function messageFiles(codes: readonly string[]): string[] {
 const OUTPUT = [
   '_nuxt/entry.CdpVvRXb.js',
   '_nuxt/entry.DpEVjEKB.css',
+  '_nuxt/app-icon.BmRkqE2c.svg',
   '_nuxt/builds/latest.json',
   '_nuxt/builds/meta/8b92f4b8.json',
   '_fonts/latin.woff2',
@@ -90,6 +91,7 @@ const OUTPUT = [
   'pokemon/pikachu/_payload.json',
   'sprites/25.webp',
   'favicon.ico',
+  'apple-touch-icon.png',
 ]
 
 describe('precachePaths', () => {
@@ -99,12 +101,13 @@ describe('precachePaths', () => {
     expect(localeCodes().length).toBeGreaterThan(1)
   })
 
-  it('installs the shell, the code, the dex, the messages and the Latin fonts — and only those', () => {
+  it('installs the shell, the code and the art it imports, the dex, the messages and the Latin fonts — and only those', () => {
     expect(precachePaths(OUTPUT, CSS)).toEqual([
       '200.html',
       '_fonts/everything.woff2',
       '_fonts/latin.woff2',
       ...messageFiles(localeCodes()),
+      '_nuxt/app-icon.BmRkqE2c.svg',
       '_nuxt/entry.CdpVvRXb.js',
       '_nuxt/entry.DpEVjEKB.css',
       'data/core.json',

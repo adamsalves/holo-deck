@@ -105,7 +105,10 @@ export function precachePaths(files: readonly string[], css: string): string[] {
     throw new Error(`service worker: ${SHELL_FILE} is not in the output — it is prerendered from nitro.prerender.routes`)
   }
 
-  const code = files.filter(path => path.startsWith('_nuxt/') && !path.startsWith('_nuxt/builds/') && /\.(?:js|css)$/.test(path))
+  // The code, and the SVG art it imports — the app's icon, which the tab shows
+  // on every page and the bar on every page with a layout. Vite writes both
+  // under `_nuxt/` with the hash in the name.
+  const code = files.filter(path => path.startsWith('_nuxt/') && !path.startsWith('_nuxt/builds/') && /\.(?:js|css|svg)$/.test(path))
   if (!code.some(path => path.endsWith('.js'))) throw new Error('service worker: no code under _nuxt/')
 
   const dex = files.filter(path => /^data\/[^/]+\.json$/.test(path))

@@ -27,7 +27,8 @@ import type { PrecacheEntry } from '../../app/utils/offline'
  * Decided with the user on 23/09/2026, and why this worker needs no screen to
  * announce an update. A page the network brings in the meantime is the new
  * build's, and it asks for none of the old build's files: every installed
- * address changes with its content — the dex's through `dexUrl`.
+ * address a page asks for changes with its content — the dex's through
+ * `dexUrl`. The shell keeps a fixed name, and no page asks for it.
  *
  * **What it never touches:** other origins, any method but GET, and `/api/`.
  * Nothing under `/api/` is ever kept — the save answers per account, and

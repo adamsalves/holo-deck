@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="92 93 327 327">
+  <!-- The app's icon cut for the tab and the bar (board "O ícone do app", NA ABA): no background and no glow, and the two
+       backs outlined, or they vanish on a dark strip. The front card's stripes are left out too: at 32 px they are a
+       tenth of a pixel at 3% opacity. -->
+  <defs>
+    <linearGradient id="back" x1=".25" x2=".75" y2="1"><stop offset="0" stop-color="#1A1E30"/><stop offset="1" stop-color="#0C0F19"/></linearGradient>
+    <linearGradient id="front" x1=".25" x2=".75" y2="1"><stop offset="0" stop-color="#241A38"/><stop offset="1" stop-color="#0C0F19"/></linearGradient>
+    <path id="card" d="M-67-111H79V99L67 111H-79V-99Z" stroke-width="2"/>
+  </defs>
+  <g transform="translate(281.1 249.7) scale(1.269)">
+    <use href="#card" transform="rotate(-11) translate(-26)" fill="url(#back)" stroke="#8E98BC"/>
+    <use href="#card" transform="rotate(-4) translate(-12)" fill="url(#back)" stroke="#8E98BC"/>
+    <g transform="rotate(3)">
+      <use href="#card" fill="url(#front)" stroke="#6B3C9E"/>
+      <g transform="translate(-30 -30) scale(.6)" fill="none" stroke="#C264FF" stroke-width="6" stroke-linecap="round">
+        <circle cx="50" cy="50" r="38"/><path d="M12 50h26M62 50h26"/><circle cx="50" cy="50" r="12"/><circle cx="50" cy="50" r="4" fill="#C264FF" stroke="none"/>
+      </g>
+    </g>
+  </g>
+</svg>
