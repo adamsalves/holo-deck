@@ -1683,15 +1683,22 @@ prancha *Offline*: repouso (com a contagem, quando o uso já guardou alguma), ba
 no aparelho e parou — por *sem rede* ou *sem espaço*, com `CONTINUAR`. Quem baixa é a
 **página**, e não o worker: a prancha desenha o download parando ao fechar a aba, e só
 quem grava distingue os dois motivos — a escrita do worker (`keptAsShown`) engole a
-própria falha, e um disco cheio passaria por download terminado. A página grava no
-cache que o worker lê (o nome leva a revisão da arte, calculada uma vez no
-`nuxt.config.ts` e entregue às páginas e ao builder, como a do dex), seis miniaturas por
-vez, com 15 s de prazo cada, e só guarda o que o worker guardaria: resposta ok, sem
-redirect e `image/*` — o muro de login do preview da Vercel seria guardado como
-miniatura. O estado mora em `useState`: sair de *Ajustes* não para o download, fechar a
-aba para, e o que veio fica. Sem worker — navegador sem suporte, `yarn dev`, a suíte que
-os bloqueia — a linha não existe. Os `6,0 MB` saem do disco no build, na conta do
-tamanho do save (÷ 1024), no formato do idioma (`6.0 MB` em inglês).
+própria falha, e um disco cheio passaria por download terminado. *Sem espaço* é só o
+`QuotaExceededError`: o `Cache.put` lê o corpo, que ainda vem pela rede, e a conexão que
+cai no meio dele rejeita a escrita com `NetworkError`, e o prazo que estoura, com
+`AbortError` (medido no Chromium) — os dois são da rede. E a página pede **por cima do
+worker** (`cache: 'reload'`, que o worker deixa à rede): enquanto o worker novo espera
+as abas fecharem, quem responde é o do build velho, e ele daria do cache dele a arte
+velha, que, guardada sob a revisão nova, o worker novo seguiria servindo até a próxima
+troca de arte. A página grava no cache que o worker lê (o nome leva a revisão da arte,
+calculada uma vez no `nuxt.config.ts` e entregue às páginas e ao builder, como a do
+dex), seis miniaturas por vez, com 15 s de prazo cada, corpo incluído, e só guarda o que
+o worker guardaria: resposta ok, sem redirect e `image/*` — o muro de login do preview
+da Vercel seria guardado como miniatura. O estado mora em `useState`: sair de *Ajustes*
+não para o download, fechar a aba para, e o que veio fica. Sem worker — navegador sem
+suporte, `yarn dev`, a suíte que os bloqueia — a linha não existe. Os `6,0 MB` saem do
+disco no build, na conta do tamanho do save (÷ 1024), no formato do idioma (`6.0 MB` em
+inglês).
 
 **O jogo é instalável.** O manifesto (`public/manifest.webmanifest`, ligado no `app.vue`
 ao lado dos ícones) traz o que a prancha *O ícone do app* manda: nome *Holo Deck*,
@@ -1700,8 +1707,12 @@ mestre no Chromium — cada um listado como `any` e de novo como `maskable`, e n
 `"any maskable"`, que o Chrome desaconselha; o mestre serve aos dois porque o baralho
 cabe no círculo que a máscara preserva e o fundo vai até a borda. `start_url`, `scope` e
 `id` são `/`, que a prancha não diz: sem isso, quem instala a partir da página de um
-Pokémon abriria o app nela toda vez. Manifesto e ícones ficam fora do precache — o
-navegador os pede fora da página, e o sistema os guarda na instalação.
+Pokémon abriria o app nela toda vez. Quem instala em inglês também abre em `/`, e a
+guarda da raiz só leva a `/en` quem escolheu o idioma em *Ajustes*: quem chegou por um
+link `/en/…` e nunca escolheu abre o Hub em português, até escolher. Decidido no review
+do #70, contra um manifesto por idioma, que duplicaria a lista de ícones. Manifesto e
+ícones ficam fora do precache — o navegador os pede fora da página, e o sistema os
+guarda na instalação.
 
 **Os portões.** `test/e2e/offline-precache.spec.ts` lê a lista do `/sw.js` servido e a
 confronta com o que ela não gerou: o disco (todo arquivo de `.output/public` é
@@ -1710,14 +1721,16 @@ dois idiomas — servidas como página **e** subidas pelo shell, que é quem ped
 as fontes que o texto pede ao navegador, o servidor (toda entrada responde 200, sem
 redirect) e um orçamento por fonte. `test/unit/service-worker-runtime.spec.ts` roda o
 worker que o build serve num sandbox: o que ele deixa ao navegador, a instalação que
-recusa cópia de outro build, o prazo da navegação, a miniatura que só entra como
-imagem, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o worker
-instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue a
-escolha, `/api/` falha como a rede, uma batalha vai até o fim, e o *Baixar tudo* deixa
-no cache do worker exatamente as miniaturas do build — e nenhum outro cache de
-miniaturas —, para por rede e por espaço, e conta o que o aparelho tem.
-`test/unit/sprite-download.spec.ts` cobre o laço (o que guarda, o que pede, que motivo
-cada falha dá) e confere a lista de endereços contra o disco, como conjunto.
+recusa cópia de outro build, o prazo da navegação, a miniatura que só entra como imagem
+— no worker e no download, pela mesma tabela —, o download de uma página nova sob o
+worker de outro build, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o
+worker instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue
+a escolha, `/api/` falha como a rede, uma batalha vai até o fim, e o *Baixar tudo* deixa
+no cache do worker exatamente as miniaturas do build — e nenhuma em outro cache, de nome
+nenhum —, para por rede e por espaço, conta o que o aparelho tem e continua longe de
+*Ajustes*. `test/unit/sprite-download.spec.ts` cobre o laço (o que guarda, o que pede,
+que motivo cada falha dá, o prazo) e confere a lista de endereços contra o disco, como
+conjunto.
 `test/e2e/app-icon.spec.ts` lê o manifesto como o navegador o recebe: nome, cores, o
 conjunto de tamanhos e finalidades contra o da prancha, e cada ícone do tamanho que
 declara e sem canal alfa. O resto da suíte roda com service worker bloqueado
