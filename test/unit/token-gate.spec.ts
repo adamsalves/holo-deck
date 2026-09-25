@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { hasExtension, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
+import { resolveToken, themeSource } from '../support/theme'
 
 /**
  * A disciplina de token, cobrada.
@@ -38,9 +39,17 @@ const SCANNED_ROOTS = ['app', 'shared', 'server']
 
 /**
  * `.svg` stays out: art carries its own color, and the app's icon is not a
- * theme decision. What holds for it holds for the dex's thumbnails.
+ * theme decision. What holds for it holds for the dex's thumbnails. The one
+ * `.svg` that copies a token instead — `MISSING_SPRITE` — is held to it below.
  */
 const SOURCE_EXTENSIONS = ['.vue', '.ts', '.css']
+
+/**
+ * The offline glyph a missing thumbnail shows. It is not art: it is drawn in
+ * `--color-ink-400`, written into the file because an image cannot read the
+ * page's custom properties (see `app/plugins/missing-sprite.client.ts`).
+ */
+const MISSING_SPRITE = 'app/assets/images/missing-sprite.svg'
 
 const SKIP = new Set(['node_modules'])
 
@@ -198,5 +207,13 @@ describe('disciplina de token', () => {
     // Se o `main.css` mudar de lugar, os testes acima passam varrendo um
     // repositório onde ninguém escreve hex porque ninguém escreve tema.
     expect(theme.match(RAW_HEX)?.length ?? 0).toBeGreaterThan(10)
+  })
+
+  it('keeps the missing-sprite glyph in the color of the token it copies', () => {
+    const token = resolveToken('--color-ink-400', themeSource())
+    const colors = new Set(readFileSync(join(REPO_ROOT, MISSING_SPRITE), 'utf8').match(RAW_HEX)?.map(hex => hex.toLowerCase()))
+
+    expect(token, `--color-ink-400 is gone from ${THEME}`).not.toBeNull()
+    expect([...colors], `${MISSING_SPRITE} copies --color-ink-400, and has to follow it`).toEqual([token?.toLowerCase()])
   })
 })

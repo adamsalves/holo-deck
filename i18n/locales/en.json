@@ -573,6 +573,10 @@
   },
   "species": {
     "artwork": "Official artwork of {name}",
+    "offline": {
+      "thumbnail": "offline · showing the thumbnail",
+      "nothing": "offline · the artwork arrives with the connection"
+    },
     "height": "Height",
     "weight": "Weight",
     "rarity": "Rarity",

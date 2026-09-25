@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { PRECACHE_CACHE, SPRITE_CACHE_PREFIX, type PrecacheEntry } from '../../app/utils/offline.ts'
 import { LOCALE_KEY } from '../../app/utils/locale-preference.ts'
-import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels } from '../support/locales'
+import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels, repeated } from '../support/locales'
 import { REPO_ROOT } from '../support/source-tree'
 import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } from './support'
 
@@ -20,7 +20,9 @@ import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } 
  * The list the worker installs is measured on its own by
  * `offline-precache.spec.ts`. What is here is the behaviour on top of it: a page
  * nobody opened comes up, in either language, the root still honours the
- * language this device chose, and a battle is played to the end.
+ * language this device chose, and a battle is played to the end. And what a
+ * picture that is not on the device turns into — the board *Offline*'s glyph
+ * for a thumbnail, and the hero's fall from the artwork.
  */
 
 test.use({ serviceWorkers: 'allow' })
@@ -184,22 +186,65 @@ test('offline, an address under /api/ is left to the network, and fails', async 
 const DECK = [6, 9, 3, 143, 149, 130]
 
 /**
+ * The board's offline glyph, as the app inlines it into a thumbnail: URL-encoded
+ * today, and base64 if Vite ever encodes it that way instead.
+ */
+const GLYPH = /^data:image\/svg\+xml[,;]/
+
+/**
+ * Writes down, on each image, every thumbnail address it failed to load — a list
+ * in `data-thumbnail-failures`. It listens on the window like the app's
+ * listener, so the app's `stopPropagation` does not keep it from hearing a
+ * failure: what registering first decides is that it reads the address before
+ * the app's listener swaps it for the glyph.
+ */
+async function recordThumbnailFailures(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.addEventListener('error', (event) => {
+      const image = event.target
+      if (!(image instanceof HTMLImageElement)) return
+
+      const address = image.getAttribute('src') ?? ''
+      if (address.startsWith('/sprites/')) image.dataset.thumbnailFailures = `${image.dataset.thumbnailFailures ?? ''} ${address}`.trim()
+    }, true)
+  })
+}
+
+/** What `recordThumbnailFailures` wrote, one list per image. */
+function thumbnailFailures(page: Page): Promise<string[][]> {
+  return page.locator('[data-thumbnail-failures]').evaluateAll(images => images.map((image) => {
+    return (image instanceof HTMLElement ? image.dataset.thumbnailFailures ?? '' : '').split(' ')
+  }))
+}
+
+/**
  * The phase's closing check, as the plan writes it: *"with the network offline,
  * the game opens and a battle runs to the end"*. Everything a battle reads — the
  * engine, the dex, the moves, the gym's team — is on the device once the worker
  * installed; the sprites it cannot find fall back to the thumbnails.
+ *
+ * **And the fallback happens once per image, never in a loop** — the board's
+ * words. No thumbnail of this battle was ever kept, so the animated sprite
+ * falls to a thumbnail that fails too, and a handler that set that address
+ * again would bring one failure after another. Each image may fail at an
+ * address once, and ends on the glyph. That holds because the first gym never
+ * switches, so each image shows one Pokémon: where the AI switches, one coming
+ * back would repeat its address, and rightly.
  */
 test('offline, a battle runs to the end', async ({ page, context }) => {
   await seedLocalSave(page, saveWith({
     collection: Object.fromEntries(DECK.map(id => [id, { c: 1, s: 0 }])),
     deck: DECK,
   }))
+  await recordThumbnailFailures(page)
   await underWorker(page)
   await context.setOffline(true)
 
   await page.goto('/battle/1')
   expect(await fromShell(page)).toBe(true)
   await expect(page.locator('.combatant')).toHaveCount(2)
+  await expect(page.locator('.battle__sprite--foe')).toHaveAttribute('src', GLYPH)
+  await expect(page.locator('.battle__sprite--own')).toHaveAttribute('src', GLYPH)
 
   // A generous ceiling: a first gym closes in far fewer turns, and a loop with
   // no ceiling would hide a battle that never ends.
@@ -208,6 +253,10 @@ test('offline, a battle runs to the end', async ({ page, context }) => {
     await playTurn(page)
   }
   await expect(result).toBeVisible()
+
+  const failures = await thumbnailFailures(page)
+  expect(failures.length, 'no thumbnail failed, so no fallback was asked for').toBeGreaterThan(0)
+  expect(failures.flatMap(list => repeated(list))).toEqual([])
 })
 
 /**
@@ -244,6 +293,176 @@ test('a sprite a page showed is kept, and one never shown is not', async ({ page
   })
 
   expect(outcome).toEqual({ shown: 'ok', never: 'unreachable' })
+})
+
+/**
+ * The thumbnails on the page that tried to load and failed, by address — what
+ * the glyph is there to replace. One still waiting, lazy and off screen, is not
+ * counted either way.
+ */
+function brokenThumbnails(page: Page): Promise<string[]> {
+  return page.evaluate(() => Array.from(document.images)
+    .filter(image => image.getAttribute('src')?.startsWith('/sprites/') === true && image.complete && image.naturalWidth === 0)
+    .map(image => image.getAttribute('src') ?? ''))
+}
+
+/**
+ * The images showing the glyph, split by whether it drew — each by the card it
+ * links to, or its `alt` where it links nowhere. A glyph that does not decode,
+ * as a `#` left unescaped in the URI makes it, still matches `GLYPH`, and still
+ * leaves no thumbnail broken at its address: the card shows nothing where the
+ * board draws the glyph. `decode()` settles once the image has loaded or failed.
+ */
+function glyphImages(page: Page): Promise<{ drawn: string[], failed: string[] }> {
+  return page.evaluate(async (pattern) => {
+    const images = Array.from(document.images).filter(image => new RegExp(pattern).test(image.getAttribute('src') ?? ''))
+    const decoded = await Promise.all(images.map(image => image.decode().then(() => true, () => false)))
+    const named = (image: HTMLImageElement): string => image.closest('a')?.getAttribute('href') ?? image.alt
+
+    return {
+      drawn: images.filter((_, index) => decoded[index]).map(named),
+      failed: images.filter((_, index) => !decoded[index]).map(named),
+    }
+  }, GLYPH.source)
+}
+
+/**
+ * **The board's glyph, wherever a thumbnail is missing.** Nothing of the ninth
+ * generation was shown before the network went, so every thumbnail of its grid
+ * has to come out as the glyph; one left at its address, broken, is the listener
+ * missing. The search is the screen whose image would not survive the failure
+ * on its own: `UAvatar` swaps an image that fails for an empty `<span>`, which
+ * is why the listener stops the event.
+ */
+test('offline, a thumbnail the device never kept shows the glyph, in the grid and in the search', async ({ page, context }) => {
+  await underWorker(page)
+  await context.setOffline(true)
+
+  await page.goto('/pokedex/9')
+  expect(await fromShell(page)).toBe(true)
+  await expect(page.locator('.dex-card img').first()).toHaveAttribute('src', GLYPH)
+  expect(await brokenThumbnails(page)).toEqual([])
+  const { drawn, failed } = await glyphImages(page)
+  expect(failed, 'a glyph that does not draw').toEqual([])
+  expect(drawn.length, 'no glyph on the grid to look at').toBeGreaterThan(0)
+
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('option').first()).toBeVisible()
+  await dialog.getByPlaceholder('Nome, número ou tipo…').fill('sprigatito')
+  await expect(dialog.getByRole('option', { name: /Sprigatito/ }).locator('img')).toHaveAttribute('src', GLYPH)
+})
+
+/** The height of the hero's art box: the page under it moves when it changes. */
+function artBox(page: Page): Promise<number> {
+  return page.locator('.hero__art').evaluate(box => box.getBoundingClientRect().height)
+}
+
+/**
+ * Opens a region's grid and waits for the app to take it: the grid shrinking
+ * from the 151 the server sent to the few the virtualizer keeps is the signal
+ * that exists only after hydration — see the search test of `pokedex.spec.ts`.
+ * Before it, a click on a card is a new document, and the search does not open.
+ */
+async function hydratedGrid(page: Page, url: string): Promise<void> {
+  await page.goto(url)
+  await expect.poll(() => page.locator('.dex-card').count()).toBeLessThan(151)
+}
+
+/**
+ * Opens the search and goes to the species it finds for `query`. The first
+ * option is the index having arrived, which the palette asks for only when it
+ * opens.
+ */
+async function searchFor(page: Page, placeholder: string, query: string, name: RegExp): Promise<void> {
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('option').first()).toBeVisible()
+  await dialog.getByPlaceholder(placeholder).fill(query)
+  await dialog.getByRole('option', { name }).click()
+}
+
+/** Whether the worker's thumbnail cache holds `url`. */
+function isKept(page: Page, cache: string, url: string): Promise<boolean> {
+  return page.evaluate(async ([name, address]) => {
+    return (await (await caches.open(name)).match(address)) !== undefined
+  }, [cache, url] as const)
+}
+
+/**
+ * **The hero, in the board's two states.** The artwork is remote and never on
+ * the device: the hero falls to the thumbnail when the device kept it — the grid
+ * kept Bulbasaur's here — and to a glyph of its own when it did not, each with
+ * the board's chip, and both in one box. That it is the artwork's box is
+ * measured in `pokedex.spec.ts`, with an artwork the suite serves itself.
+ *
+ * **And the chip keeps its word** — *the artwork arrives with the connection*:
+ * when the network comes back, the chip goes and the artwork is asked for
+ * again. It is served here, so the real host stays out of the test.
+ *
+ * **One document, from the grid on.** The chip reads `navigator.onLine`, and
+ * Playwright's offline reaches it on the page that was open when the network
+ * went, not on one the worker brings up afterwards: that one reads online, where
+ * a browser whose network is really gone reads offline — measured with Chromium
+ * in a network namespace with no interface. So the hero is reached the way a
+ * player gets there, by the card and by the search.
+ */
+test('offline, the hero falls to the thumbnail the device kept and to its glyph without it, and to the artwork when the network comes back', async ({ page, context }) => {
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+
+  await hydratedGrid(page, '/pokedex/1')
+  await expect.poll(() => isKept(page, spriteCache, '/sprites/1.webp')).toBe(true)
+  await context.setOffline(true)
+
+  await page.locator('a[href="/pokemon/bulbasaur"]').first().click()
+  const hero = page.locator('.hero__art')
+  await expect(hero.locator('img')).toHaveAttribute('src', '/sprites/1.webp')
+  await expect(hero).toContainText('sem rede · mostrando a miniatura')
+  const box = await artBox(page)
+
+  await searchFor(page, 'Nome, número ou tipo…', 'sprigatito', /Sprigatito/)
+  await expect(page).toHaveURL(pathPattern('/pokemon/sprigatito'))
+  await expect(hero).toContainText('sem rede · a arte chega com a conexão')
+  await expect(hero.locator('img')).toHaveCount(0)
+  expect(await artBox(page)).toBe(box)
+
+  let served = 0
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    served += 1
+    await route.fulfill({ path: join(REPO_ROOT, 'public/sprites/906.webp') })
+  })
+  await context.setOffline(false)
+  await expect(hero.locator('img')).toHaveAttribute('src', /\/official-artwork\/906\.png$/)
+  await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+  await expect(hero.locator('.hero__offline')).toHaveCount(0)
+  expect(served, 'the artwork came from the real host, and not from this test').toBeGreaterThan(0)
+})
+
+/**
+ * The chip in English, in both of the hero's fallbacks — where a Portuguese
+ * sentence left in either would show. Reached by the card and by the search, as
+ * above, and for the same reason.
+ */
+test('offline, the hero says in English which of its fallbacks it shows', async ({ page, context }) => {
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+  await hydratedGrid(page, localeUrl('/pokedex/1', 'en'))
+  await expect.poll(() => isKept(page, spriteCache, '/sprites/1.webp')).toBe(true)
+  await context.setOffline(true)
+
+  const hero = page.locator('.hero__art')
+  const foreign = namespaceLabels('species.offline.', 'en', defaultLocale())
+  expect(foreign.length, 'no Portuguese label of the chip to look for').toBeGreaterThan(0)
+
+  await page.locator(`a[href="${localeUrl('/pokemon/bulbasaur', 'en')}"]`).first().click()
+  await expect(hero).toContainText('offline · showing the thumbnail')
+  expect(foreignPhrases(await screenText(hero), foreign)).toEqual([])
+
+  await searchFor(page, label('dex.search.placeholder', 'en'), 'sprigatito', /Sprigatito/)
+  await expect(page).toHaveURL(pathPattern(localeUrl('/pokemon/sprigatito', 'en')))
+  await expect(hero).toContainText('offline · the artwork arrives with the connection')
+  expect(foreignPhrases(await screenText(hero), foreign)).toEqual([])
 })
 
 /**
