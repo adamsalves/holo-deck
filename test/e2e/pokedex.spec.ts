@@ -299,6 +299,53 @@ test('the artwork failing with the network up falls to the thumbnail, without th
 })
 
 /**
+ * **On a phone, the fallback and its chip keep the artwork's box too.** The chip
+ * takes room under the thumbnail, and at 320 px the column is 256 px wide: a box
+ * that only had a floor grew past the artwork's there by 46.5 px, and by 6.5 at
+ * 360, where most Android phones are — measured. The suite's 1280 px leaves the
+ * column 340 px, which hides it.
+ *
+ * The chip needs the browser to say it is offline, and Playwright does not say
+ * so to a document it opens (see `offline.spec.ts`), so the page is told so
+ * directly. What is measured is the layout, not how the app hears the network:
+ * that is in `offline.spec.ts`, against the worker.
+ */
+for (const width of [320, 360]) {
+  test(`at ${width} px, the fallback and its chip stay in the artwork's box`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.addInitScript(() => {
+      Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => false })
+    })
+    let artwork: 'served' | 'failing' = 'served'
+    await page.route('https://raw.githubusercontent.com/**', async (route) => {
+      await (artwork === 'served' ? route.fulfill({ path: join(REPO_ROOT, 'public/sprites/2.webp') }) : route.abort())
+    })
+
+    await page.goto('/pokemon/ivysaur')
+    const hero = page.locator('.hero__art')
+    await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+    const box = await hero.evaluate(element => element.getBoundingClientRect().height)
+
+    artwork = 'failing'
+    await page.goto('/pokemon/charizard')
+    await expect(hero.locator('img')).toHaveAttribute('src', '/sprites/6.webp')
+    await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+    await expect(hero).toContainText('sem rede · mostrando a miniatura')
+    expect(await hero.evaluate(element => element.getBoundingClientRect().height)).toBe(box)
+
+    // A box that keeps its height by letting the thumbnail and the chip spill
+    // out of it moves nothing, and draws the chip over the name.
+    const spilled = await hero.evaluate((element) => {
+      const bounds = element.getBoundingClientRect()
+      return Array.from(element.children)
+        .filter(child => child.getBoundingClientRect().top < bounds.top - 0.5 || child.getBoundingClientRect().bottom > bounds.bottom + 0.5)
+        .map(child => child.tagName.toLowerCase())
+    })
+    expect(spilled, 'what spills out of the box, over the page under it').toEqual([])
+  })
+}
+
+/**
  * The six stat badges, on the one screen that draws all six at once.
  *
  * This is the half of `test/unit/stat-label-gate.spec.ts` that a gate on disk

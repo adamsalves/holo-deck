@@ -638,17 +638,23 @@ useSeoMeta({
 
 /* The board's fallback: the thumbnail in 2× or the glyph, the chip under it, all
    centred in the box the artwork held — `100cqi` is the column's width, which is
-   the artwork's too, so the page under the hero does not move. */
+   the artwork's too, so the page under the hero does not move.
+
+   A height, and not a floor: at 320 px the column is 256 px wide, and the
+   thumbnail with its chip under it would push the box past the artwork's. There
+   the thumbnail gives up the room (`min-height: 0`) and keeps its shape. */
 .hero__art--fallback {
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 18px;
-  min-height: min(100cqi, 340px);
+  height: min(100cqi, 340px);
 }
 
 .hero__art--fallback :deep(img) {
   width: min(100%, 256px);
+  min-height: 0;
+  object-fit: contain;
 }
 
 .hero__glyph {
