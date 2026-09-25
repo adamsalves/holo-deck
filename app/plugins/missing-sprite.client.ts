@@ -25,6 +25,10 @@ import glyph from '~~/app/assets/images/missing-sprite.svg?inline'
  * `viewBox` pads the board's 24-unit glyph to 34 px in every 96, as the card
  * draws it, so the proportion holds at whatever size a thumbnail is drawn.
  *
+ * **An image that handles its own fallback opts out** with `data-own-fallback`:
+ * the hero of `/pokemon/[name]` falls from the artwork to the thumbnail, and
+ * from there to a glyph and a chip of its own.
+ *
  * Installed before the app mounts. What it cannot reach is a thumbnail of a
  * prerendered page that failed before that — but offline every page comes from
  * the shell, and the shell's images are all created by the app, after this.
@@ -32,7 +36,7 @@ import glyph from '~~/app/assets/images/missing-sprite.svg?inline'
 export default defineNuxtPlugin(() => {
   window.addEventListener('error', (event) => {
     const image = event.target
-    if (!(image instanceof HTMLImageElement)) return
+    if (!(image instanceof HTMLImageElement) || image.hasAttribute('data-own-fallback')) return
     if (image.getAttribute('src')?.startsWith('/sprites/') !== true) return
 
     event.stopPropagation()

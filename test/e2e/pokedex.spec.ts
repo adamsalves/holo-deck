@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { STAT_NAMES, TYPE_NAMES } from '../../shared/types/dex.ts'
 import { statKey, statNameKey, typeKey } from '../../shared/types/game.ts'
@@ -12,6 +13,7 @@ import {
   messagePattern,
   spells,
 } from '../support/locales.ts'
+import { REPO_ROOT } from '../support/source-tree.ts'
 import { screenText } from './support.ts'
 
 /** The six stat badges of one locale, as that locale spells them. */
@@ -243,6 +245,57 @@ test('espécie que não existe responde 404, e não uma página vazia', async ({
   const response = await page.goto('/pokemon/missingno')
 
   expect(response?.status()).toBe(404)
+})
+
+/**
+ * **The artwork failing with the network up** — its host down, or blocked. The
+ * hero falls to the thumbnail, as offline, and without the chip: the board's
+ * chip says *offline*, and here it would be a lie (decided on 25/09/2026).
+ *
+ * The host fails before the app hydrates — the page's scripts are held until it
+ * has —, which is the failure that never reaches the image's `@error`: the
+ * prerendered page asks for the artwork while the HTML is still arriving, and a
+ * blocked host answers that fast. The offline cases, where the app creates the
+ * image, are in `offline.spec.ts`.
+ *
+ * **And the thumbnail sits in the artwork's box**, so the page under the hero
+ * does not move. The box with the artwork is measured first, with an artwork
+ * served here: the real host is the one thing this test must not depend on — an
+ * artwork it failed to send was how the first version of this measurement went
+ * red.
+ */
+test('the artwork failing with the network up falls to the thumbnail, without the chip, in its box', async ({ page }) => {
+  let artwork: 'served' | 'failing' = 'served'
+  let artworkFailed = (): void => undefined
+  const failed = new Promise<void>((resolve) => {
+    artworkFailed = resolve
+  })
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    if (artwork === 'served') {
+      await route.fulfill({ path: join(REPO_ROOT, 'public/sprites/2.webp') })
+      return
+    }
+
+    await route.abort()
+    artworkFailed()
+  })
+
+  await page.goto('/pokemon/ivysaur')
+  const hero = page.locator('.hero__art')
+  await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+  await expect(hero).not.toHaveClass(/hero__art--fallback/)
+  const box = await hero.evaluate(element => element.getBoundingClientRect().height)
+
+  artwork = 'failing'
+  await page.route('**/_nuxt/**', async (route) => {
+    await failed
+    await route.continue()
+  })
+  await page.goto('/pokemon/charizard')
+  await expect(hero.locator('img')).toHaveAttribute('src', '/sprites/6.webp')
+  await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+  expect(await screenText(hero)).not.toContain('sem rede')
+  expect(await hero.evaluate(element => element.getBoundingClientRect().height)).toBe(box)
 })
 
 /**

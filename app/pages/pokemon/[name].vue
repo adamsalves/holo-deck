@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SpeciesEntry } from '~~/shared/types/dex'
-import { computed } from 'vue'
+import { computed, onMounted, ref, useTemplateRef } from 'vue'
 import { flattenChain } from '~~/shared/game/evolution'
 import { rarityOf } from '~~/shared/game/rarity'
 import { habitatKey, rarityKey } from '~~/shared/types/game'
@@ -142,6 +142,45 @@ const tabs = computed(() => [
 ])
 
 /**
+ * What the hero shows, in the order the board *Offline* falls through them: the
+ * official artwork, the thumbnail in 2×, and the offline glyph.
+ *
+ * The artwork never stays on the device — it is remote, and the 1025 add up to
+ * ~140 MB — so the hero needs the fallback even with everything downloaded. The
+ * thumbnail is the grid's 128 px image, which the device may have kept. The
+ * image opts out of the listener that gives every other thumbnail the card's
+ * glyph (`missing-sprite.client.ts`): the hero's glyph is its own, and so is the
+ * chip that says which of the two it fell to.
+ *
+ * **The chip only when the browser says there is no network.** The board draws
+ * the fallback as *offline*, but the artwork also fails with the network up —
+ * its host down, or blocked —, and there the chip would be a lie.
+ * `navigator.onLine`, which the sync reads too, is right when it says offline
+ * and may be wrong when it says online; then the fallback shows without the
+ * chip. Decided on 25/09/2026, a state the board does not draw.
+ */
+type ArtStage = 'artwork' | 'thumbnail' | 'glyph'
+const artStage = ref<ArtStage>('artwork')
+const offline = ref(false)
+
+function fallBack(): void {
+  offline.value = !navigator.onLine
+  artStage.value = artStage.value === 'artwork' ? 'thumbnail' : 'glyph'
+}
+
+/**
+ * **An artwork that failed before hydration never reaches `@error`.** The
+ * prerendered page asks for it while the HTML is still arriving, and Vue attaches
+ * the listener later — a blocked host fails that fast. Offline the page comes
+ * from the shell and the app creates the image, so this is the network-up case.
+ */
+const art = useTemplateRef<HTMLImageElement>('art')
+onMounted(() => {
+  const image = art.value
+  if (artStage.value === 'artwork' && image?.complete === true && image.naturalWidth === 0) fallBack()
+})
+
+/**
  * O `preconnect` da arte oficial mora aqui, e não no `app.head`.
  *
  * `raw.githubusercontent.com` é o único host de terceiro do projeto e só esta
@@ -209,7 +248,10 @@ useSeoMeta({
         <DexSearch />
       </div>
 
-      <div class="hero__art">
+      <div
+        class="hero__art"
+        :class="{ 'hero__art--fallback': artStage !== 'artwork' }"
+      >
         <!--
           Arte oficial remota, 475px, uma por página. O grid usa a miniatura de
           128px commitada; aqui a resolução cheia é o ponto da tela.
@@ -226,13 +268,50 @@ useSeoMeta({
           dimensões evitam o salto de layout enquanto ela chega.
         -->
         <img
-          :src="artworkUrl(species.id)"
-          :alt="t('species.artwork', { name: species.displayName })"
+          v-if="artStage !== 'glyph'"
+          ref="art"
+          :src="artStage === 'artwork' ? artworkUrl(species.id) : `/sprites/${species.id}.webp`"
+          :alt="artStage === 'artwork' ? t('species.artwork', { name: species.displayName }) : species.displayName"
           width="475"
           height="475"
           loading="eager"
           decoding="async"
+          data-own-fallback
+          @error="fallBack"
         >
+        <svg
+          v-else
+          class="hero__glyph"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M4 4l16 16M8.5 15.5a5 5 0 017 0M5 12a10 10 0 0114 0"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span
+          v-if="artStage !== 'artwork' && offline"
+          class="hero__offline"
+        >
+          <svg
+            class="hero__offline-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M4 4l16 16M8.5 15.5a5 5 0 017 0M5 12a10 10 0 0114 0"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          {{ artStage === 'thumbnail' ? t('species.offline.thumbnail') : t('species.offline.nothing') }}
+        </span>
       </div>
 
       <p class="numeric hero__number">
@@ -541,6 +620,49 @@ useSeoMeta({
 .hero__art :deep(img) {
   width: min(100%, 340px);
   height: auto;
+}
+
+/* The board's fallback: the thumbnail in 2× or the glyph, the chip under it, all
+   centred in the box the artwork held — `100cqi` is the column's width, which is
+   the artwork's too, so the page under the hero does not move. */
+.hero__art--fallback {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: min(100cqi, 340px);
+}
+
+.hero__art--fallback :deep(img) {
+  width: min(100%, 256px);
+}
+
+.hero__glyph {
+  width: 88px;
+  height: 88px;
+  color: var(--border-strong);
+}
+
+/* The chip of the sync indicator's *queued*, which the board gives it, a size
+   smaller; its background lets the hero's gradient through, as the board's
+   does. */
+.hero__offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid color-mix(in oklab, var(--caution) 45%, var(--bg));
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--caution) 8%, transparent);
+  color: var(--caution);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hero__offline-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
 }
 
 .hero__number {

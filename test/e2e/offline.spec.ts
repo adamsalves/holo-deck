@@ -21,7 +21,8 @@ import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } 
  * `offline-precache.spec.ts`. What is here is the behaviour on top of it: a page
  * nobody opened comes up, in either language, the root still honours the
  * language this device chose, and a battle is played to the end. And what a
- * thumbnail that is not on the device turns into: the board *Offline*'s glyph.
+ * picture that is not on the device turns into — the board *Offline*'s glyph
+ * for a thumbnail, and the hero's fall from the artwork.
  */
 
 test.use({ serviceWorkers: 'allow' })
@@ -320,6 +321,91 @@ test('offline, a thumbnail the device never kept shows the glyph, in the grid an
   await expect(dialog.getByRole('option').first()).toBeVisible()
   await dialog.getByPlaceholder('Nome, número ou tipo…').fill('sprigatito')
   await expect(dialog.getByRole('option', { name: /Sprigatito/ }).locator('img')).toHaveAttribute('src', GLYPH)
+})
+
+/** The height of the hero's art box: the page under it moves when it changes. */
+function artBox(page: Page): Promise<number> {
+  return page.locator('.hero__art').evaluate(box => box.getBoundingClientRect().height)
+}
+
+/**
+ * Opens a region's grid and waits for the app to take it: the grid shrinking
+ * from the 151 the server sent to the few the virtualizer keeps is the signal
+ * that exists only after hydration — see the search test of `pokedex.spec.ts`.
+ * Before it, a click on a card is a new document, and the search does not open.
+ */
+async function hydratedGrid(page: Page, url: string): Promise<void> {
+  await page.goto(url)
+  await expect.poll(() => page.locator('.dex-card').count()).toBeLessThan(151)
+}
+
+/**
+ * Opens the search and goes to the species it finds for `query`. The first
+ * option is the index having arrived, which the palette asks for only when it
+ * opens.
+ */
+async function searchFor(page: Page, placeholder: string, query: string, name: RegExp): Promise<void> {
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('option').first()).toBeVisible()
+  await dialog.getByPlaceholder(placeholder).fill(query)
+  await dialog.getByRole('option', { name }).click()
+}
+
+/**
+ * **The hero, in the board's two states.** The artwork is remote and never on
+ * the device: the hero falls to the thumbnail when the device kept it — the grid
+ * kept Bulbasaur's here — and to a glyph of its own when it did not, each with
+ * the board's chip, and both in one box. That it is the artwork's box is
+ * measured in `pokedex.spec.ts`, with an artwork the suite serves itself.
+ *
+ * **One document, from the grid on.** The chip reads `navigator.onLine`, and
+ * Playwright's offline reaches it on the page that was open when the network
+ * went, not on one the worker brings up afterwards: that one reads online, where
+ * a browser whose network is really gone reads offline — measured with Chromium
+ * in a network namespace with no interface. So the hero is reached the way a
+ * player gets there, by the card and by the search.
+ */
+test('offline, the hero falls to the thumbnail the device kept, and to its glyph without it', async ({ page, context }) => {
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+
+  await hydratedGrid(page, '/pokedex/1')
+  await expect.poll(() => page.evaluate(async ([name, url]) => {
+    return (await (await caches.open(name)).match(url)) !== undefined
+  }, [spriteCache, '/sprites/1.webp'] as const)).toBe(true)
+  await context.setOffline(true)
+
+  await page.locator('a[href="/pokemon/bulbasaur"]').first().click()
+  const hero = page.locator('.hero__art')
+  await expect(hero.locator('img')).toHaveAttribute('src', '/sprites/1.webp')
+  await expect(hero).toContainText('sem rede · mostrando a miniatura')
+  const box = await artBox(page)
+
+  await searchFor(page, 'Nome, número ou tipo…', 'sprigatito', /Sprigatito/)
+  await expect(page).toHaveURL(pathPattern('/pokemon/sprigatito'))
+  await expect(hero).toContainText('sem rede · a arte chega com a conexão')
+  await expect(hero.locator('img')).toHaveCount(0)
+  expect(await artBox(page)).toBe(box)
+})
+
+/**
+ * The chip in English, where a Portuguese sentence left in the hero would show.
+ * Reached by the search as above, and for the same reason.
+ */
+test('offline, the hero says in English that the artwork comes with the connection', async ({ page, context }) => {
+  await underWorker(page)
+  await hydratedGrid(page, localeUrl('/pokedex/1', 'en'))
+  await context.setOffline(true)
+
+  await searchFor(page, label('dex.search.placeholder', 'en'), 'sprigatito', /Sprigatito/)
+  await expect(page).toHaveURL(pathPattern(localeUrl('/pokemon/sprigatito', 'en')))
+  const hero = page.locator('.hero__art')
+  await expect(hero).toContainText('offline · the artwork arrives with the connection')
+
+  const foreign = namespaceLabels('species.offline.', 'en', defaultLocale())
+  expect(foreign.length, 'no Portuguese label of the chip to look for').toBeGreaterThan(0)
+  expect(foreignPhrases(await screenText(hero), foreign)).toEqual([])
 })
 
 /**

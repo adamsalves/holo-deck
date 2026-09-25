@@ -573,6 +573,10 @@
   },
   "species": {
     "artwork": "Arte oficial de {name}",
+    "offline": {
+      "thumbnail": "sem rede · mostrando a miniatura",
+      "nothing": "sem rede · a arte chega com a conexão"
+    },
     "height": "Altura",
     "weight": "Peso",
     "rarity": "Raridade",
