@@ -33,7 +33,9 @@ export interface SpriteDownload {
  *
  * The cache is this build's (`spriteRevision`). A worker of an older build still
  * in charge reads its own until the new one takes over; the new one keeps this
- * cache and deletes the other, so what was downloaded meanwhile is not lost.
+ * cache and deletes the other, so what was downloaded meanwhile is not lost —
+ * and it is this build's art, because the download asks past the worker in
+ * charge (`keepSprites`).
  */
 export function useSpriteDownload(): {
   state: Ref<SpriteDownload>

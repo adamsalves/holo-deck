@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serviceWorkerScript, transpileWorker } from '../../scripts/service-worker/build'
+import type { SpriteFetch } from '~~/app/utils/sprite-download'
+import { keepSprites } from '~~/app/utils/sprite-download'
 
 /**
  * The worker's rules, run: the script the build serves — `transpileWorker` over
@@ -91,6 +93,7 @@ interface FakeRequest {
   readonly url: string
   readonly method: string
   readonly mode: string
+  readonly cache?: string
 }
 
 function get(path: string, mode = 'cors'): FakeRequest {
@@ -390,6 +393,30 @@ describe('the thumbnails', () => {
 
       expect(worker.caches.byName.get(SPRITES)?.entries.size ?? 0).toBe(0)
     }
+  })
+
+  /**
+   * An update that changes the art: the page is the new build's — navigations
+   * go to the network first —, the worker in charge is still the old one, and
+   * its cache holds the old art. The download asks past it; an answer from that
+   * cache, kept under the new revision, would be served by the new worker until
+   * the art changed again.
+   */
+  it('leaves a download to the network, so the page keeps the art the host has now', async () => {
+    const network = async (): Promise<Response> => new Response('new art', { headers: { 'content-type': 'image/webp' } })
+    const worker = boot(network)
+    const old = await worker.caches.open(SPRITES)
+    await old.put(`${ORIGIN}/sprites/25.webp`, new Response('old art', { headers: { 'content-type': 'image/webp' } }))
+    const next = await worker.caches.open('holodeck-sprites-bbbbbbbbbbbbbbbb')
+
+    // The page's fetch, routed as a browser routes it: to the worker, and to
+    // the network when the worker leaves it.
+    const fetcher: SpriteFetch = (url, init) => worker.request({ ...get(url), cache: init.cache }).answer ?? network()
+
+    expect(await keepSprites(next, ['/sprites/25.webp'], () => undefined, fetcher)).toBeNull()
+    expect(await (await next.match('/sprites/25.webp'))?.text()).toBe('new art')
+    // The other side: a page showing the thumbnail still gets the kept one.
+    expect(await (await worker.request(get('/sprites/25.webp')).answer)?.text()).toBe('old art')
   })
 
   it('still answers the thumbnail when storage refuses to keep it', async () => {

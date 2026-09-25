@@ -5,9 +5,15 @@
  * **The page downloads, not the worker**, and it writes into the cache itself.
  * The board *Offline* draws the download stopping when the tab closes, which is
  * what a page's loop does; and it draws two reasons to stop, which only the side
- * that writes can tell apart. A thumbnail fetched through the worker is kept by
- * the worker too (`keptAsShown`), but that write swallows its own failure — a
- * full disk would read as a download that finished.
+ * that writes can tell apart — the worker's own write (`keptAsShown`) swallows
+ * its failure, and a full disk would read as a download that finished.
+ *
+ * **And it asks past the worker**, with `cache: 'reload'`, which the worker
+ * leaves to the network: what the page keeps is what the host serves now. The
+ * worker in charge while a new one waits for the tabs to close is the older
+ * build's, and it would answer from its own cache — with that build's art,
+ * which, kept under this build's revision, the new worker would go on serving
+ * until the art changed again.
  */
 
 /** Why a download stopped: the two reasons of the board's state 04. */
@@ -20,7 +26,7 @@ export interface SpriteStore {
 }
 
 /** What the loop needs of `fetch`. */
-export type SpriteFetch = (url: string, init: { signal: AbortSignal }) => Promise<Response>
+export type SpriteFetch = (url: string, init: { cache: 'reload', signal: AbortSignal }) => Promise<Response>
 
 /**
  * Thumbnails in flight at once. A browser opens six connections to a host over
@@ -97,7 +103,7 @@ export async function keepSprites(
 
       let response: Response
       try {
-        response = await fetcher(url, { signal: AbortSignal.timeout(deadline) })
+        response = await fetcher(url, { cache: 'reload', signal: AbortSignal.timeout(deadline) })
       }
       catch {
         stopped ??= 'network'

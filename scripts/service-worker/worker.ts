@@ -185,7 +185,9 @@ function respond(event: FetchEvent): Promise<Response> | undefined {
 
   const key = keyByUrl.get(url.href)
   if (key !== undefined) return installed(request, key)
-  if (url.pathname.startsWith('/sprites/')) return keptAsShown(event)
+  // *Download everything* asks past the caches, and keeps what comes itself: an
+  // answer from here could be this worker's build's art, not the page's.
+  if (url.pathname.startsWith('/sprites/')) return request.cache === 'reload' ? undefined : keptAsShown(event)
 
   return undefined
 }

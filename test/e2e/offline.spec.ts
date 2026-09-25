@@ -279,13 +279,13 @@ function keptSprites(page: Page, cache: string): Promise<string[]> {
  * The page names the cache from `runtimeConfig` and the worker from what the
  * build wrote in front of it, so the cache is read back by the worker's name,
  * and held against the build's output as sets — a thumbnail missing, or one
- * too many.
+ * too many. The page asks past the worker, so every one of them is the page's
+ * write: with the two names drifted apart, the worker's cache comes out empty.
  *
- * **And it is the only thumbnails' cache on the device.** The page downloads
- * through the worker, which keeps every thumbnail it answers in its own cache
- * whatever the page does: with the two names drifted apart, the worker's cache
- * still came out full — measured, with the page writing to another name, this
- * test was green. A second cache is what the drift leaves behind.
+ * **And no other cache holds a thumbnail**, whatever its name. Filtering the
+ * caches by the thumbnails' prefix was green with the page writing to one named
+ * otherwise — measured in the review of this PR, back when the worker kept the
+ * download too and filled its own cache anyway.
  */
 test('downloading everything leaves every thumbnail the build ships in the cache the worker reads', async ({ page, context }) => {
   const shipped = shippedSprites()
@@ -305,8 +305,18 @@ test('downloading everything leaves every thumbnail the build ships in the cache
   await expect(row.getByRole('button')).toHaveCount(0)
   expect(new Set(await keptSprites(page, spriteCache))).toEqual(new Set(shipped.urls))
 
-  const spriteCaches = (await page.evaluate(() => caches.keys())).filter(name => name.startsWith(SPRITE_CACHE_PREFIX))
-  expect(spriteCaches, 'the page kept thumbnails in a cache the worker does not read').toEqual([spriteCache])
+  const elsewhere = await page.evaluate(async (read) => {
+    const found: string[] = []
+    for (const name of (await caches.keys()).filter(name => name !== read)) {
+      for (const request of await (await caches.open(name)).keys()) {
+        const path = new URL(request.url).pathname
+        if (path.startsWith('/sprites/')) found.push(`${name}: ${path}`)
+      }
+    }
+
+    return found
+  }, spriteCache)
+  expect(elsewhere, 'thumbnails kept in a cache the worker does not read').toEqual([])
 
   // And the worker answers from it: a thumbnail no page showed, with no network.
   await context.setOffline(true)
@@ -365,16 +375,11 @@ test('downloading stops for space when the browser gives no more room, and the c
   await expect(row).toContainText('Parou em 10 de 1025 — o navegador não deu mais espaço.')
   await expect(row.getByRole('button', { name: 'CONTINUAR', exact: true })).toBeVisible()
 
-  // The worker keeps what went through it as well, so the device may hold a
-  // few more than the page managed to write: the row counts the device. Read
-  // after the reload — the page stops the moment its own write is refused,
-  // while the worker's writes of the same answers may still be landing.
+  // The page is the only one writing what it downloads: the device holds its
+  // ten, and none the worker would have kept on the way.
   await page.reload()
-  await expect(row).toContainText('já estão neste aparelho')
-  const kept = (await keptSprites(page, spriteCache)).length
-  expect(kept).toBeGreaterThanOrEqual(10)
-
-  await expect(row).toContainText(`${kept} de 1025 já estão neste aparelho — o jogo guarda o que você vê. Baixar traz as outras ${1025 - kept}.`)
+  await expect(row).toContainText('10 de 1025 já estão neste aparelho — o jogo guarda o que você vê. Baixar traz as outras 1015.')
+  expect(await keptSprites(page, spriteCache)).toHaveLength(10)
   await expect(row.getByRole('button', { name: 'BAIXAR', exact: true })).toBeVisible()
 })
 
