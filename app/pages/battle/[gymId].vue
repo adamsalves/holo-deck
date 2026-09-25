@@ -486,14 +486,17 @@ function again(): void {
 /**
  * Recuo do sprite animado: nem todas as 1025 espécies existem no conjunto.
  *
- * Offline the GIF never comes, and a thumbnail the device never kept fails too.
- * That second failure never reaches this handler, which would set the same
- * failing address again — an `onerror` loop: the listener in
- * `missing-sprite.client.ts` shows the glyph and stops the event first.
+ * **Only from the animated sprite.** Offline the GIF never comes, and a
+ * thumbnail the device never kept fails too. That second failure gets the glyph
+ * from `missing-sprite.client.ts`, which stops the event before it gets here;
+ * but a failure from any other address that did get here — the glyph itself, if
+ * it ever failed to decode — would set the thumbnail again, and each failure
+ * would bring the next: the classic `onerror` loop. So the loop is closed here,
+ * and does not hang on a listener in another file.
  */
 function fallbackSprite(event: Event, id: number): void {
   const image = event.target
-  if (image instanceof HTMLImageElement) image.src = `/sprites/${id}.webp`
+  if (image instanceof HTMLImageElement && image.getAttribute('src') === battleSpriteUrl(id)) image.src = `/sprites/${id}.webp`
 }
 </script>
 

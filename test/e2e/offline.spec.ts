@@ -220,9 +220,11 @@ function thumbnailFailures(page: Page): Promise<string[][]> {
  *
  * **And the fallback happens once per image, never in a loop** — the board's
  * words. No thumbnail of this battle was ever kept, so the animated sprite
- * falls to a thumbnail that fails too; the battle's handler would set that same
- * address again, and each failure would bring the next. Each image may fail at
- * an address once, and ends on the glyph.
+ * falls to a thumbnail that fails too, and a handler that set that address
+ * again would bring one failure after another. Each image may fail at an
+ * address once, and ends on the glyph. That holds because the first gym never
+ * switches, so each image shows one Pokémon: where the AI switches, one coming
+ * back would repeat its address, and rightly.
  */
 test('offline, a battle runs to the end', async ({ page, context }) => {
   await seedLocalSave(page, saveWith({

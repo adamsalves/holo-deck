@@ -10,12 +10,13 @@ import glyph from '~~/app/assets/images/missing-sprite.svg?inline'
  *
  * **Capture, on the window, and the event stops here.** An image's `error` does
  * not bubble, but on its way down it passes the window before any listener on
- * the image itself, and two of those would undo the glyph: `UAvatar`, in the
- * search, swaps an image that fails for an empty `<span>`; and the battle's
- * `fallbackSprite` sets the thumbnail on its image — the very address that just
- * failed, which is the classic `onerror` loop. Stopping the event closes both:
- * the image keeps its box and its `alt`, and it falls back once — the board's
- * "once per image, never in a loop".
+ * the image itself, and one of those would undo the glyph: `UAvatar`, in the
+ * search, swaps an image that fails for an empty `<span>`. Stopping the event
+ * keeps the image, its box and its `alt`. The battle's `fallbackSprite` would
+ * have been the other — it set the thumbnail again on any failure, the very
+ * address that just failed —, and it now falls back only from its animated
+ * sprite, so an image falls back once whichever listener hears it first: the
+ * board's "once per image, never in a loop".
  *
  * **The glyph is inlined** (`?inline`): it shows at the moment a request failed,
  * and a picture of its own would be one more request, answered only if the
