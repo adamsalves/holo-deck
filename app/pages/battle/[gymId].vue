@@ -483,7 +483,14 @@ function again(): void {
   focused.value = 0
 }
 
-/** Recuo do sprite animado: nem todas as 1025 espécies existem no conjunto. */
+/**
+ * Recuo do sprite animado: nem todas as 1025 espécies existem no conjunto.
+ *
+ * Offline the GIF never comes, and a thumbnail the device never kept fails too.
+ * That second failure never reaches this handler, which would set the same
+ * failing address again — an `onerror` loop: the listener in
+ * `missing-sprite.client.ts` shows the glyph and stops the event first.
+ */
 function fallbackSprite(event: Event, id: number): void {
   const image = event.target
   if (image instanceof HTMLImageElement) image.src = `/sprites/${id}.webp`

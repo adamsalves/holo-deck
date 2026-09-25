@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { PRECACHE_CACHE, SPRITE_CACHE_PREFIX, type PrecacheEntry } from '../../app/utils/offline.ts'
 import { LOCALE_KEY } from '../../app/utils/locale-preference.ts'
-import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels } from '../support/locales'
+import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels, repeated } from '../support/locales'
 import { REPO_ROOT } from '../support/source-tree'
 import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } from './support'
 
@@ -20,7 +20,8 @@ import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } 
  * The list the worker installs is measured on its own by
  * `offline-precache.spec.ts`. What is here is the behaviour on top of it: a page
  * nobody opened comes up, in either language, the root still honours the
- * language this device chose, and a battle is played to the end.
+ * language this device chose, and a battle is played to the end. And what a
+ * thumbnail that is not on the device turns into: the board *Offline*'s glyph.
  */
 
 test.use({ serviceWorkers: 'allow' })
@@ -183,23 +184,59 @@ test('offline, an address under /api/ is left to the network, and fails', async 
  */
 const DECK = [6, 9, 3, 143, 149, 130]
 
+/** The board's offline glyph, as the app inlines it into a thumbnail. */
+const GLYPH = /^data:image\/svg\+xml,/
+
+/**
+ * Writes down, on each image, every thumbnail address it failed to load — a list
+ * in `data-thumbnail-failures`. Registered before the page's own scripts, it
+ * hears each failure before the app's listener stops it.
+ */
+async function recordThumbnailFailures(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.addEventListener('error', (event) => {
+      const image = event.target
+      if (!(image instanceof HTMLImageElement)) return
+
+      const address = image.getAttribute('src') ?? ''
+      if (address.startsWith('/sprites/')) image.dataset.thumbnailFailures = `${image.dataset.thumbnailFailures ?? ''} ${address}`.trim()
+    }, true)
+  })
+}
+
+/** What `recordThumbnailFailures` wrote, one list per image. */
+function thumbnailFailures(page: Page): Promise<string[][]> {
+  return page.locator('[data-thumbnail-failures]').evaluateAll(images => images.map((image) => {
+    return (image instanceof HTMLElement ? image.dataset.thumbnailFailures ?? '' : '').split(' ')
+  }))
+}
+
 /**
  * The phase's closing check, as the plan writes it: *"with the network offline,
  * the game opens and a battle runs to the end"*. Everything a battle reads — the
  * engine, the dex, the moves, the gym's team — is on the device once the worker
  * installed; the sprites it cannot find fall back to the thumbnails.
+ *
+ * **And the fallback happens once per image, never in a loop** — the board's
+ * words. No thumbnail of this battle was ever kept, so the animated sprite
+ * falls to a thumbnail that fails too; the battle's handler would set that same
+ * address again, and each failure would bring the next. Each image may fail at
+ * an address once, and ends on the glyph.
  */
 test('offline, a battle runs to the end', async ({ page, context }) => {
   await seedLocalSave(page, saveWith({
     collection: Object.fromEntries(DECK.map(id => [id, { c: 1, s: 0 }])),
     deck: DECK,
   }))
+  await recordThumbnailFailures(page)
   await underWorker(page)
   await context.setOffline(true)
 
   await page.goto('/battle/1')
   expect(await fromShell(page)).toBe(true)
   await expect(page.locator('.combatant')).toHaveCount(2)
+  await expect(page.locator('.battle__sprite--foe')).toHaveAttribute('src', GLYPH)
+  await expect(page.locator('.battle__sprite--own')).toHaveAttribute('src', GLYPH)
 
   // A generous ceiling: a first gym closes in far fewer turns, and a loop with
   // no ceiling would hide a battle that never ends.
@@ -208,6 +245,10 @@ test('offline, a battle runs to the end', async ({ page, context }) => {
     await playTurn(page)
   }
   await expect(result).toBeVisible()
+
+  const failures = await thumbnailFailures(page)
+  expect(failures.length, 'no thumbnail failed, so no fallback was asked for').toBeGreaterThan(0)
+  expect(failures.flatMap(list => repeated(list))).toEqual([])
 })
 
 /**
@@ -244,6 +285,41 @@ test('a sprite a page showed is kept, and one never shown is not', async ({ page
   })
 
   expect(outcome).toEqual({ shown: 'ok', never: 'unreachable' })
+})
+
+/**
+ * The thumbnails on the page that tried to load and failed, by address — what
+ * the glyph is there to replace. One still waiting, lazy and off screen, is not
+ * counted either way.
+ */
+function brokenThumbnails(page: Page): Promise<string[]> {
+  return page.evaluate(() => Array.from(document.images)
+    .filter(image => image.getAttribute('src')?.startsWith('/sprites/') === true && image.complete && image.naturalWidth === 0)
+    .map(image => image.getAttribute('src') ?? ''))
+}
+
+/**
+ * **The board's glyph, wherever a thumbnail is missing.** Nothing of the ninth
+ * generation was shown before the network went, so every thumbnail of its grid
+ * has to come out as the glyph; one left at its address, broken, is the listener
+ * missing. The search is the screen whose image would not survive the failure
+ * on its own: `UAvatar` swaps an image that fails for an empty `<span>`, which
+ * is why the listener stops the event.
+ */
+test('offline, a thumbnail the device never kept shows the glyph, in the grid and in the search', async ({ page, context }) => {
+  await underWorker(page)
+  await context.setOffline(true)
+
+  await page.goto('/pokedex/9')
+  expect(await fromShell(page)).toBe(true)
+  await expect(page.locator('.dex-card img').first()).toHaveAttribute('src', GLYPH)
+  expect(await brokenThumbnails(page)).toEqual([])
+
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('option').first()).toBeVisible()
+  await dialog.getByPlaceholder('Nome, número ou tipo…').fill('sprigatito')
+  await expect(dialog.getByRole('option', { name: /Sprigatito/ }).locator('img')).toHaveAttribute('src', GLYPH)
 })
 
 /**
