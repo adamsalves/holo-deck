@@ -460,7 +460,15 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 
 | decisão | por quê |
 |---|---|
-| **o herói cai na miniatura também com rede, e sem chip** | a prancha *Offline* desenha o recuo do herói como *sem rede*, com o chip `sem rede · mostrando a miniatura`. A arte oficial também falha com rede — o host fora do ar, ou bloqueado na rede de quem joga —, e ali o chip seria mentira. O recuo vale sempre; o chip, só com `navigator.onLine` falso, que acerta quando diz *offline* e pode errar quando diz *online*. Decidido em 25/09/2026, no 5b-2 |
+| **o herói cai na miniatura também com rede, e sem chip** | a prancha *Offline* desenha o recuo do herói como *sem rede*, com o chip `sem rede · mostrando a miniatura`. A arte oficial também falha com rede — o host fora do ar, ou bloqueado na rede de quem joga —, e ali o chip seria mentira. O recuo vale sempre; o chip, só enquanto `navigator.onLine` é falso, que acerta quando diz *offline* e pode errar quando diz *online*. Quando a rede volta, ele some e a arte é pedida de novo, como o próprio chip promete. Decidido em 25/09/2026, no 5b-2 |
+
+### Decidido no PR 5 da Fase 8, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| **o recuo do herói na caixa da arte, até 340 px, e não na zona de 400** | a prancha *Offline* desenha o recuo numa zona de `height:400px`. A arte do Detalhe ocupa até 340 px, e é ela que diverge da prancha *Detalhe* (400×380, na #72). O recuo mora na caixa que a arte ocupava para a página abaixo não pular quando a arte falha; numa zona de 400, o número e o nome desceriam 60 px |
+| **a miniatura do recuo sem sombra** | a prancha dá a ela `drop-shadow(0 30px 50px rgba(0,0,0,.7))`, a mesma que a prancha *Detalhe* dá à arte, e que o código também não tem (#72). As duas entram juntas, ou o recuo teria a sombra que a arte não tem |
+| **o chip quebra linha no telefone** | o `.chip` da prancha tem `white-space:nowrap`. A 320 px a coluna tem 256 px, e o chip do glifo em inglês (*offline · the artwork arrives with the connection*) mede ~310: sem quebra, ele sairia da coluna. Quebra em duas linhas a 320 e 360 px, dentro da caixa |
 
 ### Decidido na Fase 7, contra o que a prancha desenhava
 
@@ -1732,15 +1740,17 @@ recusa cópia de outro build, o prazo da navegação, a miniatura que só entra 
 worker de outro build, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o
 worker instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue
 a escolha, `/api/` falha como a rede, uma batalha vai até o fim — cada imagem recuando
-uma vez, e nunca em laço —, a miniatura que falta vira o glifo na grade e na busca, o
-herói cai na miniatura guardada e no glifo com o chip da prancha, nos dois idiomas, e o
-*Baixar tudo* deixa no cache do worker exatamente as miniaturas do build — e nenhuma em
+uma vez, e nunca em laço —, a miniatura que falta vira o glifo, desenhado, na grade e
+na busca, o herói cai na miniatura guardada e no glifo com o chip da prancha, nos dois
+idiomas, e volta à arte quando a rede volta, e o *Baixar tudo* deixa no cache do worker exatamente as miniaturas do build — e nenhuma em
 outro cache, de nome nenhum —, para por rede e por espaço, conta o que o aparelho tem e
 continua longe de *Ajustes*. `test/unit/sprite-download.spec.ts` cobre o laço (o que guarda, o que pede,
 que motivo cada falha dá, o prazo) e confere a lista de endereços contra o disco, como
 conjunto.
 `test/e2e/pokedex.spec.ts` derruba só o host da arte, antes da hidratação: o herói cai
-na miniatura, sem chip.
+na miniatura, sem chip. E, a 320 e 360 px, o recuo com o chip fica na caixa da arte, sem
+nada saindo dela. `test/unit/token-gate.spec.ts` confere que o glifo segue a cor do token
+que ele copia.
 `test/e2e/app-icon.spec.ts` lê o manifesto como o navegador o recebe: nome, cores, o
 conjunto de tamanhos e finalidades contra o da prancha, e cada ícone do tamanho que
 declara e sem canal alfa. O resto da suíte roda com service worker bloqueado
@@ -1752,21 +1762,23 @@ também onde `settings.spec.ts` confere que, sem worker, a linha do download nã
 - **A miniatura que falta vira o glifo** de offline da prancha. Um listener de `error`
   em captura na `window` (`app/plugins/missing-sprite.client.ts`) troca toda `<img>` de
   `/sprites/` que falha e para o evento ali, antes dos listeners da própria imagem: o
-  `UAvatar` da busca trocaria a imagem por um `<span>` vazio, e o recuo da batalha
-  (`fallbackSprite`) poria de volta o endereço que acabou de falhar — o laço de
-  `onerror`, medido. Um lugar só alcança todos os pontos que pedem miniatura — 15, em
+  `UAvatar` da busca trocaria a imagem por um `<span>` vazio. O recuo da batalha
+  (`fallbackSprite`) punha de volta o endereço que acabou de falhar — o laço de
+  `onerror`, medido — e agora só recua a partir do GIF: o laço fecha nele, e não
+  depende do listener. Um lugar só alcança todos os pontos que pedem miniatura — 15, em
   12 arquivos, fora o styleguide. O glifo é um `.svg` inlinado (`?inline`) com a cor escrita nele
   (`--color-ink-400`, a que a prancha dá na carta), porque imagem não lê variável CSS;
   o `viewBox` o deixa com 34 px a cada 96, como a carta da prancha, em qualquer
   tamanho de miniatura.
 - **O herói de `/pokemon/[name]` cai em dois degraus**: da arte oficial para a
   miniatura em 2×, e dela para um glifo maior, em `--border-strong`, na caixa que a
-  arte ocupava — a página abaixo não se move. A arte nunca fica no aparelho (são ~140
+  arte ocupava, com a altura dela também no telefone — a página abaixo não se move. A arte nunca fica no aparelho (são ~140
   MB, fora do *Baixar tudo* de propósito), então o recuo vale mesmo com tudo baixado.
   O herói sai do listener global (`data-own-fallback`), porque o glifo e o chip dele
   são outros.
-- **O chip só quando o navegador diz que não há rede** (`navigator.onLine`, o sinal que
-  o sync já lê). Com rede, a arte que falha — o host fora do ar ou bloqueado — cai na
+- **O chip só enquanto o navegador diz que não há rede** (`navigator.onLine`, o sinal
+  que o sync já lê, acompanhado pelo `useOnline`). Quando a rede volta, o chip some e
+  a arte é pedida de novo: *a arte chega com a conexão*, como ele diz. Com rede, a arte que falha — o host fora do ar ou bloqueado — cai na
   miniatura sem chip: ver *Decidido no PR 5 da Fase 8, além do que a prancha
   desenhava*. A falha que chega antes da hidratação, na página pré-renderizada, se
   confere no `onMounted`, porque o `@error` ainda não estava ligado.
@@ -1784,7 +1796,8 @@ Application → Service workers*, `activated`) e derrubar o servidor com `Ctrl+C
 *Ajustes* antes de derrubar, o Pokédex de qualquer geração abre com as miniaturas; sem
 ele, com o glifo onde a miniatura não foi vista. O chip do herói pede o navegador sem
 rede, e servidor derrubado não é isso: `navigator.onLine` segue `true`, e o herói cai
-sem chip. Para vê-lo, desligar a rede do computador. O `context.setOffline` do
+sem chip. Para vê-lo, desligar a rede do computador; religada, o chip some e a arte
+volta. O `context.setOffline` do
 Playwright só chega ao documento que estava aberto: um documento novo, subido pelo
 worker, lê `true` — medido contra o Chromium num namespace de rede sem interface, que
 lê `false`. Por isso os testes do chip chegam ao herói pela grade e pela busca.
