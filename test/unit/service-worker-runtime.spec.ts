@@ -376,9 +376,11 @@ describe('the thumbnails', () => {
   /**
    * A 404, a page served where an image was asked for, and an image that came
    * through a redirect: kept, any of them would answer for the thumbnail long
-   * after the file was fixed.
+   * after the file was fixed. The download keeps by a copy of the rule
+   * (`isThumbnail` in `sprite-download.ts`, which cannot import the worker's),
+   * so the same answers go to both.
    */
-  it('keeps nothing but an image sent as itself', async () => {
+  it('keeps nothing but an image sent as itself, in the worker and in the download', async () => {
     const answers: (() => Promise<Response>)[] = [
       async () => new Response('missing', { status: 404, headers: { 'content-type': 'image/webp' } }),
       async () => new Response('<!DOCTYPE html>', { headers: { 'content-type': 'text/html' } }),
@@ -392,6 +394,10 @@ describe('the thumbnails', () => {
       await Promise.all(kept)
 
       expect(worker.caches.byName.get(SPRITES)?.entries.size ?? 0).toBe(0)
+
+      const download = new FakeCache()
+      expect(await keepSprites(download, ['/sprites/25.webp'], () => undefined, answer)).toBe('network')
+      expect(download.entries.size).toBe(0)
     }
   })
 

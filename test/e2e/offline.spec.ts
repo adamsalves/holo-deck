@@ -301,7 +301,8 @@ test('downloading everything leaves every thumbnail the build ships in the cache
   await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
 
   await expect(row).toContainText(`As 1025 miniaturas estão neste aparelho, ${size}.`, { timeout: 60_000 })
-  await expect(row).toContainText('neste aparelho')
+  // The green chip: its words are also in the note, so it is asked for whole.
+  await expect(row.getByText('neste aparelho', { exact: true })).toBeVisible()
   await expect(row.getByRole('button')).toHaveCount(0)
   expect(new Set(await keptSprites(page, spriteCache))).toEqual(new Set(shipped.urls))
 
@@ -385,31 +386,46 @@ test('downloading stops for space when the browser gives no more room, and the c
 
 /**
  * *Leaving the screen does not stop it*, as the board writes over state 02.
- * The page's writes hang after 412, which holds the download there, and the
- * game is left and come back to without a reload: a row whose state lived in
- * the component would come back at rest, having counted the same 412.
+ * The page's writes are held after 412 until the test lets them go. Coming
+ * back to *Settings* mid-way, without a reload, finds the download where it
+ * got to — a row whose state lived in the component would come back at rest.
+ * Then the writes are let go away from *Settings*, and every thumbnail has to
+ * reach the device with no *Settings* on screen: a loop that stopped with the
+ * screen would stay where it was. Back once more, the row is state 03.
  */
 test('leaving settings does not stop the download', async ({ page }) => {
   await page.addInitScript(() => {
     const put = Cache.prototype.put
     let calls = 0
+    const held = new Promise<void>((resolve) => {
+      window.addEventListener('release-writes', () => resolve())
+    })
     Cache.prototype.put = function (this: Cache, request: RequestInfo | URL, response: Response): Promise<void> {
       calls += 1
 
-      return calls > 412 ? new Promise<void>(() => undefined) : put.call(this, request, response)
+      return calls > 412 ? held.then(() => put.call(this, request, response)) : put.call(this, request, response)
     }
   })
   await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
 
   await page.goto('/settings')
   const row = offlineRow(page, 'pt-BR')
   await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
   await expect(row).toContainText('412 de 1025')
 
-  await page.getByRole('link', { name: 'HOLO/DECK', exact: true }).click()
+  const home = page.getByRole('link', { name: 'HOLO/DECK', exact: true })
+  await home.click()
   await expect(page).toHaveURL(pathPattern('/'))
   await page.goBack()
-
   await expect(row).toContainText('412 de 1025')
   await expect(row.getByText('baixando…', { exact: true })).toBeVisible()
+
+  await home.click()
+  await expect(page).toHaveURL(pathPattern('/'))
+  await page.evaluate(() => window.dispatchEvent(new Event('release-writes')))
+  await expect.poll(async () => (await keptSprites(page, spriteCache)).length, { timeout: 60_000 }).toBe(1025)
+
+  await page.goBack()
+  await expect(row).toContainText('As 1025 miniaturas estão neste aparelho')
 })
