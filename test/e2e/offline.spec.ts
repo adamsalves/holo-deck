@@ -185,13 +185,18 @@ test('offline, an address under /api/ is left to the network, and fails', async 
  */
 const DECK = [6, 9, 3, 143, 149, 130]
 
-/** The board's offline glyph, as the app inlines it into a thumbnail. */
-const GLYPH = /^data:image\/svg\+xml,/
+/**
+ * The board's offline glyph, as the app inlines it into a thumbnail: URL-encoded
+ * today, and base64 if Vite ever encodes it that way instead.
+ */
+const GLYPH = /^data:image\/svg\+xml[,;]/
 
 /**
  * Writes down, on each image, every thumbnail address it failed to load — a list
- * in `data-thumbnail-failures`. Registered before the page's own scripts, it
- * hears each failure before the app's listener stops it.
+ * in `data-thumbnail-failures`. It listens on the window like the app's
+ * listener, so the app's `stopPropagation` does not keep it from hearing a
+ * failure: what registering first decides is that it reads the address before
+ * the app's listener swaps it for the glyph.
  */
 async function recordThumbnailFailures(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -302,6 +307,26 @@ function brokenThumbnails(page: Page): Promise<string[]> {
 }
 
 /**
+ * The images showing the glyph, split by whether it drew — each by the card it
+ * links to, or its `alt` where it links nowhere. A glyph that does not decode,
+ * as a `#` left unescaped in the URI makes it, still matches `GLYPH`, and still
+ * leaves no thumbnail broken at its address: the card shows nothing where the
+ * board draws the glyph. `decode()` settles once the image has loaded or failed.
+ */
+function glyphImages(page: Page): Promise<{ drawn: string[], failed: string[] }> {
+  return page.evaluate(async (pattern) => {
+    const images = Array.from(document.images).filter(image => new RegExp(pattern).test(image.getAttribute('src') ?? ''))
+    const decoded = await Promise.all(images.map(image => image.decode().then(() => true, () => false)))
+    const named = (image: HTMLImageElement): string => image.closest('a')?.getAttribute('href') ?? image.alt
+
+    return {
+      drawn: images.filter((_, index) => decoded[index]).map(named),
+      failed: images.filter((_, index) => !decoded[index]).map(named),
+    }
+  }, GLYPH.source)
+}
+
+/**
  * **The board's glyph, wherever a thumbnail is missing.** Nothing of the ninth
  * generation was shown before the network went, so every thumbnail of its grid
  * has to come out as the glyph; one left at its address, broken, is the listener
@@ -317,6 +342,9 @@ test('offline, a thumbnail the device never kept shows the glyph, in the grid an
   expect(await fromShell(page)).toBe(true)
   await expect(page.locator('.dex-card img').first()).toHaveAttribute('src', GLYPH)
   expect(await brokenThumbnails(page)).toEqual([])
+  const { drawn, failed } = await glyphImages(page)
+  expect(failed, 'a glyph that does not draw').toEqual([])
+  expect(drawn.length, 'no glyph on the grid to look at').toBeGreaterThan(0)
 
   await page.keyboard.press('ControlOrMeta+k')
   const dialog = page.getByRole('dialog')
@@ -412,21 +440,28 @@ test('offline, the hero falls to the thumbnail the device kept and to its glyph 
 })
 
 /**
- * The chip in English, where a Portuguese sentence left in the hero would show.
- * Reached by the search as above, and for the same reason.
+ * The chip in English, in both of the hero's fallbacks — where a Portuguese
+ * sentence left in either would show. Reached by the card and by the search, as
+ * above, and for the same reason.
  */
-test('offline, the hero says in English that the artwork comes with the connection', async ({ page, context }) => {
+test('offline, the hero says in English which of its fallbacks it shows', async ({ page, context }) => {
   await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
   await hydratedGrid(page, localeUrl('/pokedex/1', 'en'))
+  await expect.poll(() => isKept(page, spriteCache, '/sprites/1.webp')).toBe(true)
   await context.setOffline(true)
+
+  const hero = page.locator('.hero__art')
+  const foreign = namespaceLabels('species.offline.', 'en', defaultLocale())
+  expect(foreign.length, 'no Portuguese label of the chip to look for').toBeGreaterThan(0)
+
+  await page.locator(`a[href="${localeUrl('/pokemon/bulbasaur', 'en')}"]`).first().click()
+  await expect(hero).toContainText('offline · showing the thumbnail')
+  expect(foreignPhrases(await screenText(hero), foreign)).toEqual([])
 
   await searchFor(page, label('dex.search.placeholder', 'en'), 'sprigatito', /Sprigatito/)
   await expect(page).toHaveURL(pathPattern(localeUrl('/pokemon/sprigatito', 'en')))
-  const hero = page.locator('.hero__art')
   await expect(hero).toContainText('offline · the artwork arrives with the connection')
-
-  const foreign = namespaceLabels('species.offline.', 'en', defaultLocale())
-  expect(foreign.length, 'no Portuguese label of the chip to look for').toBeGreaterThan(0)
   expect(foreignPhrases(await screenText(hero), foreign)).toEqual([])
 })
 
