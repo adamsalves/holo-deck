@@ -13,7 +13,7 @@ import {
   dexUrl,
   spriteCacheName,
 } from '../../app/utils/offline'
-import { folderRevisionOf, revisionOf } from './revision'
+import { revisionOf } from './revision'
 
 /**
  * Writes the service worker into the build's public output — called from
@@ -229,9 +229,6 @@ async function filesUnder(dir: string): Promise<string[]> {
 
 const WORKER_SOURCE = fileURLToPath(new URL('./worker.ts', import.meta.url))
 
-/** The thumbnails, as a folder of the public output. */
-const SPRITES = 'sprites'
-
 /**
  * Chooses the files, guards the shell, and writes the worker next to them.
  *
@@ -239,10 +236,12 @@ const SPRITES = 'sprites'
  * installs under is the one of the file the browser gets — and the one the
  * worker checks the download against.
  *
- * `dexRevision` comes from `nuxt.config.ts`, which gave the same one to every
- * page: the addresses written here are the ones the pages ask for.
+ * `dexRevision` and `spriteRevision` come from `nuxt.config.ts`, which gave the
+ * same ones to every page: the addresses written here are the ones the pages ask
+ * for, and the thumbnails' cache is the one *Download everything for offline*
+ * fills.
  */
-export async function writeServiceWorker(publicDir: string, dexRevision: string): Promise<{ entries: number, bytes: number }> {
+export async function writeServiceWorker(publicDir: string, dexRevision: string, spriteRevision: string): Promise<{ entries: number, bytes: number }> {
   const files = await filesUnder(publicDir)
   const cssFiles = files.filter(path => path.startsWith('_nuxt/') && path.endsWith('.css'))
   const css = (await Promise.all(cssFiles.map(path => readFile(join(publicDir, path), 'utf8')))).join('\n')
@@ -260,7 +259,7 @@ export async function writeServiceWorker(publicDir: string, dexRevision: string)
     return { url: addressOf(path, dexRevision), revision: revisionOf(content) }
   }))
 
-  const spriteCache = spriteCacheName(folderRevisionOf(join(publicDir, SPRITES)))
+  const spriteCache = spriteCacheName(spriteRevision)
   const worker = transpileWorker(await readFile(WORKER_SOURCE, 'utf8'))
   await writeFile(join(publicDir, SERVICE_WORKER_PATH.slice(1)), serviceWorkerScript(entries, spriteCache, worker))
 

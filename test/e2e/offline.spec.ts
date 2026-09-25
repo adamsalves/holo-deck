@@ -1,8 +1,11 @@
-import { expect, test, type Page } from '@playwright/test'
+import { readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { PRECACHE_CACHE, SPRITE_CACHE_PREFIX, type PrecacheEntry } from '../../app/utils/offline.ts'
 import { LOCALE_KEY } from '../../app/utils/locale-preference.ts'
-import { defaultLocale } from '../support/locales'
-import { navLabel, pathPattern, playTurn, saveWith, seedLocalSave } from './support'
+import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels } from '../support/locales'
+import { REPO_ROOT } from '../support/source-tree'
+import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } from './support'
 
 /**
  * **The game with the network gone** — what the service worker is for, measured
@@ -241,4 +244,188 @@ test('a sprite a page showed is kept, and one never shown is not', async ({ page
   })
 
   expect(outcome).toEqual({ shown: 'ok', never: 'unreachable' })
+})
+
+/**
+ * The thumbnails the build ships, read from its output — what *Download
+ * everything for offline* has to leave on the device, and the figure the row
+ * prints for them, worked out here with `toFixed` rather than the `Intl` the
+ * page uses.
+ */
+function shippedSprites(): { urls: string[], megabytes: string } {
+  const dir = join(REPO_ROOT, '.output/public/sprites')
+  const names = readdirSync(dir)
+  const bytes = names.reduce((sum, name) => sum + statSync(join(dir, name)).size, 0)
+
+  return { urls: names.map(name => `/sprites/${name}`), megabytes: (bytes / 1024 / 1024).toFixed(1) }
+}
+
+/** The last row of *Preferences*, found by its title in the language `code`. */
+function offlineRow(page: Page, code: string): Locator {
+  return page.locator('.settings__row').filter({
+    has: page.getByText(label('settings.offline.title', code), { exact: true }),
+  })
+}
+
+/** The paths the worker's thumbnail cache holds. */
+function keptSprites(page: Page, cache: string): Promise<string[]> {
+  return page.evaluate(async (name) => {
+    return (await (await caches.open(name)).keys()).map(request => new URL(request.url).pathname)
+  }, cache)
+}
+
+/**
+ * **The download leaves the build's thumbnails where the worker reads them.**
+ * The page names the cache from `runtimeConfig` and the worker from what the
+ * build wrote in front of it, so the cache is read back by the worker's name,
+ * and held against the build's output as sets — a thumbnail missing, or one
+ * too many. The page asks past the worker, so every one of them is the page's
+ * write: with the two names drifted apart, the worker's cache comes out empty.
+ *
+ * **And no other cache holds a thumbnail**, whatever its name. Filtering the
+ * caches by the thumbnails' prefix was green with the page writing to one named
+ * otherwise — measured in the review of this PR, back when the worker kept the
+ * download too and filled its own cache anyway.
+ */
+test('downloading everything leaves every thumbnail the build ships in the cache the worker reads', async ({ page, context }) => {
+  const shipped = shippedSprites()
+  const size = `${shipped.megabytes.replace('.', ',')} MB`
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+  expect(await keptSprites(page, spriteCache)).toEqual([])
+
+  await page.goto('/settings')
+  const row = offlineRow(page, 'pt-BR')
+  await expect(row).toContainText(`As 1025 miniaturas, ${size}. O jogo já funciona offline com o que você viu — isso cobre o resto.`)
+
+  await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
+
+  await expect(row).toContainText(`As 1025 miniaturas estão neste aparelho, ${size}.`, { timeout: 60_000 })
+  // The green chip: its words are also in the note, so it is asked for whole.
+  await expect(row.getByText('neste aparelho', { exact: true })).toBeVisible()
+  await expect(row.getByRole('button')).toHaveCount(0)
+  expect(new Set(await keptSprites(page, spriteCache))).toEqual(new Set(shipped.urls))
+
+  const elsewhere = await page.evaluate(async (read) => {
+    const found: string[] = []
+    for (const name of (await caches.keys()).filter(name => name !== read)) {
+      for (const request of await (await caches.open(name)).keys()) {
+        const path = new URL(request.url).pathname
+        if (path.startsWith('/sprites/')) found.push(`${name}: ${path}`)
+      }
+    }
+
+    return found
+  }, spriteCache)
+  expect(elsewhere, 'thumbnails kept in a cache the worker does not read').toEqual([])
+
+  // And the worker answers from it: a thumbnail no page showed, with no network.
+  await context.setOffline(true)
+  expect(await page.evaluate(async () => (await fetch('/sprites/1025.webp')).ok)).toBe(true)
+})
+
+/**
+ * State 04 by the network, and *Continue*: what came stays, and the rest comes
+ * once the connection is back. In English, where a Portuguese label left in the
+ * row would show.
+ */
+test('offline, downloading stops for the network, and continues once it is back', async ({ page, context }) => {
+  const { megabytes } = shippedSprites()
+  await underWorker(page)
+
+  await page.goto(localeUrl('/settings', 'en'))
+  const row = offlineRow(page, 'en')
+  await expect(row).toContainText(`All 1025 thumbnails, ${megabytes} MB.`)
+
+  await context.setOffline(true)
+  await row.getByRole('button', { name: 'DOWNLOAD', exact: true }).click()
+  await expect(row).toContainText('Stopped at 0 of 1025 — the connection dropped. What already came stays.')
+
+  await context.setOffline(false)
+  await row.getByRole('button', { name: 'CONTINUE', exact: true }).click()
+  await expect(row).toContainText(`All 1025 thumbnails are on this device, ${megabytes} MB.`, { timeout: 60_000 })
+
+  const foreign = namespaceLabels('settings.offline.', 'en', defaultLocale())
+  expect(foreign.length, 'no Portuguese label of the row to look for').toBeGreaterThan(0)
+  expect(foreignPhrases(await screenText(row), foreign)).toEqual([])
+})
+
+/**
+ * State 04 by space, from the page's own writes: the page's `Cache.put` refuses
+ * after ten, as a full quota does. The worker runs in a global of its own, so
+ * its install is untouched. Reloading then finds state 01 with the count —
+ * two counts, each above one, so each sentence has to pick its plural.
+ */
+test('downloading stops for space when the browser gives no more room, and the count stays', async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = Cache.prototype.put
+    let calls = 0
+    Cache.prototype.put = function (this: Cache, request: RequestInfo | URL, response: Response): Promise<void> {
+      calls += 1
+
+      return calls > 10 ? Promise.reject(new DOMException('no room', 'QuotaExceededError')) : put.call(this, request, response)
+    }
+  })
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+
+  await page.goto('/settings')
+  const row = offlineRow(page, 'pt-BR')
+  await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
+
+  await expect(row).toContainText('Parou em 10 de 1025 — o navegador não deu mais espaço.')
+  await expect(row.getByRole('button', { name: 'CONTINUAR', exact: true })).toBeVisible()
+
+  // The page is the only one writing what it downloads: the device holds its
+  // ten, and none the worker would have kept on the way.
+  await page.reload()
+  await expect(row).toContainText('10 de 1025 já estão neste aparelho — o jogo guarda o que você vê. Baixar traz as outras 1015.')
+  expect(await keptSprites(page, spriteCache)).toHaveLength(10)
+  await expect(row.getByRole('button', { name: 'BAIXAR', exact: true })).toBeVisible()
+})
+
+/**
+ * *Leaving the screen does not stop it*, as the board writes over state 02.
+ * The page's writes are held after 412 until the test lets them go. Coming
+ * back to *Settings* mid-way, without a reload, finds the download where it
+ * got to — a row whose state lived in the component would come back at rest.
+ * Then the writes are let go away from *Settings*, and every thumbnail has to
+ * reach the device with no *Settings* on screen: a loop that stopped with the
+ * screen would stay where it was. Back once more, the row is state 03.
+ */
+test('leaving settings does not stop the download', async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = Cache.prototype.put
+    let calls = 0
+    const held = new Promise<void>((resolve) => {
+      window.addEventListener('release-writes', () => resolve())
+    })
+    Cache.prototype.put = function (this: Cache, request: RequestInfo | URL, response: Response): Promise<void> {
+      calls += 1
+
+      return calls > 412 ? held.then(() => put.call(this, request, response)) : put.call(this, request, response)
+    }
+  })
+  await underWorker(page)
+  const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
+
+  await page.goto('/settings')
+  const row = offlineRow(page, 'pt-BR')
+  await row.getByRole('button', { name: 'BAIXAR', exact: true }).click()
+  await expect(row).toContainText('412 de 1025')
+
+  const home = page.getByRole('link', { name: 'HOLO/DECK', exact: true })
+  await home.click()
+  await expect(page).toHaveURL(pathPattern('/'))
+  await page.goBack()
+  await expect(row).toContainText('412 de 1025')
+  await expect(row.getByText('baixando…', { exact: true })).toBeVisible()
+
+  await home.click()
+  await expect(page).toHaveURL(pathPattern('/'))
+  await page.evaluate(() => window.dispatchEvent(new Event('release-writes')))
+  await expect.poll(async () => (await keptSprites(page, spriteCache)).length, { timeout: 60_000 }).toBe(1025)
+
+  await page.goBack()
+  await expect(row).toContainText('As 1025 miniaturas estão neste aparelho')
 })

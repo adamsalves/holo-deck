@@ -6,7 +6,7 @@ import type { PrecacheEntry } from '../../app/utils/offline'
  * **Two layers, as the plan draws them.** The first is installed whole, before
  * the worker takes over: the code, the dex, both languages' messages, the Latin
  * fonts and the shell — 2.1 MB on disk, about 680 KB over the wire. The second
- * is the 1025 thumbnails, 6.3 MB, kept as the pages show them: installing them
+ * is the 1025 thumbnails, 6.0 MB, kept as the pages show them: installing them
  * up front would make the first visit download the whole dex's art before it is
  * usable. *Download everything for offline* fills the same cache on purpose.
  *
@@ -185,7 +185,9 @@ function respond(event: FetchEvent): Promise<Response> | undefined {
 
   const key = keyByUrl.get(url.href)
   if (key !== undefined) return installed(request, key)
-  if (url.pathname.startsWith('/sprites/')) return keptAsShown(event)
+  // *Download everything* asks past the caches, and keeps what comes itself: an
+  // answer from here could be this worker's build's art, not the page's.
+  if (url.pathname.startsWith('/sprites/')) return request.cache === 'reload' ? undefined : keptAsShown(event)
 
   return undefined
 }

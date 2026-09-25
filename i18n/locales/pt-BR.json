@@ -769,10 +769,19 @@
       "accountAction": "EXCLUIR TUDO",
       "accountBusy": "EXCLUINDO…"
     },
-    "held": {
-      "title": "Ainda não",
-      "note": "A prancha desta tela desenha mais uma coisa, e ela ainda não tem de onde tirar dado: {offline} chega com o que o sustenta. Ela não aparece aqui de propósito — um controle desligado promete uma coisa que o jogo não faz.",
-      "offline": "baixar tudo para offline"
+    "offline": {
+      "title": "Baixar tudo para offline",
+      "rest": "As {total} miniaturas, {size}. O jogo já funciona offline com o que você viu — isso cobre o resto.",
+      "partialKept": "{count} já está neste aparelho — o jogo guarda o que você vê. | {count} já estão neste aparelho — o jogo guarda o que você vê.",
+      "partialMissing": "Baixar traz a última. | Baixar traz as outras {missing}.",
+      "count": "{kept} de {total}",
+      "downloading": "baixando…",
+      "kept": "As {total} miniaturas estão neste aparelho, {size}.",
+      "onDevice": "neste aparelho",
+      "stoppedNetwork": "Parou em {count} — a conexão caiu. O que veio fica guardado.",
+      "stoppedSpace": "Parou em {count} — o navegador não deu mais espaço.",
+      "start": "BAIXAR",
+      "resume": "CONTINUAR"
     },
     "version": "v{app} · {sha} · save v{schema}",
     "footDevice": "Idioma e animação não sincronizam de propósito — são preferências de aparelho.",

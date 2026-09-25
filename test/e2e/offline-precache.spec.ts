@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
@@ -75,6 +76,17 @@ function isEntry(value: unknown): value is PrecacheEntry {
     && 'revision' in value && typeof value.revision === 'string'
 }
 
+/** The icons the manifest lists, as paths of the public output — read from the manifest itself. */
+const INSTALL_ICONS: ReadonlySet<string> = new Set(manifestIconPaths())
+
+function manifestIconPaths(): string[] {
+  const manifest: unknown = JSON.parse(readFileSync(join(REPO_ROOT, 'public/manifest.webmanifest'), 'utf8'))
+  const listed: unknown = typeof manifest === 'object' && manifest !== null && 'icons' in manifest ? manifest.icons : []
+
+  return (Array.isArray(listed) ? listed : []).flatMap((icon: unknown) =>
+    typeof icon === 'object' && icon !== null && 'src' in icon && typeof icon.src === 'string' ? [pathOf(icon.src)] : [])
+}
+
 /**
  * **Who leaves, and why.** Each exit names a kind of file the worker does not
  * install. The list is closed on purpose: a file that fits none of them fails.
@@ -110,6 +122,12 @@ const LEAVES: readonly { name: string, matches: (path: string, fontsAskedFor: Re
   // the tab and the bar share is installed with the code.
   { name: 'favicon', matches: path => path === 'favicon.ico' },
   { name: 'home screen icon', matches: path => path === 'apple-touch-icon.png' },
+  // The manifest and the icons it lists: read by the browser to install the
+  // game, outside any page, and kept by the system once it is installed. The
+  // icons come from the manifest, not from a pattern: an `icon-64.png` a page
+  // showed would have to be installed, and a pattern would let it leave unseen.
+  { name: 'manifest', matches: path => path === 'manifest.webmanifest' },
+  { name: 'install icons', matches: path => INSTALL_ICONS.has(path) },
 ]
 
 /** Where an installed URL comes from — each source has to be there by name. */

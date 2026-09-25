@@ -44,3 +44,74 @@ test('the bar writes HOLO/DECK as one word, as the boards do', async ({ page }) 
 
   await expect(page.locator('.nav__brand')).toHaveAccessibleName('HOLO/DECK')
 })
+
+/** The icons the board *O ícone do app* sends to the manifest: 192 and 512, each for both purposes. */
+const BOARD_ICONS = ['192x192 any', '192x192 maskable', '512x512 any', '512x512 maskable']
+
+interface ManifestIcon {
+  readonly src: string
+  readonly sizes: string
+  readonly type: string
+  readonly purpose: string
+}
+
+function isIcon(value: unknown): value is ManifestIcon {
+  return typeof value === 'object' && value !== null
+    && 'src' in value && typeof value.src === 'string'
+    && 'sizes' in value && typeof value.sizes === 'string'
+    && 'type' in value && typeof value.type === 'string'
+    && 'purpose' in value && typeof value.purpose === 'string'
+}
+
+/** A PNG's width, height and color type, from its header — `IHDR` is always the first chunk. */
+function imageHeader(body: Buffer): { size: string, colorType: number } {
+  expect(body.subarray(0, 8).toString('hex'), 'not a PNG').toBe('89504e470d0a1a0a')
+  expect(body.subarray(12, 16).toString('latin1'), 'the first chunk is not IHDR').toBe('IHDR')
+
+  return { size: `${body.readUInt32BE(16)}x${body.readUInt32BE(20)}`, colorType: body.readUInt8(25) }
+}
+
+/**
+ * **The game installs as the board draws it** — the manifest's name, colours
+ * and icons, read as a browser gets them.
+ *
+ * The icons checked are the ones the manifest lists, and the set of sizes and
+ * purposes is held against the board's: an icon dropped from the list, or one
+ * listed as `"any maskable"`, changes the set. Each file has to be the size it
+ * claims, and opaque — a maskable icon shows whatever lies under the mask, and
+ * a transparent corner would show the launcher's colour through the deck's
+ * background.
+ */
+test('the manifest installs the game with the board\'s name, colours and icons', async ({ page, request }) => {
+  await page.goto('/')
+  await expect(page.locator('link[rel="icon"][type="image/svg+xml"][href^="http"]')).toHaveCount(1)
+
+  const links = page.locator('link[rel="manifest"]')
+  await expect(links).toHaveCount(1)
+
+  const response = await request.get(await links.getAttribute('href') ?? '')
+  expect(response.status()).toBe(200)
+
+  const manifest: unknown = await response.json()
+  expect(manifest).toMatchObject({
+    name: 'Holo Deck',
+    short_name: 'Holo Deck',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#0B0D14',
+    theme_color: '#0B0D14',
+  })
+
+  const listed: unknown = typeof manifest === 'object' && manifest !== null && 'icons' in manifest ? manifest.icons : []
+  const icons = (Array.isArray(listed) ? listed : []).filter(isIcon)
+  expect(icons.map(icon => `${icon.sizes} ${icon.purpose}`).sort()).toEqual(BOARD_ICONS)
+
+  for (const icon of icons) {
+    const file = await request.get(icon.src)
+    expect(file.status(), `${icon.src} is not served`).toBe(200)
+    expect(file.headers()['content-type'], icon.src).toBe(icon.type)
+
+    // Color type 2 is RGB with no alpha channel at all.
+    expect(imageHeader(await file.body()), icon.src).toEqual({ size: icon.sizes, colorType: 2 })
+  }
+})

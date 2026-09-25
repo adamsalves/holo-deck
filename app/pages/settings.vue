@@ -21,6 +21,7 @@ import { syncLabel } from '~~/app/utils/sync-label'
 import { useAccount } from '~/composables/useAccount'
 import { useGameClock } from '~/composables/useGameClock'
 import { useMotionSwitch } from '~/composables/useMotion'
+import { useSpriteDownload } from '~/composables/useSpriteDownload'
 import { useSync } from '~/composables/useSync'
 
 /**
@@ -31,13 +32,12 @@ import { useSync } from '~/composables/useSync'
  * conta e save do servidor*. Sem conta a tela continua sendo a do aparelho — o
  * título diz isso —, e as três coisas somem em vez de aparecer desligadas.
  *
- * What is still held back is *download everything for offline*. The worker it
- * fills arrived in Phase 8's PR 5a; the button waits for the board of its states
- * — downloading, done, failed —, drawn in the canvas cycle before PR 5b. Decided
- * on 05/09: only what can be drawn and fed goes in, and the rest is **named** in
- * a *Not yet* panel and in the README. Sound left that panel without arriving — the phase retired it
- * on 12/09 and the board stopped drawing it in version 16 — and the language
- * selector left it by arriving, in the first row of *Preferences*.
+ * The last of the board arrived in Phase 8's PR 5b: *Download everything for
+ * offline*, the last row of *Preferences*, in the four states the board
+ * *Offline* draws for it. Until then it was **named** in a *Not yet* panel —
+ * decided on 05/09: only what can be drawn and fed goes in —, and the panel
+ * left with it. Sound had left it without arriving, retired by the phase on
+ * 12/09, and the language selector by arriving, in the first row.
  */
 const collection = useCollectionStore()
 const progress = useProgressStore()
@@ -57,7 +57,7 @@ const now = useGameClock()
  * Fase 7 abrir qualquer coisa no servidor.
  */
 const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
-const { appVersion, gitSha } = useRuntimeConfig().public
+const { appVersion, gitSha, spriteBytes } = useRuntimeConfig().public
 
 const { t, localeProperties } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
@@ -147,11 +147,26 @@ const saveText = computed(() => JSON.stringify(composeSave($pinia), null, 2))
  * `length` conta unidades UTF-16, e o save carrega nome de espécie: `Nidoran♀`
  * ocupa mais bytes do que letras. A prancha estampa `20,6 KB` ao lado da
  * contagem de cartas, e o número que importa é o que atravessa a rede na Fase 7.
+ *
+ * **In the page's language**: `20.6` inside `/en`. It was `toFixed(1)` with
+ * the comma swapped in by hand — one of the origins issue #49 lists, and PR 5b
+ * put a second figure on this screen, the thumbnails' `6.0 MB`, which the board
+ * writes per language.
  */
-const sizeKb = computed(() => {
-  const bytes = new TextEncoder().encode(saveText.value).length
-  return (bytes / 1024).toFixed(1).replace('.', ',')
-})
+const sizeKb = computed(() => oneDecimal(new TextEncoder().encode(saveText.value).length / 1024))
+
+/**
+ * A figure with one decimal, as the language of the page writes it. The
+ * language is `localeProperties.language`, the tag `<html lang>` carries — see
+ * `backupLabel`.
+ */
+function oneDecimal(value: number, unit?: 'megabyte'): string {
+  return value.toLocaleString(localeProperties.value.language, {
+    ...(unit === undefined ? {} : { style: 'unit', unit }),
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })
+}
 
 const stats = computed(() => [
   { key: 'cards', value: gameNumber(collection.ownedCount), label: t('settings.stats.cards') },
@@ -363,8 +378,8 @@ function refreshBackups(): void {
  * same one `app.vue` writes into `<html lang>`. `Intl` reads the two alike
  * today, so this is one source rather than two agreeing by luck.
  *
- * The numbers on this screen — `20,6 KB`, the card counts — are the origins the
- * issue does name, and they stay pt-BR until it is closed.
+ * The card counts on this screen are origins the issue does name, and they
+ * stay pt-BR until it is closed; the save's size follows the page (`sizeKb`).
  */
 function backupLabel(at: number): string {
   return new Date(at).toLocaleString(localeProperties.value.language, {
@@ -420,6 +435,31 @@ function restoreBackup(key: string): void {
 }
 
 onMounted(refreshBackups)
+
+const download = useSpriteDownload()
+
+/**
+ * The row's state, as the board *Offline* numbers them: `null` is no row (no
+ * worker in charge yet, or none at all). Every thumbnail kept is state 03 even
+ * after a stop: the count is what the device has, and there is nothing left to
+ * continue.
+ */
+const offline = computed(() => {
+  const { kept, running, stopped } = download.state.value
+  if (kept === null) return null
+  if (running) return { step: 'downloading', kept } as const
+  if (kept >= download.total) return { step: 'kept', kept } as const
+  if (stopped !== null) return { step: 'stopped', kept, reason: stopped } as const
+
+  return { step: 'rest', kept } as const
+})
+
+/** The thumbnails' weight, measured on the build's disk: `6,0 MB`, and `6.0 MB` in English. */
+const spritesSize = computed(() => oneDecimal(spriteBytes / 1024 / 1024, 'megabyte'))
+
+onMounted(() => {
+  void download.count()
+})
 
 /** As iniciais, para quem não tem foto no provedor — o mesmo cálculo da barra. */
 const initials = computed(() => initialsOf(account.value?.name ?? ''))
@@ -873,6 +913,179 @@ useSeoMeta({
             </span>
           </button>
         </div>
+
+        <!-- DOWNLOAD EVERYTHING FOR OFFLINE — the board *Offline*, whose four
+             states come out of `offline`. No worker, no row: it vanishes rather
+             than show switched off (see `useSpriteDownload`). -->
+        <div
+          v-if="offline"
+          class="settings__row"
+        >
+          <div class="settings__offline">
+            <p class="settings__row-title">
+              {{ t('settings.offline.title') }}
+            </p>
+
+            <div
+              v-if="offline.step === 'downloading'"
+              class="settings__offline-progress"
+            >
+              <div
+                class="settings__offline-bar"
+                role="progressbar"
+                aria-valuemin="0"
+                :aria-valuemax="download.total"
+                :aria-valuenow="offline.kept"
+                :aria-label="t('settings.offline.title')"
+              >
+                <div
+                  class="settings__offline-fill"
+                  :style="{ width: `${(offline.kept / download.total) * 100}%` }"
+                />
+              </div>
+              <i18n-t
+                keypath="settings.offline.count"
+                scope="global"
+                tag="span"
+                class="numeric settings__offline-count"
+              >
+                <template #kept>
+                  <span class="settings__offline-now">{{ offline.kept }}</span>
+                </template>
+                <template #total>
+                  {{ download.total }}
+                </template>
+              </i18n-t>
+            </div>
+
+            <i18n-t
+              v-else-if="offline.step === 'kept'"
+              keypath="settings.offline.kept"
+              scope="global"
+              tag="p"
+              class="settings__row-note"
+            >
+              <template #total>
+                {{ download.total }}
+              </template>
+              <template #size>
+                <span class="numeric settings__offline-figure">{{ spritesSize }}</span>
+              </template>
+            </i18n-t>
+
+            <i18n-t
+              v-else-if="offline.step === 'stopped' && offline.reason === 'space'"
+              keypath="settings.offline.stoppedSpace"
+              scope="global"
+              tag="p"
+              class="settings__row-note"
+            >
+              <template #count>
+                <span class="numeric settings__offline-figure settings__offline-figure--caution">
+                  {{ t('settings.offline.count', { kept: offline.kept, total: download.total }) }}
+                </span>
+              </template>
+            </i18n-t>
+
+            <i18n-t
+              v-else-if="offline.step === 'stopped'"
+              keypath="settings.offline.stoppedNetwork"
+              scope="global"
+              tag="p"
+              class="settings__row-note"
+            >
+              <template #count>
+                <span class="numeric settings__offline-figure settings__offline-figure--caution">
+                  {{ t('settings.offline.count', { kept: offline.kept, total: download.total }) }}
+                </span>
+              </template>
+            </i18n-t>
+
+            <!-- Two sentences and two counts, each picking its own form: one
+                 kept is *1 de 1025 já está*, and one missing is *a última*. -->
+            <p
+              v-else-if="offline.kept > 0"
+              class="settings__row-note"
+            >
+              <i18n-t
+                keypath="settings.offline.partialKept"
+                scope="global"
+                tag="span"
+                :plural="offline.kept"
+              >
+                <template #count>
+                  <span class="numeric settings__offline-figure">
+                    {{ t('settings.offline.count', { kept: offline.kept, total: download.total }) }}
+                  </span>
+                </template>
+              </i18n-t>
+              {{ ' ' }}
+              <i18n-t
+                keypath="settings.offline.partialMissing"
+                scope="global"
+                tag="span"
+                :plural="download.total - offline.kept"
+              >
+                <template #missing>
+                  <span class="numeric settings__offline-figure">{{ download.total - offline.kept }}</span>
+                </template>
+              </i18n-t>
+            </p>
+
+            <i18n-t
+              v-else
+              keypath="settings.offline.rest"
+              scope="global"
+              tag="p"
+              class="settings__row-note"
+            >
+              <template #total>
+                {{ download.total }}
+              </template>
+              <template #size>
+                <span class="numeric settings__offline-figure">{{ spritesSize }}</span>
+              </template>
+            </i18n-t>
+          </div>
+
+          <span
+            v-if="offline.step === 'downloading'"
+            class="settings__chip settings__chip--busy"
+          >
+            <svg
+              class="settings__chip-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M20 12a8 8 0 10-2.3 5.6"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+            </svg>
+            {{ t('settings.offline.downloading') }}
+          </span>
+          <span
+            v-else-if="offline.step === 'kept'"
+            class="settings__chip settings__chip--kept"
+          >
+            <span
+              class="settings__chip-dot"
+              aria-hidden="true"
+            />
+            {{ t('settings.offline.onDevice') }}
+          </span>
+          <button
+            v-else
+            type="button"
+            class="settings__action settings__action--accent bevel-control"
+            @click="download.start()"
+          >
+            {{ offline.step === 'stopped' ? t('settings.offline.resume') : t('settings.offline.start') }}
+          </button>
+        </div>
       </section>
 
       <!-- ZONA DE PERIGO -->
@@ -939,26 +1152,6 @@ useSeoMeta({
         </p>
       </template>
     </ClientOnly>
-
-    <!-- O QUE AINDA NÃO EXISTE -->
-    <section class="settings__panel settings__panel--quiet">
-      <div class="settings__panel-head">
-        <p class="settings__eyebrow">
-          {{ t('settings.held.title') }}
-        </p>
-      </div>
-      <p class="settings__row-note settings__held">
-        <i18n-t
-          keypath="settings.held.note"
-          scope="global"
-          tag="span"
-        >
-          <template #offline>
-            <b>{{ t('settings.held.offline') }}</b>
-          </template>
-        </i18n-t>
-      </p>
-    </section>
 
     <p class="numeric settings__version">
       {{ t('settings.version', { app: appVersion, sha: gitSha, schema: SCHEMA_VERSION }) }}
@@ -1038,10 +1231,6 @@ useSeoMeta({
 
 .settings__panel--danger {
   border-color: color-mix(in oklab, var(--deficit) 40%, var(--border));
-}
-
-.settings__panel--quiet {
-  background: var(--surface-sunken);
 }
 
 .settings__panel-head {
@@ -1372,14 +1561,92 @@ useSeoMeta({
   transition: none;
 }
 
-.settings__held {
-  max-width: none;
-  padding: 16px 22px;
+/* The download row's left side grows in state 02, where the bar takes the
+   width the note had. */
+.settings__offline {
+  flex: 1 1 280px;
+  min-width: 0;
 }
 
-.settings__held b {
+.settings__offline-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.settings__offline-bar {
+  flex-grow: 1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.settings__offline-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.settings__offline-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings__offline-now {
+  color: var(--text);
+}
+
+.settings__offline-figure {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings__offline-figure--caution {
+  color: var(--caution);
+}
+
+/* The chips of states 02 and 03: the colours of the sync indicator's *sending*
+   and *synced*, which the board gives them. */
+.settings__chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid;
+  border-radius: var(--radius);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-body);
+  white-space: nowrap;
+}
+
+.settings__chip--busy {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--bg));
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  color: var(--accent);
+}
+
+.settings__chip--kept {
+  border-color: color-mix(in oklab, var(--synced) 45%, var(--bg));
+  background: color-mix(in oklab, var(--synced) 8%, var(--surface));
+  color: var(--synced);
+}
+
+.settings__chip-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.settings__chip-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
 }
 
 .settings__version {

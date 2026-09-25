@@ -5,8 +5,8 @@
  * served as a classic script. So the build writes these into its first lines
  * (`serviceWorkerScript`, in `scripts/service-worker/build.ts`) and the pages
  * import them from here. Two copies of a cache name would drift apart the day
- * one of them is renamed, and *Download everything for offline* (Phase 8's PR
- * 5b) would fill a cache the worker never reads.
+ * one of them is renamed, and *Download everything for offline* would fill a
+ * cache the worker never reads.
  *
  * This module holds no browser access, and that is load-bearing: the worker's
  * project compiles it without the DOM library and the tools project without
@@ -34,7 +34,9 @@ export const PRECACHE_CACHE = 'holodeck-precache'
  * without asking the network again. Under one name for good, art a build changed
  * would never reach a device that kept the old one; under one name per revision,
  * the worker of that build starts an empty cache and deletes the old one when it
- * takes over. The build writes the whole name into the worker.
+ * takes over. The build writes the whole name into the worker, and the pages
+ * get the revision from `runtimeConfig` — both from the one reading in
+ * `nuxt.config.ts`.
  */
 export const SPRITE_CACHE_PREFIX = 'holodeck-sprites'
 

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
 /**
@@ -35,18 +35,33 @@ export function folderRevision(files: readonly { readonly name: string, readonly
 }
 
 /**
- * The revision of the files under `dir`, read from the disk — the dex for every
- * page's addresses (`dexUrl`), the thumbnails for the name of their cache.
+ * The files under `dir`, as `/`-separated paths relative to it.
  *
  * An empty folder throws: its revision would be the same constant for every
  * build, and the addresses built from it would stop changing with the content.
  */
-export function folderRevisionOf(dir: string): string {
+function filesOf(dir: string): string[] {
   const names = readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter(entry => entry.isFile())
     .map(entry => relative(dir, join(entry.parentPath, entry.name)).replaceAll(sep, '/'))
 
   if (names.length === 0) throw new Error(`revision: ${dir} has no files`)
 
-  return folderRevision(names.map(name => ({ name, content: readFileSync(join(dir, name)) })))
+  return names
+}
+
+/**
+ * The revision of the files under `dir`, read from the disk — the dex for every
+ * page's addresses (`dexUrl`), the thumbnails for the name of their cache.
+ */
+export function folderRevisionOf(dir: string): string {
+  return folderRevision(filesOf(dir).map(name => ({ name, content: readFileSync(join(dir, name)) })))
+}
+
+/**
+ * What the files under `dir` weigh together, in bytes — the thumbnails', for the
+ * figure *Download everything for offline* prints before anything is downloaded.
+ */
+export function folderBytesOf(dir: string): number {
+  return filesOf(dir).reduce((sum, name) => sum + statSync(join(dir, name)).size, 0)
 }

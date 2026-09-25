@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { RECOVERY_REASONS, recoveryMessageKey } from '../../app/utils/recovery-reason.ts'
 import type { RecoveryReason } from '../../shared/save/schema.ts'
 import { SCHEMA_VERSION } from '../../shared/save/schema.ts'
-import { foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
+import { defaultLocale, foreignPhrases, label, localeCodes, localeUrl, message, namespaceLabels } from '../support/locales.ts'
 import { fakeSync, openWelcomePack, saveWith, screenText, seedLocalSave, seedSynced } from './support.ts'
 
 /**
@@ -160,6 +160,58 @@ test('a backup is stamped in the date format of the URL, not one language for bo
     new Set(stamps).size,
     `the backup reads ${stamps.join(' and ')} — the same in every language`,
   ).toBeGreaterThan(1)
+})
+
+/**
+ * The save's size in the number format of the URL — `20,6` and `20.6`. It was
+ * `toFixed(1)` with the comma swapped in by hand, one of the origins issue #49
+ * lists.
+ *
+ * Measured as shape, by the separator each language writes, and not against
+ * `Intl`: the page formats with it, and a test asking `Intl` the same question
+ * would agree with whatever the page did. The separators are written here
+ * because they are the answer, not the question.
+ */
+const DECIMAL_SEPARATOR: Readonly<Record<string, string>> = { 'pt-BR': ',', 'en': '.' }
+
+test('the save\'s size is written in the number format of the URL', async ({ page }) => {
+  const codes = localeCodes()
+  expect(new Set(codes)).toEqual(new Set(Object.keys(DECIMAL_SEPARATOR)))
+
+  for (const code of codes) {
+    await seedLocalSave(page, CURRENT)
+    await page.goto(localeUrl('/settings', code))
+
+    const size = page.locator('.settings__stats > div').filter({ hasText: label('settings.stats.size', code) }).locator('dd')
+    const separator = DECIMAL_SEPARATOR[code] ?? ''
+
+    await expect(size, `the save's size in ${code}`).toHaveText(new RegExp(`^\\d+${separator === '.' ? '\\.' : separator}\\d$`))
+  }
+})
+
+/**
+ * The board *Offline*: with no service worker the download row does not
+ * exist — it vanishes rather than show switched off. This suite blocks workers
+ * (see `playwright.config.ts`), which is that case; `offline.spec.ts` is the
+ * other side, where the row is there.
+ *
+ * **The barrier is a trip to the cache storage.** A row gated on anything short
+ * of a worker in charge would open the cache on mount and count it; by the
+ * time this page's own trip there comes back, that count has come back too.
+ * And the browser still has the API — only the worker is missing —, or a gate
+ * on `'serviceWorker' in navigator` alone would pass here as well.
+ */
+test('with no service worker, the download row does not exist', async ({ page }) => {
+  await page.goto('/settings')
+  await expect(page.locator('.settings__panel--danger')).toBeVisible()
+
+  expect(await page.evaluate(async () => {
+    await caches.keys()
+
+    return 'serviceWorker' in navigator
+  })).toBe(true)
+
+  await expect(page.getByText(label('settings.offline.title', defaultLocale()), { exact: true })).toHaveCount(0)
 })
 
 /**

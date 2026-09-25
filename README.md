@@ -490,7 +490,7 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | a loja tem **três** cartões, e não dois | os packs de boas-vindas existem desde a Fase 5 e precisam de onde ser abertos. Virá-los o primeiro da fileira os põe no mesmo padrão de desaparecimento que a prancha já dá ao diário; a alternativa — a loja só aparecer depois deles — esconderia saldo e preço de quem está começando |
 | sublinhado ativo em `--accent` em toda página | a prancha *Hub* o desenha azul e a *Loja* roxo, para o mesmo papel. É variação de mockup desenhado à mão, como o `2px`/`3px` que a Fase 2 normalizou num `--radius` só |
 | ~~sem o avatar de 32px no canto da barra~~ | **Entregue na Fase 7**, e com um papel a mais do que a prancha desenhava: sem sessão, o mesmo canto é o link *Entrar*. Ver a linha correspondente em *Decidido na Fase 7* |
-| `/settings` sem o painel de offline — ~~e sem os de conta, idioma e som~~ | o worker que ele enche chegou no PR 5a da Fase 8 (ver *Offline*); o botão espera a prancha dos estados dele — baixando, pronto, falhou —, que o ciclo de canvas antes do 5b desenha. Até lá ele aparece **nomeado** num painel *Ainda não* em vez de virar controle cinza: um botão desligado promete uma coisa que o jogo não faz. **Os outros três saíram da linha:** a conta entrou na Fase 7, o idioma no 4d-2 da Fase 8, e o som deixou de estar na prancha na versão 16, quando a fase o aposentou |
+| ~~`/settings` sem o painel de offline — e sem os de conta, idioma e som~~ | **Entregue no 5b da Fase 8:** *Baixar tudo para offline* é a última linha de *Preferências*, nos quatro estados da prancha *Offline* (ver *Offline*), e o painel *Ainda não*, que o nomeava enquanto não havia prancha, saiu com ele. Os outros três já tinham saído: a conta entrou na Fase 7, o idioma no 4d-2 da Fase 8, e o som deixou de estar na prancha na versão 16, quando a fase o aposentou |
 | apagar o save guarda uma cópia | a prancha põe *apagar local* na zona de perigo e não diz o que sobra. Sem conta não existe segunda cópia em lugar nenhum, e a regra inegociável do plano existe para a coleção de meses não depender de um clique não ter sido acidental. A tela avisa que a cópia fica |
 
 ### Estados sem prancha, escritos neste PR
@@ -665,9 +665,9 @@ progresso que ninguém pode mover.
   tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
   de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
   *Ainda não* ficou com três coisas, e as três são da Fase 8.
-- **Sem prancha para os estados:** *baixar tudo para offline*. O worker que ele enche
-  chegou no PR 5a da Fase 8 (ver *Offline*); o botão espera a prancha de baixando,
-  pronto e falhou, e entra no 5b. ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
+- ~~**Sem prancha para os estados:** *baixar tudo para offline*.~~ **Entregue no 5b
+  da Fase 8**, nos quatro estados que a prancha *Offline* desenhou no ciclo de canvas
+  antes dele. ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
   *Preferências*, onde a prancha *Ajustes* o desenha; ~~o interruptor de
   **som**~~ **aposentado** em 12/09 — a prancha deixou de desenhá-lo na versão 16.
 - ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
@@ -1247,12 +1247,12 @@ fileira de números, o interruptor de animação e a versão com o sha. **A Fase
 trouxe a metade que dependia de conta**: o painel da conta com e-mail e estado do
 sync, *Restaurar versão anterior* e *Excluir conta e save do servidor* — e o
 título passa a dizer de quem é a tela (*Sua conta e seu save* com sessão, *Seu
-save e este aparelho* sem). Fica segurado só o que não tem a peça que o sustenta:
-*baixar tudo para offline*, que é o PWA do PR 5 da Fase 8. **Ele aparece nomeado na
-própria tela**, num painel *Ainda não*, em vez de virar controle cinza: um botão
-desligado promete uma coisa que o jogo não faz. O painel já nomeou três coisas: o
-idioma saiu dele chegando — o seletor é a primeira linha de *Preferências* desde o
-4d-2 —, e o som saiu da prancha, que deixou de desenhá-lo na versão 16.
+save e este aparelho* sem). O último item da prancha, *baixar tudo para offline*,
+chegou no 5b da Fase 8. Até lá ele aparecia **nomeado** num painel *Ainda não*, em
+vez de virar controle cinza — um botão desligado promete uma coisa que o jogo não
+faz —, e o painel saiu com ele. Ele chegou a nomear três coisas: o idioma saiu
+chegando — o seletor é a primeira linha de *Preferências* desde o 4d-2 —, e o som
+saiu da prancha, que deixou de desenhá-lo na versão 16.
 
 **O idioma desta tela alcança duas coisas que não são desta tela.** O chip de
 sync ([`app/utils/sync-label.ts`](app/utils/sync-label.ts)) mora na barra global e
@@ -1618,7 +1618,7 @@ no hook `nitro:build:public-assets`). Em `yarn dev` não há worker.
 | camada | o quê | peso | quando |
 |---|---|---|---|
 | instalada | o código e o ícone da barra (`_nuxt/`), o dex (`data/`), as mensagens dos dois idiomas (`_i18n/`), as fontes latinas e o shell `200.html` | 2,1 MB em disco, ~680 KB na rede (gzip; 144 KB são as fontes, que o woff2 já comprime) | inteira, antes de o worker assumir |
-| guardada como vista | as 1025 miniaturas (`sprites/`) | 6,3 MB | à medida que as telas as mostram; *baixar tudo para offline* (PR 5b) enche o mesmo cache |
+| guardada como vista | as 1025 miniaturas (`sprites/`) | 6,0 MB | à medida que as telas as mostram; *Baixar tudo para offline*, em *Ajustes*, enche o mesmo cache de uma vez |
 
 Cada arquivo instalado leva a revisão do conteúdo (SHA-256, 16 dígitos): um build novo
 baixa só o que mudou, e o worker confere o hash do que baixou — uma cópia de outro
@@ -1678,6 +1678,42 @@ de o worker decidir, inclusive as de `/api/auth/…` que o worker deixa ao naveg
 se o navegador reaproveita essa resposta ou pede de novo não foi medido — um callback
 de OAuth pedido duas vezes gastaria um código de uso único.
 
+**Baixar tudo para offline** é a última linha de *Preferências*, nos quatro estados da
+prancha *Offline*: repouso (com a contagem, quando o uso já guardou alguma), baixando,
+no aparelho e parou — por *sem rede* ou *sem espaço*, com `CONTINUAR`. Quem baixa é a
+**página**, e não o worker: a prancha desenha o download parando ao fechar a aba, e só
+quem grava distingue os dois motivos — a escrita do worker (`keptAsShown`) engole a
+própria falha, e um disco cheio passaria por download terminado. *Sem espaço* é só o
+`QuotaExceededError`: o `Cache.put` lê o corpo, que ainda vem pela rede, e a conexão que
+cai no meio dele rejeita a escrita com `NetworkError`, e o prazo que estoura, com
+`AbortError` (medido no Chromium) — os dois são da rede. E a página pede **por cima do
+worker** (`cache: 'reload'`, que o worker deixa à rede): enquanto o worker novo espera
+as abas fecharem, quem responde é o do build velho, e ele daria do cache dele a arte
+velha, que, guardada sob a revisão nova, o worker novo seguiria servindo até a próxima
+troca de arte. A página grava no cache que o worker lê (o nome leva a revisão da arte,
+calculada uma vez no `nuxt.config.ts` e entregue às páginas e ao builder, como a do
+dex), seis miniaturas por vez, com 15 s de prazo cada, corpo incluído, e só guarda o que
+o worker guardaria: resposta ok, sem redirect e `image/*` — o muro de login do preview
+da Vercel seria guardado como miniatura. O estado mora em `useState`: sair de *Ajustes*
+não para o download, fechar a aba para, e o que veio fica. Sem worker — navegador sem
+suporte, `yarn dev`, a suíte que os bloqueia — a linha não existe. Os `6,0 MB` saem do
+disco no build, na conta do tamanho do save (÷ 1024), no formato do idioma (`6.0 MB` em
+inglês).
+
+**O jogo é instalável.** O manifesto (`public/manifest.webmanifest`, ligado no `app.vue`
+ao lado dos ícones) traz o que a prancha *O ícone do app* manda: nome *Holo Deck*,
+`standalone`, fundo e tema `#0B0D14`, e os ícones de 192 e 512, rasterizados do mesmo
+mestre no Chromium — cada um listado como `any` e de novo como `maskable`, e não como
+`"any maskable"`, que o Chrome desaconselha; o mestre serve aos dois porque o baralho
+cabe no círculo que a máscara preserva e o fundo vai até a borda. `start_url`, `scope` e
+`id` são `/`, que a prancha não diz: sem isso, quem instala a partir da página de um
+Pokémon abriria o app nela toda vez. Quem instala em inglês também abre em `/`, e a
+guarda da raiz só leva a `/en` quem escolheu o idioma em *Ajustes*: quem chegou por um
+link `/en/…` e nunca escolheu abre o Hub em português, até escolher. Decidido no review
+do #70, contra um manifesto por idioma, que duplicaria a lista de ícones. Manifesto e
+ícones ficam fora do precache — o navegador os pede fora da página, e o sistema os
+guarda na instalação.
+
 **Os portões.** `test/e2e/offline-precache.spec.ts` lê a lista do `/sw.js` servido e a
 confronta com o que ela não gerou: o disco (todo arquivo de `.output/public` é
 instalado ou sai por uma regra nomeada), o que as 12 páginas carregam no navegador nos
@@ -1685,30 +1721,44 @@ dois idiomas — servidas como página **e** subidas pelo shell, que é quem ped
 as fontes que o texto pede ao navegador, o servidor (toda entrada responde 200, sem
 redirect) e um orçamento por fonte. `test/unit/service-worker-runtime.spec.ts` roda o
 worker que o build serve num sandbox: o que ele deixa ao navegador, a instalação que
-recusa cópia de outro build, o prazo da navegação, a miniatura que só entra como
-imagem, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o worker
-instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue a
-escolha, `/api/` falha como a rede, e uma batalha vai até o fim. O resto da suíte roda
-com service worker bloqueado (`playwright.config.ts`): o que o worker responde não
-passa pelo `page.route`.
+recusa cópia de outro build, o prazo da navegação, a miniatura que só entra como imagem
+— no worker e no download, pela mesma tabela —, o download de uma página nova sob o
+worker de outro build, e o `activate`. `test/e2e/offline.spec.ts` derruba a rede com o
+worker instalado: página nunca aberta sobe pelo shell, `/en` sai em inglês, a raiz segue
+a escolha, `/api/` falha como a rede, uma batalha vai até o fim, e o *Baixar tudo* deixa
+no cache do worker exatamente as miniaturas do build — e nenhuma em outro cache, de nome
+nenhum —, para por rede e por espaço, conta o que o aparelho tem e continua longe de
+*Ajustes*. `test/unit/sprite-download.spec.ts` cobre o laço (o que guarda, o que pede,
+que motivo cada falha dá, o prazo) e confere a lista de endereços contra o disco, como
+conjunto.
+`test/e2e/app-icon.spec.ts` lê o manifesto como o navegador o recebe: nome, cores, o
+conjunto de tamanhos e finalidades contra o da prancha, e cada ícone do tamanho que
+declara e sem canal alfa. O resto da suíte roda com service worker bloqueado
+(`playwright.config.ts`): o que o worker responde não passa pelo `page.route` — e é
+também onde `settings.spec.ts` confere que, sem worker, a linha do download não existe.
 
-**Limites conhecidos, até o PR 5b:**
+**Limites conhecidos, até o 5b-2** (a arte que falta, com a prancha *Offline* já
+aprovada):
 
-- o herói de `/pokemon/[name]` é a arte oficial remota, sem fallback — offline a imagem
-  quebra. É estado sem prancha, e vai para o ciclo de canvas antes do 5b;
+- o herói de `/pokemon/[name]` é a arte oficial remota, sem recuo — offline a imagem
+  quebra, mesmo com tudo baixado: são ~140 MB, e ficam fora do *Baixar tudo* de
+  propósito;
+- sem o *Baixar tudo*, a miniatura que nenhuma tela mostrou quebra offline, onde a
+  prancha desenha o glifo;
 - o GIF animado da batalha é remoto e cai na miniatura, como já caía;
 - o que a primeira página carregou antes de o worker assumir não fica guardado — dali
-  em diante, sim;
-- o jogo ainda não é instalável: o manifesto e os ícones de 192 e 512 entram no 5b. O
-  ícone em si já é o do site: a barra e a aba usam o SVG da prancha *O ícone do app*, e o
-  `favicon.ico` de 32 e 16 e o `apple-touch-icon` de 180 foram rasterizados dela no
-  Chromium.
+  em diante, sim.
 
 **Para conferir à mão:** `yarn build && yarn preview`, abrir `/rules` — não a raiz: o
 `yarn preview` serve `/` sem `cache-control`, o navegador a reaproveita do cache HTTP, e
 offline a raiz voltaria de lá e não do shell —, esperar o worker (*DevTools →
 Application → Service workers*, `activated`) e derrubar o servidor com `Ctrl+C` no
-`yarn preview`. Qualquer página, mesmo nunca aberta, sobe.
+`yarn preview`. Qualquer página, mesmo nunca aberta, sobe. Com *Baixar tudo* feito em
+*Ajustes* antes de derrubar, o Pokédex de qualquer geração abre com as miniaturas.
+
+**Instalar não se confere no preview da Vercel**, como o login: o navegador pede o
+manifesto sem credenciais, e a proteção do preview o redireciona para o SSO, junto com os
+ícones (medido no #70: `302` e `ERR_FAILED`). Só em `localhost` e em produção.
 
 ## O save
 
