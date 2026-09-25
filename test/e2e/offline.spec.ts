@@ -352,12 +352,23 @@ async function searchFor(page: Page, placeholder: string, query: string, name: R
   await dialog.getByRole('option', { name }).click()
 }
 
+/** Whether the worker's thumbnail cache holds `url`. */
+function isKept(page: Page, cache: string, url: string): Promise<boolean> {
+  return page.evaluate(async ([name, address]) => {
+    return (await (await caches.open(name)).match(address)) !== undefined
+  }, [cache, url] as const)
+}
+
 /**
  * **The hero, in the board's two states.** The artwork is remote and never on
  * the device: the hero falls to the thumbnail when the device kept it — the grid
  * kept Bulbasaur's here — and to a glyph of its own when it did not, each with
  * the board's chip, and both in one box. That it is the artwork's box is
  * measured in `pokedex.spec.ts`, with an artwork the suite serves itself.
+ *
+ * **And the chip keeps its word** — *the artwork arrives with the connection*:
+ * when the network comes back, the chip goes and the artwork is asked for
+ * again. It is served here, so the real host stays out of the test.
  *
  * **One document, from the grid on.** The chip reads `navigator.onLine`, and
  * Playwright's offline reaches it on the page that was open when the network
@@ -366,14 +377,12 @@ async function searchFor(page: Page, placeholder: string, query: string, name: R
  * in a network namespace with no interface. So the hero is reached the way a
  * player gets there, by the card and by the search.
  */
-test('offline, the hero falls to the thumbnail the device kept, and to its glyph without it', async ({ page, context }) => {
+test('offline, the hero falls to the thumbnail the device kept and to its glyph without it, and to the artwork when the network comes back', async ({ page, context }) => {
   await underWorker(page)
   const spriteCache = String(await servedConstant(page, 'SPRITE_CACHE'))
 
   await hydratedGrid(page, '/pokedex/1')
-  await expect.poll(() => page.evaluate(async ([name, url]) => {
-    return (await (await caches.open(name)).match(url)) !== undefined
-  }, [spriteCache, '/sprites/1.webp'] as const)).toBe(true)
+  await expect.poll(() => isKept(page, spriteCache, '/sprites/1.webp')).toBe(true)
   await context.setOffline(true)
 
   await page.locator('a[href="/pokemon/bulbasaur"]').first().click()
@@ -387,6 +396,17 @@ test('offline, the hero falls to the thumbnail the device kept, and to its glyph
   await expect(hero).toContainText('sem rede · a arte chega com a conexão')
   await expect(hero.locator('img')).toHaveCount(0)
   expect(await artBox(page)).toBe(box)
+
+  let served = 0
+  await page.route('https://raw.githubusercontent.com/**', async (route) => {
+    served += 1
+    await route.fulfill({ path: join(REPO_ROOT, 'public/sprites/906.webp') })
+  })
+  await context.setOffline(false)
+  await expect(hero.locator('img')).toHaveAttribute('src', /\/official-artwork\/906\.png$/)
+  await expect(hero.locator('img')).toHaveJSProperty('naturalWidth', 128)
+  await expect(hero.locator('.hero__offline')).toHaveCount(0)
+  expect(served, 'the artwork came from the real host, and not from this test').toBeGreaterThan(0)
 })
 
 /**

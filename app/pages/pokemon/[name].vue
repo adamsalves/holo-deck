@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SpeciesEntry } from '~~/shared/types/dex'
-import { computed, onMounted, ref, useTemplateRef } from 'vue'
+import { useOnline } from '@vueuse/core'
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { flattenChain } from '~~/shared/game/evolution'
 import { rarityOf } from '~~/shared/game/rarity'
 import { habitatKey, rarityKey } from '~~/shared/types/game'
@@ -152,21 +153,31 @@ const tabs = computed(() => [
  * glyph (`missing-sprite.client.ts`): the hero's glyph is its own, and so is the
  * chip that says which of the two it fell to.
  *
- * **The chip only when the browser says there is no network.** The board draws
+ * **The chip only while the browser says there is no network.** The board draws
  * the fallback as *offline*, but the artwork also fails with the network up —
  * its host down, or blocked —, and there the chip would be a lie.
  * `navigator.onLine`, which the sync reads too, is right when it says offline
  * and may be wrong when it says online; then the fallback shows without the
- * chip. Decided on 25/09/2026, a state the board does not draw.
+ * chip. Decided on 25/09/2026, a state the board does not draw. `useOnline`
+ * follows it as it changes, so the chip goes the moment the network is back.
  */
 type ArtStage = 'artwork' | 'thumbnail' | 'glyph'
 const artStage = ref<ArtStage>('artwork')
-const offline = ref(false)
+const online = useOnline()
 
 function fallBack(): void {
-  offline.value = !navigator.onLine
   artStage.value = artStage.value === 'artwork' ? 'thumbnail' : 'glyph'
 }
+
+/**
+ * **And the chip keeps its word: the artwork arrives with the connection.** When
+ * the network comes back the hero asks for the artwork again — once each time
+ * the browser says it is back, so a host still down falls through once more,
+ * this time without the chip.
+ */
+watch(online, (up) => {
+  if (up && artStage.value !== 'artwork') artStage.value = 'artwork'
+})
 
 /**
  * **An artwork that failed before hydration never reaches `@error`.** The
@@ -266,6 +277,9 @@ useSeoMeta({
 
           `eager` porque esta é a maior imagem acima da dobra da página; as
           dimensões evitam o salto de layout enquanto ela chega.
+
+          When the artwork fails, this same element shows the thumbnail — the
+          board *Offline*, see `artStage`.
         -->
         <img
           v-if="artStage !== 'glyph'"
@@ -294,7 +308,7 @@ useSeoMeta({
           />
         </svg>
         <span
-          v-if="artStage !== 'artwork' && offline"
+          v-if="artStage !== 'artwork' && !online"
           class="hero__offline"
         >
           <svg
