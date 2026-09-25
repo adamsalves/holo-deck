@@ -13,15 +13,15 @@ import { REPO_ROOT } from '../support/source-tree'
 
 const ORIGIN = 'https://holo.test'
 
-/** A cache as the browser holds it: keys come back absolute. */
-function store(initial: readonly string[] = [], refuseAfter = Infinity): SpriteStore & { kept: string[] } {
+/** A cache as the browser holds it: keys come back absolute. It refuses with `refusal` once it holds `refuseAfter`. */
+function store(initial: readonly string[] = [], refuseAfter = Infinity, refusal = 'QuotaExceededError'): SpriteStore & { kept: string[] } {
   const kept = [...initial]
 
   return {
     kept,
     keys: async () => kept.map(url => ({ url: new URL(url, ORIGIN).href })),
     put: async (url) => {
-      if (kept.length >= refuseAfter) throw new DOMException('the disk is full', 'QuotaExceededError')
+      if (kept.length >= refuseAfter) throw new DOMException('refused', refusal)
       kept.push(url)
     },
   }
@@ -115,17 +115,26 @@ describe('keepSprites', () => {
     expect(cache.kept.length).toBe(5)
   })
 
-  it('gives every fetch a deadline', async () => {
-    const signals: AbortSignal[] = []
-    const fetcher: SpriteFetch = async (_url, init) => {
-      signals.push(init.signal)
-
-      return thumbnail()
+  /**
+   * `Cache.put` reads the body, which is still coming over the network: in
+   * Chromium, a connection dropped after the headers rejects the write with a
+   * `NetworkError`, and the deadline running out mid-body with an `AbortError`.
+   * Neither is the disk — the row would send the player to free space for a
+   * connection that dropped.
+   */
+  it('stops for the network when a write fails for any reason but quota', async () => {
+    for (const refusal of ['NetworkError', 'AbortError']) {
+      expect(await keepSprites(store([], 0, refusal), spriteUrls(3), () => undefined, network()), refusal).toBe('network')
     }
+  })
 
-    await keepSprites(store(), spriteUrls(2), () => undefined, fetcher)
+  it('gives up on a thumbnail that never comes, as the network', async () => {
+    // Settles only when its signal aborts: a connection that is up and never answers.
+    const hanging: SpriteFetch = (_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(init.signal.reason))
+    })
+    const unbounded = new Promise(resolve => setTimeout(resolve, 1_000, 'still waiting'))
 
-    expect(signals).toHaveLength(2)
-    expect(signals.every(signal => signal instanceof AbortSignal && !signal.aborted)).toBe(true)
+    expect(await Promise.race([keepSprites(store(), spriteUrls(2), () => undefined, hanging, 10), unbounded])).toBe('network')
   })
 })

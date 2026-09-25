@@ -29,10 +29,11 @@ export type SpriteFetch = (url: string, init: { signal: AbortSignal }) => Promis
 const PARALLEL = 6
 
 /**
- * How long one thumbnail may take. A connection that is up and never answers —
- * a captive portal, a train between stations — would otherwise leave the row
- * on *downloading* for as long as the browser waits, which is minutes; the
- * board's answer to a connection that went away is state 04 and *Continue*.
+ * How long one thumbnail may take, body included. A connection that is up and
+ * never answers — a captive portal, a train between stations — would otherwise
+ * leave the row on *downloading* for as long as the browser waits, which is
+ * minutes; the board's answer to a connection that went away is state 04 and
+ * *Continue*.
  */
 const SPRITE_TIMEOUT = 15_000
 
@@ -67,11 +68,14 @@ function isThumbnail(response: Response): boolean {
  * each one kept. Resolves with `null` once all of them are, or with the reason
  * the first failure gives — and then the lanes stop taking more.
  *
- * **A failure to fetch is the network's, a failure to keep is the disk's.** An
- * answer that is not a thumbnail counts as the network's: it is what a captive
- * portal or a sign-in wall sends, and the way out is the same — *Continue* once
- * the connection is back. The store refusing is the browser refusing room;
- * quota is the one reason the platform gives for it.
+ * **The reason is the error's, not the step's.** Only `QuotaExceededError` is
+ * the disk's. Everything else is the network's: a fetch that fails, an answer
+ * that is not a thumbnail — what a captive portal or a sign-in wall sends —,
+ * and a write that fails for any other reason, because `Cache.put` reads the
+ * body, which is still coming over the network. Measured in Chromium: a
+ * connection dropped after the headers rejects the write with a `NetworkError`,
+ * and the deadline running out mid-body with an `AbortError`. The way out is
+ * the same for all of them — *Continue* once the connection is back.
  *
  * What was kept before the failure stays: the next run starts from what the
  * store has, which is what *Continue* does.
@@ -81,6 +85,7 @@ export async function keepSprites(
   urls: readonly string[],
   onKept: () => void,
   fetcher: SpriteFetch = fetch,
+  deadline = SPRITE_TIMEOUT,
 ): Promise<SpriteDownloadStop | null> {
   const queue = [...urls]
   let stopped: SpriteDownloadStop | null = null
@@ -92,7 +97,7 @@ export async function keepSprites(
 
       let response: Response
       try {
-        response = await fetcher(url, { signal: AbortSignal.timeout(SPRITE_TIMEOUT) })
+        response = await fetcher(url, { signal: AbortSignal.timeout(deadline) })
       }
       catch {
         stopped ??= 'network'
@@ -106,8 +111,8 @@ export async function keepSprites(
       try {
         await store.put(url, response)
       }
-      catch {
-        stopped ??= 'space'
+      catch (error) {
+        stopped ??= error instanceof Error && error.name === 'QuotaExceededError' ? 'space' : 'network'
         return
       }
       onKept()
