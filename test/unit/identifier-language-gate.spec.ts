@@ -183,13 +183,17 @@ describe('the language of identifiers', () => {
       <li v-for="rung in ladder" :key="rung.step" />
       <li v-for="(sample, index) of samples" :key="index">{{ sample }}</li>
       <UTable #cell="{ row }">{{ row }}</UTable>
+      <a href="#skip-target">skip</a>
+      <div id="skip-target" :id="boundId" data-id="stamp" />
     </template>`).map(alias => alias.name).sort()
 
     // Only the declaring side. `ladder` and `samples` are references to what the
     // `<script>` already exposes, and `vue-tsc` answers for those — listing them
     // here would report the same name twice, each time for a different reason.
+    // The same goes for `boundId`, and for the link's `#skip-target`, which
+    // points at the `id` that declares it.
     expect(found, 'alias the template reader missed').toEqual(
-      ['index', 'row', 'rung', 'sample'],
+      ['index', 'row', 'rung', 'sample', 'skip', 'target'],
     )
   })
 

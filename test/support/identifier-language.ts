@@ -115,9 +115,11 @@ function declaredNames(source: ts.SourceFile): ts.Identifier[] {
  * the script, so a reference the script does not declare fails `yarn typecheck`.
  *
  * What neither of those reaches is a name the template **declares itself** —
- * a `v-for` alias or a slot prop. `templateAliases` below is for exactly that,
- * and it is not a corner: the four `v-for` aliases in `styleguide.vue` were
- * renamed by hand during the rename precisely because nothing could see them.
+ * a `v-for` alias, a slot prop or an element `id`. `templateAliases` below is for
+ * exactly that, and it is not a corner: the four `v-for` aliases in
+ * `styleguide.vue` were renamed by hand during the rename precisely because
+ * nothing could see them, and the one Portuguese name the rename left behind was
+ * an `id` — the skip link's `#conteudo`, an address every page carried.
  */
 function scriptOf(source: string): { text: string, lineOffset: number } | null {
   const block = /<script[^>]*>([\s\S]*?)<\/script>/.exec(source)
@@ -131,12 +133,15 @@ function scriptOf(source: string): { text: string, lineOffset: number } | null {
 }
 
 /**
- * The names a `<template>` declares on its own: `v-for` aliases and slot props.
+ * The names a `<template>` declares on its own: `v-for` aliases, slot props and
+ * static element ids.
  *
  * Deliberately shallow. It reads the binding side of `v-for="(rung, index) in
- * ladder"` and of `#cell="{ row }"`, pulls the identifiers out, and stops —
- * a full template parser would buy accuracy this gate does not need, and a
- * missed alias here costs a name, not a wrong pass on something else.
+ * ladder"` and of `#cell="{ row }"`, and the value of `id="forge-search"`, pulls
+ * the identifiers out, and stops — a full template parser would buy accuracy
+ * this gate does not need, and a missed alias here costs a name, not a wrong
+ * pass on something else. A bound `:id` is an expression the script answers
+ * for, and `data-id` is not a name, so neither is read.
  */
 export function templateAliases(source: string): { name: string, line: number }[] {
   const template = /<template>([\s\S]*)<\/template>/.exec(source)
@@ -149,6 +154,7 @@ export function templateAliases(source: string): { name: string, line: number }[
   const declarations = [
     /v-for="\s*(.*?)\s+(?:in|of)\s/g,
     /(?:v-slot:[\w.-]+|#[\w.-]+|v-slot)="([^"]*)"/g,
+    /(?<![\w:.-])id="([^"]*)"/g,
   ]
 
   for (const pattern of declarations) {
