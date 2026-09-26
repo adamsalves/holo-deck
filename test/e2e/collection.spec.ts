@@ -536,7 +536,7 @@ test('a primeira tabulação de qualquer tela é pular para o conteúdo', async 
   await expect(skipLink).toBeFocused()
 
   await skipLink.click()
-  await expect(page.locator('#conteudo')).toBeFocused()
+  await expect(page.locator('#content')).toBeFocused()
 })
 
 /**

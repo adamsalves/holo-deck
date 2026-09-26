@@ -31,7 +31,7 @@ const { t } = useI18n()
   <div class="shell">
     <a
       class="shell__skip"
-      href="#conteudo"
+      href="#content"
     >
       {{ t('a11y.skipToContent') }}
     </a>
@@ -39,7 +39,7 @@ const { t } = useI18n()
     <AppNav />
 
     <div
-      id="conteudo"
+      id="content"
       tabindex="-1"
       class="shell__main"
     >
