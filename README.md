@@ -1620,6 +1620,38 @@ afirmava, e o mesmo booleano escreve a classe e o `aria-current` — os dois nã
 como discordar. O `exact` da Base virou load-bearing pela primeira vez: `/` é
 prefixo de toda rota.
 
+## Acessibilidade
+
+### Estrutura de página
+
+**Toda página tem um `<main>`, e um `<h1>` dentro dele.** É por ali que quem usa
+leitor de tela chega ao conteúdo e sabe onde está. Medido em 26/09/2026 contra a
+`main`, `/deck`, `/league` e a batalha não tinham `<main>`, e duas telas não
+tinham `<h1>`: o Hub, e a batalha **durante a luta** — os quatro `<h1>` dela
+moravam nas saídas de erro. O Lighthouse, rodado no Hub, no deck e na batalha,
+acusou os dois `<main>` e nenhum dos cabeçalhos. Nada disso muda pixel: a troca de
+tag foi conferida por screenshot contra a `main`, byte a byte, a 1280 e a 390 px.
+
+| tela | o `<h1>` | por quê |
+|---|---|---|
+| Hub | **oculto** (`sr-only`), com o nome que a barra dá à tela: *Base* | a prancha *Hub* não desenha título — abre direto na faixa de retomar —, e um título visível mudaria a tela mais desenhada do canvas. Decidido em 26/09/2026 (#31, metade 1) |
+| batalha | a faixa do topo: ginásio, líder, região e tipo | é a identidade que a prancha *Batalha* já desenha. Cada saída de erro mantém o seu, porque nelas a faixa não existe |
+
+O registro de turnos é uma região viva (`role="log"`, nomeada pelo rótulo *Registro
+do turno*): o turno é lido quando entra, e não só quando alguém vai procurar. O
+`role` mora num `<div>` em volta da lista, porque `log` não é papel permitido em
+`<ol>`.
+
+[`test/e2e/page-structure.spec.ts`](test/e2e/page-structure.spec.ts) abre toda
+página de `app/pages` — a lista sai do disco, com uma amostra por parâmetro de
+rota — nos dois idiomas, e cobra um `<main>`, um `<h1>`, e o `<h1>` dentro do
+`<main>`. Duas barreiras, as duas medidas: o save semeado tem time, senão a batalha
+cai numa saída — que sempre teve `<h1>` — e o portão fica verde sem medir a luta
+(medido: 2 de 2 verdes com o defeito); e a contagem espera a rede aquietar, senão
+um segundo `<h1>` desenhado dentro de `<ClientOnly>` passa (13 de 20 verdes sem a
+espera, 0 de 20 com ela). O `league.spec.ts` lê o registro pela região viva, no
+nome de cada idioma.
+
 ## Offline
 
 O jogo roda sem rede depois da primeira visita, por um service worker nosso
