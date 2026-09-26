@@ -40,6 +40,36 @@ export function hasExtension(extensions: readonly string[]) {
   return (fileName: string) => extensions.some(extension => fileName.endsWith(extension))
 }
 
+/** A sample value for each route parameter, so a dynamic page has an address to open. */
+const SAMPLES: Readonly<Record<string, string>> = { gymId: '1', gen: '1', name: 'pikachu' }
+
+const PAGES = 'app/pages'
+
+/** `/styleguide` exists only in `yarn dev` — the build removes it (see `nuxt.config.ts`). */
+const DEVELOPMENT_ONLY = new Set(['/styleguide'])
+
+/**
+ * One address per page of `app/pages`, read from the disk: a page added later is
+ * measured without anyone remembering to add it here. A parameter nobody gave a
+ * sample for fails instead of being skipped.
+ */
+export function pageAddresses(): string[] {
+  const pages = walkFiles(join(REPO_ROOT, PAGES), new Set(), hasExtension(['.vue']))
+
+  return pages.flatMap((file) => {
+    const route = `/${relative(PAGES, file).replaceAll(sep, '/').replace(/\.vue$/, '')}`
+      .replace(/\/index$/, '') || '/'
+    const address = route.replace(/\[(\w+)\]/g, (_, parameter: string) => {
+      const sample = SAMPLES[parameter]
+      if (sample === undefined) throw new Error(`${file}: no sample for [${parameter}]`)
+
+      return sample
+    })
+
+    return DEVELOPMENT_ONLY.has(address) ? [] : [address]
+  })
+}
+
 /**
  * Apaga comentário preservando as quebras de linha, para o número da linha na
  * mensagem de erro continuar certo.

@@ -3,7 +3,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative, sep } from 'node:path'
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { OFFLINE_SHELL_PATH } from '../../app/utils/offline.ts'
-import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
+import { hasExtension, pageAddresses, REPO_ROOT, walkFiles } from '../support/source-tree'
 import { localeCodes, localeUrl } from '../support/locales'
 
 /**
@@ -331,35 +331,6 @@ test.describe('the precache', () => {
     expect(shell.split('id="locale-root-guard"')).toHaveLength(2)
   })
 })
-
-/**
- * One address per page of `app/pages`, read from the disk: a page added later is
- * measured without anyone remembering to add it here. A parameter nobody gave a
- * sample for fails instead of being skipped.
- */
-const SAMPLES: Readonly<Record<string, string>> = { gymId: '1', gen: '1', name: 'pikachu' }
-
-const PAGES = 'app/pages'
-
-/** `/styleguide` exists only in `yarn dev` — the build removes it (see `nuxt.config.ts`). */
-const DEVELOPMENT_ONLY = new Set(['/styleguide'])
-
-function pageAddresses(): string[] {
-  const pages = walkFiles(join(REPO_ROOT, PAGES), new Set(), hasExtension(['.vue']))
-
-  return pages.flatMap((file) => {
-    const route = `/${relative(PAGES, file).replaceAll(sep, '/').replace(/\.vue$/, '')}`
-      .replace(/\/index$/, '') || '/'
-    const address = route.replace(/\[(\w+)\]/g, (_, parameter: string) => {
-      const sample = SAMPLES[parameter]
-      if (sample === undefined) throw new Error(`${file}: no sample for [${parameter}]`)
-
-      return sample
-    })
-
-    return DEVELOPMENT_ONLY.has(address) ? [] : [address]
-  })
-}
 
 /**
  * Everything a page loads from its own site: opened as the network serves it,

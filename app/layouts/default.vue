@@ -14,10 +14,12 @@
  * nove em cada página — WCAG 2.4.1. Ele é invisível até receber foco, e aí
  * aparece por cima da barra.
  *
- * O alvo é um `<div>` e não um `<main>`: quase toda página já traz o próprio
- * `<main>`, e aninhar dois seria marcação inválida. O `tabindex="-1"` existe
- * porque um contêiner sem ele não recebe foco por âncora, e o salto ficaria
- * visual sem mover o cursor do leitor de tela.
+ * The target is a `<div>` and not a `<main>`: every page brings its own
+ * `<main>`, holding its `<h1>` — `test/e2e/page-structure.spec.ts` counts both on
+ * every page of `app/pages` —, and nesting two would be invalid markup. The
+ * `tabindex="-1"` is there because a container without it takes no focus from an
+ * anchor, and the jump would move the view without moving the screen reader's
+ * cursor.
  *
  * O texto do link é traduzido: ele é o **primeiro** conteúdo anunciado em toda
  * tela, e num documento `lang="en-US"` um "Pular para o conteúdo" fixo seria o
