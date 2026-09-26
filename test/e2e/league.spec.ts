@@ -551,7 +551,12 @@ test('the league and the battle speak the language of the URL, from link to log'
     await playTurn(page)
     await expect(page.locator('.battle__log-empty')).toHaveCount(0)
 
-    const log = (await page.locator('.battle__log').innerText()).replaceAll(/\s+/g, ' ')
+    // Read through the live region a screen reader follows, by its name in this
+    // locale: a turn narrated outside it would be on screen and never read out.
+    const region = page.getByRole('log', { name: label('battle.log.title', locale), exact: true })
+    await expect(region, `/battle/1 in ${locale} has no turn log a screen reader follows`).toBeVisible()
+
+    const log = (await region.innerText()).replaceAll(/\s+/g, ' ')
     const spoken = logPatterns(locale).filter(({ pattern }) => pattern.test(log))
 
     expect(spoken.length, `the ${locale} log matches no sentence from its own locale`)

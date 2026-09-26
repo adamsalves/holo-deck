@@ -692,24 +692,35 @@ function fallbackSprite(event: Event, id: number): void {
           </div>
 
           <aside class="battle__side">
-            <p class="battle__eyebrow">
+            <p
+              id="battle-log-title"
+              class="battle__eyebrow"
+            >
               {{ t('battle.log.title') }}
             </p>
-            <ol class="numeric battle__log">
-              <li
-                v-for="entry in history"
-                :key="entry.turn"
-              >
-                <span class="battle__log-turn">T{{ entry.turn }}</span>
-                <span>{{ entry.lines.join(' ') }}</span>
-              </li>
-              <li
-                v-if="history.length === 0"
-                class="battle__log-empty"
-              >
-                {{ t('battle.log.empty') }}
-              </li>
-            </ol>
+            <!-- A live region, so a turn is read out as it lands and not only
+                 when someone goes looking. `role="log"` is not allowed on an
+                 `<ol>`, hence the wrapper; its margins collapse through it. -->
+            <div
+              role="log"
+              aria-labelledby="battle-log-title"
+            >
+              <ol class="numeric battle__log">
+                <li
+                  v-for="entry in history"
+                  :key="entry.turn"
+                >
+                  <span class="battle__log-turn">T{{ entry.turn }}</span>
+                  <span>{{ entry.lines.join(' ') }}</span>
+                </li>
+                <li
+                  v-if="history.length === 0"
+                  class="battle__log-empty"
+                >
+                  {{ t('battle.log.empty') }}
+                </li>
+              </ol>
+            </div>
 
             <div class="battle__bench-wrap">
               <p class="battle__eyebrow">
