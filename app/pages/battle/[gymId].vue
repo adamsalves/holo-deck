@@ -501,11 +501,14 @@ function fallbackSprite(event: Event, id: number): void {
 </script>
 
 <template>
-  <div class="battle">
+  <main class="battle">
     <ClientOnly>
       <template v-if="standing === 'ready' && state && player && opponent && leader">
         <header class="battle__bar">
-          <div class="battle__who">
+          <!-- The fight's heading is the board's own bar — gym, leader, region
+               and type — and not a title the board does not draw. The exits
+               below each carry their own `<h1>`, since this bar is not there. -->
+          <h1 class="battle__who">
             <span class="numeric battle__gym">
               {{ t('battle.bar.gym', { gym, total: GYM_COUNT }) }}
             </span>
@@ -513,7 +516,7 @@ function fallbackSprite(event: Event, id: number): void {
             <span class="numeric battle__region">
               {{ REGION_LABELS[leader.region] }} · {{ t(typeKey(leader.type)) }}
             </span>
-          </div>
+          </h1>
           <div class="numeric battle__meta">
             <span>{{ t('battle.bar.turn') }} <b>{{ String(state.turn).padStart(2, '0') }}</b></span>
             <span>{{ t('battle.bar.level') }}</span>
@@ -836,7 +839,7 @@ function fallbackSprite(event: Event, id: number): void {
         </template>
       </div>
     </ClientOnly>
-  </div>
+  </main>
 </template>
 
 <style scoped>

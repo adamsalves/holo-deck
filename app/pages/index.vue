@@ -158,6 +158,14 @@ onMounted(() => {
 
 <template>
   <main class="hub">
+    <!-- The Hub board draws no title: it opens straight on the resume strip.
+         The heading is for whoever navigates by headings, so it is hidden, and it
+         is the name the bar gives this screen. Outside `<ClientOnly>`, so the
+         prerendered page carries it too. -->
+    <h1 class="sr-only">
+      {{ t('nav.base') }}
+    </h1>
+
     <div class="hub__body">
       <ClientOnly>
         <!-- A faixa de retomar, acima de tudo: é a única coisa da tela que o

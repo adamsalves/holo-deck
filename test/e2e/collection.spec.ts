@@ -223,8 +223,8 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
    * o que uma lista de portas escrita à mão fazia. Era a mesma lista de entrada
    * que o `nav-gate` tinha, e pela mesma razão ela falhava em silêncio.
    */
-  const arrivals: Record<string, { url: RegExp, title: string | null, root: string }> = {
-    '/': { url: /\/$/, title: null, root: '.hub' },
+  const arrivals: Record<string, { url: RegExp, title: string, root: string }> = {
+    '/': { url: /\/$/, title: 'Base', root: '.hub' },
     '/packs': { url: /\/packs$/, title: 'Packs', root: '.packs' },
     '/pokedex': { url: /\/pokedex$/, title: 'Pokédex', root: 'main' },
     '/collection': { url: /\/collection$/, title: 'Binder', root: '.collection' },
@@ -265,16 +265,9 @@ test('a barra global leva a todas as telas, e de qualquer tela', async ({ page }
     await page.getByRole('link', { name: navLabel(destination.label), exact: true }).click()
     await expect(page).toHaveURL(expected.url)
 
-    /**
-     * A Base é a única sem `<h1>` — o Hub não tem um, e a prancha *Hub* não
-     * desenha nenhum. Ela é a única porta cuja chegada não pode ser afirmada
-     * pelo título, então o que se afirma é a raiz da tela: sem isto ela seria
-     * a única das oito a provar só a URL, que é o que a versão anterior deste
-     * teste fazia sem escrever por quê.
-     */
-    if (expected.title !== null) {
-      await expect(page.getByRole('heading', { level: 1, name: expected.title })).toBeVisible()
-    }
+    // The Hub's heading is hidden — its board draws no title — and still has the
+    // one-pixel box that counts as visible, so every door is asserted the same way.
+    await expect(page.getByRole('heading', { level: 1, name: expected.title })).toBeVisible()
     await expect(page.locator(expected.root).first()).toBeVisible()
   }
 })
