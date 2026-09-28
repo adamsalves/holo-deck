@@ -279,6 +279,7 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
   inset: -5px;
   pointer-events: none;
   background: var(--focus);
+  forced-color-adjust: none;
   clip-path: polygon(
     evenodd,
     var(--outer) 0,
@@ -296,6 +297,13 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
     2px var(--inner),
     var(--inner) 2px
   );
+}
+
+/* A painted ring, like the bevel's: forced colours would repaint it as the page. */
+@media (forced-colors: active) {
+  .poke-card-frame:has(> .poke-card > .poke-card__link:focus-visible)::after {
+    background: Highlight;
+  }
 }
 
 .poke-card__number {

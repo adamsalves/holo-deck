@@ -424,6 +424,9 @@
     inset: -7px;
     pointer-events: none;
     background: var(--focus);
+    /* Forced colours repaint every background as the page's own, and the ring
+       went with it: it keeps a colour of its own, the system's highlight. */
+    forced-color-adjust: none;
     clip-path: polygon(
       evenodd,
       0 0,
@@ -439,6 +442,10 @@
       5.5px calc(5.5px + var(--bevel)),
       calc(var(--bevel) + 5.5px) 5.5px
     );
+
+    @media (forced-colors: active) {
+      background: Highlight;
+    }
   }
 }
 
