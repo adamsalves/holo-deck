@@ -1687,9 +1687,9 @@ recorte da pintura: o `clip-path` do chanfro come o `outline`, e o
 | controle | o anel |
 |---|---|
 | sem chanfro | a regra base de `main.css`, em `@layer base`, para as regras dos componentes e os utilitários do Nuxt UI ficarem acima dela. Ela nomeia `a:focus-visible` porque a base do Nuxt UI zera o `outline-offset` dos links na mesma camada, com um seletor mais específico |
-| chanfrado (`bevel-*`) | o próprio utilitário: no foco, o `clip-path` deixa passar a faixa de 3 a 5 px, e um `::after` a pinta. Sombra não serve — a diagonal do anel passa por dentro da caixa de borda, onde sombra externa não pinta |
+| chanfrado (`bevel-*`) | o próprio utilitário: no foco, o `clip-path` deixa passar a faixa de 3 a 5 px, e um `::after` a pinta. Sombra não serve — a diagonal do anel passa por dentro da caixa de borda, onde sombra externa não pinta. Em cores forçadas o `::after` guarda uma cor própria, a `Highlight` do sistema (`forced-color-adjust: none`): o navegador repinta todo fundo com a cor da página, e o anel ia junto |
 | a forma é de outro elemento: o link que cobre a carta de ginásio, o `<input>` de 1 px do IMPORTAR | `data-focus-parent`, e o pai chanfrado desenha o anel. A carta de ginásio perdeu o `overflow: hidden`, que cortava o anel; o chanfro já corta o que ela pinta |
-| carta (`PokeCard`) | um `::after` na moldura, com o polígono da própria prancha |
+| carta (`PokeCard`) | um `::after` na moldura, com o polígono da própria prancha, e a mesma cor própria em cores forçadas |
 | abas do Detalhe (`UTabs`) | a prop `ui`: o anel do Nuxt UI mede 1,51:1, e os utilitários dele ganham da regra base |
 | lista com `content-visibility` | 5 px de folga dentro do `<li>`, devolvidos pela margem |
 
@@ -1702,11 +1702,19 @@ repouso, e o **interior** igual ao repouso, que é onde o hover no foco aparece.
 quatro formas de desenhar o anel — regra base, chanfro, pai e moldura — são cobradas
 pelo nome.
 
+E anda duas vezes: a segunda em cores forçadas, o alto contraste do Windows. Ali a
+cor é a do sistema de quem joga, e o anel é o que o foco mudou de 3 a 5 px; o
+interior não é cobrado, porque o próprio Chromium repinta em `Highlight` o fio de
+todo `<button>` focado — medido num botão nu, com `outline: none` inclusive. Antes do
+conserto, o DESAFIAR da Liga mudava 100 pixels sob foco ali, contra 3.815 sem cores
+forçadas, e nenhum deles era anel.
+
 Cada defeito foi reintroduzido e reprovou com a sua mensagem: o chanfro sem o anel,
 as abas com o anel do Nuxt UI, os links sem o `a:`, a carta com o retângulo que a
 prancha recusou (reprova só nos cortes), a lista sem folga, o `overflow` da carta
-de ginásio, o IMPORTAR sem a marca, a #74, a folga de 2 px e o hover no foco, num
-preenchimento e numa borda de 1 px. A borda passou verde duas vezes antes de
+de ginásio, o IMPORTAR sem a marca, a #74, a folga de 2 px, o hover no foco — num
+preenchimento e numa borda de 1 px —, e o anel pintado sem cor própria em cores
+forçadas. A borda passou verde duas vezes antes de
 reprovar, e cada vez ensinou uma coisa ao portão: a cadeia de evolução mora numa aba
 inativa, que o Tab não alcança; e o menor hover do sistema, `--border` para
 `--border-strong`, move 9 por canal, abaixo da tolerância de 24 que o anel pede.
