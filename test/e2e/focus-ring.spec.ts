@@ -216,7 +216,7 @@ function settle(page: Page): Promise<unknown> {
 }
 
 /** What went wrong with one stop, side by side; empty when the ring is there. */
-async function measure(page: Page, stop: Stop, focus: readonly number[]): Promise<string[]> {
+async function measure(page: Page, stop: Stop, focus: readonly number[] | null): Promise<string[]> {
   const viewport = page.viewportSize()
   if (viewport === null) throw new Error('the gate needs a viewport')
 
@@ -299,6 +299,16 @@ async function measure(page: Page, stop: Stop, focus: readonly number[]): Promis
       }
     }
 
+    // The ring is `--focus` — or, with `focus` null, in forced colours, where
+    // the colour is the one the player's system chose: whatever focus changed.
+    const isRing = (x: number, y: number): boolean => {
+      const color = pixel(focused, x, y)
+      if (color === null) return false
+      if (focus !== null) return near(color, focus)
+      const before = pixel(rest, x, y)
+      return before !== null && !near(color, before)
+    }
+
     const readings = samples.map(({ side, origin, out, straight }) => {
       const at = (distance: number): [number, number] => [origin[0] + out[0] * distance, origin[1] + out[1] * distance]
       const [middleX, middleY] = at(ring)
@@ -310,8 +320,7 @@ async function measure(page: Page, stop: Stop, focus: readonly number[]): Promis
       let found = false
       for (const dy of [-1, 0, 1]) {
         for (const dx of [-1, 0, 1]) {
-          const color = pixel(focused, middleX + dx / scale, middleY + dy / scale)
-          if (color !== null && near(color, focus)) found = true
+          if (isRing(middleX + dx / scale, middleY + dy / scale)) found = true
         }
       }
 
@@ -323,8 +332,7 @@ async function measure(page: Page, stop: Stop, focus: readonly number[]): Promis
       if (straight) {
         const hits: boolean[] = []
         for (let step = scale; step < 8 * scale; step++) {
-          const color = pixel(focused, ...at((step + 0.5) / scale))
-          hits.push(color !== null && near(color, focus))
+          hits.push(isRing(...at((step + 0.5) / scale)))
         }
         const first = hits.indexOf(true)
         if (first >= 0) {
@@ -364,7 +372,7 @@ async function measure(page: Page, stop: Stop, focus: readonly number[]): Promis
     const enough = (count: number): boolean => count >= onScreen.length * 0.9
 
     const ring = onScreen.filter(reading => reading.ring).length
-    if (!enough(ring)) failures.push(`${side}: the ring is --focus at ${ring} of ${onScreen.length} points`)
+    if (!enough(ring)) failures.push(`${side}: the ring is ${focus === null ? 'drawn' : '--focus'} at ${ring} of ${onScreen.length} points`)
 
     const measured = onScreen.filter(reading => reading.straight)
     const placed = measured.filter(({ edges }) => edges !== null
@@ -382,97 +390,112 @@ async function measure(page: Page, stop: Stop, focus: readonly number[]): Promis
     if (!enough(still)) failures.push(`${side}: the gap or the outside changed under focus at ${onScreen.length - still} of ${onScreen.length} points`)
   }
 
-  if (!moved && changedInside > 0) {
+  // Not in forced colours: there Chromium itself repaints a focused button's
+  // border in the system highlight — measured on a bare `<button>`, with
+  // `outline: none` too —, and the hover this guards against is measured in
+  // the other pass.
+  if (!moved && focus !== null && changedInside > 0) {
     failures.push(`inside: ${changedInside} device pixels changed under focus — focus is rest plus the ring, not hover`)
   }
 
   return failures
 }
 
-test('every keyboard stop of every page draws the ring', async ({ page, baseURL }) => {
-  test.setTimeout(300_000)
+/**
+ * Twice: as the page is drawn, and in forced colours — Windows' high contrast —,
+ * where the system repaints every colour, and a ring painted as a background
+ * went with it. Measured before the fix, CHALLENGE changed 100 pixels under
+ * focus there, against 3815 without forced colours, and none of them a ring.
+ */
+for (const forcedColors of ['none', 'active'] as const) {
+  test(`every keyboard stop of every page draws the ring${forcedColors === 'active' ? ', in forced colors' : ''}`, async ({ page, baseURL }) => {
+    test.setTimeout(300_000)
+    await page.emulateMedia({ forcedColors })
 
-  const addresses = pageAddresses()
-  expect(addresses, 'the Hub is not measured').toContain('/')
+    const addresses = pageAddresses()
+    expect(addresses, 'the Hub is not measured').toContain('/')
 
-  if (baseURL === undefined) throw new Error('the suite runs without a baseURL')
-  const origin = new URL(baseURL).origin
-  // The ring does not depend on another host, and the barrier below would wait
-  // for the slowest of them.
-  await page.route(url => url.origin !== origin, route => route.abort())
+    if (baseURL === undefined) throw new Error('the suite runs without a baseURL')
+    const origin = new URL(baseURL).origin
+    // The ring does not depend on another host, and the barrier below would wait
+    // for the slowest of them.
+    await page.route(url => url.origin !== origin, route => route.abort())
 
-  await skipInvite(page)
-  // On every navigation, the save of the page about to open: each page lands in
-  // the state it is measured in, whatever the previous one wrote.
-  const saves: Record<string, unknown> = { '*': saveFor('*') }
-  for (const address of addresses) saves[address] = saveFor(address)
-  await page.addInitScript((byPath: Record<string, unknown>) => {
-    window.localStorage.setItem('holodeck:save', JSON.stringify(byPath[location.pathname] ?? byPath['*']))
-  }, saves)
+    await skipInvite(page)
+    // On every navigation, the save of the page about to open: each page lands in
+    // the state it is measured in, whatever the previous one wrote.
+    const saves: Record<string, unknown> = { '*': saveFor('*') }
+    for (const address of addresses) saves[address] = saveFor(address)
+    await page.addInitScript((byPath: Record<string, unknown>) => {
+      window.localStorage.setItem('holodeck:save', JSON.stringify(byPath[location.pathname] ?? byPath['*']))
+    }, saves)
 
-  const kinds = new Set<Stop['kind']>()
+    const kinds = new Set<Stop['kind']>()
 
-  for (const address of addresses) {
-    await page.goto(address)
-    await page.waitForLoadState('networkidle')
-    if (address.startsWith('/battle/')) {
-      await expect(page.locator('.combatant'), 'the battle is being fought').toHaveCount(2)
-    }
-
-    const focus = await page.evaluate(() => {
-      const probe = document.createElement('div')
-      probe.style.color = 'var(--focus)'
-      document.body.append(probe)
-      const channels = getComputedStyle(probe).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? []
-      probe.remove()
-      return channels
-    })
-    expect(focus, 'the page has no --focus to read').toHaveLength(3)
-
-    const seen = new Set<string>()
-
-    /** Measures the stop with the focus; false when there is none, or it was measured already. */
-    const measureFocused = async (): Promise<boolean> => {
-      const stop = await readStop(page)
-      if (stop === null || seen.has(stop.key)) return false
-      seen.add(stop.key)
-      kinds.add(stop.kind)
-
-      expect.soft(await measure(page, stop, focus), `${address} — ${stop.name}`).toEqual([])
-
-      // Back to the stop, so the next Tab goes on from it.
-      await page.evaluate(() => {
-        const element: unknown = Reflect.get(window, 'e2eStop')
-        if (element instanceof HTMLElement) element.focus({ preventScroll: true })
-      })
-      return true
-    }
-
-    /** Tab by Tab from wherever the focus is, until a stop comes round again. */
-    const walk = async (): Promise<void> => {
-      for (let step = 0; step < 400; step++) {
-        await page.keyboard.press('Tab')
-        if (!await measureFocused()) return
+    for (const address of addresses) {
+      await page.goto(address)
+      await page.waitForLoadState('networkidle')
+      if (address.startsWith('/battle/')) {
+        await expect(page.locator('.combatant'), 'the battle is being fought').toHaveCount(2)
       }
-    }
 
-    await walk()
+      const focus = forcedColors === 'active'
+        ? null
+        : await page.evaluate(() => {
+            const probe = document.createElement('div')
+            probe.style.color = 'var(--focus)'
+            document.body.append(probe)
+            const channels = getComputedStyle(probe).color.match(/\d+/g)?.slice(0, 3).map(Number) ?? []
+            probe.remove()
+            return channels
+          })
+      if (focus !== null) expect(focus, 'the page has no --focus to read').toHaveLength(3)
 
-    // A tab list takes one Tab stop, the selected tab, and the other panels
-    // wait behind the arrow keys — the Detail's evolution chain among them,
-    // which no walk reached until a hover planted on it passed. Focusing a tab
-    // opens it, as the arrows do; each tab is measured and walked from.
-    const tabs = page.getByRole('tab')
-    for (let index = 0; index < await tabs.count(); index++) {
-      await tabs.nth(index).focus()
-      await measureFocused()
+      const seen = new Set<string>()
+
+      /** Measures the stop with the focus; false when there is none, or it was measured already. */
+      const measureFocused = async (): Promise<boolean> => {
+        const stop = await readStop(page)
+        if (stop === null || seen.has(stop.key)) return false
+        seen.add(stop.key)
+        kinds.add(stop.kind)
+
+        expect.soft(await measure(page, stop, focus), `${address} — ${stop.name}`).toEqual([])
+
+        // Back to the stop, so the next Tab goes on from it.
+        await page.evaluate(() => {
+          const element: unknown = Reflect.get(window, 'e2eStop')
+          if (element instanceof HTMLElement) element.focus({ preventScroll: true })
+        })
+        return true
+      }
+
+      /** Tab by Tab from wherever the focus is, until a stop comes round again. */
+      const walk = async (): Promise<void> => {
+        for (let step = 0; step < 400; step++) {
+          await page.keyboard.press('Tab')
+          if (!await measureFocused()) return
+        }
+      }
+
       await walk()
+
+      // A tab list takes one Tab stop, the selected tab, and the other panels
+      // wait behind the arrow keys — the Detail's evolution chain among them,
+      // which no walk reached until a hover planted on it passed. Focusing a tab
+      // opens it, as the arrows do; each tab is measured and walked from.
+      const tabs = page.getByRole('tab')
+      for (let index = 0; index < await tabs.count(); index++) {
+        await tabs.nth(index).focus()
+        await measureFocused()
+        await walk()
+      }
+
+      expect.soft(seen.size, `${address}: no keyboard stop was measured`).toBeGreaterThan(0)
     }
 
-    expect.soft(seen.size, `${address}: no keyboard stop was measured`).toBeGreaterThan(0)
-  }
-
-  // Each way a ring is drawn, asked by name: a count over the sum would stay
-  // green with one of them never measured.
-  expect([...kinds].sort(), 'the kinds of ring measured').toEqual(['bevel', 'frame', 'outline', 'parent'])
-})
+    // Each way a ring is drawn, asked by name: a count over the sum would stay
+    // green with one of them never measured.
+    expect([...kinds].sort(), 'the kinds of ring measured').toEqual(['bevel', 'frame', 'outline', 'parent'])
+  })
+}
