@@ -171,8 +171,7 @@ useSeoMeta({
   transition: border-color 140ms var(--ease-out), background 140ms var(--ease-out);
 }
 
-.region-card:hover,
-.region-card:focus-visible {
+.region-card:hover {
   background: var(--surface-raised);
   border-color: var(--border-strong);
 }

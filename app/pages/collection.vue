@@ -510,11 +510,6 @@ useSeoMeta({
   color: var(--accent);
 }
 
-.collection__chip:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .collection__divider {
   width: 1px;
   height: 20px;
@@ -548,6 +543,13 @@ useSeoMeta({
 .collection__grid > li {
   content-visibility: auto;
   contain-intrinsic-size: auto 218px;
+
+  /* Five pixels of room inside the item, handed back by the margin: the paint
+     containment `content-visibility` brings cuts whatever leaves the item's
+     box, and the card's focus ring stands 5px outside it. Same as the deck's
+     picks. */
+  margin: -5px;
+  padding: 5px;
 }
 
 .collection__empty {
@@ -587,11 +589,6 @@ useSeoMeta({
   border-radius: var(--radius);
 }
 
-.collection__search:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
-}
-
 .collection__suggestions {
   margin-top: 8px;
   display: grid;
@@ -612,11 +609,8 @@ useSeoMeta({
   cursor: pointer;
 }
 
-.collection__suggestion:hover,
-.collection__suggestion:focus-visible {
+.collection__suggestion:hover {
   color: var(--text);
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
 }
 
 .collection__target {
@@ -648,11 +642,6 @@ useSeoMeta({
   background: var(--surface-raised);
   border-color: var(--border);
   cursor: not-allowed;
-}
-
-.collection__forge-button:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .collection__table {

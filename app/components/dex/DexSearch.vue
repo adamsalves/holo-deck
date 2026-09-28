@@ -138,8 +138,7 @@ defineShortcuts({
   text-align: left;
 }
 
-.dex-search__trigger:hover,
-.dex-search__trigger:focus-visible {
+.dex-search__trigger:hover {
   border-color: var(--border-strong);
 }
 

@@ -546,8 +546,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.hub__give-up:hover,
-.hub__give-up:focus-visible {
+.hub__give-up:hover {
   color: var(--deficit);
 }
 
@@ -752,8 +751,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.hub__button:hover,
-.hub__button:focus-visible {
+.hub__button:hover {
   color: var(--text);
   border-color: var(--accent);
 }
@@ -764,8 +762,7 @@ onMounted(() => {
   border-color: var(--type);
 }
 
-.hub__button--type:hover,
-.hub__button--type:focus-visible {
+.hub__button--type:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--type) 82%, var(--text));
 }
@@ -776,8 +773,7 @@ onMounted(() => {
   border-color: var(--forge);
 }
 
-.hub__button--daily:hover,
-.hub__button--daily:focus-visible {
+.hub__button--daily:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--forge) 82%, var(--text));
 }
@@ -788,8 +784,7 @@ onMounted(() => {
   border-color: var(--coin);
 }
 
-.hub__button--warm:hover,
-.hub__button--warm:focus-visible {
+.hub__button--warm:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--coin) 82%, var(--text));
 }

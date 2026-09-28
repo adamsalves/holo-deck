@@ -374,8 +374,7 @@ const next = computed(() => view.next.value)
   background: var(--type);
 }
 
-.league__action:hover,
-.league__action:focus-visible {
+.league__action:hover {
   background: color-mix(in oklab, var(--type) 80%, var(--text));
 }
 
@@ -385,8 +384,7 @@ const next = computed(() => view.next.value)
   border: 1px solid var(--border-strong);
 }
 
-.league__action--empty:hover,
-.league__action--empty:focus-visible {
+.league__action--empty:hover {
   color: var(--text);
   background: var(--surface-raised);
   border-color: var(--accent);

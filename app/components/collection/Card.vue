@@ -203,10 +203,7 @@ const label = computed(() => [
   font-weight: 700;
 }
 
-.binder-card__scrap:hover,
-.binder-card__scrap:focus-visible {
+.binder-card__scrap:hover {
   color: var(--text-body);
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 </style>

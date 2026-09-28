@@ -737,6 +737,7 @@ useSeoMeta({
               type="file"
               accept="application/json,.json"
               class="settings__file"
+              data-focus-parent
               @change="importSave"
             >
           </label>
@@ -1435,12 +1436,6 @@ useSeoMeta({
   opacity: 0.6;
 }
 
-.settings__action:focus-visible,
-.settings__action:focus-within {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-}
-
 /**
  * The language selector, as the board draws it: two segments in mono 11/700,
  * `7px 13px`, six apart, the active one filled.
@@ -1479,12 +1474,12 @@ useSeoMeta({
   color: var(--bg);
 }
 
-.settings__segment:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-}
-
-/** O `<input type="file">` some, e o `<label>` em volta dele é o botão. */
+/**
+ * O `<input type="file">` some, e o `<label>` em volta dele é o botão.
+ *
+ * The keyboard still lands on the input, a pixel wide, so it is marked
+ * `data-focus-parent`: the beveled label draws the ring (see `bevel-*`).
+ */
 .settings__file {
   position: absolute;
   width: 1px;
@@ -1540,11 +1535,6 @@ useSeoMeta({
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
-}
-
-.settings__switch:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
 }
 
 /**

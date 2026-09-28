@@ -315,12 +315,9 @@ function onDrop(event: DragEvent): void {
   cursor: pointer;
 }
 
-.deck-slot__remove:hover,
-.deck-slot__remove:focus-visible {
+.deck-slot__remove:hover {
   color: var(--text);
   border-color: var(--deficit);
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 /**

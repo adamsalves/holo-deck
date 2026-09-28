@@ -597,21 +597,11 @@ async function pick(side: ChoiceSide): Promise<void> {
   opacity: 0.7;
 }
 
-.choice__use:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .choice__loading {
   margin-top: 18px;
   font-size: 13px;
   color: var(--text-muted);
   text-align: center;
-}
-
-.choice__sheet:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 4px;
 }
 
 .choice__failed {

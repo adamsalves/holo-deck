@@ -142,6 +142,9 @@ const tabs = computed(() => [
   { label: t('species.tabs.evolution'), slot: 'evolution' as const },
 ])
 
+/** The ring of `main.css`, as utilities: the tabs take their classes, not rules. */
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--focus)'
+
 /**
  * What the hero shows, in the order the board *Offline* falls through them: the
  * official artwork, the thumbnail in 2×, and the offline glyph.
@@ -377,12 +380,19 @@ useSeoMeta({
         e linha evolutiva — que é o conteúdo pelo qual estas páginas seriam
         encontradas. Também é o que faz o Ctrl+F do navegador achar o que está
         na aba fechada.
+
+        The `ui` prop hands the tab and its panel the system's focus ring. Nuxt
+        UI draws its own, a 3px outline at a quarter of the primary colour —
+        1.51:1 measured, on the very tab the *Foco* block of the *Tokens* board
+        draws — and its utilities sit above the ring of `main.css`, so asking is
+        the way in.
       -->
       <UTabs
         :items="tabs"
         :unmount-on-hide="false"
         variant="link"
         class="w-full"
+        :ui="{ trigger: FOCUS_RING, content: FOCUS_RING }"
       >
         <template #about>
           <!--
@@ -615,8 +625,7 @@ useSeoMeta({
   text-decoration: none;
 }
 
-.hero__crumbs a:hover,
-.hero__crumbs a:focus-visible {
+.hero__crumbs a:hover {
   color: var(--accent);
 }
 

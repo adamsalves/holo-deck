@@ -881,11 +881,6 @@ useSeoMeta({
   cursor: not-allowed;
 }
 
-.packs__buy:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-}
-
 .packs__offer-meta {
   font-size: 11px;
   color: var(--text-muted);
@@ -1149,11 +1144,6 @@ useSeoMeta({
 .packs__skip--primary {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-.packs__skip:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .packs__pity-hit {

@@ -350,6 +350,29 @@
  *
  * `clip-path` em vez de borda porque a silhueta precisa cortar o foil e a arte
  * junto — uma borda desenharia o corte por cima e o brilho vazaria no canto.
+ *
+ * **The focus ring of a beveled control lives here, because this clip is what
+ * ate it.** A `clip-path` cuts everything the element paints, `outline` and
+ * `box-shadow` included: thirteen controls did not change one pixel under the
+ * keyboard while their computed style said `2px solid`. So on focus the clip
+ * lets the ring through — three outlines, `evenodd`: the ring's outer edge 5px
+ * out, its inner edge 3px out, and the body. Each is the same bevel moved out
+ * along its normal, which is where `sqrt(2) - 1` comes from: a 45° cut pushed
+ * out by `d` meets the edge `d * (sqrt(2) - 1)` closer to the corner.
+ *
+ * The `::after` is only the paint. A shadow cannot be it — measured, the ring's
+ * diagonal runs *inside* the border box, where an outer shadow never paints, and
+ * the button's own fill showed there. The pseudo-element can paint inside, but
+ * it is placed from the padding box, one border away from the box the ring is
+ * measured from — so it does not draw the ring: it covers everything around
+ * the body, leaving a hole 5.5px into itself, and the clip above cuts the ring
+ * out of that. The hole lands inside the 3px gap for a border of 0 or 1px, which
+ * is every beveled control there is; a thicker border would leave the ring
+ * short, and the focus gate would say so.
+ *
+ * A control whose shape is not its own — the link that covers a gym card, the
+ * file input inside the IMPORT label — marks itself `data-focus-parent`, and the
+ * beveled parent shows its focus.
  */
 @utility bevel-* {
   --bevel: --value(--bevel-*);
@@ -361,6 +384,90 @@
     0 100%,
     0 var(--bevel)
   );
+
+  &:focus-visible,
+  &:has(> [data-focus-parent]:focus-visible) {
+    --ring-outer: calc(var(--bevel) - 5px * (sqrt(2) - 1));
+    --ring-inner: calc(var(--bevel) - 3px * (sqrt(2) - 1));
+    position: relative;
+    clip-path: polygon(
+      evenodd,
+      var(--ring-outer) -5px,
+      calc(100% + 5px) -5px,
+      calc(100% + 5px) calc(100% - var(--ring-outer)),
+      calc(100% - var(--ring-outer)) calc(100% + 5px),
+      -5px calc(100% + 5px),
+      -5px var(--ring-outer),
+      var(--ring-outer) -5px,
+      var(--ring-inner) -3px,
+      calc(100% + 3px) -3px,
+      calc(100% + 3px) calc(100% - var(--ring-inner)),
+      calc(100% - var(--ring-inner)) calc(100% + 3px),
+      -3px calc(100% + 3px),
+      -3px var(--ring-inner),
+      var(--ring-inner) -3px,
+      var(--bevel) 0,
+      100% 0,
+      100% calc(100% - var(--bevel)),
+      calc(100% - var(--bevel)) 100%,
+      0 100%,
+      0 var(--bevel),
+      var(--bevel) 0,
+      var(--ring-inner) -3px
+    );
+  }
+
+  &:focus-visible::after,
+  &:has(> [data-focus-parent]:focus-visible)::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    background: var(--focus);
+    clip-path: polygon(
+      evenodd,
+      0 0,
+      100% 0,
+      100% 100%,
+      0 100%,
+      0 0,
+      calc(var(--bevel) + 5.5px) 5.5px,
+      calc(100% - 5.5px) 5.5px,
+      calc(100% - 5.5px) calc(100% - 5.5px - var(--bevel)),
+      calc(100% - 5.5px - var(--bevel)) calc(100% - 5.5px),
+      5.5px calc(100% - 5.5px),
+      5.5px calc(5.5px + var(--bevel)),
+      calc(var(--bevel) + 5.5px) 5.5px
+    );
+  }
+}
+
+/**
+ * The ring every other control gets: 2px of `--focus`, 3px away, following the
+ * control's own radius — the *Foco* block of the *Tokens* board, which draws one
+ * ring in one colour for every control. The gap is what keeps a blue ring
+ * visible around a blue control; without it the ring vanishes into the Water
+ * leader's CHALLENGE and into a rare card's frame.
+ *
+ * Focus is not hover. Hover lightens a fill or lights a border; focus draws this
+ * ring and nothing else, and the two can be on at once.
+ *
+ * In `@layer base` on purpose, so the components' own rules and Nuxt UI's
+ * utilities stay above it. A rule outside the layers would beat those too, and
+ * the command palette's input would grow a ring over its `focus:outline-none`;
+ * `UTabs`, the one of theirs that needed ours, asks for it through its `ui` prop.
+ *
+ * `a` is named because Nuxt UI's own base sets `a:focus-visible { outline-offset:
+ * 0 }` in this same layer, and that selector outranks a bare `:focus-visible`:
+ * every link drew its ring touching the text. Tied, the later rule wins, and
+ * this file is read after `@nuxt/ui`.
+ */
+@layer base {
+  :focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
 }
 
 /**

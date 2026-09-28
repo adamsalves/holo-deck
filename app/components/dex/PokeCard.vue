@@ -263,11 +263,39 @@ const dexLabel = computed(() => `#${String(props.dexNumber).padStart(4, '0')}`)
  * `outline` no próprio link seria cortado nos quatro cantos. O `:has()` traz o
  * estado de foco de dentro para fora, que é exatamente o que a moldura já
  * existia para permitir — ela não gira e não recorta.
+ *
+ * The ring follows the card's bevel, as the *Foco* block of the *Tokens* board
+ * draws it; the frame's rectangle it used to be was the answer the board turned
+ * down. The frame's box is the card's border box, so here — unlike in `bevel-*`
+ * — the ring is drawn exactly, with the board's own shape: a box 5px bigger, and
+ * the bevel moved out along its normal to 5px (the outer edge) and 3px (the
+ * inner one). `--bevel-tile` because the card is `bevel-tile` in the template.
  */
-.poke-card-frame:has(.poke-card__link:focus-visible) {
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-  border-radius: var(--radius);
+.poke-card-frame:has(> .poke-card > .poke-card__link:focus-visible)::after {
+  --outer: calc(var(--bevel-tile) + 5px - 5px * (sqrt(2) - 1));
+  --inner: calc(var(--bevel-tile) + 5px - 3px * (sqrt(2) - 1));
+  content: '';
+  position: absolute;
+  inset: -5px;
+  pointer-events: none;
+  background: var(--focus);
+  clip-path: polygon(
+    evenodd,
+    var(--outer) 0,
+    100% 0,
+    100% calc(100% - var(--outer)),
+    calc(100% - var(--outer)) 100%,
+    0 100%,
+    0 var(--outer),
+    var(--outer) 0,
+    var(--inner) 2px,
+    calc(100% - 2px) 2px,
+    calc(100% - 2px) calc(100% - var(--inner)),
+    calc(100% - var(--inner)) calc(100% - 2px),
+    2px calc(100% - 2px),
+    2px var(--inner),
+    var(--inner) 2px
+  );
 }
 
 .poke-card__number {

@@ -292,9 +292,4 @@ function clear() {
   color: var(--text-body);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--type) 45%, transparent);
 }
-
-.filters__type:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 </style>
