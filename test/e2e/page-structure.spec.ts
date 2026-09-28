@@ -1,6 +1,8 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { localeCodes, localeUrl } from '../support/locales'
-import { pageAddresses } from '../support/source-tree'
+import { pageAddresses, REPO_ROOT } from '../support/source-tree'
 import { saveWith, seedLocalSave } from './support'
 
 /**
@@ -29,9 +31,19 @@ const TEAM = [1, 4, 7, 10, 16, 25]
 
 const ADDRESSES = pageAddresses()
 
-test('there are pages to measure, in more than one language', () => {
-  // The other side of the loop below: no pages, no measurement.
-  expect(ADDRESSES.length).toBeGreaterThan(10)
+test('every folder of app/pages has a page measured, in more than one language', () => {
+  // The other side of the loop below, asked of each source by name: a count over
+  // the sum stayed green with a whole folder of pages gone from the list.
+  const folders = readdirSync(join(REPO_ROOT, 'app/pages'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => `/${entry.name}`)
+
+  expect(folders.length, 'app/pages has no folder to ask for').toBeGreaterThan(0)
+  expect(
+    folders.filter(folder => !ADDRESSES.some(address => address === folder || address.startsWith(`${folder}/`))),
+    'folders of app/pages with no page measured',
+  ).toEqual([])
+  expect(ADDRESSES, 'the Hub is not measured').toContain('/')
   expect(localeCodes().length).toBeGreaterThan(1)
 })
 
