@@ -456,6 +456,12 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | **service worker nosso**, e não `@vite-pwa/nuxt` | o spike deste PR mediu o módulo (1.1.1, sem release para Nuxt 4): com o padrão, ele instalava os 2.104 `_payload.json` (7,5 MB) e nenhum JS; reescrevia `200.html` como `/200`, que responde 404, e o worker nunca ativava; e custava 1.932 linhas de lockfile e 211 pacotes. O que o jogo precisa é uma lista e três regras |
 | **2,1 MB instalados, ~680 KB na rede**, e não "~310 KB" | o número do plano é de antes de o jogo existir. A lista do plano também não tinha o `index.json` (busca e Detalhe), as mensagens de i18n (o shell as busca por rede) nem as fontes. O orçamento é por fonte, em `offline-precache.spec.ts` |
 
+### Decidido no PR 6 da Fase 8, contra o que a prancha desenhava
+
+| divergência | por quê |
+|---|---|
+| **o painel do próximo líder cresce com o conteúdo** (`min-height: 250px`), e fica ~15 px mais baixo que os ginásios da fileira | a prancha *Liga* o desenha na altura das cartas de ginásio, com o mesmo conteúdo, e o conteúdo não cabe: 264 px, 266 com o deck vazio, em todo viewport. Na altura fixa, o chanfro cortava os 15 px de baixo do DESAFIAR — fora da vista, do clique e do anel de foco (#74). Crescer é a divergência menor. Decidido em 28/09/2026 |
+
 ### Decidido no PR 5 da Fase 8, além do que a prancha desenhava
 
 | decisão | por quê |
@@ -1661,6 +1667,57 @@ um segundo `<h1>` desenhado dentro de `<ClientOnly>` passa (13 de 20 verdes sem 
 espera, 0 de 20 com ela). O `league.spec.ts` lê o registro pela região viva, no
 nome de cada idioma, e joga essa derrota até o fim, uma batalha salva com semente
 fixa, cobrando que cada ação ponha na região exatamente uma linha nova.
+
+### O anel de foco
+
+Um anel só, para todo controle, como o bloco *Foco* da prancha *Tokens* o desenha:
+2 px de `--focus`, **3 px de folga**, com o corte do próprio controle — chanfro onde
+há chanfro, raio onde há raio. A folga é o que separa o anel azul de um controle
+azul, como o DESAFIAR da Nessa e a moldura da carta rara. E **foco não é hover**: o
+foco é o repouso mais o anel. As 19 regras de hover que também respondiam a
+`:focus-visible` — clarear o cheio, acender a borda, trocar a cor do rótulo, em 11
+arquivos — passaram a responder só ao ponteiro.
+
+Medido em 26/09/2026, 13 das 288 paradas de Tab de 12 rotas não mudavam um pixel
+sob foco, com o estilo computado dizendo `2px solid`. As duas causas estão no
+recorte da pintura: o `clip-path` do chanfro come o `outline`, e o
+`content-visibility` dos `<li>` do binder e da lista de escalar traz
+`contain: paint`, que cortava o anel da carta. Onde o anel mora agora:
+
+| controle | o anel |
+|---|---|
+| sem chanfro | a regra base de `main.css`, em `@layer base`, para as regras dos componentes e os utilitários do Nuxt UI ficarem acima dela. Ela nomeia `a:focus-visible` porque a base do Nuxt UI zera o `outline-offset` dos links na mesma camada, com um seletor mais específico |
+| chanfrado (`bevel-*`) | o próprio utilitário: no foco, o `clip-path` deixa passar a faixa de 3 a 5 px, e um `::after` a pinta. Sombra não serve — a diagonal do anel passa por dentro da caixa de borda, onde sombra externa não pinta |
+| a forma é de outro elemento: o link que cobre a carta de ginásio, o `<input>` de 1 px do IMPORTAR | `data-focus-parent`, e o pai chanfrado desenha o anel. A carta de ginásio perdeu o `overflow: hidden`, que cortava o anel; o chanfro já corta o que ela pinta |
+| carta (`PokeCard`) | um `::after` na moldura, com o polígono da própria prancha |
+| abas do Detalhe (`UTabs`) | a prop `ui`: o anel do Nuxt UI mede 1,51:1, e os utilitários dele ganham da regra base |
+| lista com `content-visibility` | 5 px de folga dentro do `<li>`, devolvidos pela margem |
+
+[`test/e2e/focus-ring.spec.ts`](test/e2e/focus-ring.spec.ts) anda com o Tab por
+toda página de `app/pages`, abre cada aba — o painel de uma aba inativa só se
+alcança pelas setas — e fotografa cada parada duas vezes, com foco e sem. Mede
+pixel, nunca estilo computado: um portão de estilo passaria nas 13. Cobra o anel de
+3 a 5 px em cada lado e no meio de cada corte, a folga e o lado de fora iguais ao
+repouso, e o **interior** igual ao repouso, que é onde o hover no foco aparece. As
+quatro formas de desenhar o anel — regra base, chanfro, pai e moldura — são cobradas
+pelo nome.
+
+Cada defeito foi reintroduzido e reprovou com a sua mensagem: o chanfro sem o anel,
+as abas com o anel do Nuxt UI, os links sem o `a:`, a carta com o retângulo que a
+prancha recusou (reprova só nos cortes), a lista sem folga, o `overflow` da carta
+de ginásio, o IMPORTAR sem a marca, a #74, a folga de 2 px e o hover no foco, num
+preenchimento e numa borda de 1 px. A borda passou verde duas vezes antes de
+reprovar, e cada vez ensinou uma coisa ao portão: a cadeia de evolução mora numa aba
+inativa, que o Tab não alcança; e o menor hover do sistema, `--border` para
+`--border-strong`, move 9 por canal, abaixo da tolerância de 24 que o anel pede.
+Dentro do controle, foco e repouso são o mesmo render — o ruído medido é 1 —, e a
+tolerância ali é 4.
+
+**O que ele não alcança:** o que só abre com conta, com estado ou no meio de um
+fluxo — a tela *Duas coleções*, o convite, os avisos de save e de conflito, a
+abertura de pack, a troca forçada e o fim da batalha, e a paleta de busca, cujo campo
+segue com o `focus:outline-none` do Nuxt UI. As regras de foco desses controles
+foram alinhadas lendo o código, sem medição.
 
 ## Offline
 
