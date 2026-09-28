@@ -85,9 +85,24 @@ useHead({
  */
 type Standing = 'loading' | 'ready' | 'unknown-gym' | 'locked' | 'no-deck' | 'busy' | 'failed'
 
+/**
+ * A narrated turn, and the key it has in the log.
+ *
+ * `turn` does not name an entry: a forced switch does not advance the turn
+ * (`BattleExpecting`), so the switch and the turn after it share a number. Keyed
+ * by it, every slide of the six-line window made Vue insert old lines into the
+ * live region again — and each insertion there is read out — and leave behind
+ * rows it never removed: 21 on a seeded loss, 15 of them carried into the rematch.
+ */
+interface LoggedTurn extends NarratedTurn {
+  readonly id: number
+}
+
 const standing = ref<Standing>('loading')
 const context = shallowRef<BattleContext | null>(null)
-const history = ref<readonly NarratedTurn[]>([])
+const history = ref<readonly LoggedTurn[]>([])
+/** How many narrations this page has logged: the next one's `id`. */
+let logged = 0
 const focused = ref(0)
 
 /** Seis linhas, como a prancha: o registro é o que acabou de acontecer, não o
@@ -430,7 +445,7 @@ function play(action: BattleAction): void {
   // another URL, the page remounts, and the history starts empty in the new
   // language — never half of it in each.
   const turn = narrate(before, battle.events, ctx.moves, t)
-  if (turn.lines.length > 0) history.value = [...history.value, turn].slice(-LOG_LINES)
+  if (turn.lines.length > 0) history.value = [...history.value, { ...turn, id: logged++ }].slice(-LOG_LINES)
   focused.value = 0
 }
 
@@ -708,7 +723,7 @@ function fallbackSprite(event: Event, id: number): void {
               <ol class="numeric battle__log">
                 <li
                   v-for="entry in history"
-                  :key="entry.turn"
+                  :key="entry.id"
                 >
                   <span class="battle__log-turn">T{{ entry.turn }}</span>
                   <span>{{ entry.lines.join(' ') }}</span>

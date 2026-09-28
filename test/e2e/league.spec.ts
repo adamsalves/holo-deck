@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { ENGINE_VERSION } from '../../shared/game/battle.ts'
 import { MOVES_IN_BATTLE, STAT_NAMES } from '../../shared/types/dex.ts'
 import { statKey, statNameKey } from '../../shared/types/game.ts'
 import {
@@ -14,7 +15,7 @@ import {
   readLocale,
   spells,
 } from '../support/locales'
-import { openWelcomePack, playTurn } from './support'
+import { DEX_VERSION, openWelcomePack, playTurn, saveWith, seedLocalSave, skipInvite } from './support'
 
 /**
  * A Liga e a batalha num navegador de verdade.
@@ -591,4 +592,76 @@ test('the league and the battle speak the language of the URL, from link to log'
       `/battle/1 in ${locale} sends the player back to another language`,
     ).toEqual([])
   }
+})
+
+/**
+ * Each action puts one new line in the turn log, and the log keeps six.
+ *
+ * The log is a live region: whatever enters it is read out. A forced switch does
+ * not advance the turn, and keyed by `entry.turn` the switch and the turn after it
+ * shared a key — so once the window started to slide, Vue inserted old lines again
+ * on every turn and left rows behind that it never removed. Measured on this very
+ * fight: 21 rows, two or three insertions per turn, and 15 rows carried into the
+ * rematch.
+ *
+ * **Seeded, so it is the same fight on every run.** A saved battle with a fixed
+ * seed resumes into the same rolls, the leader decides from the same generator,
+ * and this team faints against rock: five forced switches, then a loss.
+ */
+test('each action puts one new line in the turn log, and the log keeps six', async ({ page }) => {
+  const team = [10, 13, 129, 16, 4, 12]
+  await skipInvite(page)
+  await seedLocalSave(page, saveWith({
+    collection: Object.fromEntries(team.map(id => [id, { c: 1, s: 0 }])),
+    deck: team,
+    battle: { gymId: 1, seed: 7, engineVersion: ENGINE_VERSION, dexVersion: DEX_VERSION, team, actions: [] },
+  }))
+  await page.goto('/battle/1')
+
+  const region = page.getByRole('log')
+  await expect(region, 'the saved battle did not resume').toBeVisible()
+
+  // Watched on the node itself, from before the first action: a region born with
+  // the line it carries is not announced, so what counts is what enters this one.
+  await region.evaluate((node) => {
+    const heard: string[] = []
+    Reflect.set(window, 'e2eHeard', heard)
+    new MutationObserver((records) => {
+      for (const record of records) {
+        record.addedNodes.forEach((added) => {
+          if (added instanceof HTMLLIElement) heard.push(added.textContent ?? '')
+        })
+      }
+    }).observe(node, { childList: true, subtree: true })
+  })
+  const heard = (): Promise<string[]> => page.evaluate(() => {
+    const lines: unknown = Reflect.get(window, 'e2eHeard')
+    return Array.isArray(lines) ? lines.map(String) : []
+  })
+
+  const result = page.locator('.battle__result')
+  let actions = 0
+  let forced = 0
+
+  while (!(await result.isVisible()) && actions < 60) {
+    if (await page.locator('.battle__forced').isVisible()) forced++
+    await playTurn(page)
+    actions++
+
+    await expect
+      .poll(async () => (await heard()).length, `action ${actions} did not put exactly one line in the log`)
+      .toBe(actions)
+
+    const rows = await region.getByRole('listitem').allTextContents()
+    // Six, as the board draws the log (`LOG_LINES` on the page).
+    expect(rows.length, `after action ${actions} the log shows more than six lines`).toBeLessThanOrEqual(6)
+    expect(rows, `after action ${actions} the log is not the last lines it read out`)
+      .toEqual((await heard()).slice(-rows.length))
+  }
+
+  // The other side: a fight that never forced a switch, or never slid the window,
+  // measured nothing this test is about.
+  await expect(result, 'the seeded fight did not end').toBeVisible()
+  expect(forced, 'the seeded fight forced no switch').toBeGreaterThan(0)
+  expect(actions, 'the seeded fight never slid the six-line window').toBeGreaterThan(6)
 })

@@ -1640,7 +1640,10 @@ tag foi conferida por screenshot contra a `main`, byte a byte, a 1280 e a 390 px
 O registro de turnos é uma região viva (`role="log"`, nomeada pelo rótulo *Registro
 do turno*): o turno é lido quando entra, e não só quando alguém vai procurar. O
 `role` mora num `<div>` em volta da lista, porque `log` não é papel permitido em
-`<ol>`.
+`<ol>`. **Cada entrada tem chave própria, e não o número do turno**: a troca forçada
+não avança o turno, e com a chave repetida o Vue voltava a inserir na região, a
+cada turno, linhas que já tinham sido lidas. Medido numa derrota semeada, o
+registro de seis linhas chegou a 21, e 15 delas sobraram na revanche.
 
 [`test/e2e/page-structure.spec.ts`](test/e2e/page-structure.spec.ts) abre toda
 página de `app/pages` — a lista sai do disco, com uma amostra por parâmetro de
@@ -1650,7 +1653,8 @@ cai numa saída — que sempre teve `<h1>` — e o portão fica verde sem medir 
 (medido: 2 de 2 verdes com o defeito); e a contagem espera a rede aquietar, senão
 um segundo `<h1>` desenhado dentro de `<ClientOnly>` passa (13 de 20 verdes sem a
 espera, 0 de 20 com ela). O `league.spec.ts` lê o registro pela região viva, no
-nome de cada idioma.
+nome de cada idioma, e joga essa derrota até o fim, uma batalha salva com semente
+fixa, cobrando que cada ação ponha na região exatamente uma linha nova.
 
 ## Offline
 

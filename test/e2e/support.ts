@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { defaultLocale, label, messagePattern } from '../support/locales'
@@ -517,3 +519,28 @@ export function saveWith(over: Record<string, unknown> = {}): Record<string, unk
     ...over,
   }
 }
+
+/**
+ * The dex version the served game uses: what a saved battle has to carry.
+ *
+ * **It has to be the real one.** `resume` checks the engine and the dex before
+ * replaying, and drops a battle recorded against another: with an invented
+ * `dexVersion` there is no battle left to assert anything about. The first
+ * version of the sync suite's warning test got that wrong and passed anyway,
+ * because the screen read a snapshot taken on boot, before the drop — it warned
+ * about a fight that no longer existed.
+ */
+export const DEX_VERSION: string = (() => {
+  const core: unknown = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../../public/data/core.json', import.meta.url)), 'utf8'),
+  )
+
+  if (typeof core !== 'object' || core === null || !('dexVersion' in core)) {
+    throw new Error('core.json has no dexVersion: run `yarn data:build`')
+  }
+
+  const version = core.dexVersion
+  if (typeof version !== 'string') throw new Error('dexVersion is not a string')
+
+  return version
+})()

@@ -50,8 +50,8 @@ const DEX_NAMES = new Set([
 const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'crypto', 'css', 'ctx', 'cwd',
   'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
-  'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'ui', 'uid', 'uint',
-  'url',
+  'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'subtree', 'ui', 'uid',
+  'uint', 'url',
 ]
 
 /** The tools, by their own names. */
