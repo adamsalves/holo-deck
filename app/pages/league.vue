@@ -48,7 +48,7 @@ const next = computed(() => view.next.value)
 </script>
 
 <template>
-  <div class="league">
+  <main class="league">
     <header class="league__head">
       <div>
         <p class="league__eyebrow">
@@ -184,7 +184,7 @@ const next = computed(() => view.next.value)
       <span>{{ t('league.foot.unlock') }}</span>
       <span>{{ t('league.foot.teams') }}</span>
     </footer>
-  </div>
+  </main>
 </template>
 
 <style scoped>

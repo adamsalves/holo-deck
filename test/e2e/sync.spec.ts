@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import { ENGINE_VERSION } from '../../shared/game/battle.ts'
 import {
@@ -11,7 +9,7 @@ import {
   message,
   namespaceLabels,
 } from '../support/locales'
-import { fakeSync, navLabel, pathPattern, saveWith, screenText, seedLocalSave } from './support'
+import { DEX_VERSION, fakeSync, navLabel, pathPattern, saveWith, screenText, seedLocalSave } from './support'
 
 /**
  * A decisão do primeiro login num navegador de verdade.
@@ -157,31 +155,6 @@ test('a escolha não reaparece no boot seguinte', async ({ page }) => {
   await expect(page.locator('.choice')).toHaveCount(0)
   expect(sync.puts, 'boot já acertado não regrava o que o servidor já tem').toHaveLength(1)
 })
-
-/**
- * A versão do dex que o jogo servido usa.
- *
- * **Ela precisa ser a de verdade**, e é o que a primeira versão deste teste errava:
- * com um `dexVersion` inventado, o Hub descarta a batalha no `resume` — motor e dex
- * são conferidos antes de reproduzir — e não há batalha nenhuma para avisar. O teste
- * passava porque a tela lia um retrato tirado no boot, antes do descarte: ele avisava
- * sobre uma luta que já não existia. Com a tela lendo as stores, o aviso só aparece
- * quando a batalha sobrevive — e o fixture precisa ser uma batalha que sobreviva.
- */
-const DEX_VERSION: string = (() => {
-  const core: unknown = JSON.parse(
-    readFileSync(fileURLToPath(new URL('../../public/data/core.json', import.meta.url)), 'utf8'),
-  )
-
-  if (typeof core !== 'object' || core === null || !('dexVersion' in core)) {
-    throw new Error('core.json sem dexVersion: rodar `yarn data:build`')
-  }
-
-  const version = core.dexVersion
-  if (typeof version !== 'string') throw new Error('dexVersion não é texto')
-
-  return version
-})()
 
 test('a batalha em andamento é avisada antes da escolha', async ({ page }) => {
   await fakeSync(page, REMOTE)

@@ -105,7 +105,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 </script>
 
 <template>
-  <div class="deck">
+  <main class="deck">
     <div class="deck__main">
       <ClientOnly>
         <header class="mb-7 flex items-end justify-between gap-4">
@@ -365,7 +365,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
         </template>
       </ClientOnly>
     </aside>
-  </div>
+  </main>
 </template>
 
 <style scoped>
