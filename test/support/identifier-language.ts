@@ -140,8 +140,10 @@ function scriptOf(source: string): { text: string, lineOffset: number } | null {
  * ladder"` and of `#cell="{ row }"`, and the value of `id="forge-search"`, pulls
  * the identifiers out, and stops — a full template parser would buy accuracy
  * this gate does not need, and a missed alias here costs a name, not a wrong
- * pass on something else. A bound `:id` is an expression the script answers
- * for, and `data-id` is not a name, so neither is read.
+ * pass on something else. A bound `:id` is not read: its value is an
+ * expression, and neither this reader nor the script's follows one to the id it
+ * produces, so `:id="'x'"`, or a `const` holding the string, passes unread — the
+ * tree binds no `id` today. `data-id` is not a name, so it is not read either.
  */
 export function templateAliases(source: string): { name: string, line: number }[] {
   const template = /<template>([\s\S]*)<\/template>/.exec(source)
