@@ -1637,6 +1637,12 @@ tag foi conferida por screenshot contra a `main`, byte a byte, a 1280 e a 390 px
 | Hub | **oculto** (`sr-only`), com o nome que a barra dá à tela: *Base* | a prancha *Hub* não desenha título — abre direto na faixa de retomar —, e um título visível mudaria a tela mais desenhada do canvas. Decidido em 26/09/2026 (#31, metade 1) |
 | batalha | a faixa do topo: ginásio, líder, região e tipo | é a identidade que a prancha *Batalha* já desenha. Cada saída de erro mantém o seu, porque nelas a faixa não existe |
 
+**A exceção é a tela de erro.** O 404 ainda é a página padrão do Nuxt: sem
+`<main>`, com o código no `<h1>` e sem `lang`. Ela aparece em qualquer rota
+inexistente, inclusive `/pokedex/99` e um `/pokemon/` com nome errado. Não mora em
+`app/pages`, então o portão abaixo não a alcança; trocá-la pede prancha, e está na
+#63.
+
 O registro de turnos é uma região viva (`role="log"`, nomeada pelo rótulo *Registro
 do turno*): o turno é lido quando entra, e não só quando alguém vai procurar. O
 `role` mora num `<div>` em volta da lista, porque `log` não é papel permitido em
