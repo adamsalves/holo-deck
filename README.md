@@ -460,7 +460,7 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 
 | divergência | por quê |
 |---|---|
-| **o painel do próximo líder cresce com o conteúdo** (`min-height: 250px`), e fica ~15 px mais baixo que os ginásios da fileira | a prancha *Liga* o desenha na altura das cartas de ginásio, com o mesmo conteúdo, e o conteúdo não cabe: 264 px, 266 com o deck vazio, em todo viewport. Na altura fixa, o chanfro cortava os 15 px de baixo do DESAFIAR — fora da vista, do clique e do anel de foco (#74). Crescer é a divergência menor. Decidido em 28/09/2026 |
+| **o painel do próximo líder cresce com o conteúdo** (`min-height: 250px`): mede 285,5 px e termina 35,5 px abaixo dos ginásios da fileira (287,5 e 37,5 com o deck vazio) | a prancha *Liga* o desenha na altura das cartas de ginásio, com o mesmo conteúdo, e o conteúdo não cabe: o DESAFIAR termina a 264 px do topo do painel (266 com o deck vazio), em todo viewport, e o padding de baixo vem depois. Na altura fixa, o chanfro cortava os 15 px de baixo do DESAFIAR — fora da vista, do clique e do anel de foco (#74). Crescer é a divergência menor. Decidido em 28/09/2026 com "~15 px"; medido no review, são 35,5, e a decisão foi mantida em 29/09 |
 
 ### Decidido no PR 5 da Fase 8, além do que a prancha desenhava
 
@@ -1700,14 +1700,30 @@ pixel, nunca estilo computado: um portão de estilo passaria nas 13. Cobra o ane
 3 a 5 px em cada lado e no meio de cada corte, a folga e o lado de fora iguais ao
 repouso, e o **interior** igual ao repouso, que é onde o hover no foco aparece. As
 quatro formas de desenhar o anel — regra base, chanfro, pai e moldura — são cobradas
-pelo nome.
+pelo nome. Só o link de pular pode se mover sob foco; qualquer outro controle que se
+mova reprova, porque um hover que também levanta o controle escaparia da comparação.
 
-E anda duas vezes: a segunda em cores forçadas, o alto contraste do Windows. Ali a
-cor é a do sistema de quem joga, e o anel é o que o foco mudou de 3 a 5 px; o
-interior não é cobrado, porque o próprio Chromium repinta em `Highlight` o fio de
-todo `<button>` focado — medido num botão nu, com `outline: none` inclusive. Antes do
-conserto, o DESAFIAR da Liga mudava 100 pixels sob foco ali, contra 3.815 sem cores
-forçadas, e nenhum deles era anel.
+Anda também pelos estados que o save de nenhuma página desenha: o Hub com uma luta
+em curso, a Liga com o deck por montar, um ginásio com outra luta aberta, a forja
+com uma busca, a paleta de busca, o convite e uma conta; e a coleção abre com
+duplicatas. **Toda classe que uma regra `:hover` de `app/` estiliza, lida do disco,
+precisa ter sido medida numa parada.** Sem isso, 7 das 19 regras de hover que o anel
+tirou do foco moravam em estados que o portão não abria, e devolver três delas ao
+foco o deixava verde (medido no review do PR #77).
+
+E anda três vezes. Em cores forçadas, o alto contraste do Windows: ali a cor é a do
+sistema de quem joga, e o anel é o que o foco mudou de 3 a 5 px; o interior não é
+cobrado, porque o próprio Chromium repinta em `Highlight` o fio de todo `<button>`
+focado — medido num botão nu, com `outline: none` inclusive. Antes do conserto, o
+DESAFIAR da Liga mudava 100 pixels sob foco ali, contra 3.815 sem cores forçadas, e
+nenhum deles era anel. E num celular, a 360 px, o que a largura muda: a faixa de
+chips da Pokédex, que rola de lado e cujo padding de 2 px cortava o anel em cima e
+embaixo, e o painel de retomar luta do Hub, cujo `overflow: hidden` cortava o anel
+das ações quando elas quebram linha e encostam na borda. Ali o portão cobra o anel
+presente e a folga e o lado de fora iguais ao repouso. Onde o anel fica e o interior
+são o mesmo CSS em toda largura e são medidos a 1280: no celular, uma posição
+fracionária empurra o anel pintado até 0,88 px para fora, e o × de um slot do deck
+sai rasterizado diferente quando o anel da carta passa por cima dele.
 
 Cada defeito foi reintroduzido e reprovou com a sua mensagem: o chanfro sem o anel,
 as abas com o anel do Nuxt UI, os links sem o `a:`, a carta com o retângulo que a
@@ -1719,13 +1735,23 @@ reprovar, e cada vez ensinou uma coisa ao portão: a cadeia de evolução mora n
 inativa, que o Tab não alcança; e o menor hover do sistema, `--border` para
 `--border-strong`, move 9 por canal, abaixo da tolerância de 24 que o anel pede.
 Dentro do controle, foco e repouso são o mesmo render — o ruído medido é 1 —, e a
-tolerância ali é 4.
+tolerância ali é 4. No review, mais catorze num build só, cada um reprovando com a sua
+mensagem: o hover no foco em sete controles que só aparecem com estado, um hover que
+também move o controle, a folha do convite com anel, a sugestão da forja sem
+`z-index`, o Fechar da paleta com o anel do Nuxt UI, a faixa de chips com 2 px, o
+painel do Hub com `overflow: hidden`, e uma regra de hover numa classe que nenhuma
+caminhada foca. O menor hover real mudou 231 pixels dentro do controle.
 
-**O que ele não alcança:** o que só abre com conta, com estado ou no meio de um
-fluxo — a tela *Duas coleções*, o convite, os avisos de save e de conflito, a
-abertura de pack, a troca forçada e o fim da batalha, e a paleta de busca, cujo campo
-segue com o `focus:outline-none` do Nuxt UI. As regras de foco desses controles
-foram alinhadas lendo o código, sem medição.
+**O que ele não alcança:** o que só abre no meio de um fluxo ou diante de um
+conflito — a tela *Duas coleções*, os avisos de save e de conflito, a abertura de
+pack, a troca forçada e o fim da batalha. As regras de foco desses controles foram
+alinhadas lendo o código; o review do PR #77 mediu cada um uma vez, com o mesmo
+`measure()`, menos o aviso de conflito. E o campo da paleta de busca segue com o
+`focus:outline-none` do Nuxt UI: é a única exceção, e o portão a cobra pelo nome,
+como cobra a folha do convite, que recebe o foco para ser lida e não é parada do
+Tab — nas duas, nenhum anel. E a barra do topo, que no celular mede 217 px, fica
+presa em cima e cobre o controle focado (#78): enquanto isso, o portão centraliza
+cada parada na área que ela deixa, como um `scroll-padding-top` faria.
 
 ## Offline
 

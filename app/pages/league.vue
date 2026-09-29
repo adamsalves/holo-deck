@@ -298,11 +298,12 @@ const next = computed(() => view.next.value)
  * At least the 250px of the board, and not exactly them.
  *
  * The *Liga* board draws this panel at the gym cards' height with the same
- * content, and the content does not fit: 264px, 266 with an empty deck, in every
- * viewport. At a fixed height the bevel cut the bottom 15px off CHALLENGE — out
- * of sight, out of reach of a click, and out of reach of its focus ring (#74).
- * Growing is the lesser divergence: the panel stands ~15px below the gyms of its
- * row, which the README records.
+ * content, and the content does not fit: CHALLENGE ends 264px down the panel
+ * (266 with an empty deck), in every viewport, and the padding below it makes
+ * the panel 285.5px. At a fixed height the bevel cut the bottom 15px off
+ * CHALLENGE — out of sight, out of reach of a click, and out of reach of its
+ * focus ring (#74). Growing is the lesser divergence: the panel ends 35.5px
+ * below the gyms of its row (37.5 with an empty deck), which the README records.
  */
 .league__next {
   box-sizing: border-box;
