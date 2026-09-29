@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { ENGINE_VERSION } from '../../shared/game/battle.ts'
 import { PACK_PRICE } from '../../shared/game/economy.ts'
-import { pageAddresses } from '../support/source-tree'
-import { saveWith, skipInvite } from './support'
+import { hasExtension, pageAddresses, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
+import { DEX_VERSION, fakeSync, saveWith, seedSynced } from './support'
 
 /**
  * Every keyboard stop of every page draws the ring — measured in pixels, never
@@ -25,7 +28,8 @@ import { saveWith, skipInvite } from './support'
  *
  * The pages come from the disk, and every stop the Tab key reaches is measured:
  * a control added later is measured the day it is written. So is every stop
- * behind a tab, which the Tab key alone never reaches.
+ * behind a tab, which the Tab key alone never reaches, and every stop of the
+ * states in `STATES`, which no page's own save draws.
  */
 
 /** The team of the page-structure gate: six commons, so no invite opens. */
@@ -38,17 +42,168 @@ const OWNED = [...TEAM, 2, 5]
  * A full deck everywhere — the battle needs one to land on the fight — except on
  * the deck page, where a full deck disables every pick and takes them out of
  * the tab order: the picks, inside a list that cuts what leaves its items, are
- * one of the two places the ring disappeared.
+ * one of the two places the ring disappeared. And duplicates on the collection
+ * page, where each card offers its spares to scrap.
  */
 function saveFor(path: string): Record<string, unknown> {
   return saveWith({
-    collection: Object.fromEntries(OWNED.map(id => [id, { c: 1, s: 0 }])),
+    collection: Object.fromEntries(OWNED.map(id => [id, { c: path.endsWith('/collection') ? 3 : 1, s: 0 }])),
     deck: path.endsWith('/deck') ? [...TEAM.slice(0, 5), null] : TEAM,
     // The three packs of the shop open: a welcome pack left, the daily one due,
     // and coins for the one on sale.
     progress: { pity: 0, welcomeClaimed: 0, coins: PACK_PRICE * 2, badges: 0, dailyClaimed: null },
   })
 }
+
+/** A state the walk goes through: a page, the save it opens with, and what brings the state about. */
+interface Scene {
+  readonly name: string
+  readonly address: string
+  readonly save: Record<string, unknown>
+  /** What shows the state is on the screen, waited for before the walk. */
+  readonly ready?: string
+  /** An account, or a session answered as none, before the page opens. */
+  readonly before?: (page: Page) => Promise<unknown>
+  /** What brings the state about once the page is up. */
+  readonly open?: (page: Page) => Promise<unknown>
+  /** Only here may the invite open: anywhere else it would sit over the page. */
+  readonly invite?: true
+  /**
+   * What takes the focus here and draws no ring, by decision, and why. Each is
+   * measured for that — no ring anywhere around it —, and each has to come up.
+   */
+  readonly noRing?: Readonly<Record<string, string>>
+}
+
+/** A fight against the first leader, as a save records one. */
+const FIGHT = { gymId: 1, seed: 7, engineVersion: ENGINE_VERSION, dexVersion: DEX_VERSION, team: TEAM, actions: [] }
+
+const NO_DECK = [null, null, null, null, null, null]
+
+/**
+ * The states no page's own save draws. Each is here for a control that a
+ * `:hover` rule styles and that lives only there — `hoverClasses` holds the walk
+ * to that —, or for a control measured nowhere else: the palette's Close, and
+ * the invite, whose sheet drew a ring once the bevel did.
+ */
+const STATES: readonly Scene[] = [
+  { name: 'the Hub with a fight on', address: '/', save: { ...saveFor('/'), battle: FIGHT }, ready: '.hub__give-up' },
+  { name: 'the League with a deck to finish', address: '/league', save: { ...saveFor('/league'), deck: NO_DECK }, ready: '.league__action--empty' },
+  {
+    name: 'a gym while another fight is on',
+    address: '/battle/2',
+    save: { ...saveFor('/battle/2'), progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 1, dailyClaimed: null }, battle: FIGHT },
+    ready: '.battle__standing',
+  },
+  {
+    name: 'the forge with a search typed',
+    address: '/collection',
+    save: saveFor('/collection'),
+    // The walk starts at the first suggestion and goes on to the end of the page.
+    // The field behind it is measured empty on the page itself: holding a search,
+    // a `type="search"` field shows the browser's own clear button under focus.
+    open: async (page) => {
+      await page.locator('#forge-search').fill('char')
+      await page.keyboard.press('Tab')
+      await expect(page.locator('.collection__suggestion').first()).toBeFocused()
+    },
+  },
+  {
+    name: 'the search palette',
+    address: '/pokedex/1',
+    save: saveFor('/pokedex/1'),
+    open: async (page) => {
+      await page.locator('.dex-search__trigger').focus()
+      await page.keyboard.press('Enter')
+      await expect(page.locator('[role="dialog"] input')).toBeFocused()
+    },
+    noRing: { '[role="dialog"] input': 'the palette\'s field keeps Nuxt UI\'s `focus:outline-none`, and the caret marks it' },
+  },
+  {
+    name: 'the account invite',
+    address: '/',
+    save: { ...saveFor('/'), progress: { pity: 0, welcomeClaimed: 3, coins: 300, badges: 1, dailyClaimed: null } },
+    before: page => page.route('**/api/auth/get-session', route => route.fulfill({ json: null })),
+    invite: true,
+    open: page => expect(page.locator('.invite__card')).toBeFocused(),
+    noRing: { '.invite__card': 'the sheet takes the focus to be read out, and is no stop of the Tab key: the *Convite de conta* board draws no ring on it' },
+  },
+  {
+    name: 'an account',
+    address: '/settings',
+    save: saveFor('/settings'),
+    before: async (page) => {
+      await fakeSync(page, saveFor('/settings'))
+      await seedSynced(page, { base: 1 })
+    },
+    ready: '.account__out',
+  },
+]
+
+/**
+ * The one control that moves under focus, by name: the skip link slides in. Any
+ * other that moves fails — the board draws focus as rest plus the ring, and rest
+ * is where the control was.
+ */
+const SKIP_LINK = '.shell__skip'
+
+/**
+ * The class each `:hover` rule of `app/` styles — the class nearest the `:hover`
+ * in its selector —, read from the disk.
+ *
+ * A hover that also answers `:focus-visible` shows only where the walk focuses a
+ * control that has it. Seven of the nineteen that this gate's PR took off
+ * `:focus-visible` lived in states no page's save draws, and putting three of
+ * them back left the gate green: every one of these classes has to be measured.
+ * A hover written as a Tailwind variant in a template is not read here.
+ */
+function hoverClasses(): Set<string> {
+  const files = walkFiles(join(REPO_ROOT, 'app'), new Set(), hasExtension(['.vue', '.css']))
+  const classes = new Set<string>()
+
+  for (const file of files) {
+    const source = stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))
+    const styles = file.endsWith('.css')
+      ? [source]
+      : [...source.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match => match[1] ?? '')
+
+    for (const style of styles) {
+      for (const match of style.matchAll(/([^{},;]*):hover\b/g)) {
+        const name = [...(match[1] ?? '').matchAll(/\.([\w-]+)/g)].at(-1)?.[1]
+        if (name !== undefined) classes.add(name)
+      }
+    }
+  }
+
+  return classes
+}
+
+/**
+ * The same walk three times, each reading what it is there for.
+ *
+ * As the page is drawn: the ring, where it stands, and the inside — and there
+ * every `:hover` class has to have been measured.
+ *
+ * In forced colours — Windows' high contrast —, where the system repaints every
+ * colour, and a ring painted as a background went with it: measured before the
+ * fix, CHALLENGE changed 100 pixels under focus there, against 3815 without
+ * forced colours, and none of them a ring. Not the inside: Chromium itself
+ * repaints a focused button's border in the system highlight there — measured
+ * on a bare `<button>`, with `outline: none` too.
+ *
+ * On a phone, what the width changes: a strip of chips that scrolls sideways, a
+ * panel whose actions wrap onto its edge — whether the ring is there, and the
+ * gap and the outside as at rest. Where the ring stands and what focus does
+ * inside are the same CSS at every width, and are read at 1280. Here a
+ * fractional position moved a scrap button's painted ring 0.88px out, past the
+ * slack measured at 1280, and a deck slot's × glyph rasterised 16 pixels apart
+ * once the card's ring was drawn over it.
+ */
+const PASSES = [
+  { title: '', forcedColors: 'none', viewport: { width: 1280, height: 900 }, edges: true, inside: true },
+  { title: ', in forced colors', forcedColors: 'active', viewport: { width: 1280, height: 900 }, edges: true, inside: false },
+  { title: ', on a phone', forcedColors: 'none', viewport: { width: 360, height: 800 }, edges: false, inside: false },
+] as const
 
 /**
  * The ring of the *Foco* block, in CSS pixels outside the control: its inner
@@ -94,6 +249,11 @@ interface Stop {
   readonly bevel: number | null
   readonly radius: number
   readonly kind: 'outline' | 'bevel' | 'parent' | 'frame'
+  readonly skipLink: boolean
+  /** The scene's `noRing` entry this stop answers to, if any. */
+  readonly noRing: string | null
+  /** Its classes and its ancestors': the hover rules this stop stands for. */
+  readonly classes: readonly string[]
 }
 
 /**
@@ -105,12 +265,18 @@ interface Stop {
  * ring to its parent. The bevel is the `--bevel` of whichever element on that
  * walk has a `clip-path`: that one is what cuts the ring's corners.
  */
-function readStop(page: Page): Promise<Stop | null> {
-  return page.evaluate(async () => {
+function readStop(page: Page, noRing: readonly string[]): Promise<Stop | null> {
+  return page.evaluate(async ({ noRing, skipLink }) => {
     const element = document.activeElement
     if (!(element instanceof HTMLElement) || element === document.body) return null
 
     Reflect.set(window, 'e2eStop', element)
+    // On a phone the nav wraps to 217px and sticks, and a tall card centred on
+    // the screen had its top under it. That is #78 — focus obscured —, not
+    // the ring: the stop is centred in what the nav leaves, as the page's own
+    // `scroll-padding-top` would do.
+    const nav = document.querySelector('header.nav')
+    document.documentElement.style.scrollPaddingTop = nav === null ? '' : `${nav.getBoundingClientRect().height}px`
     element.scrollIntoView({ block: 'center', inline: 'center' })
     // Two frames, so what the scroll brought into view is laid out: a list item
     // under `content-visibility` takes its real height only then, and a box read
@@ -134,8 +300,10 @@ function readStop(page: Page): Promise<Stop | null> {
     const rect = box.getBoundingClientRect()
 
     let key = ''
+    const classes = new Set<string>()
     for (let node: Element | null = element; node !== null; node = node.parentElement) {
       key = `${node.tagName}:${node.parentElement === null ? 0 : Array.from(node.parentElement.children).indexOf(node)}/${key}`
+      for (const name of Array.from(node.classList)) classes.add(name)
     }
 
     const label = element.getAttribute('aria-label') ?? element.textContent ?? ''
@@ -149,8 +317,11 @@ function readStop(page: Page): Promise<Stop | null> {
       kind: parentMarked
         ? 'parent' as const
         : clipped === undefined ? 'outline' as const : clipped === element ? 'bevel' as const : 'frame' as const,
+      skipLink: element.matches(skipLink),
+      noRing: noRing.find(selector => element.matches(selector)) ?? null,
+      classes: [...classes],
     }
-  })
+  }, { noRing, skipLink: SKIP_LINK })
 }
 
 /**
@@ -215,13 +386,21 @@ function settle(page: Page): Promise<unknown> {
     .map(animation => animation.finished.catch(() => undefined))))
 }
 
-/** What went wrong with one stop, side by side; empty when the ring is there. */
-async function measure(page: Page, stop: Stop, focus: readonly number[] | null): Promise<string[]> {
+/** What went wrong with one stop, side by side — empty when all is well —, and whether it moved. */
+async function measure(
+  page: Page,
+  stop: Stop,
+  focus: readonly number[] | null,
+  read: { readonly edges: boolean, readonly inside: boolean },
+): Promise<{ failures: string[], moved: boolean }> {
   const viewport = page.viewportSize()
   if (viewport === null) throw new Error('the gate needs a viewport')
 
   if (stop.box.width < 8 || stop.box.height < 8) {
-    return [`the focused element is ${Math.round(stop.box.width)}×${Math.round(stop.box.height)}: a ring around it is a ring nobody sees — the control the player sees takes it with \`data-focus-parent\``]
+    return {
+      failures: [`the focused element is ${Math.round(stop.box.width)}×${Math.round(stop.box.height)}: a ring around it is a ring nobody sees — the control the player sees takes it with \`data-focus-parent\``],
+      moved: false,
+    }
   }
 
   const left = Math.max(0, Math.floor(stop.box.x - MARGIN))
@@ -364,7 +543,18 @@ async function measure(page: Page, stop: Stop, focus: readonly number[] | null):
     unchanged: UNCHANGED,
   })
 
+  // What draws no ring by decision is asked the opposite: no ring anywhere.
+  if (stop.noRing !== null) {
+    const ringed = readings.filter(reading => reading.onScreen && reading.ring).length
+    return { failures: ringed === 0 ? [] : [`a ring at ${ringed} points around \`${stop.noRing}\`, which draws none`], moved }
+  }
+
   const failures: string[] = []
+  // The skip link slides in, and at rest it is somewhere else: it has nothing to
+  // be compared with. Any other control that moves fails here, whatever else it
+  // does — a hover that lifts the control would otherwise go unmeasured.
+  if (moved && !stop.skipLink) failures.push('the control moved under focus: focus is rest plus the ring, and rest is where it was')
+
   for (const side of new Set(readings.map(reading => reading.side))) {
     // A side outside the viewport — a panel taller than the screen — is not read.
     const onScreen = readings.filter(reading => reading.side === side && reading.onScreen)
@@ -374,7 +564,7 @@ async function measure(page: Page, stop: Stop, focus: readonly number[] | null):
     const ring = onScreen.filter(reading => reading.ring).length
     if (!enough(ring)) failures.push(`${side}: the ring is ${focus === null ? 'drawn' : '--focus'} at ${ring} of ${onScreen.length} points`)
 
-    const measured = onScreen.filter(reading => reading.straight)
+    const measured = read.edges ? onScreen.filter(reading => reading.straight) : []
     const placed = measured.filter(({ edges }) => edges !== null
       && edges[0] >= INNER[0] && edges[0] <= INNER[1] && edges[1] >= OUTER[0] && edges[1] <= OUTER[1])
     if (measured.length > 0 && !enough(placed.length)) {
@@ -383,63 +573,65 @@ async function measure(page: Page, stop: Stop, focus: readonly number[] | null):
       failures.push(`${side}: the ring runs ${where}, not from 3 to 5, at ${measured.length - placed.length} of ${measured.length} points`)
     }
 
-    // A control that moves on focus — the skip link slides in — has nothing to
-    // compare with at rest: at rest it is somewhere else.
     if (moved) continue
     const still = onScreen.filter(reading => reading.unchanged).length
     if (!enough(still)) failures.push(`${side}: the gap or the outside changed under focus at ${onScreen.length - still} of ${onScreen.length} points`)
   }
 
-  // Not in forced colours: there Chromium itself repaints a focused button's
-  // border in the system highlight — measured on a bare `<button>`, with
-  // `outline: none` too —, and the hover this guards against is measured in
-  // the other pass.
-  if (!moved && focus !== null && changedInside > 0) {
+  if (!moved && read.inside && changedInside > 0) {
     failures.push(`inside: ${changedInside} device pixels changed under focus — focus is rest plus the ring, not hover`)
   }
 
-  return failures
+  return { failures, moved }
 }
 
-/**
- * Twice: as the page is drawn, and in forced colours — Windows' high contrast —,
- * where the system repaints every colour, and a ring painted as a background
- * went with it. Measured before the fix, CHALLENGE changed 100 pixels under
- * focus there, against 3815 without forced colours, and none of them a ring.
- */
-for (const forcedColors of ['none', 'active'] as const) {
-  test(`every keyboard stop of every page draws the ring${forcedColors === 'active' ? ', in forced colors' : ''}`, async ({ page, baseURL }) => {
-    test.setTimeout(300_000)
-    await page.emulateMedia({ forcedColors })
+/** Each page of `app/pages`, as its own save draws it. */
+function pageScene(address: string): Scene {
+  const scene: Scene = { name: address, address, save: saveFor(address) }
+  if (address.startsWith('/battle/')) return { ...scene, open: page => expect(page.locator('.combatant'), 'the battle is being fought').toHaveCount(2) }
+  return scene
+}
+
+for (const pass of PASSES) {
+  test(`every keyboard stop draws the ring${pass.title}`, async ({ context, baseURL }) => {
+    test.setTimeout(480_000)
 
     const addresses = pageAddresses()
     expect(addresses, 'the Hub is not measured').toContain('/')
 
     if (baseURL === undefined) throw new Error('the suite runs without a baseURL')
     const origin = new URL(baseURL).origin
-    // The ring does not depend on another host, and the barrier below would wait
-    // for the slowest of them.
-    await page.route(url => url.origin !== origin, route => route.abort())
-
-    await skipInvite(page)
-    // On every navigation, the save of the page about to open: each page lands in
-    // the state it is measured in, whatever the previous one wrote.
-    const saves: Record<string, unknown> = { '*': saveFor('*') }
-    for (const address of addresses) saves[address] = saveFor(address)
-    await page.addInitScript((byPath: Record<string, unknown>) => {
-      window.localStorage.setItem('holodeck:save', JSON.stringify(byPath[location.pathname] ?? byPath['*']))
-    }, saves)
 
     const kinds = new Set<Stop['kind']>()
+    /** The classes of every stop whose inside was compared with rest. */
+    const measured = new Set<string>()
+    let skipLinkMoved = false
 
-    for (const address of addresses) {
-      await page.goto(address)
+    for (const scene of [...addresses.map(pageScene), ...STATES]) {
+      // A tab of its own, so a route, a session or a save never outlives its scene.
+      const page = await context.newPage()
+      await page.setViewportSize(pass.viewport)
+      await page.emulateMedia({ forcedColors: pass.forcedColors })
+      // The ring does not depend on another host, and the barrier below would wait
+      // for the slowest of them.
+      await page.route(url => url.origin !== origin, route => route.abort())
+      await scene.before?.(page)
+      // On every navigation, the scene's save: it lands in the state it is
+      // measured in, whatever the page wrote before.
+      await page.addInitScript(({ save, invite }) => {
+        window.localStorage.setItem('holodeck:save', JSON.stringify(save))
+        if (invite) window.localStorage.removeItem('holodeck:invite')
+        else window.localStorage.setItem('holodeck:invite', '1')
+      }, { save: scene.save, invite: scene.invite === true })
+
+      await page.goto(scene.address)
       await page.waitForLoadState('networkidle')
-      if (address.startsWith('/battle/')) {
-        await expect(page.locator('.combatant'), 'the battle is being fought').toHaveCount(2)
+      await scene.open?.(page)
+      if (scene.ready !== undefined) {
+        await expect(page.locator(scene.ready).first(), `${scene.name}: the state is not on the screen`).toBeVisible()
       }
 
-      const focus = forcedColors === 'active'
+      const focus = pass.forcedColors === 'active'
         ? null
         : await page.evaluate(() => {
             const probe = document.createElement('div')
@@ -451,16 +643,23 @@ for (const forcedColors of ['none', 'active'] as const) {
           })
       if (focus !== null) expect(focus, 'the page has no --focus to read').toHaveLength(3)
 
+      const noRing = Object.keys(scene.noRing ?? {})
+      const noRingMet = new Set<string>()
       const seen = new Set<string>()
 
       /** Measures the stop with the focus; false when there is none, or it was measured already. */
       const measureFocused = async (): Promise<boolean> => {
-        const stop = await readStop(page)
+        const stop = await readStop(page, noRing)
         if (stop === null || seen.has(stop.key)) return false
         seen.add(stop.key)
-        kinds.add(stop.kind)
 
-        expect.soft(await measure(page, stop, focus), `${address} — ${stop.name}`).toEqual([])
+        const { failures, moved } = await measure(page, stop, focus, pass)
+        expect.soft(failures, `${scene.name} — ${stop.name}`).toEqual([])
+
+        if (stop.noRing !== null) noRingMet.add(stop.noRing)
+        else kinds.add(stop.kind)
+        if (stop.skipLink && moved) skipLinkMoved = true
+        if (stop.noRing === null && !moved) for (const name of stop.classes) measured.add(name)
 
         // Back to the stop, so the next Tab goes on from it.
         await page.evaluate(() => {
@@ -478,6 +677,8 @@ for (const forcedColors of ['none', 'active'] as const) {
         }
       }
 
+      // What a script focused as the state opened — a sheet, a field — first.
+      await measureFocused()
       await walk()
 
       // A tab list takes one Tab stop, the selected tab, and the other panels
@@ -491,11 +692,22 @@ for (const forcedColors of ['none', 'active'] as const) {
         await walk()
       }
 
-      expect.soft(seen.size, `${address}: no keyboard stop was measured`).toBeGreaterThan(0)
+      expect.soft(seen.size, `${scene.name}: no keyboard stop was measured`).toBeGreaterThan(0)
+      expect.soft([...noRingMet].sort(), `${scene.name}: what draws no ring never took the focus`).toEqual([...noRing].sort())
+      await page.close()
     }
 
     // Each way a ring is drawn, asked by name: a count over the sum would stay
     // green with one of them never measured.
     expect([...kinds].sort(), 'the kinds of ring measured').toEqual(['bevel', 'frame', 'outline', 'parent'])
+    expect(skipLinkMoved, 'the skip link never slid in: the one control let to move is not measured').toBe(true)
+
+    if (pass.inside) {
+      const hover = hoverClasses()
+      // The reader's other side: the class whose hover passed this gate twice.
+      expect(hover, 'no hover rule was read from app/').toContain('chain__card')
+      const missed = [...hover].filter(name => !measured.has(name)).sort()
+      expect(missed, 'hover rules on controls no walk measured — the state that draws them belongs in STATES').toEqual([])
+    }
   })
 }
