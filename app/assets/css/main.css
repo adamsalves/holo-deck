@@ -373,6 +373,11 @@
  * A control whose shape is not its own — the link that covers a gym card, the
  * file input inside the IMPORT label — marks itself `data-focus-parent`, and the
  * beveled parent shows its focus.
+ *
+ * `tabindex="-1"` is left out: that is a sheet a script focuses so it is read
+ * out, never a stop of the Tab key, and the ring is drawn for the keyboard. The
+ * invite's sheet says `outline: none` for that reason, and an `outline` rule
+ * cannot reach this `::after` — without the `:not`, the whole dialog wore a ring.
  */
 @utility bevel-* {
   --bevel: --value(--bevel-*);
@@ -385,7 +390,7 @@
     0 var(--bevel)
   );
 
-  &:focus-visible,
+  &:focus-visible:not([tabindex='-1']),
   &:has(> [data-focus-parent]:focus-visible) {
     --ring-outer: calc(var(--bevel) - 5px * (sqrt(2) - 1));
     --ring-inner: calc(var(--bevel) - 3px * (sqrt(2) - 1));
@@ -417,7 +422,7 @@
     );
   }
 
-  &:focus-visible::after,
+  &:focus-visible:not([tabindex='-1'])::after,
   &:has(> [data-focus-parent]:focus-visible)::after {
     content: '';
     position: absolute;
