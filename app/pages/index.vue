@@ -450,7 +450,6 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 24px;
-  overflow: hidden;
   margin-bottom: 22px;
   padding-right: 26px;
   border-radius: var(--radius);
@@ -458,9 +457,16 @@ onMounted(() => {
   background: linear-gradient(96deg, color-mix(in oklab, var(--coin) 8%, var(--surface)), var(--surface) 46%);
 }
 
+/**
+ * The mark rounds its own corners, one border inside the panel's, where the
+ * panel used to clip it with `overflow: hidden`. That clip also cut the focus
+ * ring of the actions: on a phone they wrap onto the panel's left and bottom
+ * edges, and GIVE UP lost the left of its ring, RESUME the bottom.
+ */
 .hub__resume-mark {
   align-self: stretch;
   width: 4px;
+  border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px);
   background: var(--coin);
 }
 
@@ -546,8 +552,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.hub__give-up:hover,
-.hub__give-up:focus-visible {
+.hub__give-up:hover {
   color: var(--deficit);
 }
 
@@ -752,8 +757,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.hub__button:hover,
-.hub__button:focus-visible {
+.hub__button:hover {
   color: var(--text);
   border-color: var(--accent);
 }
@@ -764,8 +768,7 @@ onMounted(() => {
   border-color: var(--type);
 }
 
-.hub__button--type:hover,
-.hub__button--type:focus-visible {
+.hub__button--type:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--type) 82%, var(--text));
 }
@@ -776,8 +779,7 @@ onMounted(() => {
   border-color: var(--forge);
 }
 
-.hub__button--daily:hover,
-.hub__button--daily:focus-visible {
+.hub__button--daily:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--forge) 82%, var(--text));
 }
@@ -788,8 +790,7 @@ onMounted(() => {
   border-color: var(--coin);
 }
 
-.hub__button--warm:hover,
-.hub__button--warm:focus-visible {
+.hub__button--warm:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--coin) 82%, var(--text));
 }

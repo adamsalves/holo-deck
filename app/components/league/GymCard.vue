@@ -78,6 +78,7 @@ const generation = computed(() => t('generation.label', {
       :to="localePath(`/battle/${leader.gym}`)"
       class="gym__link"
       :aria-label="label"
+      data-focus-parent
     />
 
     <div
@@ -199,10 +200,14 @@ const generation = computed(() => t('generation.label', {
  * Altura fixa, como a prancha: as dez células da trilha são uma fileira, e uma
  * carta que crescesse com o tamanho do time faria a linha subir e descer entre
  * as faixas A, B e C — 3, 4 e 6 Pokémon.
+ *
+ * No `overflow: hidden`, and the card looks the same without it: the bevel
+ * already cuts everything the card paints, and the glow fades out before the
+ * edge. What the scroll box cut was the focus ring — the link that covers the
+ * card is `data-focus-parent`, so the card draws the ring outside itself.
  */
 .gym {
   position: relative;
-  overflow: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -217,11 +222,6 @@ const generation = computed(() => t('generation.label', {
   position: absolute;
   inset: 0;
   z-index: 1;
-}
-
-.gym__link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -3px;
 }
 
 /* O brilho do tipo atrás da arte — o mesmo mecanismo do resto do sistema:

@@ -1088,8 +1088,7 @@ function fallbackSprite(event: Event, id: number): void {
   cursor: not-allowed;
 }
 
-.battle__item:not(:disabled):hover,
-.battle__item:focus-visible {
+.battle__item:not(:disabled):hover {
   border-color: var(--accent);
   color: var(--text);
 }
@@ -1169,14 +1168,12 @@ function fallbackSprite(event: Event, id: number): void {
   border-color: var(--accent);
 }
 
-.battle__button:hover,
-.battle__button:focus-visible {
+.battle__button:hover {
   color: var(--text);
   border-color: var(--accent);
 }
 
-.battle__button--primary:hover,
-.battle__button--primary:focus-visible {
+.battle__button--primary:hover {
   color: var(--bg);
   background: color-mix(in oklab, var(--accent) 82%, var(--text));
 }
@@ -1243,8 +1240,7 @@ function fallbackSprite(event: Event, id: number): void {
   max-height: 40px;
 }
 
-.battle__pill:not(:disabled):hover,
-.battle__pill:focus-visible {
+.battle__pill:not(:disabled):hover {
   border-color: var(--accent);
 }
 

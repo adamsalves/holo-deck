@@ -106,9 +106,4 @@ const dismissed = ref(false)
   border-radius: var(--radius);
   cursor: pointer;
 }
-
-.save-notice__dismiss:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 </style>

@@ -307,8 +307,7 @@ useSeoMeta({
   gap: 24px;
 }
 
-.region-header__back:hover,
-.region-header__back:focus-visible {
+.region-header__back:hover {
   color: var(--accent);
 }
 

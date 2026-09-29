@@ -515,11 +515,6 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
   font-size: 12px;
 }
 
-.deck__search input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .deck__chip {
   padding: 5px 10px;
   border-radius: 2px;
@@ -534,11 +529,6 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
   color: var(--accent);
   border-color: color-mix(in oklab, var(--accent) 55%, transparent);
   background: color-mix(in oklab, var(--accent) 9%, transparent);
-}
-
-.deck__chip:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .deck__picks {
@@ -564,6 +554,13 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 .deck__picks > li {
   content-visibility: auto;
   contain-intrinsic-size: auto 108px;
+
+  /* Five pixels of room inside the item, handed back by the margin. The paint
+     containment `content-visibility` brings cuts whatever leaves the item's
+     box, and a pick's focus ring stands 5px outside the tile. The rows keep
+     their size; two items overlap only inside the gap between their tiles. */
+  margin: -5px;
+  padding: 5px;
 }
 
 /**
@@ -598,11 +595,6 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
 .deck__pick:hover:not(:disabled) {
   border-color: var(--accent);
-}
-
-.deck__pick:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .deck__pick-number {

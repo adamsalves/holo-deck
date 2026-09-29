@@ -198,13 +198,18 @@ function clear() {
  * A margem negativa e o respiro fazem a faixa sangrar até a borda do viewport:
  * um chip cortado no meio da margem parece defeito, cortado na borda parece
  * rolagem.
+ *
+ * Six pixels above and below, because a scroll box cuts whatever leaves its
+ * padding, and a chip's focus ring stands 5px out: at 2px only its two sides
+ * were left. The same room keeps the search's ring clear — the chips began 2px
+ * under the search, and painted over the bottom of its ring.
  */
 @media (max-width: 767px) {
   .filters {
     flex-wrap: nowrap;
     overflow-x: auto;
     margin: 0 -24px;
-    padding: 2px 24px;
+    padding: 6px 24px;
     scrollbar-width: none;
   }
 
@@ -291,10 +296,5 @@ function clear() {
   background: color-mix(in oklab, var(--type) 10%, transparent);
   color: var(--text-body);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--type) 45%, transparent);
-}
-
-.filters__type:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 </style>

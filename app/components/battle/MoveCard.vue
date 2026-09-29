@@ -130,11 +130,6 @@ const detail = computed(() => {
   background: var(--surface-raised);
 }
 
-.move:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 /* O slot gasto continua uma jogada — o motor o resolve em Struggle. O que a cor
    diz é que o golpe escrito ali não é o que vai sair; quem diz o que sai é o
    aviso `SEM PP · STRUGGLE`, na linha do multiplicador. Sem `not-allowed`: o

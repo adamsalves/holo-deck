@@ -165,8 +165,7 @@ function nameOf(node: EvolutionNode): string {
   text-decoration: none;
 }
 
-.chain__card:hover,
-.chain__card:focus-visible {
+.chain__card:hover {
   border-color: var(--border-strong);
 }
 

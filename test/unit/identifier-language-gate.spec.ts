@@ -51,7 +51,7 @@ const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'crypto', 'css', 'ctx', 'cwd',
   'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
   'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'subtree', 'ui', 'uid',
-  'uint', 'url',
+  'uint', 'url', 'viewport',
 ]
 
 /** The tools, by their own names. */
