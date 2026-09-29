@@ -66,6 +66,14 @@ defineShortcuts({
     open.value = !open.value
   },
 })
+
+/**
+ * The ring of `main.css` for the palette's Close, as utilities — the same string
+ * as the Detail's tabs, and the focus gate measures both. Nuxt UI's own ring is
+ * a quarter of the primary colour: 2.16:1, measured on this button. The field
+ * keeps its `focus:outline-none`, the one control left without the ring.
+ */
+const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-(--focus)'
 </script>
 
 <template>
@@ -113,6 +121,7 @@ defineShortcuts({
     <template #content>
       <UCommandPalette
         close
+        :ui="{ close: FOCUS_RING }"
         :groups="groups"
         :loading="loading"
         :placeholder="t('dex.search.placeholder')"
