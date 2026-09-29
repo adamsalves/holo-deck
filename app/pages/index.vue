@@ -450,7 +450,6 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 24px;
-  overflow: hidden;
   margin-bottom: 22px;
   padding-right: 26px;
   border-radius: var(--radius);
@@ -458,9 +457,16 @@ onMounted(() => {
   background: linear-gradient(96deg, color-mix(in oklab, var(--coin) 8%, var(--surface)), var(--surface) 46%);
 }
 
+/**
+ * The mark rounds its own corners, one border inside the panel's, where the
+ * panel used to clip it with `overflow: hidden`. That clip also cut the focus
+ * ring of the actions: on a phone they wrap onto the panel's left and bottom
+ * edges, and GIVE UP lost the left of its ring, RESUME the bottom.
+ */
 .hub__resume-mark {
   align-self: stretch;
   width: 4px;
+  border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px);
   background: var(--coin);
 }
 
