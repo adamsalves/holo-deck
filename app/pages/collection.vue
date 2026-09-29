@@ -613,6 +613,13 @@ useSeoMeta({
   color: var(--text);
 }
 
+/* One pixel apart, each on its own fill: the next suggestion painted over the
+   bottom of the ring, which stands 5px out. On focus this one goes on top. */
+.collection__suggestion:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
 .collection__target {
   display: flex;
   align-items: center;
