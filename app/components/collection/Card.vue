@@ -202,10 +202,17 @@ const label = computed(() => [
 }
 
 /* O degrau que a `PokeCard` publica: a camada do link é `z-index: 1`, e o rodapé
-   com ação sobe para 2 para receber o próprio clique. */
+   com ação sobe para 2 para receber o próprio clique.
+
+   The target is 24px tall (WCAG 2.5.8) where the footer line is 16.8: the box
+   grows by 7.2px, the button centres its text in it, and the margin gives the
+   growth back — 3.6px off each side — so the text, the row and the card sit where
+   they did. */
 .binder-card__scrap {
   position: relative;
   z-index: 2;
+  min-height: 24px;
+  margin: 0.4px 0 -3.6px;
   color: var(--text-muted);
   background: transparent;
   border: 0;

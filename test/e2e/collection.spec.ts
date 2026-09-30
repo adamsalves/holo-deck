@@ -622,6 +622,12 @@ test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', asy
   const scrap = page.locator('.binder-card__scrap').first()
   await expect(scrap).toBeVisible({ timeout: 15_000 })
 
+  // The name a screen reader hears has to hold what the line draws (WCAG 2.5.3).
+  // It opened with `Transformar 2 duplicatas de …` over a line that reads
+  // `2 dup · 10 pó`, and a speech-input user could not say what they saw.
+  const drawn = (await scrap.innerText()).replaceAll(/\s+/g, ' ').trim()
+  expect(await scrap.getAttribute('aria-label'), 'the name must hold what the line draws').toContain(drawn)
+
   await scrap.click()
 
   // O clique moeu, e **não** navegou: continuamos no binder, e a linha sumiu

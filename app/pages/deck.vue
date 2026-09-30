@@ -154,6 +154,18 @@ function removeTarget(index: number): HTMLElement | null {
     : slotList.value?.children[at]?.querySelector<HTMLElement>('.deck-slot__remove') ?? null
 }
 
+/**
+ * `#0002` — what a pick draws, and the start of what its name says.
+ *
+ * The button is named `Escalar #0002 Ivysaur` because a name that leaves out what
+ * is drawn (`Escalar Ivysaur` over `#0002 Ivysaur`) is one a speech-input user
+ * cannot say: WCAG 2.5.3, *Label in name*. One function writes both, so the two
+ * cannot drift.
+ */
+function dexNumber(entry: SearchEntry): string {
+  return `#${String(entry.id).padStart(4, '0')}`
+}
+
 function onDrop(slot: number, id: number): void {
   if (!isSpeciesId(id) || !collection.has(id)) return
   deck.place(slot, id)
@@ -400,12 +412,12 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               class="deck__pick bevel-tile"
               draggable="true"
               :disabled="firstEmpty < 0"
-              :aria-label="t('deck.collection.pickLabel', { name: entry.displayName })"
+              :aria-label="t('deck.collection.pickLabel', { number: dexNumber(entry), name: entry.displayName })"
               @click="pick(entry)"
               @dragstart="event => onDragStart(event, entry)"
             >
               <span class="numeric deck__pick-number">
-                #{{ String(entry.id).padStart(4, '0') }}
+                {{ dexNumber(entry) }}
               </span>
               <!-- `draggable="false"`: a imagem é arrastável por padrão, e o
                    `dragstart` dela carregaria a URL do sprite no `dataTransfer`.

@@ -233,7 +233,7 @@
       "shinyBadge": "SHINY",
       "scrap": "{count} dup · {dust}",
       "dustAmount": "{dust} pó",
-      "scrapLabel": "Transformar {count} duplicata de {name} em {dust} de pó | Transformar {count} duplicatas de {name} em {dust} de pó"
+      "scrapLabel": "{count} dup · {dust} pó, transformar {count} duplicata de {name} em pó | {count} dup · {dust} pó, transformar {count} duplicatas de {name} em pó"
     },
     "progress": {
       "valueText": "{progress} capturados"
@@ -269,14 +269,15 @@
       "all": "TODAS",
       "empty": "Sua coleção está vazia. Abra um pack para começar.",
       "noMatch": "Nenhuma carta combina com esse filtro.",
-      "pickLabel": "Escalar {name}",
+      "pickLabel": "Escalar {number} {name}",
       "hint": "Clique para escalar, ou arraste para um slot. Cartas já no deck saem da lista.",
       "loading": "Carregando sua coleção…"
     },
     "slot": {
       "takes": "LEVA {multiplier}",
       "hint": "ARRASTE{break}UMA CARTA",
-      "removeLabel": "Tirar {name} do slot {slot}"
+      "removeLabel": "Tirar {name} do slot {slot}",
+      "linkLabel": "{name}, slot {slot}, {types}, {rarity}"
     }
   },
   "ailment": {

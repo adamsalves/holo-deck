@@ -2,10 +2,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { ENGINE_VERSION } from '../../shared/game/battle.ts'
-import { PACK_PRICE } from '../../shared/game/economy.ts'
 import { hasExtension, pageAddresses, REPO_ROOT, stripComments, walkFiles } from '../support/source-tree'
-import { DEX_VERSION, fakeSync, saveWith, seedSynced } from './support'
+import { openScene, pageScene, STATES } from './support'
 
 /**
  * Every keyboard stop of every page draws the ring — measured in pixels, never
@@ -31,114 +29,6 @@ import { DEX_VERSION, fakeSync, saveWith, seedSynced } from './support'
  * behind a tab, which the Tab key alone never reaches, and every stop of the
  * states in `STATES`, which no page's own save draws.
  */
-
-/** The team of the page-structure gate: six commons, so no invite opens. */
-const TEAM = [1, 4, 7, 10, 16, 25]
-
-/** Two cards more than the team, so the deck's pick list has something to field. */
-const OWNED = [...TEAM, 2, 5]
-
-/**
- * A full deck everywhere — the battle needs one to land on the fight — except on
- * the deck page, where a full deck disables every pick and takes them out of
- * the tab order: the picks, inside a list that cuts what leaves its items, are
- * one of the two places the ring disappeared. And duplicates on the collection
- * page, where each card offers its spares to scrap.
- */
-function saveFor(path: string): Record<string, unknown> {
-  return saveWith({
-    collection: Object.fromEntries(OWNED.map(id => [id, { c: path.endsWith('/collection') ? 3 : 1, s: 0 }])),
-    deck: path.endsWith('/deck') ? [...TEAM.slice(0, 5), null] : TEAM,
-    // The three packs of the shop open: a welcome pack left, the daily one due,
-    // and coins for the one on sale.
-    progress: { pity: 0, welcomeClaimed: 0, coins: PACK_PRICE * 2, badges: 0, dailyClaimed: null },
-  })
-}
-
-/** A state the walk goes through: a page, the save it opens with, and what brings the state about. */
-interface Scene {
-  readonly name: string
-  readonly address: string
-  readonly save: Record<string, unknown>
-  /** What shows the state is on the screen, waited for before the walk. */
-  readonly ready?: string
-  /** An account, or a session answered as none, before the page opens. */
-  readonly before?: (page: Page) => Promise<unknown>
-  /** What brings the state about once the page is up. */
-  readonly open?: (page: Page) => Promise<unknown>
-  /** Only here may the invite open: anywhere else it would sit over the page. */
-  readonly invite?: true
-  /**
-   * What takes the focus here and draws no ring, by decision, and why. Each is
-   * measured for that — no ring anywhere around it —, and each has to come up.
-   */
-  readonly noRing?: Readonly<Record<string, string>>
-}
-
-/** A fight against the first leader, as a save records one. */
-const FIGHT = { gymId: 1, seed: 7, engineVersion: ENGINE_VERSION, dexVersion: DEX_VERSION, team: TEAM, actions: [] }
-
-const NO_DECK = [null, null, null, null, null, null]
-
-/**
- * The states no page's own save draws. Each is here for a control that a
- * `:hover` rule styles and that lives only there — `hoverClasses` holds the walk
- * to that —, or for a control measured nowhere else: the palette's Close, and
- * the invite, whose sheet drew a ring once the bevel did.
- */
-const STATES: readonly Scene[] = [
-  { name: 'the Hub with a fight on', address: '/', save: { ...saveFor('/'), battle: FIGHT }, ready: '.hub__give-up' },
-  { name: 'the League with a deck to finish', address: '/league', save: { ...saveFor('/league'), deck: NO_DECK }, ready: '.league__action--empty' },
-  {
-    name: 'a gym while another fight is on',
-    address: '/battle/2',
-    save: { ...saveFor('/battle/2'), progress: { pity: 0, welcomeClaimed: 0, coins: 0, badges: 1, dailyClaimed: null }, battle: FIGHT },
-    ready: '.battle__standing',
-  },
-  {
-    name: 'the forge with a search typed',
-    address: '/collection',
-    save: saveFor('/collection'),
-    // The walk starts at the first suggestion and goes on to the end of the page.
-    // The field behind it is measured empty on the page itself: holding a search,
-    // a `type="search"` field shows the browser's own clear button under focus.
-    open: async (page) => {
-      await page.locator('#forge-search').fill('char')
-      await page.keyboard.press('Tab')
-      await expect(page.locator('.collection__suggestion').first()).toBeFocused()
-    },
-  },
-  {
-    name: 'the search palette',
-    address: '/pokedex/1',
-    save: saveFor('/pokedex/1'),
-    open: async (page) => {
-      await page.locator('.dex-search__trigger').focus()
-      await page.keyboard.press('Enter')
-      await expect(page.locator('[role="dialog"] input')).toBeFocused()
-    },
-    noRing: { '[role="dialog"] input': 'the palette\'s field keeps Nuxt UI\'s `focus:outline-none`, and the caret marks it' },
-  },
-  {
-    name: 'the account invite',
-    address: '/',
-    save: { ...saveFor('/'), progress: { pity: 0, welcomeClaimed: 3, coins: 300, badges: 1, dailyClaimed: null } },
-    before: page => page.route('**/api/auth/get-session', route => route.fulfill({ json: null })),
-    invite: true,
-    open: page => expect(page.locator('.invite__card')).toBeFocused(),
-    noRing: { '.invite__card': 'the sheet takes the focus to be read out, and is no stop of the Tab key: the *Convite de conta* board draws no ring on it' },
-  },
-  {
-    name: 'an account',
-    address: '/settings',
-    save: saveFor('/settings'),
-    before: async (page) => {
-      await fakeSync(page, saveFor('/settings'))
-      await seedSynced(page, { base: 1 })
-    },
-    ready: '.account__out',
-  },
-]
 
 /**
  * The one control that moves under focus, by name: the skip link slides in. Any
@@ -585,13 +475,6 @@ async function measure(
   return { failures, moved }
 }
 
-/** Each page of `app/pages`, as its own save draws it. */
-function pageScene(address: string): Scene {
-  const scene: Scene = { name: address, address, save: saveFor(address) }
-  if (address.startsWith('/battle/')) return { ...scene, open: page => expect(page.locator('.combatant'), 'the battle is being fought').toHaveCount(2) }
-  return scene
-}
-
 for (const pass of PASSES) {
   test(`every keyboard stop draws the ring${pass.title}`, async ({ context, baseURL }) => {
     test.setTimeout(480_000)
@@ -612,24 +495,7 @@ for (const pass of PASSES) {
       const page = await context.newPage()
       await page.setViewportSize(pass.viewport)
       await page.emulateMedia({ forcedColors: pass.forcedColors })
-      // The ring does not depend on another host, and the barrier below would wait
-      // for the slowest of them.
-      await page.route(url => url.origin !== origin, route => route.abort())
-      await scene.before?.(page)
-      // On every navigation, the scene's save: it lands in the state it is
-      // measured in, whatever the page wrote before.
-      await page.addInitScript(({ save, invite }) => {
-        window.localStorage.setItem('holodeck:save', JSON.stringify(save))
-        if (invite) window.localStorage.removeItem('holodeck:invite')
-        else window.localStorage.setItem('holodeck:invite', '1')
-      }, { save: scene.save, invite: scene.invite === true })
-
-      await page.goto(scene.address)
-      await page.waitForLoadState('networkidle')
-      await scene.open?.(page)
-      if (scene.ready !== undefined) {
-        await expect(page.locator(scene.ready).first(), `${scene.name}: the state is not on the screen`).toBeVisible()
-      }
+      await openScene(page, scene, { origin })
 
       const focus = pass.forcedColors === 'active'
         ? null

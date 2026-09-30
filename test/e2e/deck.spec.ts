@@ -67,6 +67,13 @@ test('a carta sai da coleção, entra num slot e sobrevive ao reload', async ({ 
 
   const before = await picks.count()
   const firstPickLabel = (await picks.first().getAttribute('aria-label')) ?? ''
+
+  // What a screen reader hears has to hold what the pick draws — `#0002 Ivysaur`
+  // —, or a speech-input user cannot say what they see (WCAG 2.5.3). The name was
+  // `Escalar Ivysaur` and dropped the number.
+  const drawn = (await picks.first().innerText()).replaceAll(/\s+/g, ' ').trim()
+  expect(firstPickLabel, 'the name must hold what the pick draws').toContain(drawn)
+
   await picks.first().click()
 
   // Um slot a menos vazio, e a carta saiu da lista: "cartas já no deck saem da

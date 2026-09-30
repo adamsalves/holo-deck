@@ -229,6 +229,7 @@ const IDENTICAL_LABELS: readonly string[] = [
   'collection.title',
   'condition.paralysis',
   'deck.seo.title',
+  'deck.slot.linkLabel',
   'deck.slotsCount',
   'dex.bst',
   'dex.card.shiny',
