@@ -489,7 +489,7 @@ forma que o `CLAUDE.md` nomeia: asserção que lê a mesma fonte que o código l
 | `dragon` em `#966BFF`, e não no valor do canvas | é o único dos 18 tipos que reprova AA sobre painel (3,99 em `--surface-raised`). A issue #11 dizia que a Fase 6 decidiria, e ela decidiu **limpar a exceção em vez de carregá-la** — não porque um consumidor tenha chegado (nenhuma tela pinta nome de tipo na cor do tipo), mas porque a alternativa obrigaria o portão a saber em qual superfície cada texto cai, sem traçar a cascata. O preço foram 3 pontos de L; o que se compra é `18 × 5 ≥ AA` sem exceção para consultar |
 | *Deck* em stats de Lv50, não em base stat | a prancha escrevia `HP 35` e a *Batalha* `110` para o mesmo Pikachu. O deck é onde se decide quem entra em campo, então ele mostra o que entra; a *Detalhe* segue em base stat, e lá a aba **se chama** *Base stats*. A prancha *Deck* foi corrigida |
 | `/deck` sem botão SALVAR | a prancha desenha um, cinza. O save é gravado a cada mutação — um botão que não salva nada é pior que nenhum, e um que salvasse exigiria um estado "não salvo" que o jogo não tem |
-| `×2` de efetividade fora da carta do deck | a prancha o põe na linha do número de cada carta; ele está na coluna de cobertura logo abaixo, por tipo, que é onde informa mais — duas cartas do mesmo tipo dão a mesma linha. Na carta ficou o que muda decisão: a faixa `LEVA ×2` |
+| `×2` de efetividade só nos tiles da lista da prancha, e em tile nenhum do código | na v22 da prancha *Deck* o `×2` saiu da carta do deck e ficou nos tiles da lista da direita. O código não o desenha em nenhum dos dois: a efetividade está na coluna de cobertura, por tipo, que é onde informa mais — duas cartas do mesmo tipo dão a mesma linha —, e na carta do deck ficou o que muda decisão, a faixa `LEVA ×2`. Os tiles da lista seguem sem ele |
 | chip de resumo em `--accent`, não no amarelo de terrestre | a prancha usa um primitivo de tipo para um aviso, e o portão de token recusa: cor de tipo é preenchimento de tipo. A tela já tem dois níveis — `--deficit` no risco concreto, `--accent` no resumo |
 
 ### Decidido no PR da Liga, contra o que a prancha desenhava
@@ -1722,8 +1722,11 @@ embaixo, e o painel de retomar luta do Hub, cujo `overflow: hidden` cortava o an
 das ações quando elas quebram linha e encostam na borda. Ali o portão cobra o anel
 presente e a folga e o lado de fora iguais ao repouso. Onde o anel fica e o interior
 são o mesmo CSS em toda largura e são medidos a 1280: no celular, uma posição
-fracionária empurra o anel pintado até 0,88 px para fora, e o × de um slot do deck
-sai rasterizado diferente quando o anel da carta passa por cima dele.
+fracionária empurrava o anel pintado do botão de moer até 0,88 px para fora, e o ×
+de um slot do deck sai rasterizado diferente quando o anel da carta passa por cima
+dele. Medido de novo no 6b-2, lendo também as bordas e o interior a 360 px, com o
+botão de moer e o × de 24 px: o botão de moer passa, e o × do primeiro slot ainda
+muda 16 pixels sob o anel da carta. A leitura a 360 px segue como está.
 
 Cada defeito foi reintroduzido e reprovou com a sua mensagem: o chanfro sem o anel,
 as abas com o anel do Nuxt UI, os links sem o `a:`, a carta com o retângulo que a
@@ -1746,12 +1749,101 @@ caminhada foca. O menor hover real mudou 231 pixels dentro do controle.
 conflito — a tela *Duas coleções*, os avisos de save e de conflito, a abertura de
 pack, a troca forçada e o fim da batalha. As regras de foco desses controles foram
 alinhadas lendo o código; o review do PR #77 mediu cada um uma vez, com o mesmo
-`measure()`, menos o aviso de conflito. E o campo da paleta de busca segue com o
-`focus:outline-none` do Nuxt UI: é a única exceção, e o portão a cobra pelo nome,
-como cobra a folha do convite, que recebe o foco para ser lida e não é parada do
-Tab — nas duas, nenhum anel. E a barra do topo, que no celular mede 217 px, fica
-presa em cima e cobre o controle focado (#78): enquanto isso, o portão centraliza
-cada parada na área que ela deixa, como um `scroll-padding-top` faria.
+`measure()`, menos o aviso de conflito. (O **foco** desses controles é outro
+assunto, e o censo de [`keyboard-focus.spec.ts`](test/e2e/keyboard-focus.spec.ts)
+o cobra: a abertura de pack, a troca forçada e o fim da batalha entram nele; o
+anel, não.) E o campo da paleta de busca segue com o `focus:outline-none` do Nuxt
+UI: é a única exceção, e o portão a cobra pelo nome, como cobra a folha do
+convite, que recebe o foco para ser lida e não é parada do Tab — nas duas, nenhum
+anel. A barra do topo, que no celular mede 217 px e cobria o controle focado
+(#78), deixou de ser assunto deste portão: a página tem o seu `scroll-padding-top`,
+a altura medida da barra, e a passada a 360 px mede o real em vez de emular.
+
+### Foco depois de uma ação
+
+**O controle que o jogador acabou de usar não leva o foco embora.** Um botão que
+sai da página, ou vira `disabled`, por causa da própria ação deixava o foco no
+`<body>`, e o Tab seguinte recomeçava do topo do documento. Medido em 29/09/2026
+apertando Enter em 214 paradas: 22 faziam isso — as seis do deck e da batalha, e
+mais oito tipos de controle que ninguém tinha listado: a última poção, a revanche,
+moer, ABRIR e COMPRAR, DESISTIR no Hub e na batalha, a sugestão da forja e o
+convite. Lendo o código saíram mais duas, fora do censo: o PULAR da loja, que some
+quando a virada termina, e o FORJAR, que fica `disabled` quando o pó acaba.
+
+Uma regra só, em [`app/utils/focus.ts`](app/utils/focus.ts) (`keepFocus`): depois
+de a tela alcançar a ação, se o controle que tinha o foco saiu ou ficou
+`disabled`, o foco vai para o alvo da transição — e para o `#content` quando não há
+alvo. **Só se o controle tinha o foco antes da ação.** No Safari o clique não foca
+botão, e mover o foco arrastaria a rolagem de quem usa mouse.
+
+| onde | o foco vai para |
+|---|---|
+| batalha, depois de golpe, troca, poção, revanche ou DESISTIR E COMEÇAR ESTA | pela fase que a ação deixou: o primeiro golpe; o primeiro pill habilitado, na troca forçada; LUTAR ou TENTAR DE NOVO, no fim |
+| ESCALAR | o próximo ESCALAR (o anterior, se era o último); com o time completo, o link da carta que entrou |
+| `×` do slot | o `×` do próximo slot ocupado, o do anterior, ou o primeiro ESCALAR |
+| DESISTIR, no Hub | a ação do painel do próximo líder: DESAFIAR, ou montar o deck |
+| sugestão da forja | FORJAR, se o pó chega; senão o campo de busca |
+| FORJAR que gasta o último pó | o campo de busca |
+| moer duplicatas | o link da própria carta |
+| ABRIR, COMPRAR, ABRIR O PRÓXIMO, PULAR e o fim da virada | a ação primária da abertura (`packs__skip--primary`) |
+| VOLTAR À LOJA | o botão que abriu, ou o `#content` se ele sumiu |
+| convite fechado (Agora não, Escape) | quem tinha o foco; o `#content` se era o `<body>` ou saiu da tela |
+
+O `focused = 0` saiu de `play()` e de `again()`: o destaque acompanha o foco
+(`@focus`), e Enter no terceiro golpe deixa o terceiro aceso — antes, o foco ficava
+no terceiro e o primeiro é que acendia. O deck ganhou uma região `role="status"`,
+só falada, com três frases por idioma; o `×` do slot passou a 24 px a 4 px do
+canto, como a v22 desenha; e três nomes deixaram de dizer outra coisa que a tela:
+o link do slot, que cravava `slot N` e `' e '` e no `/en` dizia *Grass e Poison*
+(agora é do locale, com os tipos unidos por `Intl.ListFormat`); ESCALAR, que passa
+a conter o número que desenha (*Escalar #0002 Ivysaur*, WCAG 2.5.3); e moer, que
+começa pelo texto visível e ganhou alvo de 24 px (WCAG 2.5.8) sem mexer no
+repouso: a `/collection` sai idêntica byte a byte contra a `main`, a 1280 (1x e
+2x) e a 360, nos dois idiomas. `<NuxtRouteAnnouncer />` anuncia o título da página
+nova a cada troca de rota, e o `AppNav` mede o `header.nav` e escreve
+`--nav-height`, que o `main.css` lê em `scroll-padding-top`: 66 px a 1280, 83 a 768
+e 217 a 360.
+
+[`test/e2e/keyboard-focus.spec.ts`](test/e2e/keyboard-focus.spec.ts) segura isso de
+quatro lados. O **censo** aperta Enter em um botão de cada tipo, em cada estado, num
+contexto novo, e cobra que o foco não termine no `<body>`, desconectado ou
+`disabled`; os estados são os de `sceneList` (as páginas, os estados que nenhum
+save desenha e os fundos: um golpe de cada fase da luta, a abertura do pack virando
+e revelada, o deck com vaga, a forja com o pó exato). Os tipos vêm do disco
+([`test/support/buttons.ts`](test/support/buttons.ts)): todo `<button>` de `app/` foi
+apertado, ou está nomeado com o motivo. Os **alvos** do deck e da batalha, e os da
+loja e da forja, são cobrados pelo nome, porque fora do `<body>` é só o piso. O
+**anunciador** cobra a região não vazia e diferente entre duas navegações; e a
+**barra** cobra, a 360 px e com Shift+Tab, que nenhuma parada fique inteira sob ela.
+Uma cena abre com o cliente já de posse da página (`isHydrating`), porque um Enter
+antes disso não roda handler e o portão passaria sobre um defeito que não chegou a
+acontecer.
+
+Contra a `main`, o censo acha 26 perdas em 49 paradas; na árvore consertada,
+nenhuma. Com um worker, o arquivo leva 2,5 min. Cada defeito foi reintroduzido e
+reprovou com a sua mensagem: a chamada do helper tirada do Hub, um `<button>` novo
+num estado sem cena, o anunciador fora, o `scroll-padding` fora, o `focused = 0` de
+volta, o `' e '` de volta, a guarda do convite que o impede de tomar o foco em toda
+carga de página — que a comparação de pixels do binder achou primeiro —, e o helper
+mexendo no foco de quem não o tinha.
+
+**O que ele não alcança:**
+
+- `SaveRecoveryNotice`, `SyncConflictNotice`, `SaveChoice` e o restaurar da versão
+  anterior das Ajustes: nenhuma cena os desenha (pedem um save ilegível, um 409, duas
+  coleções, uma conta com versão anterior), e o botão de cada um sai da página como
+  os outros. Estão em `NO_SCENE`, com o motivo. **Não foram consertados nesta fase.**
+- BAIXAR, em Ajustes, divide as classes com EXPORTAR, e a linha nem existe sem o
+  service worker, que o e2e bloqueia. Pelo template, o clique troca o botão pelo
+  indicador de progresso, e o foco deve cair no `<body>`: não foi medido, e o censo
+  não vê. IMPORTAR é um `<label>`, e não entra: o censo é de `<button>`.
+- A identidade de um tipo é a classe: dois botões com as mesmas classes são um
+  tipo só, e apertar um vale pelos dois (EXPORTAR e BAIXAR; SAIR e restaurar uma
+  cópia). O censo prova o tipo, não cada `<button>` do código.
+- A batalha não tem `#content` (`layout: false`): o convite fechado depois de uma
+  vitória, que abre por cima do golpe que já saiu da tela, deixa o foco no `<body>`.
+- O Safari é medido só pelo `click()` de um script, que roda o handler e não move o
+  foco, como o clique dele. O motor não é o do Safari.
 
 ## Offline
 
