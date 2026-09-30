@@ -49,6 +49,15 @@ const PAGES = 'app/pages'
 const DEVELOPMENT_ONLY = new Set(['/styleguide'])
 
 /**
+ * The files of `app/pages` the build leaves out, from the same list that keeps
+ * their addresses out of `pageAddresses` — a gate that reads the templates of
+ * `app/` has to leave them out too, and one list is what keeps the two agreeing.
+ */
+export function developmentOnlyPages(): string[] {
+  return [...DEVELOPMENT_ONLY].map(address => `${PAGES}${address}.vue`)
+}
+
+/**
  * One address per page of `app/pages`, read from the disk: a page added later is
  * measured without anyone remembering to add it here. A parameter nobody gave a
  * sample for fails instead of being skipped.

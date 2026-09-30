@@ -851,7 +851,10 @@ export function sceneList(fights: Fights): Scene[] {
       save: saveFor('/packs'),
       open: async (page) => {
         await opening(page)
-        await page.locator('.packs__skip:not(.packs__skip--primary)').first().click()
+        // By class and not by name: the scene is opened in every language, and
+        // the first button of the row that is not the primary one is the skip —
+        // the link to the collection is an `<a>`.
+        await page.locator('button.packs__skip:not(.packs__skip--primary)').first().click()
         await expect(page.locator('.packs__skip--primary')).toBeVisible()
       },
     },

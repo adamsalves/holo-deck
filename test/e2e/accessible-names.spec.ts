@@ -7,25 +7,20 @@ import { openScene, pageScene, recordFights, sceneList } from './support'
  * Every accessible name of a translated screen is in its language: the
  * `aria-label` and the `alt` of every element, on every state the game draws.
  *
- * **Nothing read them.** The language sweeps read text — `screenText()` walks
- * text nodes, `innerText` what the CSS draws — and a name is an attribute. The
- * card links of the deck said *Grass e Poison* in English, a Portuguese
- * conjunction in the middle of an English sentence, and every sweep of the
- * suite was green over it: `Slot.vue` wrote `slot ${n}` and joined the types
- * with `' e '` itself, where the other three card labels take both from the
- * locale.
+ * **Nothing read them.** The language sweeps read text, and a name is an
+ * attribute: the card links of the deck said *Grass e Poison* in English, and
+ * every sweep of the suite was green over it. `Slot.vue` wrote `slot ${n}` and
+ * joined the types with `' e '` itself, where the other three card labels take
+ * both from the locale.
  *
  * Measured on 30/09/2026, before this was written, on the build of `main`: 24
- * states of `/en` — the twelve pages, the seven states no page draws, and five
- * deep ones — hold 321 `aria-label`s and 41 `alt`s with something in them, 142
- * different values among them, plus 163 empty `alt`s, the images that say they
- * are decoration. One source spoke Portuguese: the card links of the deck, five
- * labels with `slot N` in all of them and the *e* in two. The list of what to
- * look for is the one every language sweep uses, `defaultOnlyLabels`, and it
- * matches only those two of the 142 — through a label one letter long, the *e*
- * of `rules.league.and`. That is why the detector is asked, below, whether it
- * still sees that word: a sweep whose only catch hangs on one letter is one
- * translator away from seeing nothing.
+ * states of `/en` hold 321 `aria-label`s and 41 `alt`s with something in them,
+ * 142 different values among them, plus 163 empty `alt`s (decoration). One
+ * source spoke Portuguese, the deck's card links. The list to look for is the one
+ * every language sweep uses, `defaultOnlyLabels`, and only 2 of the 142 values
+ * match it — through a label one letter long, the *e* of `rules.league.and`. So
+ * the detector is asked, below, whether it still sees that word: a sweep whose
+ * only catch hangs on one letter is one translator away from seeing nothing.
  *
  * The states are `sceneList`, the same that the ring and the census walk.
  */
