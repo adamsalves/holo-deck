@@ -243,6 +243,11 @@
     "eyebrow": "Montagem de deck",
     "title": "Seu time",
     "slotsCount": "{filled} / {total} slots",
+    "status": {
+      "joined": "{name} entrou no slot {slot}.",
+      "left": "{name} saiu do slot {slot}.",
+      "complete": "Time completo."
+    },
     "loading": "Carregando seu deck…",
     "seo": {
       "title": "Deck"

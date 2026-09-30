@@ -243,6 +243,11 @@
     "eyebrow": "Deck building",
     "title": "Your team",
     "slotsCount": "{filled} / {total} slots",
+    "status": {
+      "joined": "{name} joined slot {slot}.",
+      "left": "{name} left slot {slot}.",
+      "complete": "Team complete."
+    },
     "loading": "Loading your deck…",
     "seo": {
       "title": "Deck"

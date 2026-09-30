@@ -97,14 +97,30 @@ function pick(entry: SearchEntry): void {
   const at = visible.value.findIndex(item => item.id === entry.id)
   deck.place(slot, entry.id)
 
+  const joined = t('deck.status.joined', { name: entry.displayName, slot: slot + 1 })
+  status.value = deck.filled === DECK_SIZE ? `${joined} ${t('deck.status.complete')}` : joined
+
   void keepFocus(() => (deck.filled === DECK_SIZE ? slotLink(slot) : nextPick(at)))
 }
 
 function clearSlot(index: number): void {
+  const name = view.slots.value[index]?.entry?.displayName
   deck.clear(index)
+
+  if (name !== undefined) status.value = t('deck.status.left', { name, slot: index + 1 })
 
   void keepFocus(() => removeTarget(index))
 }
+
+/**
+ * What a screen reader is told when a card changes sides.
+ *
+ * The tiles trade places and the counter above them moves, and nothing on the
+ * screen says so out loud: the board draws no message for it, so this one is
+ * only heard. It sits in the page from the start, empty — a live region that
+ * is born with its text is not announced by every reader.
+ */
+const status = ref('')
 
 const slotList = useTemplateRef<HTMLElement>('slotList')
 const pickList = useTemplateRef<HTMLElement>('pickList')
@@ -151,6 +167,13 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
 <template>
   <main class="deck">
+    <p
+      role="status"
+      class="sr-only"
+    >
+      {{ status }}
+    </p>
+
     <div class="deck__main">
       <ClientOnly>
         <header class="mb-7 flex items-end justify-between gap-4">
