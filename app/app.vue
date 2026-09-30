@@ -118,6 +118,13 @@ if (import.meta.server && route.path === '/') {
 
 <template>
   <UApp :locale="uiLocale">
+    <!-- A route change is silent for a screen reader: the link that took the player
+         there is gone with its page, and nothing says where they landed. Nuxt's
+         announcer writes the new page's `<title>` into a live region on every
+         route change. It is outside `<ClientOnly>` on purpose — a region has to be
+         in the document before its text arrives. -->
+    <NuxtRouteAnnouncer />
+
     <!-- O aviso de save recuperado fica acima do layout e fora dele: ele é
          estado do **boot**, não de uma tela, e o jogador precisa vê-lo em
          qualquer rota que tenha aberto o jogo. `ClientOnly` porque o plugin que

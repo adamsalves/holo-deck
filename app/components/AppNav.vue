@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useElementSize } from '@vueuse/core'
+import { onBeforeUnmount, onMounted, useTemplateRef, watchEffect } from 'vue'
 import { gameNumber } from '~~/shared/game/progress'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useRoute } from 'nuxt/app'
@@ -74,6 +76,29 @@ const localePath = useLocalePath()
 const progress = useProgressStore()
 const route = useRoute()
 
+/**
+ * The bar's height, **measured**, and handed to the page as `--nav-height`.
+ *
+ * The bar sticks to the top and wraps: 66px at 1280, 83 at 768, 217 at 360 and
+ * 263 with an account, and it changes with the language too. Whatever the focus
+ * scrolls to could land under it — 22 stops in 9 states of the game did on a
+ * phone, all of them whole (#78, WCAG 2.4.11) — and `scroll-padding-top` on
+ * `<html>` is what keeps the browser from doing that. A number written in the CSS
+ * would be right at one width and one language; this one is read from the bar
+ * itself, by the same observer that watches it grow. `main.css` reads it.
+ *
+ * It is the page's, not the bar's: a route with no bar — the battle — has none
+ * to leave room for, and the property goes with the bar.
+ */
+const bar = useTemplateRef<HTMLElement>('bar')
+const { height } = useElementSize(bar, undefined, { box: 'border-box' })
+
+onMounted(() => {
+  watchEffect(() => document.documentElement.style.setProperty('--nav-height', `${height.value}px`))
+})
+
+onBeforeUnmount(() => document.documentElement.style.removeProperty('--nav-height'))
+
 /** A seção atual, por prefixo de caminho — exato só onde `exact` pede. */
 function isCurrent(link: NavLink): boolean {
   const to = localePath(link.to)
@@ -84,7 +109,10 @@ function isCurrent(link: NavLink): boolean {
 </script>
 
 <template>
-  <header class="nav">
+  <header
+    ref="bar"
+    class="nav"
+  >
     <div class="nav__side">
       <NuxtLink
         v-slot="{ href, navigate }"

@@ -161,12 +161,9 @@ function readStop(page: Page, noRing: readonly string[]): Promise<Stop | null> {
     if (!(element instanceof HTMLElement) || element === document.body) return null
 
     Reflect.set(window, 'e2eStop', element)
-    // On a phone the nav wraps to 217px and sticks, and a tall card centred on
-    // the screen had its top under it. That is #78 — focus obscured —, not
-    // the ring: the stop is centred in what the nav leaves, as the page's own
-    // `scroll-padding-top` would do.
-    const nav = document.querySelector('header.nav')
-    document.documentElement.style.scrollPaddingTop = nav === null ? '' : `${nav.getBoundingClientRect().height}px`
+    // Centred in what the sticky bar leaves: the page's own `scroll-padding-top`
+    // does that, and it used to be written here for the gate, because the page
+    // had none (#78).
     element.scrollIntoView({ block: 'center', inline: 'center' })
     // Two frames, so what the scroll brought into view is laid out: a list item
     // under `content-visibility` takes its real height only then, and a box read
