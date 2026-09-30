@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { multiplierLabel } from '~~/shared/game/typechart'
 import type { SearchEntry } from '~~/shared/types/dex'
@@ -8,6 +8,7 @@ import { isSpeciesId } from '~~/shared/types/brand'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useDeck } from '~/composables/useDeck'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 
@@ -89,8 +90,52 @@ const firstEmpty = computed(() => deck.slots.findIndex(id => id === null))
  * campo por ordem — quem quer a posição arrasta.
  */
 function pick(entry: SearchEntry): void {
-  if (firstEmpty.value < 0) return
-  deck.place(firstEmpty.value, entry.id)
+  const slot = firstEmpty.value
+  if (slot < 0) return
+
+  // Where the pick stood in the list, taken before it leaves it.
+  const at = visible.value.findIndex(item => item.id === entry.id)
+  deck.place(slot, entry.id)
+
+  void keepFocus(() => (deck.filled === DECK_SIZE ? slotLink(slot) : nextPick(at)))
+}
+
+function clearSlot(index: number): void {
+  deck.clear(index)
+
+  void keepFocus(() => removeTarget(index))
+}
+
+const slotList = useTemplateRef<HTMLElement>('slotList')
+const pickList = useTemplateRef<HTMLElement>('pickList')
+
+/**
+ * Where the keyboard goes when a card changes sides — the deck and the list are
+ * two halves of one screen, and the control that was used is gone from its half.
+ *
+ * Fielding a card takes its pick out of the list: the focus goes to the pick that
+ * slid into its place, or to the one before when it was the last. With the sixth
+ * card in, every pick is `disabled` and there is nothing to go on to — the card
+ * that just arrived is the answer. Removing goes to the next slot's ×, then the
+ * one before it, and with the deck empty back to the list, where the card went.
+ */
+function slotLink(slot: number): HTMLElement | null {
+  return slotList.value?.children[slot]?.querySelector<HTMLElement>('.poke-card__link') ?? null
+}
+
+function nextPick(at: number): HTMLElement | null {
+  const picks = Array.from(pickList.value?.querySelectorAll<HTMLElement>('.deck__pick:not(:disabled)') ?? [])
+
+  return picks[Math.min(at, picks.length - 1)] ?? null
+}
+
+function removeTarget(index: number): HTMLElement | null {
+  const occupied = deck.slots.flatMap((id, slot) => (id === null ? [] : [slot]))
+  const at = occupied.find(slot => slot > index) ?? occupied.findLast(slot => slot < index)
+
+  return at === undefined
+    ? pickList.value?.querySelector<HTMLElement>('.deck__pick:not(:disabled)') ?? null
+    : slotList.value?.children[at]?.querySelector<HTMLElement>('.deck-slot__remove') ?? null
 }
 
 function onDrop(slot: number, id: number): void {
@@ -132,7 +177,10 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           </i18n-t>
         </header>
 
-        <ul class="deck__slots">
+        <ul
+          ref="slotList"
+          class="deck__slots"
+        >
           <li
             v-for="slot in view.slots.value"
             :key="slot.index"
@@ -142,7 +190,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               :entry="slot.entry"
               :stats="slot.stats"
               :incoming="slot.entry ? incomingById.get(slot.entry.id) ?? 1 : 1"
-              @remove="deck.clear(slot.index)"
+              @remove="clearSlot(slot.index)"
               @drop="id => onDrop(slot.index, id)"
             />
           </li>
@@ -317,6 +365,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
         <ul
           v-else
+          ref="pickList"
           class="deck__picks"
         >
           <li
