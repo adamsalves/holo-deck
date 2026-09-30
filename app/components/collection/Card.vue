@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { dustFor } from '~~/shared/game/dust'
 import { gameNumber } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import { rarityKey } from '~~/shared/types/game'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 
@@ -45,7 +46,19 @@ const props = defineProps<{
   duplicates: number
 }>()
 
-defineEmits<{ scrap: [] }>()
+const emit = defineEmits<{ scrap: [] }>()
+
+const card = useTemplateRef<HTMLElement>('card')
+
+/**
+ * The scrap button is the card's own footer, and scrapping every duplicate turns
+ * it into the rarity line: the keyboard stays on the card, at its link.
+ */
+function scrap(): void {
+  emit('scrap')
+
+  void keepFocus(() => card.value?.querySelector<HTMLElement>('.poke-card__link'))
+}
 
 const rarity = computed(() => rarityFrom(props.entry))
 const dustValue = computed(() => props.duplicates * dustFor(rarity.value))
@@ -62,6 +75,7 @@ const label = computed(() => [
 
 <template>
   <article
+    ref="card"
     class="binder-card"
     :class="{ 'binder-card--shiny': isShiny }"
   >
@@ -95,7 +109,7 @@ const label = computed(() => [
             { count: duplicates, name: entry.displayName, dust: gameNumber(dustValue) },
             duplicates,
           )"
-          @click="$emit('scrap')"
+          @click="scrap"
         >
           <i18n-t
             keypath="collection.card.scrap"

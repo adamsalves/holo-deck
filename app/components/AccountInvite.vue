@@ -83,7 +83,7 @@ const stakes = computed(() => {
 const sheet = ref<HTMLElement | null>(null)
 let returnFocus: HTMLElement | null = null
 
-watch(open, async (value) => {
+watch(open, async (value, wasOpen) => {
   if (value) {
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     await nextTick()
@@ -91,8 +91,19 @@ watch(open, async (value) => {
     return
   }
 
-  returnFocus?.focus()
+  // `immediate` runs this once at setup with the invite shut, and there is
+  // nothing to give back then: taking the focus on every page load is not it.
+  if (wasOpen !== true) return
+
+  // Back to whoever had the focus when it opened — unless that was the page
+  // itself, or the control is gone by now (a pack opened at the end of the reveal
+  // took its skip button with it). The focus goes to the page's content then,
+  // and not to the `<body>`, where the next Tab would start over.
+  const back = returnFocus
   returnFocus = null
+
+  if (back !== null && back !== document.body && back.isConnected && !back.matches(':disabled')) back.focus()
+  else document.getElementById('content')?.focus()
 }, { immediate: true })
 
 function trapTab(event: KeyboardEvent): void {
