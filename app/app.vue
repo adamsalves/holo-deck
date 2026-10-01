@@ -121,8 +121,12 @@ if (import.meta.server && route.path === '/') {
     <!-- A route change is silent for a screen reader: the link that took the player
          there is gone with its page, and nothing says where they landed. Nuxt's
          announcer writes the new page's `<title>` into a live region on every
-         route change. It is outside `<ClientOnly>` on purpose — a region has to be
-         in the document before its text arrives. -->
+         route change. It is here, above every layout, because the battle is drawn
+         outside the default one: put in the layout, it left the battle
+         unannounced. Nuxt registers the component for the client only, so the
+         region is not in the served HTML — it is born on the client holding the
+         title of the page that loaded. No change is made on a load, and one is
+         on every navigation after it. -->
     <NuxtRouteAnnouncer />
 
     <!-- O aviso de save recuperado fica acima do layout e fora dele: ele é
