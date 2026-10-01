@@ -53,11 +53,28 @@ const card = useTemplateRef<HTMLElement>('card')
 /**
  * The scrap button is the card's own footer, and scrapping every duplicate turns
  * it into the rarity line: the keyboard stays on the card, at its link.
+ *
+ * **Under the *Duplicadas* filter the card goes with its button**, having no
+ * duplicate left to be listed for. The focus goes to the scrap button that slid
+ * into its place, or to the one before when it was the last — the rule of the
+ * deck's picks —, because scrapping one after the other is what that filter is
+ * for: it fell to the page's content, eleven Tabs from the next one.
  */
 function scrap(): void {
+  // Where this card's button stood among the ones on the screen, taken before it leaves.
+  const at = scrapButtons().findIndex(button => card.value?.contains(button))
   emit('scrap')
 
-  void keepFocus(() => card.value?.querySelector<HTMLElement>('.poke-card__link'))
+  void keepFocus(() => {
+    if (card.value !== null) return card.value.querySelector<HTMLElement>('.poke-card__link')
+
+    const buttons = scrapButtons()
+    return buttons[Math.min(at, buttons.length - 1)]
+  })
+}
+
+function scrapButtons(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('.binder-card__scrap'))
 }
 
 const rarity = computed(() => rarityFrom(props.entry))

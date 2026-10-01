@@ -28,11 +28,12 @@ const { t } = useI18n()
  * que salvasse de verdade exigiria um estado "não salvo" que o jogo não tem e não
  * quer ter. O cabeçalho diz `5 / 6 slots` e para por aí.
  *
- * **O `×2` que a prancha põe na linha do número de cada carta não está lá.** Ele
- * é a efetividade daquela carta contra o líder, e está na coluna de cobertura
- * logo abaixo, por tipo — que é onde ela informa mais, porque duas cartas do
- * mesmo tipo dão a mesma linha. O que ficou na carta é o alerta que muda decisão:
- * a faixa `LEVA ×2`.
+ * **No tile draws the `×2` of the board.** Since v22 the board keeps it off the
+ * deck's cards and on the tiles of the list on the right, and the code draws it
+ * on neither. It is how well a card does against the leader, and that is in the
+ * coverage column just below, by type — where it says more, because two cards of
+ * one type make the same line. What the deck's card keeps is the warning that
+ * changes a decision: the `LEVA ×2` strip.
  */
 const collection = useCollectionStore()
 const deck = useDeckStore()
@@ -96,11 +97,16 @@ function pick(entry: SearchEntry): void {
   // Where the pick stood in the list, taken before it leaves it.
   const at = visible.value.findIndex(item => item.id === entry.id)
   deck.place(slot, entry.id)
-
-  const joined = t('deck.status.joined', { name: entry.displayName, slot: slot + 1 })
-  status.value = deck.filled === DECK_SIZE ? `${joined} ${t('deck.status.complete')}` : joined
+  status.value = joined(entry.displayName, slot)
 
   void keepFocus(() => (deck.filled === DECK_SIZE ? slotLink(slot) : nextPick(at)))
+}
+
+/** What the status says of a card that came in, by a press or by a drop. */
+function joined(name: string, slot: number): string {
+  const sentence = t('deck.status.joined', { name, slot: slot + 1 })
+
+  return deck.filled === DECK_SIZE ? `${sentence} ${t('deck.status.complete')}` : sentence
 }
 
 function clearSlot(index: number): void {
@@ -124,6 +130,7 @@ const status = ref('')
 
 const slotList = useTemplateRef<HTMLElement>('slotList')
 const pickList = useTemplateRef<HTMLElement>('pickList')
+const searchField = useTemplateRef<HTMLInputElement>('searchField')
 
 /**
  * Where the keyboard goes when a card changes sides — the deck and the list are
@@ -134,6 +141,11 @@ const pickList = useTemplateRef<HTMLElement>('pickList')
  * card in, every pick is `disabled` and there is nothing to go on to — the card
  * that just arrived is the answer. Removing goes to the next slot's ×, then the
  * one before it, and with the deck empty back to the list, where the card went.
+ *
+ * **A list the search has emptied sends the focus to the search.** Fielding the
+ * one pick that `ivy` leaves takes the list itself off the screen, and the focus
+ * fell to the page's content, a walk away from the field where the next name is
+ * typed.
  */
 function slotLink(slot: number): HTMLElement | null {
   return slotList.value?.children[slot]?.querySelector<HTMLElement>('.poke-card__link') ?? null
@@ -142,7 +154,7 @@ function slotLink(slot: number): HTMLElement | null {
 function nextPick(at: number): HTMLElement | null {
   const picks = Array.from(pickList.value?.querySelectorAll<HTMLElement>('.deck__pick:not(:disabled)') ?? [])
 
-  return picks[Math.min(at, picks.length - 1)] ?? null
+  return picks[Math.min(at, picks.length - 1)] ?? searchField.value
 }
 
 function removeTarget(index: number): HTMLElement | null {
@@ -150,7 +162,7 @@ function removeTarget(index: number): HTMLElement | null {
   const at = occupied.find(slot => slot > index) ?? occupied.findLast(slot => slot < index)
 
   return at === undefined
-    ? pickList.value?.querySelector<HTMLElement>('.deck__pick:not(:disabled)') ?? null
+    ? nextPick(0)
     : slotList.value?.children[at]?.querySelector<HTMLElement>('.deck-slot__remove') ?? null
 }
 
@@ -166,9 +178,17 @@ function dexNumber(entry: SearchEntry): string {
   return `#${String(entry.id).padStart(4, '0')}`
 }
 
+/**
+ * A drop is a card coming in like any other, and the status says so. Left
+ * unwritten, it went on saying that the card the drop had just replaced was in
+ * the slot.
+ */
 function onDrop(slot: number, id: number): void {
   if (!isSpeciesId(id) || !collection.has(id)) return
   deck.place(slot, id)
+
+  const name = view.owned.value.find(entry => entry.id === id)?.displayName
+  if (name !== undefined) status.value = joined(name, slot)
 }
 
 function onDragStart(event: DragEvent, entry: SearchEntry): void {
@@ -362,6 +382,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
         <label class="deck__search">
           <span class="sr-only">{{ t('deck.collection.filterLabel') }}</span>
           <input
+            ref="searchField"
             v-model="query"
             type="search"
             :placeholder="t('deck.collection.filterLabel')"
