@@ -397,6 +397,39 @@ export function foreignPhrases(text: string, phrases: readonly string[]): string
   return phrases.filter(phrase => spells(text, phrase))
 }
 
+/** The words of a text, lowercased: every run of letters, whatever the script. */
+export function wordsOf(text: string): string[] {
+  return text.toLowerCase().match(/\p{L}+/gu) ?? []
+}
+
+/**
+ * Every word a locale writes: its messages, placeholders out, split into words.
+ *
+ * It is the other way of asking which language a sentence is in. `foreignPhrases`
+ * looks for what it knows to be the other language — the labels of the other
+ * locale, whole —, and a list of who comes in fails in silence: a message with a
+ * placeholder is not on it (*Escalar #0002 Ivysaur*), and neither is a word
+ * somebody typed into a component, which is in no locale at all. `Slot.vue`
+ * joining two types with `' e '` was that, and so was *líder de ginásio* planted
+ * on a gym's name, which every sweep was green over.
+ *
+ * This names who goes out instead: a word of the sentence that the locale it
+ * claims to be in does not write. What it cannot see is a word both languages
+ * write — `slot`, `pack` —, and it is paired with `foreignPhrases` for the one
+ * case that looks like that and is not: a letter that is a word in one language
+ * and part of none in the other.
+ */
+export function writtenWords(code: string): Set<string> {
+  return new Set(leafEntries(readLocale(code)).flatMap(([, value]) => (
+    typeof value === 'string' ? wordsOf(value.replaceAll(/\{\w+\}/g, ' ')) : []
+  )))
+}
+
+/** The words of `text` that are in none of `written`, each once. */
+export function unwrittenWords(text: string, written: ReadonlySet<string>): string[] {
+  return [...new Set(wordsOf(text))].filter(word => !written.has(word))
+}
+
 /**
  * The stat badges of every other locale that `locale` does not also write.
  *

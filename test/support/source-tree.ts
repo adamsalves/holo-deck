@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -57,12 +57,8 @@ export function developmentOnlyPages(): string[] {
   return [...DEVELOPMENT_ONLY].map(address => `${PAGES}${address}.vue`)
 }
 
-/**
- * One address per page of `app/pages`, read from the disk: a page added later is
- * measured without anyone remembering to add it here. A parameter nobody gave a
- * sample for fails instead of being skipped.
- */
-export function pageAddresses(): string[] {
+/** The pages the build keeps, each with the address it answers at. */
+function builtPages(): { file: string, address: string }[] {
   const pages = walkFiles(join(REPO_ROOT, PAGES), new Set(), hasExtension(['.vue']))
 
   return pages.flatMap((file) => {
@@ -75,8 +71,36 @@ export function pageAddresses(): string[] {
       return sample
     })
 
-    return DEVELOPMENT_ONLY.has(address) ? [] : [address]
+    return DEVELOPMENT_ONLY.has(address) ? [] : [{ file, address }]
   })
+}
+
+/**
+ * One address per page of `app/pages`, read from the disk: a page added later is
+ * measured without anyone remembering to add it here. A parameter nobody gave a
+ * sample for fails instead of being skipped.
+ */
+export function pageAddresses(): string[] {
+  return builtPages().map(page => page.address)
+}
+
+/**
+ * The layout each page is drawn in, by address: what its `definePageMeta` says —
+ * `none` for `layout: false` —, and `default` for a page that says nothing.
+ *
+ * It exists for what lives **around** the pages. A component put in a layout is
+ * missing from every page drawn outside it, and a walk that only lands on pages
+ * of one layout cannot tell: the route announcer, moved from `app.vue` into the
+ * default layout, left the battle unannounced with its own test green.
+ */
+export function pageLayouts(): Map<string, string> {
+  return new Map(builtPages().map(({ file, address }) => {
+    const source = stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))
+    const layout = /definePageMeta\(\s*\{[^}]*?\blayout:\s*(false|'[\w-]+'|"[\w-]+")/.exec(source)?.[1]
+
+    if (layout === undefined) return [address, 'default']
+    return [address, layout === 'false' ? 'none' : layout.slice(1, -1)]
+  }))
 }
 
 /**
