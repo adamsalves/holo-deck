@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { DECK_SIZE } from '~~/shared/game/deck'
 import { multiplierLabel } from '~~/shared/game/typechart'
 import type { SearchEntry } from '~~/shared/types/dex'
@@ -8,6 +8,7 @@ import { isSpeciesId } from '~~/shared/types/brand'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useDeck } from '~/composables/useDeck'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 
@@ -27,11 +28,12 @@ const { t } = useI18n()
  * que salvasse de verdade exigiria um estado "não salvo" que o jogo não tem e não
  * quer ter. O cabeçalho diz `5 / 6 slots` e para por aí.
  *
- * **O `×2` que a prancha põe na linha do número de cada carta não está lá.** Ele
- * é a efetividade daquela carta contra o líder, e está na coluna de cobertura
- * logo abaixo, por tipo — que é onde ela informa mais, porque duas cartas do
- * mesmo tipo dão a mesma linha. O que ficou na carta é o alerta que muda decisão:
- * a faixa `LEVA ×2`.
+ * **No tile draws the `×2` of the board.** Since v22 the board keeps it off the
+ * deck's cards and on the tiles of the list on the right, and the code draws it
+ * on neither. It is how well a card does against the leader, and that is in the
+ * coverage column just below, by type — where it says more, because two cards of
+ * one type make the same line. What the deck's card keeps is the warning that
+ * changes a decision: the `LEVA ×2` strip.
  */
 const collection = useCollectionStore()
 const deck = useDeckStore()
@@ -89,13 +91,104 @@ const firstEmpty = computed(() => deck.slots.findIndex(id => id === null))
  * campo por ordem — quem quer a posição arrasta.
  */
 function pick(entry: SearchEntry): void {
-  if (firstEmpty.value < 0) return
-  deck.place(firstEmpty.value, entry.id)
+  const slot = firstEmpty.value
+  if (slot < 0) return
+
+  // Where the pick stood in the list, taken before it leaves it.
+  const at = visible.value.findIndex(item => item.id === entry.id)
+  deck.place(slot, entry.id)
+  status.value = joined(entry.displayName, slot)
+
+  void keepFocus(() => (deck.filled === DECK_SIZE ? slotLink(slot) : nextPick(at)))
 }
 
+/** What the status says of a card that came in, by a press or by a drop. */
+function joined(name: string, slot: number): string {
+  const sentence = t('deck.status.joined', { name, slot: slot + 1 })
+
+  return deck.filled === DECK_SIZE ? `${sentence} ${t('deck.status.complete')}` : sentence
+}
+
+function clearSlot(index: number): void {
+  const name = view.slots.value[index]?.entry?.displayName
+  deck.clear(index)
+
+  if (name !== undefined) status.value = t('deck.status.left', { name, slot: index + 1 })
+
+  void keepFocus(() => removeTarget(index))
+}
+
+/**
+ * What a screen reader is told when a card changes sides.
+ *
+ * The tiles trade places and the counter above them moves, and nothing on the
+ * screen says so out loud: the board draws no message for it, so this one is
+ * only heard. It sits in the page from the start, empty — a live region that
+ * is born with its text is not announced by every reader.
+ */
+const status = ref('')
+
+const slotList = useTemplateRef<HTMLElement>('slotList')
+const pickList = useTemplateRef<HTMLElement>('pickList')
+const searchField = useTemplateRef<HTMLInputElement>('searchField')
+
+/**
+ * Where the keyboard goes when a card changes sides — the deck and the list are
+ * two halves of one screen, and the control that was used is gone from its half.
+ *
+ * Fielding a card takes its pick out of the list: the focus goes to the pick that
+ * slid into its place, or to the one before when it was the last. With the sixth
+ * card in, every pick is `disabled` and there is nothing to go on to — the card
+ * that just arrived is the answer. Removing goes to the next slot's ×, then the
+ * one before it, and with the deck empty back to the list, where the card went.
+ *
+ * **A list the search has emptied sends the focus to the search.** Fielding the
+ * one pick that `ivy` leaves takes the list itself off the screen, and the focus
+ * fell to the page's content, a walk away from the field where the next name is
+ * typed.
+ */
+function slotLink(slot: number): HTMLElement | null {
+  return slotList.value?.children[slot]?.querySelector<HTMLElement>('.poke-card__link') ?? null
+}
+
+function nextPick(at: number): HTMLElement | null {
+  const picks = Array.from(pickList.value?.querySelectorAll<HTMLElement>('.deck__pick:not(:disabled)') ?? [])
+
+  return picks[Math.min(at, picks.length - 1)] ?? searchField.value
+}
+
+function removeTarget(index: number): HTMLElement | null {
+  const occupied = deck.slots.flatMap((id, slot) => (id === null ? [] : [slot]))
+  const at = occupied.find(slot => slot > index) ?? occupied.findLast(slot => slot < index)
+
+  return at === undefined
+    ? nextPick(0)
+    : slotList.value?.children[at]?.querySelector<HTMLElement>('.deck-slot__remove') ?? null
+}
+
+/**
+ * `#0002` — what a pick draws, and the start of what its name says.
+ *
+ * The button is named `Escalar #0002 Ivysaur` because a name that leaves out what
+ * is drawn (`Escalar Ivysaur` over `#0002 Ivysaur`) is one a speech-input user
+ * cannot say: WCAG 2.5.3, *Label in name*. One function writes both, so the two
+ * cannot drift.
+ */
+function dexNumber(entry: SearchEntry): string {
+  return `#${String(entry.id).padStart(4, '0')}`
+}
+
+/**
+ * A drop is a card coming in like any other, and the status says so. Left
+ * unwritten, it went on saying that the card the drop had just replaced was in
+ * the slot.
+ */
 function onDrop(slot: number, id: number): void {
   if (!isSpeciesId(id) || !collection.has(id)) return
   deck.place(slot, id)
+
+  const name = view.owned.value.find(entry => entry.id === id)?.displayName
+  if (name !== undefined) status.value = joined(name, slot)
 }
 
 function onDragStart(event: DragEvent, entry: SearchEntry): void {
@@ -106,6 +199,13 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
 <template>
   <main class="deck">
+    <p
+      role="status"
+      class="sr-only"
+    >
+      {{ status }}
+    </p>
+
     <div class="deck__main">
       <ClientOnly>
         <header class="mb-7 flex items-end justify-between gap-4">
@@ -132,7 +232,10 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
           </i18n-t>
         </header>
 
-        <ul class="deck__slots">
+        <ul
+          ref="slotList"
+          class="deck__slots"
+        >
           <li
             v-for="slot in view.slots.value"
             :key="slot.index"
@@ -142,7 +245,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               :entry="slot.entry"
               :stats="slot.stats"
               :incoming="slot.entry ? incomingById.get(slot.entry.id) ?? 1 : 1"
-              @remove="deck.clear(slot.index)"
+              @remove="clearSlot(slot.index)"
               @drop="id => onDrop(slot.index, id)"
             />
           </li>
@@ -279,6 +382,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
         <label class="deck__search">
           <span class="sr-only">{{ t('deck.collection.filterLabel') }}</span>
           <input
+            ref="searchField"
             v-model="query"
             type="search"
             :placeholder="t('deck.collection.filterLabel')"
@@ -317,6 +421,7 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
 
         <ul
           v-else
+          ref="pickList"
           class="deck__picks"
         >
           <li
@@ -328,12 +433,12 @@ function onDragStart(event: DragEvent, entry: SearchEntry): void {
               class="deck__pick bevel-tile"
               draggable="true"
               :disabled="firstEmpty < 0"
-              :aria-label="t('deck.collection.pickLabel', { name: entry.displayName })"
+              :aria-label="t('deck.collection.pickLabel', { number: dexNumber(entry), name: entry.displayName })"
               @click="pick(entry)"
               @dragstart="event => onDragStart(event, entry)"
             >
               <span class="numeric deck__pick-number">
-                #{{ String(entry.id).padStart(4, '0') }}
+                {{ dexNumber(entry) }}
               </span>
               <!-- `draggable="false"`: a imagem é arrastável por padrão, e o
                    `dragstart` dela carregaria a URL do sprite no `dataTransfer`.

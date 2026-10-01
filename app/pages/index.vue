@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, useTemplateRef, watch } from 'vue'
 import { useGameClock } from '~/composables/useGameClock'
 import { useLeague } from '~/composables/useLeague'
 import { useCollection } from '~/composables/useCollection'
 import { useInvite } from '~/composables/useInvite'
 import { loadBattleContext } from '~/composables/useBattleContext'
+import { keepFocus } from '~~/app/utils/focus'
 import { useBattleStore } from '~~/app/stores/battle'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
@@ -83,6 +84,19 @@ const resumable = computed(() => {
     standing: state.player.team.filter(card => !isFainted(card)).length,
   }
 })
+
+/**
+ * Giving up takes the whole strip out, with the button that was pressed: the
+ * keyboard goes on to the next challenge, which is what the screen offers once
+ * there is nothing left to resume — the fight, or the deck to build first.
+ */
+const nextPanel = useTemplateRef<HTMLElement>('nextPanel')
+
+function giveUp(): void {
+  battle.discard()
+
+  void keepFocus(() => nextPanel.value?.querySelector<HTMLElement>('.hub__panel-foot a'))
+}
 
 /** O mesmo relógio da loja, e agora literalmente o mesmo — ver `useGameClock`. */
 const now = useGameClock()
@@ -219,7 +233,7 @@ onMounted(() => {
             <button
               type="button"
               class="numeric hub__give-up"
-              @click="battle.discard()"
+              @click="giveUp()"
             >
               {{ t('hub.resume.giveUp') }}
             </button>
@@ -302,6 +316,7 @@ onMounted(() => {
 
           <!-- Próximo desafio. -->
           <section
+            ref="nextPanel"
             class="hub__panel"
             :data-type="league.next.value.leader.type"
           >

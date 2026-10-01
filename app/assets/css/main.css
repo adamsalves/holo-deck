@@ -483,6 +483,22 @@
 }
 
 /**
+ * Room for the bar, wherever the focus scrolls to.
+ *
+ * The top bar sticks, and on a phone it wraps into 217px (263 with an account):
+ * a control that focus scrolls to the top of the screen ended up under it, whole.
+ * `scroll-padding-top` moves the edge that scrolling aims for down by the bar's
+ * height — which `AppNav` measures and publishes as `--nav-height`, because it
+ * changes with the width, the account and the language. Without the property —
+ * the battle draws no bar — there is nothing to leave room for.
+ */
+@layer base {
+  html {
+    scroll-padding-top: var(--nav-height, 0px);
+  }
+}
+
+/**
  * Movimento: dois sinais, e a regra de escrever os dois.
  *
  * Quem pede menos movimento diz isso de duas formas — pelo sistema

@@ -4,6 +4,7 @@ import { useAccount } from '~/composables/useAccount'
 import { useInvite } from '~/composables/useInvite'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
+import { moveFocus } from '~~/app/utils/focus'
 import { inviteSeen, markInviteSeen } from '~~/app/utils/invite'
 import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
 import { gameNumber } from '~~/shared/game/progress'
@@ -83,7 +84,7 @@ const stakes = computed(() => {
 const sheet = ref<HTMLElement | null>(null)
 let returnFocus: HTMLElement | null = null
 
-watch(open, async (value) => {
+watch(open, async (value, wasOpen) => {
   if (value) {
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     await nextTick()
@@ -91,8 +92,20 @@ watch(open, async (value) => {
     return
   }
 
-  returnFocus?.focus()
+  // `immediate` runs this once at setup with the invite shut, and there is
+  // nothing to give back then: taking the focus on every page load is not it.
+  if (wasOpen !== true) return
+
+  // Back to whoever had the focus when it opened — unless that was the page
+  // itself, or the control is gone by now (a pack opened at the end of the reveal
+  // took its skip button with it). The focus goes to the page's content then,
+  // and not to the `<body>`, where the next Tab would start over. `moveFocus`
+  // holds the key as well: Enter kept down on *Agora não* would go on to press
+  // the control the focus came back to.
+  const back = returnFocus
   returnFocus = null
+
+  moveFocus(back !== null && back !== document.body && back.isConnected && !back.matches(':disabled') ? back : null)
 }, { immediate: true })
 
 function trapTab(event: KeyboardEvent): void {

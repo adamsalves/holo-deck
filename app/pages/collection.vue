@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { dustFor, dustMissing, forgeCost } from '~~/shared/game/dust'
 import { gameNumber, progressLabel } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
@@ -8,6 +8,7 @@ import type { Rarity } from '~~/shared/types/game'
 import { rarityKey, RARITY_NAMES } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useCollection } from '~/composables/useCollection'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -80,16 +81,30 @@ const targetCost = computed(() =>
 const missing = computed(() =>
   (targetRarity.value === null ? 0 : dustMissing(store.dust, targetRarity.value)))
 
+const forgeButton = useTemplateRef<HTMLButtonElement>('forgeButton')
+const searchField = useTemplateRef<HTMLInputElement>('searchField')
+
+/**
+ * Choosing a card empties the suggestions, and the one that was pressed goes with
+ * them. The keyboard goes to FORJAR when the dust is there for it, and back to the
+ * field — where the next name is typed — when it is not, because a `disabled`
+ * button takes no focus.
+ */
 function choose(entry: SearchEntry): void {
   target.value = entry
   query.value = ''
+
+  void keepFocus(() => (forgeButton.value?.disabled === false ? forgeButton.value : searchField.value))
 }
 
+/** FORJAR turns `disabled` when it spent the last of the dust: the field is next. */
 function forgeTarget(): void {
   const entry = target.value
   const rarity = targetRarity.value
   if (entry === null || rarity === null) return
   store.forge(entry.id, rarity)
+
+  void keepFocus(() => searchField.value)
 }
 
 useSeoMeta({
@@ -281,6 +296,7 @@ useSeoMeta({
           >{{ t('collection.forge.searchLabel') }}</label>
           <input
             id="forge-search"
+            ref="searchField"
             v-model="query"
             type="search"
             class="collection__search"
@@ -349,6 +365,7 @@ useSeoMeta({
 
           <button
             v-if="target !== null"
+            ref="forgeButton"
             type="button"
             class="collection__forge-button"
             :disabled="missing > 0"

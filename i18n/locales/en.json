@@ -233,7 +233,7 @@
       "shinyBadge": "SHINY",
       "scrap": "{count} dup · {dust}",
       "dustAmount": "{dust} dust",
-      "scrapLabel": "Turn {count} duplicate of {name} into {dust} dust | Turn {count} duplicates of {name} into {dust} dust"
+      "scrapLabel": "{count} dup · {dust} dust, turn {count} duplicate of {name} into dust | {count} dup · {dust} dust, turn {count} duplicates of {name} into dust"
     },
     "progress": {
       "valueText": "{progress} caught"
@@ -243,6 +243,11 @@
     "eyebrow": "Deck building",
     "title": "Your team",
     "slotsCount": "{filled} / {total} slots",
+    "status": {
+      "joined": "{name} joined slot {slot}.",
+      "left": "{name} left slot {slot}.",
+      "complete": "Team complete."
+    },
     "loading": "Loading your deck…",
     "seo": {
       "title": "Deck"
@@ -264,14 +269,15 @@
       "all": "ALL",
       "empty": "Your collection is empty. Open a pack to start.",
       "noMatch": "No card matches this filter.",
-      "pickLabel": "Field {name}",
+      "pickLabel": "Field {number} {name}",
       "hint": "Click to field, or drag onto a slot. Cards already in the deck leave the list.",
       "loading": "Loading your collection…"
     },
     "slot": {
       "takes": "TAKES {multiplier}",
       "hint": "DRAG{break}A CARD",
-      "removeLabel": "Remove {name} from slot {slot}"
+      "removeLabel": "Remove {name} from slot {slot}",
+      "linkLabel": "{name}, slot {slot}, {types}, {rarity}"
     }
   },
   "ailment": {

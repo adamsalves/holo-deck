@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { dustFor } from '~~/shared/game/dust'
 import { gameNumber } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import { rarityKey } from '~~/shared/types/game'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 
@@ -45,7 +46,36 @@ const props = defineProps<{
   duplicates: number
 }>()
 
-defineEmits<{ scrap: [] }>()
+const emit = defineEmits<{ scrap: [] }>()
+
+const card = useTemplateRef<HTMLElement>('card')
+
+/**
+ * The scrap button is the card's own footer, and scrapping every duplicate turns
+ * it into the rarity line: the keyboard stays on the card, at its link.
+ *
+ * **Under the *Duplicadas* filter the card goes with its button**, having no
+ * duplicate left to be listed for. The focus goes to the scrap button that slid
+ * into its place, or to the one before when it was the last — the rule of the
+ * deck's picks —, because scrapping one after the other is what that filter is
+ * for: it fell to the page's content, eleven Tabs from the next one.
+ */
+function scrap(): void {
+  // Where this card's button stood among the ones on the screen, taken before it leaves.
+  const at = scrapButtons().findIndex(button => card.value?.contains(button))
+  emit('scrap')
+
+  void keepFocus(() => {
+    if (card.value !== null) return card.value.querySelector<HTMLElement>('.poke-card__link')
+
+    const buttons = scrapButtons()
+    return buttons[Math.min(at, buttons.length - 1)]
+  })
+}
+
+function scrapButtons(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>('.binder-card__scrap'))
+}
 
 const rarity = computed(() => rarityFrom(props.entry))
 const dustValue = computed(() => props.duplicates * dustFor(rarity.value))
@@ -62,6 +92,7 @@ const label = computed(() => [
 
 <template>
   <article
+    ref="card"
     class="binder-card"
     :class="{ 'binder-card--shiny': isShiny }"
   >
@@ -95,7 +126,7 @@ const label = computed(() => [
             { count: duplicates, name: entry.displayName, dust: gameNumber(dustValue) },
             duplicates,
           )"
-          @click="$emit('scrap')"
+          @click="scrap"
         >
           <i18n-t
             keypath="collection.card.scrap"
@@ -188,10 +219,17 @@ const label = computed(() => [
 }
 
 /* O degrau que a `PokeCard` publica: a camada do link é `z-index: 1`, e o rodapé
-   com ação sobe para 2 para receber o próprio clique. */
+   com ação sobe para 2 para receber o próprio clique.
+
+   The target is 24px tall (WCAG 2.5.8) where the footer line is 16.8: the box
+   grows by 7.2px, the button centres its text in it, and the margin gives the
+   growth back — 3.6px off each side — so the text, the row and the card sit where
+   they did. */
 .binder-card__scrap {
   position: relative;
   z-index: 2;
+  min-height: 24px;
+  margin: 0.4px 0 -3.6px;
   color: var(--text-muted);
   background: transparent;
   border: 0;

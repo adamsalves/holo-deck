@@ -6,7 +6,7 @@ import type { BattleStats } from '~~/shared/game/stats'
 import type { SearchEntry, StatName } from '~~/shared/types/dex'
 import { rarityKey, statKey, typeKey } from '~~/shared/types/game'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 /**
  * Um dos seis slots — a mesma carta do sistema, com o rodapé que o deck precisa.
@@ -57,13 +57,16 @@ const card = computed(() => {
     link: {
       to: `/pokemon/${entry.slug}`,
       // O link cobre a carta e não tem texto dentro: este rótulo é o único nome
-      // que ele tem.
-      label: [
-        entry.displayName,
-        `slot ${props.index + 1}`,
-        entry.types.map(type => t(typeKey(type))).join(' e '),
-        t(rarityKey(rarity)),
-      ].join(', '),
+      // que ele tem. The sentence is the locale's, and so is the *and* between two
+      // types: it used to be a `' e '` written here, which read *Grass e Poison*
+      // in English.
+      label: t('deck.slot.linkLabel', {
+        name: entry.displayName,
+        slot: props.index + 1,
+        types: new Intl.ListFormat(locale.value, { type: 'conjunction' })
+          .format(entry.types.map(type => t(typeKey(type)))),
+        rarity: t(rarityKey(rarity)),
+      }),
     },
   }
 })
@@ -299,14 +302,14 @@ function onDrop(event: DragEvent): void {
    tem ação. */
 .deck-slot__remove {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 2px;
   background: var(--bg);

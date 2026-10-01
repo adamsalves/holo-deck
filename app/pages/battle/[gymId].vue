@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef, useTemplateRef } from 'vue'
 import type { BattleAction, BattleContext, BattlePokemon } from '~~/shared/game/battle'
 import { activeOf, isFainted } from '~~/shared/game/battle'
 import { switchOptions } from '~~/shared/game/engine'
@@ -26,6 +26,7 @@ import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { loadBattleContext } from '~/composables/useBattleContext'
 import { useInvite } from '~/composables/useInvite'
+import { keepFocus } from '~~/app/utils/focus'
 import type { NarratedTurn } from '~~/app/utils/battle-narration'
 import { narrate } from '~~/app/utils/battle-narration'
 
@@ -271,7 +272,7 @@ async function dropAndStart(): Promise<void> {
   }
 
   battle.discard()
-  await startFresh(id)
+  await keepFocus(fightTarget, startFresh(id))
 }
 
 const state = computed(() => battle.state)
@@ -291,6 +292,16 @@ const moves = computed(() => {
     return { index, move: slot.move, pp: slot.pp, multiplier, note: noteFor(slot, foe, multiplier) }
   })
 })
+
+/**
+ * The move the highlight and the reading are on: the one the focus or the pointer
+ * was last on — the first, when the card on the field has no move there.
+ *
+ * Nothing sets `focused` back any more, because the highlight follows the focus.
+ * A switch to a card with fewer moves left it pointing past the end: the reading
+ * already fell back to the first move, and the highlight lit none.
+ */
+const lit = computed(() => (focused.value < moves.value.length ? focused.value : 0))
 
 /**
  * O aviso que substitui o multiplicador, quando há um.
@@ -330,7 +341,7 @@ function noteFor(
 const reading = computed(() => {
   const foe = opponent.value
   const ctx = context.value
-  const chosen = moves.value[focused.value] ?? moves.value[0]
+  const chosen = moves.value[lit.value]
   if (foe === null || ctx === null || chosen === undefined) return null
 
   /**
@@ -422,6 +433,31 @@ const teamStanding = computed(() =>
 const canSwitch = computed(() => state.value !== null && switchOptions(state.value).length > 0)
 const potions = computed(() => state.value?.player.potionsLeft ?? 0)
 
+const arena = useTemplateRef<HTMLElement>('arena')
+
+/**
+ * Where the keyboard lands when the control that had it is gone — decided by the
+ * phase the action left, and asked once the screen has drawn it.
+ *
+ * A move that keeps the choice open leaves its own button where it was, and the
+ * focus with it: the highlight follows the focus (`@focus`), so *Enter* on the
+ * third move leaves the third lit. What takes the focus away is the phase
+ * changing under it: the last potion (its button turns `disabled`), a switch (the
+ * card that came in turns `disabled` in the bench), a faint (the moves go, and
+ * the bench is what the screen asks for), the end of the fight (the result takes
+ * the place of the choice) and a new fight (the exit that started it is gone).
+ */
+function fightTarget(): HTMLElement | null {
+  const root = arena.value
+  if (root === null) return null
+
+  if (standing.value !== 'ready') return root.querySelector<HTMLElement>('.battle__standing .battle__button--primary')
+  if (finished.value) return root.querySelector<HTMLElement>('.battle__result .battle__button--primary')
+  if (state.value?.expecting === 'playerSwitch') return root.querySelector<HTMLElement>('.battle__pill:not(:disabled)')
+
+  return root.querySelector<HTMLElement>('.move')
+}
+
 /**
  * Uma ação, e a narração do que ela produziu.
  *
@@ -446,7 +482,8 @@ function play(action: BattleAction): void {
   // language — never half of it in each.
   const turn = narrate(before, battle.events, ctx.moves, t)
   if (turn.lines.length > 0) history.value = [...history.value, { ...turn, id: logged++ }].slice(-LOG_LINES)
-  focused.value = 0
+
+  void keepFocus(fightTarget)
 }
 
 /**
@@ -495,7 +532,8 @@ function again(): void {
 
   battle.start(id, deck.team, newSeed(), ctx)
   history.value = []
-  focused.value = 0
+
+  void keepFocus(fightTarget)
 }
 
 /**
@@ -516,7 +554,10 @@ function fallbackSprite(event: Event, id: number): void {
 </script>
 
 <template>
-  <main class="battle">
+  <main
+    ref="arena"
+    class="battle"
+  >
     <ClientOnly>
       <template v-if="standing === 'ready' && state && player && opponent && leader">
         <header class="battle__bar">
@@ -699,7 +740,7 @@ function fallbackSprite(event: Event, id: number): void {
                 :pp="option.pp"
                 :multiplier="option.multiplier"
                 :note="option.note"
-                :focused="focused === option.index"
+                :focused="lit === option.index"
                 @focus="focused = option.index"
                 @choose="choose(option.index)"
               />

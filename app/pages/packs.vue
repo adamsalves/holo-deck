@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'nuxt/app'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import {
   PACK_PRICE,
   WELCOME_PACKS,
@@ -28,6 +28,7 @@ import { useDex } from '~/composables/useDex'
 import { useGameClock } from '~/composables/useGameClock'
 import { useReduceMotion } from '~/composables/useMotion'
 import { useInvite } from '~/composables/useInvite'
+import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -111,8 +112,24 @@ const openedEntries = computed(() =>
  */
 const invite = useInvite()
 
+const stage = useTemplateRef<HTMLElement>('stage')
+
+/**
+ * The action the opening offers first: the same pack again, or the way back.
+ *
+ * Two controls hand the screen over to it. A pack of the shop, which the opening
+ * replaces as soon as it starts, and the button that skips the animation, which
+ * leaves when the last card is up — on its own, or because it was pressed.
+ */
+function primaryAction(): HTMLElement | null {
+  return stage.value?.querySelector<HTMLElement>('.packs__skip--primary') ?? null
+}
+
 watch(revealed, (count) => {
   if (count === 0 || count < opened.value.length) return
+
+  void keepFocus(primaryAction)
+
   if (opened.value.some(card => rarityRank(card.rarity) >= rarityRank('ultra'))) invite.offer()
 })
 
@@ -181,6 +198,8 @@ function open(from: PackSource): void {
   source.value = from
   skipped.value = false
   revealed.value = reduced.value ? result.cards.length : 0
+
+  void keepFocus(primaryAction)
 }
 
 function skip(): void {
@@ -207,9 +226,25 @@ onMounted(() => {
  * ela desenha `VER COLEÇÃO` —, mas sem ela abrir o segundo pack exigiria
  * recarregar a rota. */
 function backToShop(): void {
+  const from = source.value
   opened.value = []
   source.value = null
   welcomeNumber.value = null
+
+  void keepFocus(() => opener(from))
+}
+
+/** The button that opened the pack — when it is still there and can be pressed. */
+const OPENERS: Readonly<Record<PackSource, string>> = {
+  welcome: '.packs__buy--gift',
+  daily: '.packs__buy--daily',
+  store: '.packs__buy--coin',
+}
+
+function opener(from: PackSource | null): HTMLElement | null {
+  const button = from === null ? null : stage.value?.querySelector<HTMLButtonElement>(OPENERS[from])
+
+  return button?.disabled === false ? button : null
 }
 
 /**
@@ -269,7 +304,10 @@ useSeoMeta({
 </script>
 
 <template>
-  <main class="packs">
+  <main
+    ref="stage"
+    class="packs"
+  >
     <ClientOnly>
       <!-- LOJA -->
       <template v-if="opened.length === 0">
