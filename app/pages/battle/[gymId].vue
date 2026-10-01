@@ -294,6 +294,16 @@ const moves = computed(() => {
 })
 
 /**
+ * The move the highlight and the reading are on: the one the focus or the pointer
+ * was last on — the first, when the card on the field has no move there.
+ *
+ * Nothing sets `focused` back any more, because the highlight follows the focus.
+ * A switch to a card with fewer moves left it pointing past the end: the reading
+ * already fell back to the first move, and the highlight lit none.
+ */
+const lit = computed(() => (focused.value < moves.value.length ? focused.value : 0))
+
+/**
  * O aviso que substitui o multiplicador, quando há um.
  *
  * Dois vêm da prancha: o golpe que não afeta (`×0`) e o de status contra alvo que
@@ -331,7 +341,7 @@ function noteFor(
 const reading = computed(() => {
   const foe = opponent.value
   const ctx = context.value
-  const chosen = moves.value[focused.value] ?? moves.value[0]
+  const chosen = moves.value[lit.value]
   if (foe === null || ctx === null || chosen === undefined) return null
 
   /**
@@ -730,7 +740,7 @@ function fallbackSprite(event: Event, id: number): void {
                 :pp="option.pp"
                 :multiplier="option.multiplier"
                 :note="option.note"
-                :focused="focused === option.index"
+                :focused="lit === option.index"
                 @focus="focused = option.index"
                 @choose="choose(option.index)"
               />

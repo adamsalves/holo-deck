@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { typeKey } from '~~/shared/types/game'
 import { dexNumber } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
+import { swallowRepeats } from '~~/app/utils/focus'
 
 const { t } = useI18n()
 
@@ -43,6 +44,15 @@ watch(open, async (isOpen) => {
     loading.value = false
   }
 })
+
+/**
+ * Opening hands the focus to the palette's field and closing hands it back to
+ * the trigger — the library does both —, and the key that did either may still be
+ * down. Enter held on the trigger went on to choose the first result, and held on
+ * Close it opened the palette again: measured on `main` too, by the census that
+ * now asks it of every button.
+ */
+watch(open, () => swallowRepeats())
 
 /**
  * O sufixo carrega número e tipos porque é por eles que se procura quando não se

@@ -4,6 +4,7 @@ import { useAccount } from '~/composables/useAccount'
 import { useInvite } from '~/composables/useInvite'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
+import { moveFocus } from '~~/app/utils/focus'
 import { inviteSeen, markInviteSeen } from '~~/app/utils/invite'
 import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
 import { gameNumber } from '~~/shared/game/progress'
@@ -98,12 +99,13 @@ watch(open, async (value, wasOpen) => {
   // Back to whoever had the focus when it opened — unless that was the page
   // itself, or the control is gone by now (a pack opened at the end of the reveal
   // took its skip button with it). The focus goes to the page's content then,
-  // and not to the `<body>`, where the next Tab would start over.
+  // and not to the `<body>`, where the next Tab would start over. `moveFocus`
+  // holds the key as well: Enter kept down on *Agora não* would go on to press
+  // the control the focus came back to.
   const back = returnFocus
   returnFocus = null
 
-  if (back !== null && back !== document.body && back.isConnected && !back.matches(':disabled')) back.focus()
-  else document.getElementById('content')?.focus()
+  moveFocus(back !== null && back !== document.body && back.isConnected && !back.matches(':disabled') ? back : null)
 }, { immediate: true })
 
 function trapTab(event: KeyboardEvent): void {
