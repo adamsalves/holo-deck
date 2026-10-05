@@ -157,8 +157,6 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      - run: yarn build
-        env:
-          NITRO_PRESET: vercel
+      - run: yarn build:vercel
 
       - run: yarn check:vercel-bundle

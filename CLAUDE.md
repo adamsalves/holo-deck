@@ -30,8 +30,11 @@ yarn typecheck               # vue-tsc
 yarn test                    # Vitest
 yarn build                   # saída Nitro
 PORT=3100 yarn test:e2e      # a 3000 é do Grafana nesta máquina; exige build antes
-yarn check:vercel-bundle     # o dex dentro da função da Vercel
+yarn build:vercel            # apaga .output e .vercel/output, e constrói com o preset da Vercel
+yarn check:vercel-bundle     # confere a saída do preset; exige o build:vercel antes
 ```
+
+O `build:vercel` apaga o `.output`: o e2e roda antes dele, ou pede `yarn build` de novo.
 
 Manuais, porque nada no CI os dispara: `yarn db:verify` (o CAS do `PUT /api/save` contra o Postgres)
 e `yarn db:seed-remote`. Login **não** se valida em preview da Vercel — só em `localhost` e produção.

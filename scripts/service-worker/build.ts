@@ -117,7 +117,11 @@ export function precachePaths(files: readonly string[], css: string): string[] {
   const messages = LOCALES.map(({ code: locale }) => {
     const found = files.filter(path => path.startsWith('_i18n/') && path.endsWith(`/${locale}/messages.json`))
     if (found.length !== 1) {
-      throw new Error(`service worker: expected one _i18n/…/${locale}/messages.json, found ${found.length}`)
+      throw new Error(
+        `service worker: expected one _i18n/…/${locale}/messages.json, found ${found.length}. `
+        + 'With the Vercel preset, the .output of a Node build left on disk cuts the prerender short, '
+        + 'and this is where it shows: run `yarn build:vercel`, which deletes it first',
+      )
     }
 
     return found[0] ?? ''

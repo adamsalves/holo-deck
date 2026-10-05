@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url'
  *    as outras rotas são symlink para `__fallback.func`; no dia em que o Nitro
  *    emitir funções separadas, medir só a de fallback seria medir a errada.
  *
- * Roda depois de `NITRO_PRESET=vercel yarn build`.
+ * Roda depois de `yarn build:vercel`.
  */
 
 /**
@@ -80,7 +80,7 @@ if (sources.length === 0) {
 
 const functionsRoot = join(REPO_ROOT, FUNCTIONS)
 if (!existsSync(functionsRoot)) {
-  console.error(`::error::${FUNCTIONS} não existe (o build não foi com NITRO_PRESET=vercel?)`)
+  console.error(`::error::${FUNCTIONS} não existe (o build não foi com yarn build:vercel?)`)
   process.exit(1)
 }
 
