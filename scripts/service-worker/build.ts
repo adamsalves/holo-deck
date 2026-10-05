@@ -119,8 +119,9 @@ export function precachePaths(files: readonly string[], css: string): string[] {
     if (found.length !== 1) {
       throw new Error(
         `service worker: expected one _i18n/…/${locale}/messages.json, found ${found.length}. `
-        + 'With the Vercel preset, the .output of a Node build left on disk cuts the prerender short, '
-        + 'and this is where it shows: run `yarn build:vercel`, which deletes it first',
+        + 'With the Vercel preset, Nitro\'s prerenderer answers a route with the file a previous build '
+        + 'left in .output/public instead of rendering it, so nothing new is written for it, '
+        + 'and this is where it shows: run `yarn build:vercel`, which deletes .output first',
       )
     }
 
