@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { basename, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { withFunctionServer } from '../test/support/built-server.ts'
 import { builtRouteProblems } from '../test/support/prerendered-routes.ts'
@@ -43,14 +43,20 @@ import { probeServer } from '../test/support/server-probe.ts'
  * `.nvmrc` fails here and gets decided instead of moving production's runtime on
  * its own — and this step holds the declared major to the one in `.nvmrc`. A
  * missing file, or a `runtime` that is not `nodejs<N>.x`, is a failure and not a
- * pass: there is nothing it could be holding to.
+ * pass: there is nothing it could be holding to. `engines.node` is not read here
+ * because yarn already holds it: `yarn install` refuses a Node outside the range
+ * of the root `package.json` — measured —, so an `.nvmrc` that left it fails
+ * before any build.
  *
- * **The pages are measured too, by origin.** `.vercel/output/static` is what
- * Vercel serves and nothing else looked at it: the e2e that holds the Node output
- * to the sources (`prerender-payload.spec.ts`) cannot see a page the Vercel build
- * lost. The same helper (`test/support/prerendered-routes.ts`) holds this folder
- * to the same set — the static pages, the generations, the species, the nine
- * battles, the offline shell —, by name, in every language and in both directions.
+ * **The pages are measured too, by origin.** `.vercel/output/static` is the
+ * folder Vercel serves the pages from, and nothing else looked at it: the e2e that
+ * holds the Node output to the sources (`prerender-payload.spec.ts`) cannot see a
+ * page the Vercel build lost. The same helper (`test/support/prerendered-routes.ts`)
+ * holds this folder to the same set — the static pages, the generations, the
+ * species, the nine battles, the offline shell —, by name, in every language and
+ * in both directions. What it does **not** read is `config.json`, whose
+ * `overrides` are what give each of those files its URL: this measures that the
+ * page was written, not that the edge serves it.
  *
  * **And then it starts the function and asks it.** Files in place are not files
  * read: a function that reads the dex through `process.cwd()` has every chunk
@@ -64,7 +70,7 @@ import { probeServer } from '../test/support/server-probe.ts'
  * comes last on purpose — a build that lost the dex fails above, by name, and not
  * here as a 500.
  *
- * Roda depois de `yarn build:vercel`.
+ * It runs after `yarn build:vercel`.
  */
 
 /**
@@ -112,19 +118,62 @@ if (sources.length === 0) {
 
 const functionsRoot = join(REPO_ROOT, FUNCTIONS)
 if (!existsSync(functionsRoot)) {
-  console.error(`::error::${FUNCTIONS} não existe (o build não foi com yarn build:vercel?)`)
+  console.error(`::error::${FUNCTIONS} does not exist — was the build made with yarn build:vercel?`)
   process.exit(1)
 }
 
-// Toda rota que não a de fallback precisa continuar sendo symlink para ela,
-// senão este portão mede uma função e o `/pokemon/*` é servido por outra.
-const split = readdirSync(functionsRoot)
-  .filter(name => name.endsWith('.func') && name !== FALLBACK)
-  .filter(name => !lstatSync(join(functionsRoot, name)).isSymbolicLink())
+/**
+ * Every `*.func` under `dir`, at any depth, without walking into one.
+ *
+ * At any depth, because that is where the routed ones are: `config.json` sends
+ * `/pokemon/<name>` to `pokemon/[name].func` and `/en/pokedex/<gen>` to
+ * `en/pokedex/[gen].func`. Reading the first level alone saw 2 of the 16 the
+ * build writes, and a real folder planted at `pokemon/[name].func` — its own
+ * runtime, its own handler answering 500 with a path — passed every step below.
+ */
+function functionFolders(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.name.endsWith('.func')) return [path]
 
-if (split.length > 0) {
+    return entry.isDirectory() ? functionFolders(path) : []
+  })
+}
+
+/** Where `path` really is, with the links followed — or nothing, for a link that leads nowhere. */
+function realPath(path: string): string | undefined {
+  try {
+    return realpathSync(path)
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Every function has to be the fallback one under another name. This gate starts
+// one function, reads the runtime of one and probes one: with a second one on
+// disk, it would measure that one while requests are answered by the other.
+const fallback = realPath(join(functionsRoot, FALLBACK))
+if (fallback === undefined) {
+  console.error(`::error::${FUNCTIONS}/${FALLBACK} does not exist: the build wrote no fallback function`)
+  process.exit(1)
+}
+
+const folders = functionFolders(functionsRoot)
+
+// The other side: a walk that found nothing would find no stranger either.
+if (!folders.some(folder => realPath(folder) === fallback)) {
+  console.error(`::error::the walk of ${FUNCTIONS} did not come across ${FALLBACK} itself, so it cannot say that every function is that one`)
+  process.exit(1)
+}
+
+const strangers = folders
+  .filter(folder => realPath(folder) !== fallback)
+  .map(folder => relative(functionsRoot, folder))
+
+if (strangers.length > 0) {
   console.error(
-    `::error::${split.join(', ')} deixaram de ser symlink para ${FALLBACK} — este portão mede só a função de fallback, e agora há outra servindo rota`,
+    `::error::${strangers.join(', ')}: not ${FALLBACK} under another name — this gate starts, reads the runtime of and probes that one function only, and config.json routes requests to each of these`,
   )
   process.exit(1)
 }
@@ -176,12 +225,20 @@ function runtimeProblems(): string[] {
   const declared = typeof runtime === 'string' ? /^nodejs(\d+)\.x$/.exec(runtime)?.[1] : undefined
   if (declared === undefined) return [`${config} declares runtime ${JSON.stringify(runtime)}, which is not of the form nodejs<N>.x`]
 
-  const pinned = /^v?(\d+)\./.exec(readFileSync(join(REPO_ROOT, '.nvmrc'), 'utf8').trim())?.[1]
-  if (pinned === undefined) return ['.nvmrc does not start with a Node version, so the runtime of the function has nothing to be held to']
+  if (!existsSync(join(REPO_ROOT, '.nvmrc'))) return ['.nvmrc does not exist, so the runtime of the function has nothing to be held to']
 
-  return declared === pinned
-    ? []
-    : [`${config} declares nodejs${declared}.x and .nvmrc pins Node ${pinned}: set nitro.vercel.functions.runtime in nuxt.config.ts to nodejs${pinned}.x`]
+  // `24`, `24.20.0` and `v24.20.0` are all a version to nvm; an alias (`lts/*`) names no major to hold anything to.
+  const pinned = /^v?(\d+)(?:\.|$)/.exec(readFileSync(join(REPO_ROOT, '.nvmrc'), 'utf8').trim())?.[1]
+  if (pinned === undefined) return ['.nvmrc does not start with a Node version, so the runtime of the function has nothing to be held to']
+  if (declared === pinned) return []
+
+  // Vercel has only ever had a runtime for the even majors, the LTS lines: for an
+  // odd one there is no `nodejs<N>.x` to point the config at.
+  const advice = Number(pinned) % 2 === 0
+    ? `set nitro.vercel.functions.runtime in nuxt.config.ts to nodejs${pinned}.x`
+    : `Node ${pinned} is not an LTS line and Vercel has no runtime for it, so one of the two has to change`
+
+  return [`${config} declares nodejs${declared}.x and .nvmrc pins Node ${pinned}: ${advice}`]
 }
 
 const runtimeFindings = runtimeProblems()
