@@ -1,9 +1,9 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { withFunctionServer } from '../test/support/built-server.ts'
 import { builtRouteProblems } from '../test/support/prerendered-routes.ts'
 import { probeServer } from '../test/support/server-probe.ts'
-import { withFunctionServer } from '../test/support/vercel-function-server.ts'
 
 /**
  * O dex vai dentro da função da Vercel — a issue #15.
@@ -55,12 +55,14 @@ import { withFunctionServer } from '../test/support/vercel-function-server.ts'
  * **And then it starts the function and asks it.** Files in place are not files
  * read: a function that reads the dex through `process.cwd()` has every chunk
  * above in place and still answers 500 from anywhere but the project root. So
- * the last step runs the function from a temporary directory
- * (`test/support/vercel-function-server.ts`) and puts the probe of
- * `server-runtime.spec.ts` to it (`test/support/server-probe.ts`): the same 404s,
- * in every language, and a real species answering 200 as the good side. It comes
- * last on purpose — a build that lost the dex fails above, by name, and not here
- * as a 500.
+ * the last step runs **a copy** of the function, in a temporary folder outside
+ * the repository (`test/support/built-server.ts`) — which is what a deploy gets,
+ * and what tells a function that carries everything it imports from one that
+ * only runs where it was built — and puts the probe of `server-runtime.spec.ts`
+ * to it (`test/support/server-probe.ts`): the index through the dex route, the
+ * same 404s in every language, and the real pages beside them answering 200. It
+ * comes last on purpose — a build that lost the dex fails above, by name, and not
+ * here as a 500.
  *
  * Roda depois de `yarn build:vercel`.
  */
@@ -205,7 +207,7 @@ const functionDir = join(functionsRoot, FALLBACK)
 
 let problems: string[]
 try {
-  problems = await withFunctionServer(functionDir, (base, cwd) => probeServer(base, [cwd, functionDir]))
+  problems = await withFunctionServer(functionDir, (base, root) => probeServer(base, [root]))
 }
 catch (error) {
   fail(error)
@@ -214,4 +216,4 @@ catch (error) {
 for (const problem of problems) console.error(`::error::${problem}`)
 if (problems.length > 0) process.exit(1)
 
-console.log('the function answered the probe: 404 with no path leaked, and the real species page, in every language')
+console.log('a copy of the function, outside the repository, answered the probe: the index, 404 with no path leaked, and the real pages, in every language')

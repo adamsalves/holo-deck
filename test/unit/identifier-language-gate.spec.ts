@@ -44,14 +44,16 @@ const DEX_NAMES = new Set([
  * these are spelled by the runtime, the DOM, a wire format or the language
  * itself: `namespace` is a TypeScript keyword before it is anything else, and it
  * is also what `@nuxtjs/i18n` calls the prefix of a message key, and `keypath`
- * is how vue-i18n spells the attribute that carries one into `<i18n-t>`. They
- * are here and not in `DOMAIN` because this project did not coin them.
+ * is how vue-i18n spells the attribute that carries one into `<i18n-t>`, and
+ * `symlinks` is half of `verbatimSymlinks`, the option of `node:fs`'s `cp` that
+ * keeps a copied link as it was. They are here and not in `DOMAIN` because this
+ * project did not coin them.
  */
 const PLATFORM = [
   'api', 'args', 'argv', 'async', 'attrs', 'auth', 'config', 'crossorigin', 'crypto', 'css', 'ctx', 'cwd',
   'env', 'href', 'hreflang', 'html', 'http', 'init', 'ip', 'iso', 'json', 'keepalive', 'keypath',
-  'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'subtree', 'ui', 'uid',
-  'uint', 'url', 'viewport',
+  'namespace', 'nav', 'ok', 'onchange', 'pathname', 'proto', 'rect', 'sha', 'src', 'subtree', 'symlinks', 'ui',
+  'uid', 'uint', 'url', 'viewport',
 ]
 
 /** The tools, by their own names. */

@@ -146,9 +146,9 @@ jobs:
   # paralelo com o e2e, porque os dois constroem e nenhum depende do outro.
   #
   # It also holds the pages in `.vercel/output/static` to the same sources the e2e
-  # holds `.output/public` to, and starts the function from a temporary directory
-  # to put it the same 404 probe, in every language, that the e2e puts to the Node
-  # server.
+  # holds `.output/public` to, and starts a copy of the function outside the
+  # repository to put it the same 404 probe, in every language, that the e2e puts
+  # to the Node server.
   vercel-bundle:
     name: dex na função da Vercel
     runs-on: ubuntu-latest

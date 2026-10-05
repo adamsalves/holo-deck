@@ -1,9 +1,6 @@
-import { spawn } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { withNodeServer } from '../support/built-server.ts'
 import { probeServer } from '../support/server-probe.ts'
 
 /**
@@ -29,46 +26,23 @@ import { probeServer } from '../support/server-probe.ts'
  * lugar onde o problema não está. Por isso este teste sobe o servidor **de um
  * diretório temporário**, que é o que reproduz a forma do deploy.
  *
- * What is asked of that server lives in `test/support/server-probe.ts`: the 404s
- * in every language, with the good side asserted. `scripts/check-vercel-bundle.ts`
- * asks the same questions of the Vercel function, so the two presets answer to
- * one probe and this file only decides where the server runs from.
+ * What is asked of that server lives in `test/support/server-probe.ts`: the index
+ * through the dex route, the 404s in every language, and the real pages beside
+ * them. `scripts/check-vercel-bundle.ts` asks the same questions of the Vercel
+ * function, so the two presets answer to one probe.
+ *
+ * Where the server runs from lives in `test/support/built-server.ts`, for both
+ * presets too: **a copy of it, outside the repository**, in a child whose own
+ * "listening" line is what the test waits for. The copy is what keeps the
+ * project's `node_modules` out of reach, and the line is what keeps a server
+ * someone else left on the port from answering in its place — with the port
+ * merely answering as the signal, this test passed in 101 ms against one, on a
+ * build it fails by itself.
  */
 
-const OUTPUT_SERVER = fileURLToPath(new URL('../../.output/server/index.mjs', import.meta.url))
-const PORT = 3311
-const BASE = `http://127.0.0.1:${PORT}`
+const OUTPUT = fileURLToPath(new URL('../../.output', import.meta.url))
 
-async function waitForServer(signal: AbortSignal): Promise<void> {
-  while (!signal.aborted) {
-    try {
-      await fetch(BASE, { signal })
-      return
-    }
-    catch {
-      await new Promise(resolve => setTimeout(resolve, 200))
-    }
-  }
-}
-
-test('the built server answers every language from outside the project root: 404 with no path leaked, and the real page', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'holo-deck-cwd-'))
-  const child = spawn(process.execPath, [OUTPUT_SERVER], {
-    cwd,
-    env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  try {
-    const ready = AbortSignal.timeout(30_000)
-    await waitForServer(ready)
-
-    // The temporary working directory and the folder the server file lives in:
-    // the two places the 500 used to print.
-    expect(await probeServer(BASE, [cwd, dirname(OUTPUT_SERVER)])).toEqual([])
-  }
-  finally {
-    child.kill('SIGTERM')
-    await rm(cwd, { recursive: true, force: true })
-  }
+test('the built server answers from a copy outside the repository, in every language: the index, 404 with no path leaked, and the real pages', async () => {
+  // The temporary folder the copy runs in is what the 500 used to print.
+  expect(await withNodeServer(OUTPUT, (base, root) => probeServer(base, [root]))).toEqual([])
 })
