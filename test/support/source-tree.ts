@@ -57,24 +57,33 @@ export function developmentOnlyPages(): string[] {
   return [...DEVELOPMENT_ONLY].map(address => `${PAGES}${address}.vue`)
 }
 
+interface BuiltPage {
+  readonly file: string
+  readonly route: string
+}
+
 /**
  * The pages the build keeps, each with its route as `app/pages` spells it — the
- * parameter in brackets — and the address it answers at, with a sample in its place.
+ * parameter in brackets.
  */
-function builtPages(): { file: string, route: string, address: string }[] {
+function builtPages(): BuiltPage[] {
   const pages = walkFiles(join(REPO_ROOT, PAGES), new Set(), hasExtension(['.vue']))
 
   return pages.flatMap((file) => {
     const route = `/${relative(PAGES, file).replaceAll(sep, '/').replace(/\.vue$/, '')}`
       .replace(/\/index$/, '') || '/'
-    const address = route.replace(/\[(\w+)\]/g, (_, parameter: string) => {
-      const sample = SAMPLES[parameter]
-      if (sample === undefined) throw new Error(`${file}: no sample for [${parameter}]`)
 
-      return sample
-    })
+    return DEVELOPMENT_ONLY.has(route) ? [] : [{ file, route }]
+  })
+}
 
-    return DEVELOPMENT_ONLY.has(address) ? [] : [{ file, route, address }]
+/** The address a page answers at: its route, with a sample in place of each parameter. */
+function addressOf({ file, route }: BuiltPage): string {
+  return route.replace(/\[(\w+)\]/g, (_, parameter: string) => {
+    const sample = SAMPLES[parameter]
+    if (sample === undefined) throw new Error(`${file}: no sample for [${parameter}]`)
+
+    return sample
   })
 }
 
@@ -84,7 +93,7 @@ function builtPages(): { file: string, route: string, address: string }[] {
  * sample for fails instead of being skipped.
  */
 export function pageAddresses(): string[] {
-  return builtPages().map(page => page.address)
+  return builtPages().map(addressOf)
 }
 
 /**
@@ -95,6 +104,11 @@ export function pageAddresses(): string[] {
  * It exists for what a page with a parameter expands to. `pageAddresses` swaps the
  * parameter for one sample so a gate has an address to open, which says nothing
  * about which values the build is meant to write a page for.
+ *
+ * It asks for no sample, on purpose. A page whose parameter nobody declared yet
+ * still has a route, and `prerendered-routes.ts` is who says it has no source —
+ * a throw from here used to get in first, with "no sample for [id]" in the place
+ * of the message that names what to declare.
  */
 export function pageRoutes(): string[] {
   return builtPages().map(page => page.route)
@@ -110,8 +124,9 @@ export function pageRoutes(): string[] {
  * default layout, left the battle unannounced with its own test green.
  */
 export function pageLayouts(): Map<string, string> {
-  return new Map(builtPages().map(({ file, address }) => {
-    const source = stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))
+  return new Map(builtPages().map((page) => {
+    const address = addressOf(page)
+    const source = stripComments(readFileSync(join(REPO_ROOT, page.file), 'utf8'))
     const layout = /definePageMeta\(\s*\{[^}]*?\blayout:\s*(false|'[\w-]+'|"[\w-]+")/.exec(source)?.[1]
 
     if (layout === undefined) return [address, 'default']

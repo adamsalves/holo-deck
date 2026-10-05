@@ -41,9 +41,21 @@ import { pageRoutes, REPO_ROOT } from './source-tree.ts'
  * **A page with a parameter and no declared source fails.** A new `[x].vue` has to
  * say where its addresses come from, and a declaration whose page is gone is as
  * stale as a list nobody reads.
+ *
+ * **And every page has its payload beside it, and every payload its page.** The
+ * two are written by the same render, so a page alone is a page this build did
+ * not render. That is what the Vercel preset does with a file a previous build
+ * left in `.output/public`: Nitro's prerenderer answers the route with it instead
+ * of rendering, and the old page goes into the output with nothing beside it.
+ * Measured with one such file on disk: the build exits 0 with 4,210 routes
+ * instead of 4,211, and every other question of the Vercel gate passes.
  */
 
 const DATA = join(REPO_ROOT, 'public/data')
+
+/** The file a page is, and the file its data travels in, side by side in the page's folder. */
+const PAGE = 'index.html'
+const PAYLOAD = '_payload.json'
 
 /** More than this many routes in one message is a wall of text: the count says the rest. */
 const LIST_LIMIT = 20
@@ -106,7 +118,8 @@ function originsOfRoutes(): { origins: Origin[], problems: string[] } {
 }
 
 /**
- * Every route the build wrote, as a path with no locale prefix, by locale.
+ * Every route the build wrote a `file` for — the page or its payload —, as a
+ * path with no locale prefix, by locale.
  *
  * The locale **root** is the case worth spelling out: `/en` is the home page of
  * the other language, not a page called *en* in this one. Matching only
@@ -118,12 +131,12 @@ function originsOfRoutes(): { origins: Origin[], problems: string[] } {
  * output folder and not assumed. The offline shell is the one file with another
  * name, which is why `builtRouteProblems` asks for it by name.
  */
-export function routesByLocale(dir: string): Map<string, Set<string>> {
+function routesByLocale(dir: string, file: string): Map<string, Set<string>> {
   const prefixed = LOCALES.map(({ code }) => code).filter(code => code !== DEFAULT_LOCALE)
   const byLocale = new Map<string, Set<string>>(LOCALES.map(({ code }) => [code, new Set<string>()]))
 
   for (const entry of readdirSync(dir, { withFileTypes: true, recursive: true })) {
-    if (!entry.isFile() || entry.name !== 'index.html') continue
+    if (!entry.isFile() || entry.name !== file) continue
 
     const relativePath = relative(dir, entry.parentPath).replaceAll(sep, '/')
     const route = relativePath === '' ? '/' : `/${relativePath}`
@@ -160,10 +173,12 @@ export function builtRouteProblems(dir: string): string[] {
   }
 
   const explained = new Set(origins.flatMap(origin => origin.routes))
-  const built = routesByLocale(dir)
+  const built = routesByLocale(dir, PAGE)
+  const carried = routesByLocale(dir, PAYLOAD)
 
   for (const { code } of LOCALES) {
     const wrote = built.get(code) ?? new Set<string>()
+    const data = carried.get(code) ?? new Set<string>()
 
     for (const origin of origins) {
       const missing = origin.routes.filter(route => !wrote.has(route))
@@ -172,6 +187,12 @@ export function builtRouteProblems(dir: string): string[] {
 
     const unexplained = [...wrote].filter(route => !explained.has(route)).sort()
     if (unexplained.length > 0) problems.push(`[${code}] ${where} has routes no origin explains: ${listed(unexplained, code)}`)
+
+    const alone = [...wrote].filter(route => !data.has(route)).sort()
+    if (alone.length > 0) problems.push(`[${code}] ${where} has pages with no ${PAYLOAD} beside them, which is a page this build did not render: ${listed(alone, code)}`)
+
+    const adrift = [...data].filter(route => !wrote.has(route)).sort()
+    if (adrift.length > 0) problems.push(`[${code}] ${where} has a ${PAYLOAD} with no page beside it: ${listed(adrift, code)}`)
   }
 
   if (!existsSync(join(dir, OFFLINE_SHELL_PATH))) problems.push(`offline shell: ${where} lacks ${OFFLINE_SHELL_PATH}`)
