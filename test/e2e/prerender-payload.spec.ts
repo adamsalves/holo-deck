@@ -2,7 +2,8 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
-import { defaultLocale, localeCodes } from '../support/locales.ts'
+import { LOCALES } from '../../app/utils/locales.ts'
+import { builtRouteProblems } from '../support/prerendered-routes.ts'
 
 /**
  * O dado pré-renderizado de `useAsyncData` é JSON, e a mesma chave vale o mesmo
@@ -145,34 +146,6 @@ test('o dado pré-renderizado é JSON, e a mesma chave vale o mesmo em toda pág
 })
 
 /**
- * Every route the build wrote, as a path with no locale prefix, by locale.
- *
- * The locale **root** is the case worth spelling out: `/en` is the home page of
- * the other language, not a page called *en* in this one. Matching only
- * `/en/…` files it in the default bucket, where it becomes a route `/en` that
- * the other language is then reported as missing — which is what the first
- * version of this did, and the failure names the wrong thing twice.
- */
-async function routesByLocale(): Promise<Map<string, Set<string>>> {
-  const entries = await readdir(PUBLIC, { withFileTypes: true, recursive: true })
-  const prefixed = localeCodes().filter(code => code !== defaultLocale())
-  const byLocale = new Map<string, Set<string>>(localeCodes().map(code => [code, new Set<string>()]))
-
-  for (const entry of entries) {
-    if (!entry.isFile() || entry.name !== 'index.html') continue
-
-    const relativePath = relative(PUBLIC, entry.parentPath)
-    const route = relativePath === '' ? '/' : `/${relativePath}`
-    const code = prefixed.find(one => route === `/${one}` || route.startsWith(`/${one}/`))
-
-    if (code === undefined) byLocale.get(defaultLocale())?.add(route)
-    else byLocale.get(code)?.add(route.slice(code.length + 1) || '/')
-  }
-
-  return byLocale
-}
-
-/**
  * Every route the build writes in the default language, it also writes in the
  * other one — with no exception left.
  *
@@ -205,25 +178,20 @@ async function routesByLocale(): Promise<Map<string, Set<string>>> {
  * With the list gone, a route the build writes in one language only is a
  * failure here, named, whatever the reason. The day one genuinely has to be,
  * the argument belongs in the review that brings the list back.
+ *
+ * **What it is compared to is the sources, not the default language.** Holding
+ * `/en` against the Portuguese pages catches a route lost in one language and
+ * nothing else: a route lost in both, or the whole build gone, agreed with itself
+ * — and the `toBeGreaterThan(1000)` that stood in for it was a floor on the sum,
+ * green with the nine battles or the nine static pages missing. The helper holds
+ * each language to what the sources name, origin by origin, and to nothing extra
+ * (`test/support/prerendered-routes.ts`); `scripts/check-vercel-bundle.ts` asks
+ * it the same of the Vercel output, which is the one that is deployed. A prefix
+ * leaking into the path (`/en/en/deck`) is a route no origin explains.
  */
-test('every prerendered route exists in each language', async () => {
-  const byLocale = await routesByLocale()
-  const base = byLocale.get(defaultLocale()) ?? new Set<string>()
+test('every route the sources name is prerendered in each language, and the build writes no other', () => {
+  // With one language there is no "each language" to speak of.
+  expect(LOCALES.length).toBeGreaterThan(1)
 
-  // `[] === []` passes: a build that never ran, or a renamed directory, would
-  // leave both comparisons below measuring nothing and looking healthy for it.
-  expect(base.size, 'no prerendered route at all — did the build run?').toBeGreaterThan(1000)
-  expect(localeCodes().length).toBeGreaterThan(1)
-
-  for (const [code, routes] of byLocale) {
-    if (code === defaultLocale()) continue
-
-    const missing = [...base].filter(route => !routes.has(route)).sort()
-
-    expect(missing, `the prerender never reached these routes in ${code}`).toEqual([])
-
-    // No route only in `/en`: a prefix leaking into the path itself
-    // (`/en/en/deck`) would show up here, and nowhere above.
-    expect([...routes].filter(route => !base.has(route)).sort(), `route only in ${code}`).toEqual([])
-  }
+  expect(builtRouteProblems(PUBLIC)).toEqual([])
 })

@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { builtRouteProblems } from '../test/support/prerendered-routes.ts'
 import { probeServer } from '../test/support/server-probe.ts'
 import { withFunctionServer } from '../test/support/vercel-function-server.ts'
 
@@ -35,6 +36,13 @@ import { withFunctionServer } from '../test/support/vercel-function-server.ts'
  *    as outras rotas são symlink para `__fallback.func`; no dia em que o Nitro
  *    emitir funções separadas, medir só a de fallback seria medir a errada.
  *
+ * **The pages are measured too, by origin.** `.vercel/output/static` is what
+ * Vercel serves and nothing else looked at it: the e2e that holds the Node output
+ * to the sources (`prerender-payload.spec.ts`) cannot see a page the Vercel build
+ * lost. The same helper (`test/support/prerendered-routes.ts`) holds this folder
+ * to the same set — the static pages, the generations, the species, the nine
+ * battles, the offline shell —, by name, in every language and in both directions.
+ *
  * **And then it starts the function and asks it.** Files in place are not files
  * read: a function that reads the dex through `process.cwd()` has every chunk
  * above in place and still answers 500 from anywhere but the project root. So
@@ -60,6 +68,7 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const DATA = 'public/data'
 const FUNCTIONS = '.vercel/output/functions'
+const STATIC = '.vercel/output/static'
 const FALLBACK = '__fallback.func'
 const RAW = join(FUNCTIONS, FALLBACK, 'chunks/raw')
 
@@ -128,6 +137,30 @@ if (missing.length > 0) process.exit(1)
 
 console.log(`${sources.length} arquivos do dex conferidos dentro da função da Vercel`)
 
+/**
+ * A check that threw — a source it could not read, a function that never started —
+ * fails the run like one that found a problem, and is annotated the same way.
+ * `%0A` is how a workflow command carries a line break, so the stderr of a
+ * function that never started stays inside the annotation.
+ */
+function fail(error: unknown): never {
+  console.error(`::error::${(error instanceof Error ? error.message : String(error)).replaceAll('\n', '%0A')}`)
+  process.exit(1)
+}
+
+let pageProblems: string[]
+try {
+  pageProblems = builtRouteProblems(join(REPO_ROOT, STATIC))
+}
+catch (error) {
+  fail(error)
+}
+
+for (const problem of pageProblems) console.error(`::error::${problem}`)
+if (pageProblems.length > 0) process.exit(1)
+
+console.log(`the pages in ${STATIC} match what the sources name, in every language`)
+
 const functionDir = join(functionsRoot, FALLBACK)
 
 let problems: string[]
@@ -135,10 +168,7 @@ try {
   problems = await withFunctionServer(functionDir, (base, cwd) => probeServer(base, [cwd, functionDir]))
 }
 catch (error) {
-  // `%0A` is how a workflow command carries a line break, so the stderr of a
-  // function that never started stays inside the annotation.
-  console.error(`::error::${(error instanceof Error ? error.message : String(error)).replaceAll('\n', '%0A')}`)
-  process.exit(1)
+  fail(error)
 }
 
 for (const problem of problems) console.error(`::error::${problem}`)

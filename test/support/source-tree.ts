@@ -57,8 +57,11 @@ export function developmentOnlyPages(): string[] {
   return [...DEVELOPMENT_ONLY].map(address => `${PAGES}${address}.vue`)
 }
 
-/** The pages the build keeps, each with the address it answers at. */
-function builtPages(): { file: string, address: string }[] {
+/**
+ * The pages the build keeps, each with its route as `app/pages` spells it — the
+ * parameter in brackets — and the address it answers at, with a sample in its place.
+ */
+function builtPages(): { file: string, route: string, address: string }[] {
   const pages = walkFiles(join(REPO_ROOT, PAGES), new Set(), hasExtension(['.vue']))
 
   return pages.flatMap((file) => {
@@ -71,7 +74,7 @@ function builtPages(): { file: string, address: string }[] {
       return sample
     })
 
-    return DEVELOPMENT_ONLY.has(address) ? [] : [{ file, address }]
+    return DEVELOPMENT_ONLY.has(address) ? [] : [{ file, route, address }]
   })
 }
 
@@ -82,6 +85,19 @@ function builtPages(): { file: string, address: string }[] {
  */
 export function pageAddresses(): string[] {
   return builtPages().map(page => page.address)
+}
+
+/**
+ * The route of each page the build keeps, as `app/pages` spells it — `/pokedex/[gen]`,
+ * with the parameter in brackets — from the same scan and the same
+ * development-only exclusion as `pageAddresses`.
+ *
+ * It exists for what a page with a parameter expands to. `pageAddresses` swaps the
+ * parameter for one sample so a gate has an address to open, which says nothing
+ * about which values the build is meant to write a page for.
+ */
+export function pageRoutes(): string[] {
+  return builtPages().map(page => page.route)
 }
 
 /**
