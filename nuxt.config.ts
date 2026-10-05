@@ -263,6 +263,10 @@ export default defineNuxtConfig({
      * O preço é a função crescer de 3,4 MB para 5,3 MB, e ele é aceito: os
      * arquivos entram como chunks separados e só o pedido é carregado, então o
      * custo é de tamanho de deploy, não de cold start.
+     *
+     * Those two sizes are from the day the dex went in. In October 2026 the
+     * function is 17.1 MB, 14.4 of them `node_modules` — and 866 of its 990
+     * packages are a lone `package.json` nothing imports, which is issue #90.
      */
     serverAssets: [
       { baseName: 'dex', dir: '../public/data' },
