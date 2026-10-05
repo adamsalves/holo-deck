@@ -52,6 +52,13 @@ Um portão errado é pior que nenhum: ele dá a impressão de que a regra está 
 - **Afirmar o outro lado**, senão `[] === []` passa.
 - **Provar reintroduzindo o defeito e vendo a mensagem de erro** — e também medir contra entrada boa,
   senão um portão que reprova sempre parece igualmente saudável.
+- **O lado bom tem de ser respondido pelo mesmo mecanismo que o lado ruim.** Antes de chamar duas
+  perguntas de par, conferir quem responde cada uma em cada ambiente medido: a página de uma espécie
+  real era arquivo estático no preset Node, e o 404 ao lado dela seguia 404 com o dex ilegível.
+- **Rodar o artefato no lugar mede o `cwd`, não o lugar.** O Node resolve import subindo pelos
+  diretórios pais, então o que roda de dentro do repositório acha o `node_modules` do projeto. Subir
+  uma cópia fora da árvore, e varrer a cópia pelo caminho do repositório — o import absoluto
+  sobrevive à cópia na máquina que construiu.
 - **Comparar conjuntos, não contagens.** Contagem é o disfarce mais comum de portão que não confere.
 - **Piso por fonte, nunca piso sobre a soma.** Uma asserção do tipo "achei mais que N" é sustentada
   por qualquer parcela que ainda funcione: quando o total tem duas origens, matar uma inteira não
