@@ -53,6 +53,19 @@ yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
 yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver abaixo
 ```
 
+O preset da Vercel, que é o que vai ao ar, tem o seu par de comandos:
+
+```bash
+yarn build:vercel         # apaga .output e .vercel/output e constrói com o preset da Vercel
+yarn check:vercel-bundle  # confere a saída do preset; exige o build:vercel antes
+```
+
+O `build:vercel` **apaga o `.output`**, de propósito: com o `.output` de um build
+Node em disco, o preset da Vercel prerenderiza 19 rotas em vez das 4.211 de um
+build limpo e morre no hook do service worker. Por isso o e2e roda antes dele, ou
+pede `yarn build` de novo. O que o `check:vercel-bundle` cobra está em *Pokédex*,
+onde o defeito que ele vigia é contado.
+
 Dois dos portões da Fase 7 são **manuais**, e a razão de estarem escritos aqui é
 que nada no CI os dispara:
 
@@ -857,9 +870,47 @@ Quatro decisões desta fase que não se deduzem lendo o código:
   responder 404: `/pokemon/<slug inexistente>` respondia **500, com o caminho
   absoluto do servidor na linha de status e no corpo**. O e2e que provava o 404
   não pegava porque roda contra `yarn preview` a partir da raiz do repositório —
-  o único `cwd` em que o código quebrado funcionava. Agora quem prova é
+  o único `cwd` em que o código quebrado funcionava. Agora quem prova, no preset
+  do `yarn build`, é
   [`test/e2e/server-runtime.spec.ts`](test/e2e/server-runtime.spec.ts), que sobe
   o servidor construído de um diretório temporário.
+
+  **O alcance do portão, hoje.** Os dois presets respondem à mesma conferência, e
+  o da Vercel — o que vai ao ar — tem o seu próprio comando
+  (`yarn build:vercel` e `yarn check:vercel-bundle`):
+
+  - **A mesma sonda, nos dois presets, em toda língua.**
+    [`test/support/server-probe.ts`](test/support/server-probe.ts) tira as URLs
+    das fontes: para cada língua de `LOCALES`, `/pokemon/missingno` e
+    `/pokedex/99` respondem 404 sem caminho na linha de status nem no corpo, e a
+    primeira espécie do índice responde 200 com o nome dela. O lado bom é o que
+    impede passar um servidor que respondesse 404 a tudo, e a entrada inválida é
+    conferida contra a fonte: se `missingno` virar slug ou `gen-99.json` virar
+    arquivo, a sonda acusa a entrada, e não o servidor.
+  - **A função subindo de fato.**
+    [`test/support/vercel-function-server.ts`](test/support/vercel-function-server.ts)
+    roda `.vercel/output/functions/__fallback.func` num processo filho, de um
+    diretório temporário. Ali não há página estática, então o 200 da espécie é
+    SSR lendo o dex embarcado. Provado plantando de volta a leitura por
+    `process.cwd()`: as conferências estáticas do dex seguem passando, e só a
+    sonda acusa o 500 e o caminho.
+  - **As páginas, por origem.**
+    [`test/support/prerendered-routes.ts`](test/support/prerendered-routes.ts)
+    compara cada língua com o que as fontes nomeiam — as páginas de `app/pages`
+    sem parâmetro, as gerações pelos `gen-N.json`, as espécies pelo índice, as
+    batalhas por `GYM_COUNT` e o shell offline pelo nome —, nos dois sentidos, em
+    `.output/public` no e2e e em `.vercel/output/static` no script. São 2.104
+    páginas, 1.052 por língua. O piso `> 1000` que havia antes ficou verde com as
+    nove batalhas fora das duas línguas; agora o portão reprova nomeando as 18.
+  - **O Node da função.** O Nitro 2.13 só conhece Node 18, 20 e 22 e caía para 22
+    no build em Node 24. O `nuxt.config.ts` declara `nodejs24.x` por literal, e o
+    script confere o major do `.vc-config.json` contra o do `.nvmrc`: uma subida
+    do `.nvmrc` reprova o portão e é decidida, em vez de mudar o runtime de
+    produção sozinha.
+
+  **O que continua fora:** o deploy de verdade, a terceira saída da #15. O
+  preview fica atrás da autenticação da Vercel, então o que a Vercel faz com a
+  saída — inclusive rodar a função no `nodejs24.x` — continua conferido à mão.
 - **Tudo é pré-renderizado — 1036 páginas, ~18 s de build.** `crawlLinks` parte
   de `/pokedex`, alcança as nove regiões e, de cada grid, as 1025 espécies. As
   três abas do detalhe são montadas mesmo fechadas (`unmount-on-hide` desligado):
