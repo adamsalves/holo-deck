@@ -267,6 +267,17 @@ export default defineNuxtConfig({
     serverAssets: [
       { baseName: 'dex', dir: '../public/data' },
     ],
+
+    /**
+     * The Node the Vercel function runs on, declared and not derived.
+     *
+     * Nitro 2.13 only knows Node 18, 20 and 22 and falls back to 22 on anything
+     * newer, so a build on this repository's Node 24 shipped a `nodejs22.x`
+     * function. It is a literal on purpose: a bump of `.nvmrc` has to fail
+     * `scripts/check-vercel-bundle.ts` and be decided, not move production's
+     * runtime on its own.
+     */
+    vercel: { functions: { runtime: 'nodejs24.x' } },
   },
 
   typescript: {

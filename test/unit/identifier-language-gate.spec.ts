@@ -57,7 +57,7 @@ const PLATFORM = [
 /** The tools, by their own names. */
 const TOOLING = [
   'deps', 'devtools', 'dirs', 'eslint', 'github', 'gunzip', 'gzip', 'nuxt', 'pinia', 'prerender',
-  'repo', 'teardown', 'transpile', 'tsconfig', 'untracked',
+  'repo', 'teardown', 'transpile', 'tsconfig', 'untracked', 'vercel',
 ]
 
 /**
