@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { probeServer } from '../support/server-probe.ts'
 
 /**
  * O servidor construído responde certo **de qualquer diretório de trabalho**.
@@ -27,6 +28,11 @@ import { expect, test } from '@playwright/test'
  * funcionava. É o defeito recorrente deste repo outra vez: o portão medindo o
  * lugar onde o problema não está. Por isso este teste sobe o servidor **de um
  * diretório temporário**, que é o que reproduz a forma do deploy.
+ *
+ * What is asked of that server lives in `test/support/server-probe.ts`: the 404s
+ * in every language, with the good side asserted. `scripts/check-vercel-bundle.ts`
+ * asks the same questions of the Vercel function, so the two presets answer to
+ * one probe and this file only decides where the server runs from.
  */
 
 const OUTPUT_SERVER = fileURLToPath(new URL('../../.output/server/index.mjs', import.meta.url))
@@ -45,7 +51,7 @@ async function waitForServer(signal: AbortSignal): Promise<void> {
   }
 }
 
-test('o servidor construído responde 404 e não vaza caminho, rodando fora da raiz do projeto', async () => {
+test('the built server answers every language from outside the project root: 404 with no path leaked, and the real page', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'holo-deck-cwd-'))
   const child = spawn(process.execPath, [OUTPUT_SERVER], {
     cwd,
@@ -57,21 +63,9 @@ test('o servidor construído responde 404 e não vaza caminho, rodando fora da r
     const ready = AbortSignal.timeout(30_000)
     await waitForServer(ready)
 
-    // Um slug que não existe no índice. Ele não é pré-renderizado, então é o
-    // servidor quem responde — e responder exige ler o índice para saber que a
-    // espécie não existe. É o caminho inteiro que o defeito quebrava.
-    const response = await fetch(`${BASE}/pokemon/missingno`)
-    const body = await response.text()
-
-    expect(response.status).toBe(404)
-
-    // O 500 antigo carregava o caminho absoluto do servidor nos dois lugares.
-    // Conferir os dois porque o h3 põe o `statusMessage` na linha de status
-    // **e** no corpo, e um deles sozinho já vaza.
-    for (const surface of [response.statusText, body]) {
-      expect(surface).not.toContain(cwd)
-      expect(surface).not.toMatch(/\/(?:var\/task|home|tmp)\//)
-    }
+    // The temporary working directory and the folder the server file lives in:
+    // the two places the 500 used to print.
+    expect(await probeServer(BASE, [cwd, dirname(OUTPUT_SERVER)])).toEqual([])
   }
   finally {
     child.kill('SIGTERM')
