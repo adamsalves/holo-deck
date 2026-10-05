@@ -1,6 +1,8 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { probeServer } from '../test/support/server-probe.ts'
+import { withFunctionServer } from '../test/support/vercel-function-server.ts'
 
 /**
  * O dex vai dentro da função da Vercel — a issue #15.
@@ -32,6 +34,16 @@ import { fileURLToPath } from 'node:url'
  * 3. **A função medida precisa continuar sendo a que serve `/pokemon/*`.** Hoje
  *    as outras rotas são symlink para `__fallback.func`; no dia em que o Nitro
  *    emitir funções separadas, medir só a de fallback seria medir a errada.
+ *
+ * **And then it starts the function and asks it.** Files in place are not files
+ * read: a function that reads the dex through `process.cwd()` has every chunk
+ * above in place and still answers 500 from anywhere but the project root. So
+ * the last step runs the function from a temporary directory
+ * (`test/support/vercel-function-server.ts`) and puts the probe of
+ * `server-runtime.spec.ts` to it (`test/support/server-probe.ts`): the same 404s,
+ * in every language, and a real species answering 200 as the good side. It comes
+ * last on purpose — a build that lost the dex fails above, by name, and not here
+ * as a 500.
  *
  * Roda depois de `yarn build:vercel`.
  */
@@ -115,3 +127,21 @@ for (const name of missing) {
 if (missing.length > 0) process.exit(1)
 
 console.log(`${sources.length} arquivos do dex conferidos dentro da função da Vercel`)
+
+const functionDir = join(functionsRoot, FALLBACK)
+
+let problems: string[]
+try {
+  problems = await withFunctionServer(functionDir, (base, cwd) => probeServer(base, [cwd, functionDir]))
+}
+catch (error) {
+  // `%0A` is how a workflow command carries a line break, so the stderr of a
+  // function that never started stays inside the annotation.
+  console.error(`::error::${(error instanceof Error ? error.message : String(error)).replaceAll('\n', '%0A')}`)
+  process.exit(1)
+}
+
+for (const problem of problems) console.error(`::error::${problem}`)
+if (problems.length > 0) process.exit(1)
+
+console.log('the function answered the probe: 404 with no path leaked, and the real species page, in every language')

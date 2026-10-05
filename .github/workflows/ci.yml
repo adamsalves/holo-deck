@@ -144,6 +144,9 @@ jobs:
   # só chega à função por `serverAssets`. Este job constrói com o preset de
   # verdade e cobra que cada arquivo de `public/data/` tenha cópia lá dentro. Em
   # paralelo com o e2e, porque os dois constroem e nenhum depende do outro.
+  #
+  # It also starts the function from a temporary directory and puts it the same
+  # 404 probe, in every language, that the e2e puts to the Node server.
   vercel-bundle:
     name: dex na função da Vercel
     runs-on: ubuntu-latest
