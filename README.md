@@ -53,6 +53,24 @@ yarn test:e2e    # Playwright — exige `yarn build` antes: o webServer sobe
 yarn data:build  # regera o dex; só é preciso quando o pipeline muda — ver abaixo
 ```
 
+O preset da Vercel, que é o que vai ao ar, tem o seu par de comandos:
+
+```bash
+yarn build:vercel         # apaga .output e .vercel/output e constrói com o preset da Vercel
+yarn check:vercel-bundle  # confere a saída do preset; exige o build:vercel antes
+```
+
+O `build:vercel` **apaga o `.output`**, de propósito. No preset da Vercel, o
+prerenderer do Nitro segue lendo os estáticos de `.output/public`, e responde cada
+rota com o arquivo que um build anterior deixou lá em vez de renderizá-la. Com o
+`.output` de um build Node inteiro em disco saem 19 rotas, todas velhas, em vez
+das 4.211 de um build limpo, e o build morre no hook do service worker. Com um
+`.output` de uma página só o build **passa**, com a página velha dentro — e quem
+acusa é o `check:vercel-bundle`, porque página que o build não renderizou não tem
+payload ao lado. Por isso o e2e roda antes do `build:vercel`, ou pede `yarn build`
+de novo. O que o `check:vercel-bundle` cobra está em *Pokédex*, onde o defeito
+que ele vigia é contado.
+
 Dois dos portões da Fase 7 são **manuais**, e a razão de estarem escritos aqui é
 que nada no CI os dispara:
 
@@ -372,7 +390,7 @@ está aqui é só o que sobrou de propósito.
 | `DexTypeBadge` sem chanfro | nenhuma prancha chanfra o chip de tipo, e a 11px do grid um chanfro de 9px come a última letra de VENENOSO |
 | habitat em `--accent` | a prancha *Detalhe* pinta o valor com o verde de planta (`#5FE07A`), que não tem papel no sistema. `--accent` é o semântico que existe para "este valor se destaca" |
 | habitat traduzido, não `HABITAT MOUNTAIN` | a prancha *Detalhe* escreve o habitat em inglês e maiúsculas, que é o identificador da PokeAPI. `--accent` faz dele o valor mais destacado do painel, e um documento não destaca uma palavra de outro idioma — o mesmo argumento que trocou `FLYING` por `VOADOR` nos chips. Desde a Fase 8 ele tem **dois** valores (`Montanha` / `Mountain`), resolvidos por `habitatKey` no locale |
-| busca no herói do Detalhe | a prancha *Detalhe* não desenha o `Buscar Pokémon ⌘K` no topo da coluna da arte. Estas são 1025 das 1036 páginas do site e é para cá que a própria busca leva: sem ela, sair da tela só pela trilha, e o `Cmd/Ctrl+K` que o resto da Pokédex promete não responderia justamente onde o jogador passa mais tempo |
+| busca no herói do Detalhe | a prancha *Detalhe* não desenha o `Buscar Pokémon ⌘K` no topo da coluna da arte. Estas são 1025 das 1.052 páginas de cada língua e é para cá que a própria busca leva: sem ela, sair da tela só pela trilha, e o `Cmd/Ctrl+K` que o resto da Pokédex promete não responderia justamente onde o jogador passa mais tempo |
 | relações de dano completas | a prancha desenha **4** resistências e o Charizard tem **7**. O painel mostra quem foge do neutro, e truncar esconderia relação que decide batalha — o mockup escolheu o número que coube bonito nele |
 | marca-d'água em `--text` a 3% | a prancha usa branco a **2,8%**. `color-mix` aceita o fracionário; o 3% é o passo redondo, e a diferença é invisível no papel que a própria prancha dá ao número (identidade, não leitura) |
 | marca-d'água em `min(46cqw, 230px)` e `max(-30px, -5%)` | a prancha fixa `230px` e `left:-30px` numa coluna de 560. A página não tem `max-width`, então a coluna vai de 100% do viewport a 5/12 dele — os valores fixos só reproduziriam o desenho em 1440. A conta acompanha a coluna e para nos números da prancha |
@@ -857,11 +875,78 @@ Quatro decisões desta fase que não se deduzem lendo o código:
   responder 404: `/pokemon/<slug inexistente>` respondia **500, com o caminho
   absoluto do servidor na linha de status e no corpo**. O e2e que provava o 404
   não pegava porque roda contra `yarn preview` a partir da raiz do repositório —
-  o único `cwd` em que o código quebrado funcionava. Agora quem prova é
+  o único `cwd` em que o código quebrado funcionava. Agora quem prova, no preset
+  do `yarn build`, é
   [`test/e2e/server-runtime.spec.ts`](test/e2e/server-runtime.spec.ts), que sobe
-  o servidor construído de um diretório temporário.
-- **Tudo é pré-renderizado — 1036 páginas, ~18 s de build.** `crawlLinks` parte
-  de `/pokedex`, alcança as nove regiões e, de cada grid, as 1025 espécies. As
+  uma cópia do servidor construído, fora do repositório.
+
+  **O alcance do portão, hoje.** Os dois presets respondem à mesma conferência, e
+  o da Vercel — o que vai ao ar — tem o seu próprio comando
+  (`yarn build:vercel` e `yarn check:vercel-bundle`):
+
+  - **A mesma sonda, nos dois presets, em toda língua.**
+    [`test/support/server-probe.ts`](test/support/server-probe.ts) tira as URLs
+    das fontes. Primeiro pede ao servidor o próprio índice, pela rota que o
+    `useDex()` dele usa (`/__dex/index.json`): 200, com a espécie real dentro.
+    Depois, para cada língua de `LOCALES`, `/pokemon/missingno` e `/pokedex/99`
+    respondem 404 sem caminho na linha de status nem no corpo — pedidos como o
+    `fetch` pede e com `Accept: text/html`, que é a página de erro que o
+    visitante recebe —, e cada um tem o seu 200 ao lado: a primeira espécie do
+    índice e a primeira geração do dex, com o nome de uma espécie no corpo. A
+    entrada inválida é conferida contra a fonte: se `missingno` virar slug ou
+    `gen-99.json` virar arquivo, a sonda acusa a entrada, e não o servidor.
+
+    **Quem distingue o servidor que lê o dex do que não lê é a rota, e não as
+    páginas.** No preset do `yarn build` a página de uma espécie real é um
+    arquivo estático, respondido antes de o app ser consultado. Com a leitura de
+    volta em `process.cwd()` na forma "ausente é 404", todo 404 seguia 404 pelo
+    motivo errado, o 200 seguia 200, e o spec passava. Com a pergunta ao índice
+    ele reprova: `GET /__dex/index.json: answered 404 …, expected 200`.
+  - **Uma cópia do servidor, fora do repositório.**
+    [`test/support/built-server.ts`](test/support/built-server.ts) copia a pasta
+    do servidor — `.vercel/output/functions/__fallback.func` num preset,
+    `.output/server` no outro — para um diretório temporário e sobe a cópia num
+    processo filho, com o `cwd` nela, que é a forma de `/var/task`. Rodando do
+    lugar onde o build a deixou, a função achava o `node_modules` do projeto
+    subindo pelos diretórios pais: com o dela renomeado, o portão passava. Antes
+    de subir, cada arquivo da cópia é lido atrás do caminho do repositório, que é
+    o que pega o build que deixou de rastrear dependências e passou a importar
+    por caminho absoluto. O pronto é a linha que o próprio filho imprime com a
+    porta, e não a porta respondendo: um servidor velho na mesma porta não
+    responde no lugar dele. Na função não há página estática, então os 200 são
+    SSR lendo o dex embarcado. Provado plantando de volta a leitura por
+    `process.cwd()`: as conferências de disco seguem passando, e só a sonda
+    acusa.
+  - **Toda função é a de fallback.** O preset escreve 16 pastas `.func`, e 15 são
+    link para `__fallback.func`. As aninhadas são as que o `config.json` roteia —
+    `/pokemon/<name>` vai para `pokemon/[name].func` —, então o script anda a
+    árvore inteira e cobra que cada uma resolva para a de fallback, que é a única
+    que ele sobe, sonda e lê.
+  - **As páginas, por origem, cada uma com o seu payload.**
+    [`test/support/prerendered-routes.ts`](test/support/prerendered-routes.ts)
+    compara cada língua com o que as fontes nomeiam — as páginas de `app/pages`
+    sem parâmetro, as gerações pelos `gen-N.json`, as espécies pelo índice, as
+    batalhas por `GYM_COUNT` e o shell offline pelo nome —, nos dois sentidos, em
+    `.output/public` no e2e e em `.vercel/output/static` no script. São 2.104
+    páginas, 1.052 por língua, e 2.104 payloads: página sem `_payload.json` ao
+    lado é página que o build não renderizou. O piso `> 1000` que havia antes
+    ficou verde com as nove batalhas fora das duas línguas; agora o portão
+    reprova nomeando as 18.
+  - **O Node da função.** O Nitro 2.13 só conhece Node 18, 20 e 22 e caía para 22
+    no build em Node 24. O `nuxt.config.ts` declara `nodejs24.x` por literal, e o
+    script confere o major do `.vc-config.json` contra o do `.nvmrc`: uma subida
+    do `.nvmrc` reprova o portão e é decidida, em vez de mudar o runtime de
+    produção sozinha. O `engines.node` fica fora da conta porque o `yarn install`
+    já recusa um Node fora da faixa dele.
+
+  **O que continua fora:** o deploy de verdade, a terceira saída da #15. O
+  preview fica atrás da autenticação da Vercel, então o que a Vercel faz com a
+  saída — inclusive rodar a função no `nodejs24.x` — continua conferido à mão. E
+  o `config.json`: o portão lê que a página foi escrita, e não os `overrides` que
+  dão a cada arquivo o seu endereço na borda.
+- **Tudo é pré-renderizado — 2.104 páginas, 1.052 por língua, ~40 s de build.**
+  `crawlLinks` parte de `/pokedex`, alcança as nove regiões e, de cada grid, as
+  1025 espécies. As
   três abas do detalhe são montadas mesmo fechadas (`unmount-on-hide` desligado):
   sem isso o HTML sai com a descrição e **sem** base stats, relações de dano e
   linha evolutiva, que é o conteúdo pelo qual a página seria encontrada.

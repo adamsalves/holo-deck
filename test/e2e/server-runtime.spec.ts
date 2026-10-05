@@ -1,9 +1,7 @@
-import { spawn } from 'node:child_process'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
+import { withNodeServer } from '../support/built-server.ts'
+import { probeServer } from '../support/server-probe.ts'
 
 /**
  * O servidor construído responde certo **de qualquer diretório de trabalho**.
@@ -27,54 +25,24 @@ import { expect, test } from '@playwright/test'
  * funcionava. É o defeito recorrente deste repo outra vez: o portão medindo o
  * lugar onde o problema não está. Por isso este teste sobe o servidor **de um
  * diretório temporário**, que é o que reproduz a forma do deploy.
+ *
+ * What is asked of that server lives in `test/support/server-probe.ts`: the index
+ * through the dex route, the 404s in every language, and the real pages beside
+ * them. `scripts/check-vercel-bundle.ts` asks the same questions of the Vercel
+ * function, so the two presets answer to one probe.
+ *
+ * Where the server runs from lives in `test/support/built-server.ts`, for both
+ * presets too: **a copy of it, outside the repository**, in a child whose own
+ * "listening" line is what the test waits for. The copy is what keeps the
+ * project's `node_modules` out of reach, and the line is what keeps a server
+ * someone else left on the port from answering in its place — with the port
+ * merely answering as the signal, this test passed in 101 ms against one, on a
+ * build it fails by itself.
  */
 
-const OUTPUT_SERVER = fileURLToPath(new URL('../../.output/server/index.mjs', import.meta.url))
-const PORT = 3311
-const BASE = `http://127.0.0.1:${PORT}`
+const OUTPUT = fileURLToPath(new URL('../../.output', import.meta.url))
 
-async function waitForServer(signal: AbortSignal): Promise<void> {
-  while (!signal.aborted) {
-    try {
-      await fetch(BASE, { signal })
-      return
-    }
-    catch {
-      await new Promise(resolve => setTimeout(resolve, 200))
-    }
-  }
-}
-
-test('o servidor construído responde 404 e não vaza caminho, rodando fora da raiz do projeto', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'holo-deck-cwd-'))
-  const child = spawn(process.execPath, [OUTPUT_SERVER], {
-    cwd,
-    env: { ...process.env, PORT: String(PORT), NODE_ENV: 'production' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  try {
-    const ready = AbortSignal.timeout(30_000)
-    await waitForServer(ready)
-
-    // Um slug que não existe no índice. Ele não é pré-renderizado, então é o
-    // servidor quem responde — e responder exige ler o índice para saber que a
-    // espécie não existe. É o caminho inteiro que o defeito quebrava.
-    const response = await fetch(`${BASE}/pokemon/missingno`)
-    const body = await response.text()
-
-    expect(response.status).toBe(404)
-
-    // O 500 antigo carregava o caminho absoluto do servidor nos dois lugares.
-    // Conferir os dois porque o h3 põe o `statusMessage` na linha de status
-    // **e** no corpo, e um deles sozinho já vaza.
-    for (const surface of [response.statusText, body]) {
-      expect(surface).not.toContain(cwd)
-      expect(surface).not.toMatch(/\/(?:var\/task|home|tmp)\//)
-    }
-  }
-  finally {
-    child.kill('SIGTERM')
-    await rm(cwd, { recursive: true, force: true })
-  }
+test('the built server answers from a copy outside the repository, in every language: the index, 404 with no path leaked, and the real pages', async () => {
+  // The temporary folder the copy runs in is what the 500 used to print.
+  expect(await withNodeServer(OUTPUT, (base, root) => probeServer(base, [root]))).toEqual([])
 })

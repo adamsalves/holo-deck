@@ -144,9 +144,22 @@ jobs:
   # só chega à função por `serverAssets`. Este job constrói com o preset de
   # verdade e cobra que cada arquivo de `public/data/` tenha cópia lá dentro. Em
   # paralelo com o e2e, porque os dois constroem e nenhum depende do outro.
+  #
+  # That is the first of five questions, and the reason the job was called "dex na
+  # função da Vercel" until it outgrew the name. It also holds every function the
+  # build wrote to being the fallback one under another name, the Node that one
+  # declares to the major `.nvmrc` pins, and the pages in `.vercel/output/static`
+  # — each with its payload — to the same sources the e2e holds `.output/public`
+  # to; and it starts a copy of the function outside the repository to put it the
+  # same probe, in every language, that the e2e puts to the Node server.
+  #
+  # `timeout-minutes` is the backstop. The harness kills a function that will not
+  # stop and gives up on one that never listens, and the job takes about two
+  # minutes: ten is for the day one of those fails too.
   vercel-bundle:
-    name: dex na função da Vercel
+    name: vercel preset
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -157,8 +170,6 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      - run: yarn build
-        env:
-          NITRO_PRESET: vercel
+      - run: yarn build:vercel
 
       - run: yarn check:vercel-bundle

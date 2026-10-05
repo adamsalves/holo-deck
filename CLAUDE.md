@@ -30,8 +30,11 @@ yarn typecheck               # vue-tsc
 yarn test                    # Vitest
 yarn build                   # saída Nitro
 PORT=3100 yarn test:e2e      # a 3000 é do Grafana nesta máquina; exige build antes
-yarn check:vercel-bundle     # o dex dentro da função da Vercel
+yarn build:vercel            # apaga .output e .vercel/output, e constrói com o preset da Vercel
+yarn check:vercel-bundle     # confere a saída do preset; exige o build:vercel antes
 ```
+
+O `build:vercel` apaga o `.output`: o e2e roda antes dele, ou pede `yarn build` de novo.
 
 Manuais, porque nada no CI os dispara: `yarn db:verify` (o CAS do `PUT /api/save` contra o Postgres)
 e `yarn db:seed-remote`. Login **não** se valida em preview da Vercel — só em `localhost` e produção.
@@ -49,6 +52,13 @@ Um portão errado é pior que nenhum: ele dá a impressão de que a regra está 
 - **Afirmar o outro lado**, senão `[] === []` passa.
 - **Provar reintroduzindo o defeito e vendo a mensagem de erro** — e também medir contra entrada boa,
   senão um portão que reprova sempre parece igualmente saudável.
+- **O lado bom tem de ser respondido pelo mesmo mecanismo que o lado ruim.** Antes de chamar duas
+  perguntas de par, conferir quem responde cada uma em cada ambiente medido: a página de uma espécie
+  real era arquivo estático no preset Node, e o 404 ao lado dela seguia 404 com o dex ilegível.
+- **Rodar o artefato no lugar mede o `cwd`, não o lugar.** O Node resolve import subindo pelos
+  diretórios pais, então o que roda de dentro do repositório acha o `node_modules` do projeto. Subir
+  uma cópia fora da árvore, e varrer a cópia pelo caminho do repositório — o import absoluto
+  sobrevive à cópia na máquina que construiu.
 - **Comparar conjuntos, não contagens.** Contagem é o disfarce mais comum de portão que não confere.
 - **Piso por fonte, nunca piso sobre a soma.** Uma asserção do tipo "achei mais que N" é sustentada
   por qualquer parcela que ainda funcione: quando o total tem duas origens, matar uma inteira não

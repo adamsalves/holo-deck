@@ -117,7 +117,12 @@ export function precachePaths(files: readonly string[], css: string): string[] {
   const messages = LOCALES.map(({ code: locale }) => {
     const found = files.filter(path => path.startsWith('_i18n/') && path.endsWith(`/${locale}/messages.json`))
     if (found.length !== 1) {
-      throw new Error(`service worker: expected one _i18n/…/${locale}/messages.json, found ${found.length}`)
+      throw new Error(
+        `service worker: expected one _i18n/…/${locale}/messages.json, found ${found.length}. `
+        + 'With the Vercel preset, Nitro\'s prerenderer answers a route with the file a previous build '
+        + 'left in .output/public instead of rendering it, so nothing new is written for it, '
+        + 'and this is where it shows: run `yarn build:vercel`, which deletes .output first',
+      )
     }
 
     return found[0] ?? ''

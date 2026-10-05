@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
+    "build:vercel": "rm -rf .output .vercel/output && NITRO_PRESET=vercel nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
