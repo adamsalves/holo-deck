@@ -103,9 +103,20 @@ test('the request spy and the icon reader can see a defect when there is one', a
   // A page with no palette, so nothing of the page's own gets in the way.
   await page.goto('/rules')
 
-  await page.route('**/api/_nuxt_icon/**', route => route.fulfill({ status: 204 }))
-  await page.evaluate(() => fetch('/api/_nuxt_icon/lucide.json?icons=search').then(response => response.status))
-  expect(asked, 'the spy did not see a request of the shape it looks for').toHaveLength(1)
+  // One request of each shape the spy looks for — the server's route, the public
+  // API, the address built with no endpoint —, each spelled so that only its own
+  // alternative of `ICON_REQUEST` matches it: one address that matched two would
+  // go on being seen with either of them gone.
+  const shapes = [
+    '/api/_nuxt_icon/ph.json?icons=star',
+    'https://api.iconify.design/ph.json?icons=star',
+    'undefined/lucide.json?icons=search',
+  ].map(shape => new URL(shape, page.url()).href)
+  await page.route(url => shapes.includes(url.href), route => route.fulfill({ status: 204 }))
+  for (const shape of shapes) {
+    await page.evaluate(address => fetch(address, { mode: 'no-cors' }).then(() => undefined, () => undefined), shape)
+  }
+  expect(asked, 'the spy did not see every shape of request it exists to see').toEqual(shapes)
 
   await page.evaluate(() => {
     const span = document.createElement('span')
