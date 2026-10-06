@@ -72,12 +72,9 @@ Um portão errado é pior que nenhum: ele dá a impressão de que a regra está 
   idioma**, que é onde o literal aparece.
 - Helper de portão mora em `test/support/`.
 
-As três últimas entraram juntas, e da mesma raiz: o `i18n-gate` repetiu o mesmo defeito em três PRs
-seguidos — fonte nova entrando no conjunto medido e não no piso — e o primeiro conserto somou um
-termo ao piso, o que durou exatamente um PR porque tratava a instância e não a forma. No mesmo
-ciclo, dois testes apresentados como prova de conserto ficaram verdes com o defeito reintroduzido,
-porque comparavam a saída contra o arquivo de onde a saída vinha. **Conserto de portão que não muda
-a forma da asserção reaparece no PR seguinte.**
+*Piso por fonte* e *asserção que lê a mesma fonte* têm a mesma raiz: somar um termo ao piso trata a
+instância, e comparar a saída contra o arquivo de onde ela vem fica verde com o defeito
+reintroduzido. **Conserto de portão que não muda a forma da asserção reaparece no PR seguinte.**
 
 ## Commits e release
 
@@ -106,18 +103,14 @@ pt-BR e EN; a *chave* segue a regra. Plano, commits e PRs em português.
 
 **A prosa dentro do código também é inglês**: comentário, docblock, descrição de `describe`/`it` e
 **mensagem de asserção** — tudo que se lê dentro de um arquivo de código, e não só o que a pessoa
-comenta. Vale para tudo que se escreve a partir do PR 2 da Fase 8. O que já está em português fica
+comenta. Vale para tudo que se escreve daqui em diante. O que já está em português fica
 para uma varredura única depois do `1.0.0` — são ~7.600 linhas em 197 arquivos, e elas guardam
 medição e motivo (*"Medido: a arte oficial pesa 118 KB"*), então traduzir mal custa mais que deixar.
 
-Essa regra existe porque a lista de *nomes* acima e a lista do que segue em português eram ambas
-fechadas, e comentário e descrição de teste não estavam em nenhuma das duas — foi nessa lacuna que
-eles cresceram, sem ninguém quebrar regra. **A mensagem de asserção entrou na lista pelo mesmo
-motivo, e uma fase depois:** ela não era nome, não era texto de jogador e não estava entre as três
-que a regra nomeava, então o PR das telas de batalha escreveu oito delas em português com todo mundo
-achando que estava seguindo a regra. Uma lista fechada de exemplos vira, na leitura de quem aplica,
-uma lista fechada do que a regra alcança — e é por isso que ela agora diz *tudo que se lê dentro do
-arquivo*, com os exemplos servindo de exemplo.
+A regra diz *tudo que se lê dentro do arquivo* porque uma lista fechada de exemplos vira, na leitura
+de quem aplica, uma lista fechada do que a regra alcança: comentário, descrição de teste e mensagem
+de asserção cresceram em português por não estarem em lista nenhuma. Os exemplos acima são
+exemplos.
 
 **Identificador em português é defeito, não estilo.** Conferir com a medição, não a olho: a
 varredura por lista de palavras já subestimou o problema em uma ordem de grandeza, porque perde
@@ -125,6 +118,6 @@ parâmetro de arrow além do primeiro e perde palavra que existe nas duas língu
 
 ## Onde ler cada assunto
 
-Hoje tudo está em `README.md`, por seção (*Verificação*, *Sistema de design*, *Divergências do
-canvas*, *Dados do jogo*, *O save*, *Motor de batalha*, *Release*). O PR 8 da Fase 8 parte isso em
-`docs/` — quando existir, ler o arquivo do assunto e atualizar esta seção.
+Hoje tudo está em `README.md`, uma seção `## ` por assunto: os títulos do arquivo são o índice, e
+lê-se só a seção do assunto. O PR 8 da Fase 8 parte isso em `docs/` — quando existir, ler o arquivo
+do assunto e atualizar esta seção.
