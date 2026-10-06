@@ -168,8 +168,15 @@ function isCurrent(link: NavLink): boolean {
 
     <div class="nav__side nav__side--end">
       <ClientOnly>
+        <!-- No prefetch. This link is on every page, and Nuxt fetches the payload of
+             what a link points at as soon as the link is on screen: `/packs/_payload.json`,
+             156 KB raw, on every first load of every screen with the bar, for a page most
+             visits do not open from here. The bar's other links are `custom`, which Nuxt
+             does not watch; what a screen with no cards may prefetch is in
+             `test/e2e/prefetch.spec.ts`. -->
         <NuxtLink
           :to="localePath('/packs')"
+          :prefetch="false"
           class="numeric nav__coins"
         >
           <svg
