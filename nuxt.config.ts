@@ -155,6 +155,27 @@ export default defineNuxtConfig({
   // Sem @nuxtjs/color-mode em runtime: a classe `dark` é fixa no <html>.
   ui: {
     colorMode: false,
+
+    /**
+     * **Nuxt UI writes the theme of the components the sources use, and no longer
+     * of every component it ships.**
+     *
+     * Without this, the stylesheet of every page carries the classes of all the
+     * library's components — about 240 KB, the same on every screen — and the game
+     * draws a handful of them. The detection reads the names of the components in
+     * `app/` and hands Tailwind the theme of those, and of what they are built
+     * from, which took each page's CSS to about 125 KB.
+     *
+     * **It reads names, so a component it cannot read the name of is not found:**
+     * `resolveComponent()` with a variable, or `<component :is>`. The sources have
+     * none today. The day one appears its name goes in as a list, spelled as the
+     * library's file and not as the tag — `componentDetection: ['Tabs']`; with the
+     * prefix the library only warns of an unknown component and adds nothing —,
+     * because an unlisted component draws with no theme and nothing in
+     * `first-load-budget.spec.ts` would say so: that gate has a ceiling and no
+     * floor.
+     */
+    experimental: { componentDetection: true },
   },
 
   runtimeConfig: {
@@ -356,6 +377,51 @@ export default defineNuxtConfig({
      */
     detectBrowserLanguage: false,
     locales: LOCALES.map(({ code, language }) => ({ code, language, file: `${code}.json` })),
+  },
+
+  /**
+   * **The palette's icons ship in the code, and no icon is asked of the network.**
+   *
+   * Nuxt UI draws Lucide's icons. On the search palette's first opening they were
+   * asked of the server's own icon route, which passed the request on to a public
+   * API — a round trip no offline device can make, and one more host the page
+   * depends on. They are six files of this repository now, the six the palette
+   * reads from the library's `appConfig.ui.icons` (search, close, loading,
+   * selected, group, back), embedded in the client as a custom collection.
+   *
+   * **`provider: 'none'` is what makes it a rule and not a habit.** An icon that
+   * is not in the bundle is found nowhere: the module asks the page's own host for
+   * `undefined/lucide.json`, which is a 404, and the icon stays a blank square,
+   * with a network or without — on the developer's machine, and not only on a
+   * phone with no signal. It also drops the server's icon route from the function,
+   * and the bundle of collections that route would serve; `serverBundle: false`
+   * says so to the reader, and keeps the module from announcing a server bundle it
+   * does not build.
+   *
+   * **Only the palette is watched for it.** `palette-icons.spec.ts` asks for the
+   * icons of the palette's flow and looks at no other screen, and the build goes
+   * on with an icon it could not load. Measured with one planted on `/login`: the
+   * build and every gate green, and a blank square on the page. The sources name
+   * no icon outside the palette today; the first that does needs its screen in
+   * that spec.
+   *
+   * **What ships an icon is its file in the folder, and the list is the build's
+   * check that the file is there.** Every SVG of the folder goes into the bundle —
+   * the module does that for a custom collection whenever the provider is not
+   * `server` —, and Nuxt UI asks for its own icons by name as well, so a name
+   * taken off the list changes nothing; one left on it with no file behind fails
+   * the build, with a message that does not name it — `[NUXT_B1001] Could not
+   * compile template nuxt-icon-client-bundle.mjs`. A seventh icon — a Nuxt UI
+   * component the game starts to draw, or an `icon` prop on one it already does —
+   * is a new SVG in the folder and its name here.
+   */
+  icon: {
+    customCollections: [{ prefix: 'lucide', dir: './app/assets/icons/lucide' }],
+    clientBundle: {
+      icons: ['lucide:search', 'lucide:x', 'lucide:loader-circle', 'lucide:check', 'lucide:chevron-right', 'lucide:arrow-left'],
+    },
+    provider: 'none',
+    serverBundle: false,
   },
 
 })
