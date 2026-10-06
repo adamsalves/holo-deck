@@ -2179,6 +2179,130 @@ lê `false`. Por isso os testes do chip chegam ao herói pela grade e pela busca
 manifesto sem credenciais, e a proteção do preview o redireciona para o SSO, junto com os
 ícones (medido no #70: `302` e `ERR_FAILED`). Só em `localhost` e em produção.
 
+## Primeira carga
+
+O que uma tela declara antes de poder rodar — o script de entrada, os `modulepreload`
+dos chunks que ele puxa e as folhas de estilo — é o custo que nenhum jogador evita, e
+até o PR 7a nada na suíte o pesava. Esta seção guarda o que foi medido em 06/10/2026
+(a `0fa2e03` antes, o PR depois) e o que passou a vigiar cada número.
+
+### O teto de cada tela
+
+[`test/e2e/first-load-budget.spec.ts`](test/e2e/first-load-budget.spec.ts) lê o HTML que
+o build escreveu em `.output/public`, para cada página de `app/pages` nos dois idiomas,
+e soma o que ele declara em bytes **crus**
+([`test/support/first-load.ts`](test/support/first-load.ts)): `script type=module` e
+`modulepreload` para o JS, `stylesheet` para o CSS. Crus e não comprimidos, porque quem
+escolhe a codificação é o host, e um teto que andasse com ela mediria a CDN. O gêmeo
+`/en` pesa o mesmo que a página em português, então cada tela tem **um par de tetos,
+pelo nome**, com JS e CSS separados: um teto sobre a soma é sustentado por quem ainda
+cabe, e o CSS dobraria com o JS ainda folgado.
+
+| tela               | JS antes → agora  | teto de JS | CSS antes → agora | teto de CSS |
+| ------------------ | ----------------- | ---------- | ----------------- | ----------- |
+| `/`                | 628.759 → 630.324 | 661.000    | 240.530 → 125.623 | 132.000     |
+| `/battle/1`        | 628.927 → 630.480 | 661.000    | 240.145 → 125.238 | 132.000     |
+| `/collection`      | 633.544 → 635.109 | 666.000    | 243.474 → 128.567 | 135.000     |
+| `/deck`            | 632.872 → 634.437 | 665.000    | 242.865 → 127.958 | 135.000     |
+| `/league`          | 625.019 → 626.584 | 657.000    | 240.145 → 125.238 | 132.000     |
+| `/login`           | 619.191 → 620.756 | 651.000    | 239.921 → 125.014 | 132.000     |
+| `/packs`           | 632.428 → 633.993 | 665.000    | 242.865 → 127.958 | 135.000     |
+| `/pokedex`         | 754.715 → 756.280 | 793.000    | 241.100 → 126.193 | 133.000     |
+| `/pokedex/1`       | 766.217 → 767.782 | 805.000    | 243.659 → 128.752 | 136.000     |
+| `/pokemon/pikachu` | 792.720 → 794.285 | 833.000    | 240.715 → 125.808 | 133.000     |
+| `/rules`           | 628.191 → 629.756 | 660.000    | 239.921 → 125.014 | 132.000     |
+| `/settings`        | 634.124 → 635.689 | 666.000    | 239.921 → 125.014 | 132.000     |
+
+O teto de JS é o medido na `0fa2e03` mais 5%; o de CSS, o medido depois da detecção de
+componentes (abaixo), também mais 5%, ambos arredondados para cima no KB. O JS de hoje
+é o de antes mais ~1,5 KB dos ícones e 12 bytes do `prefetch`: o PR não o emagrece.
+
+O que o portão cobra além do teto: página de `app/pages` sem teto reprova, e teto de
+página que não existe também, os dois por nome e como conjuntos; cada página tem JS e
+CSS contados (> 0), senão o teto passaria qualquer coisa; e um endereço declarado que
+não é arquivo do build, um script de terceiros por exemplo, é acusado em vez de
+descartado. **Subir um teto é decisão, escrita no PR que engordou a página**; descer é
+no PR que a emagreceu. O portão só tem teto, de propósito, e um teto longe da página
+não mede nada. O medidor tem o seu teste, sobre um documento escrito para a pergunta:
+com os `modulepreload` ignorados o orçamento seguia verde, e só ele reprovava.
+
+### O tema do Nuxt UI, só do que o jogo usa
+
+O Nuxt UI escrevia no CSS de cada página o tema de todos os componentes da biblioteca,
+~240 KB iguais em toda tela, e o jogo desenha 4 deles: `UApp`, `UModal`, `UTabs` e
+`UCommandPalette`, 17 contando o que eles usam por dentro.
+`ui.experimental.componentDetection` entrega ao Tailwind só o tema dos componentes que
+as fontes nomeiam, e toda página perdeu os mesmos 114.907 bytes de CSS (de -47% a -48%)
+sem mexer no JS. Reintroduzir o defeito, tirando a opção, reprova os 24 tetos de CSS,
+cada um com a página e os bytes na mensagem, e nenhum de JS.
+
+**A detecção lê nomes.** Um componente que só se alcança por um nome que ela não lê,
+`resolveComponent()` com variável ou `<component :is>`, ficaria sem tema, e o orçamento
+não acusaria, porque só tem teto. As fontes não têm nenhum hoje; o comentário do
+`nuxt.config.ts` diz onde declarar o dia em que tiverem.
+
+### Os ícones da paleta, embarcados
+
+A paleta de busca desenha seis ícones do Lucide que o Nuxt UI lê de
+`appConfig.ui.icons`: buscar, fechar, carregando, item escolhido, grupo e voltar. Na
+primeira abertura eles eram pedidos à rota de ícones do servidor, que repassava o
+pedido a uma API pública, e um aparelho sem rede abria a paleta com quadrados em branco
+no lugar do campo e do botão de fechar. Hoje são seis SVG em `app/assets/icons/lucide/`,
+embarcados no cliente como coleção própria (`icon.customCollections`, `provider: 'none'`
+e `serverBundle: false`, em `nuxt.config.ts`), ao custo de 1.553 bytes de JS por tela.
+Com `provider: 'none'` um ícone que ninguém embarcou não é achado em lugar nenhum — o
+módulo só pede ao próprio host um `undefined/lucide.json`, que dá 404, e o ícone fica
+em branco — e passa a reprovar o e2e, em vez de funcionar na máquina de quem desenvolve
+e falhar no celular sem sinal. O crédito do Lucide (ISC) está em *Créditos*.
+
+**O que embarca o ícone é o arquivo, e não o nome na lista.** A lista de
+`clientBundle.icons` parece quem carrega, e medido não é: tirar um nome dela não muda
+nada, porque a coleção própria entra inteira sempre que o provedor não é `server`, e o
+Nuxt UI pede os ícones dele por nome também. Tirar o arquivo e o nome reprova os dois
+portões abaixo, e tirar o arquivo deixando o nome faz o **build** falhar. A lista é a
+checagem do build de que o arquivo existe.
+
+- [`test/e2e/palette-icons.spec.ts`](test/e2e/palette-icons.spec.ts) percorre a paleta
+  — abrir pelo gatilho, digitar, setas, busca sem resultado, fechar, reabrir e escolher
+  —, cobra por nome os ícones de cada passo, exige zero requisições de ícone e zero
+  `.iconify` sem `mask-image`, que é o quadrado em branco que nenhuma outra asserção
+  vê. O índice é segurado, para o ícone de carregando ficar na tela, e os dois
+  instrumentos têm o seu teste do outro lado.
+- [`test/e2e/offline.spec.ts`](test/e2e/offline.spec.ts) abre a paleta pela primeira
+  vez sem rede, sob o worker. No build de antes do conserto o fluxo via três requisições
+  a `lucide.json` e o offline via `search` e `x` sem imagem.
+
+### A pré-busca, medida
+
+O `NuxtLink` observa os links visíveis e busca o `_payload.json` do destino antes do
+clique. Dois casos, medidos em 06/10/2026 contra o `yarn build`:
+
+- **As cartas do grid (#14).** Em `/pokedex/1`, a 1280×900: 21 payloads de espécie na
+  carga inicial e 151 de 151 ao rolar o grid até o fim, que pesam 442.493 bytes crus e
+  124.002 com brotli no nível 11. **Ficam como estão, em `visibility`**: o clique numa
+  carta navega sem espera, Kanto inteira custa 124 KB, e o levantamento de 01/10/2026
+  mediu que a pré-busca não atrasa o LCP. Pré-buscar por interação, ou desligar,
+  trocaria latência de navegação por bytes que esse levantamento não mostrou custarem
+  nada ao LCP.
+- **O link das moedas**, que a #14 não via. Ele fica na barra, que está em toda tela, e
+  pré-buscava `/packs/_payload.json` — 155.759 bytes crus, 33 KB com gzip — em toda
+  primeira carga, para uma página que a maioria das visitas não abre por ali. Em
+  `/rules`, o navegador pedia `/rules` e `/packs`; com `:prefetch="false"` pede só o
+  próprio. Os outros links da barra são `custom`, que o `NuxtLink` não observa, e não
+  pré-buscavam.
+
+[`test/e2e/prefetch.spec.ts`](test/e2e/prefetch.spec.ts) compara, por nome, o conjunto de
+`_payload.json` pedidos em `/rules` — uma tela sem cartas e sem link no corpo — com a
+lista permitida, vazia hoje, nos dois idiomas: um link novo da barra que passe a
+pré-buscar reprova pelo endereço, e a lista só cresce por decisão. O outro lado vem do
+mesmo instrumento: o espião tem de ter visto o payload da própria página, e a grade de
+`/pokedex/1` tem de continuar pré-buscando as espécies. Provado no build de antes do
+conserto: `/packs/_payload.json` e `/en/packs/_payload.json` acusados, e a grade passa.
+
+**O que segue pré-buscado, e não foi mexido:** os links do corpo das telas — o Hub
+pré-busca `/packs` e `/deck`, a coleção pré-busca `/packs` — e o grid, pela decisão
+acima. A paleta carregada sob demanda é a #85, fora deste PR.
+
 ## O save
 
 Um documento só, versionado, em `holodeck:save`.
