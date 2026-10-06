@@ -48,18 +48,18 @@ interface Ceiling {
 
 /** In raw bytes, by the address `pageAddresses()` spells — a sample for each parameter. */
 const CEILINGS: Readonly<Record<string, Ceiling>> = {
-  '/': { scripts: 661_000, css: 253_000 },
-  '/battle/1': { scripts: 661_000, css: 253_000 },
-  '/collection': { scripts: 666_000, css: 256_000 },
-  '/deck': { scripts: 665_000, css: 256_000 },
-  '/league': { scripts: 657_000, css: 253_000 },
-  '/login': { scripts: 651_000, css: 252_000 },
-  '/packs': { scripts: 665_000, css: 256_000 },
-  '/pokedex': { scripts: 793_000, css: 254_000 },
-  '/pokedex/1': { scripts: 805_000, css: 256_000 },
-  '/pokemon/pikachu': { scripts: 833_000, css: 253_000 },
-  '/rules': { scripts: 660_000, css: 252_000 },
-  '/settings': { scripts: 666_000, css: 252_000 },
+  '/': { scripts: 661_000, css: 132_000 },
+  '/battle/1': { scripts: 661_000, css: 132_000 },
+  '/collection': { scripts: 666_000, css: 135_000 },
+  '/deck': { scripts: 665_000, css: 135_000 },
+  '/league': { scripts: 657_000, css: 132_000 },
+  '/login': { scripts: 651_000, css: 132_000 },
+  '/packs': { scripts: 665_000, css: 135_000 },
+  '/pokedex': { scripts: 793_000, css: 133_000 },
+  '/pokedex/1': { scripts: 805_000, css: 136_000 },
+  '/pokemon/pikachu': { scripts: 833_000, css: 133_000 },
+  '/rules': { scripts: 660_000, css: 132_000 },
+  '/settings': { scripts: 666_000, css: 132_000 },
 }
 
 function bytes(count: number): string {

@@ -155,6 +155,25 @@ export default defineNuxtConfig({
   // Sem @nuxtjs/color-mode em runtime: a classe `dark` é fixa no <html>.
   ui: {
     colorMode: false,
+
+    /**
+     * **Nuxt UI writes the theme of the components the sources use, and no longer
+     * of every component it ships.**
+     *
+     * Without this, the stylesheet of every page carries the classes of all the
+     * library's components — about 240 KB, the same on every screen — and the game
+     * draws a handful of them. The detection reads the names of the components in
+     * `app/` and hands Tailwind the theme of those, and of what they are built
+     * from, which took each page's CSS to about 125 KB.
+     *
+     * **It reads names, so a component it cannot read the name of is not found:**
+     * `resolveComponent()` with a variable, or `<component :is>`. The sources have
+     * none today. The day one appears its name goes in as a list —
+     * `componentDetection: ['UTabs']` —, because an unlisted component draws with
+     * no theme and nothing in `first-load-budget.spec.ts` would say so: that gate
+     * has a ceiling and no floor.
+     */
+    experimental: { componentDetection: true },
   },
 
   runtimeConfig: {
