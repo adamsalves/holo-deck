@@ -168,10 +168,12 @@ export default defineNuxtConfig({
      *
      * **It reads names, so a component it cannot read the name of is not found:**
      * `resolveComponent()` with a variable, or `<component :is>`. The sources have
-     * none today. The day one appears its name goes in as a list —
-     * `componentDetection: ['UTabs']` —, because an unlisted component draws with
-     * no theme and nothing in `first-load-budget.spec.ts` would say so: that gate
-     * has a ceiling and no floor.
+     * none today. The day one appears its name goes in as a list, spelled as the
+     * library's file and not as the tag — `componentDetection: ['Tabs']`; with the
+     * prefix the library only warns of an unknown component and adds nothing —,
+     * because an unlisted component draws with no theme and nothing in
+     * `first-load-budget.spec.ts` would say so: that gate has a ceiling and no
+     * floor.
      */
     experimental: { componentDetection: true },
   },
@@ -389,20 +391,29 @@ export default defineNuxtConfig({
    *
    * **`provider: 'none'` is what makes it a rule and not a habit.** An icon that
    * is not in the bundle is found nowhere: the module asks the page's own host for
-   * `undefined/lucide.json`, which is a 404, and the icon stays a blank square —
-   * so one nobody embedded fails `palette-icons.spec.ts` on the developer's
-   * machine, not on a phone with no signal. It also drops the server's icon route
-   * from the function, and `serverBundle: false` the collections that route would
-   * serve.
+   * `undefined/lucide.json`, which is a 404, and the icon stays a blank square,
+   * with a network or without — on the developer's machine, and not only on a
+   * phone with no signal. It also drops the server's icon route from the function,
+   * and the bundle of collections that route would serve; `serverBundle: false`
+   * says so to the reader, and keeps the module from announcing a server bundle it
+   * does not build.
+   *
+   * **Only the palette is watched for it.** `palette-icons.spec.ts` asks for the
+   * icons of the palette's flow and looks at no other screen, and the build goes
+   * on with an icon it could not load. Measured with one planted on `/login`: the
+   * build and every gate green, and a blank square on the page. The sources name
+   * no icon outside the palette today; the first that does needs its screen in
+   * that spec.
    *
    * **What ships an icon is its file in the folder, and the list is the build's
    * check that the file is there.** Every SVG of the folder goes into the bundle —
    * the module does that for a custom collection whenever the provider is not
    * `server` —, and Nuxt UI asks for its own icons by name as well, so a name
    * taken off the list changes nothing; one left on it with no file behind fails
-   * the build. A seventh icon — a Nuxt UI component the game starts to draw, or an
-   * `icon` prop on one it already does — is a new SVG in the folder and its name
-   * here.
+   * the build, with a message that does not name it — `[NUXT_B1001] Could not
+   * compile template nuxt-icon-client-bundle.mjs`. A seventh icon — a Nuxt UI
+   * component the game starts to draw, or an `icon` prop on one it already does —
+   * is a new SVG in the folder and its name here.
    */
   icon: {
     customCollections: [{ prefix: 'lucide', dir: './app/assets/icons/lucide' }],
