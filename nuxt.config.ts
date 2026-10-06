@@ -377,4 +377,40 @@ export default defineNuxtConfig({
     locales: LOCALES.map(({ code, language }) => ({ code, language, file: `${code}.json` })),
   },
 
+  /**
+   * **The palette's icons ship in the code, and no icon is asked of the network.**
+   *
+   * Nuxt UI draws Lucide's icons. On the search palette's first opening they were
+   * asked of the server's own icon route, which passed the request on to a public
+   * API — a round trip no offline device can make, and one more host the page
+   * depends on. They are six files of this repository now, the six the palette
+   * reads from the library's `appConfig.ui.icons` (search, close, loading,
+   * selected, group, back), embedded in the client as a custom collection.
+   *
+   * **`provider: 'none'` is what makes it a rule and not a habit.** An icon that
+   * is not in the bundle is found nowhere: the module asks the page's own host for
+   * `undefined/lucide.json`, which is a 404, and the icon stays a blank square —
+   * so one nobody embedded fails `palette-icons.spec.ts` on the developer's
+   * machine, not on a phone with no signal. It also drops the server's icon route
+   * from the function, and `serverBundle: false` the collections that route would
+   * serve.
+   *
+   * **What ships an icon is its file in the folder, and the list is the build's
+   * check that the file is there.** Every SVG of the folder goes into the bundle —
+   * the module does that for a custom collection whenever the provider is not
+   * `server` —, and Nuxt UI asks for its own icons by name as well, so a name
+   * taken off the list changes nothing; one left on it with no file behind fails
+   * the build. A seventh icon — a Nuxt UI component the game starts to draw, or an
+   * `icon` prop on one it already does — is a new SVG in the folder and its name
+   * here.
+   */
+  icon: {
+    customCollections: [{ prefix: 'lucide', dir: './app/assets/icons/lucide' }],
+    clientBundle: {
+      icons: ['lucide:search', 'lucide:x', 'lucide:loader-circle', 'lucide:check', 'lucide:chevron-right', 'lucide:arrow-left'],
+    },
+    provider: 'none',
+    serverBundle: false,
+  },
+
 })

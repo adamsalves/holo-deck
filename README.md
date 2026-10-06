@@ -2390,3 +2390,12 @@ Dados e sprites vêm da [PokeAPI](https://pokeapi.co), usada aqui de forma
 **não-comercial**, como pede sua política de fair use. Pokémon é marca registrada
 da Nintendo / Creatures Inc. / GAME FREAK inc. Este projeto é portfólio, sem
 qualquer vínculo com os detentores da marca.
+
+Os seis ícones da paleta de busca, em `app/assets/icons/lucide/`, são do
+[Lucide](https://lucide.dev), licença ISC (© Lucide Icons and Contributors), na
+versão 1.52.0 do `lucide-static`, com o aviso de licença que cada arquivo traz no
+topo. Cinco deles — `arrow-left`, `check`, `chevron-right`, `search` e `x` —
+derivam do Feather (MIT, © Cole Bemis), como o próprio Lucide registra em
+[lucide.dev/license](https://lucide.dev/license). Moram no repositório, e não
+vêm de um pacote, para a paleta não pedir ícone à rede: o motivo está em
+`nuxt.config.ts`.

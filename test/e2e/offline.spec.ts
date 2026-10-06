@@ -5,7 +5,7 @@ import { PRECACHE_CACHE, SPRITE_CACHE_PREFIX, type PrecacheEntry } from '../../a
 import { LOCALE_KEY } from '../../app/utils/locale-preference.ts'
 import { defaultLocale, foreignPhrases, label, localeUrl, namespaceLabels, repeated } from '../support/locales'
 import { REPO_ROOT } from '../support/source-tree'
-import { navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } from './support'
+import { ICON_REQUEST, iconProblems, navLabel, pathPattern, playTurn, saveWith, screenText, seedLocalSave } from './support'
 
 /**
  * **The game with the network gone** — what the service worker is for, measured
@@ -351,6 +351,38 @@ test('offline, a thumbnail the device never kept shows the glyph, in the grid an
   await expect(dialog.getByRole('option').first()).toBeVisible()
   await dialog.getByPlaceholder('Nome, número ou tipo…').fill('sprigatito')
   await expect(dialog.getByRole('option', { name: /Sprigatito/ }).locator('img')).toHaveAttribute('src', GLYPH)
+})
+
+/**
+ * **The search palette's icons are in the code, so they come up with no
+ * network.** They used to be asked of a route of the server, and of a public API
+ * behind it, on the palette's first opening: a device that opened it for the
+ * first time offline drew the field's glyph and the close button's as blank
+ * squares. The worker answers for the build's files and never for that route,
+ * and a request that failed left nothing behind but the gap — the test above
+ * opens this same palette and looks at its thumbnails, not at its icons.
+ *
+ * It is the first opening of this context, on the shell of a page nobody visited:
+ * no earlier visit left an icon in the HTTP cache or in the worker. The same
+ * flow online, step by step, is `palette-icons.spec.ts`.
+ */
+test('offline, the palette draws its icons on its first opening', async ({ page, context }) => {
+  await underWorker(page)
+  await context.setOffline(true)
+
+  const asked: string[] = []
+  page.on('request', (request) => {
+    if (ICON_REQUEST.test(request.url())) asked.push(request.url())
+  })
+
+  await page.goto('/pokedex/9')
+  expect(await fromShell(page)).toBe(true)
+  await expect(page.locator('.dex-card').first()).toBeVisible()
+
+  await page.keyboard.press('ControlOrMeta+k')
+  await expect(page.getByRole('dialog').getByRole('option').first()).toBeVisible()
+  await expect.poll(() => iconProblems(page, ['i-lucide:search', 'i-lucide:x'])).toEqual({ missing: [], bare: [] })
+  expect(asked, 'the palette asked for an icon with no network to answer').toEqual([])
 })
 
 /** The height of the hero's art box: the page under it moves when it changes. */

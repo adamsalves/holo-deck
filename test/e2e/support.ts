@@ -479,6 +479,41 @@ export function pathPattern(path: string): RegExp {
   return new RegExp(`^https?://[^/]+${escaped}$`)
 }
 
+/**
+ * What an icon would ask the network for: Nuxt Icon's own route, the public API it
+ * falls back to, and the address it builds when it has no endpoint at all —
+ * `undefined/lucide.json`, which is where the loader of a custom collection goes
+ * for an icon missing from the bundle when the module's provider is `none`.
+ */
+export const ICON_REQUEST = /\/api\/_nuxt_icon|iconify\.design|\/lucide\.json/
+
+/**
+ * What is wrong with the icons on screen, by name: the ones asked for that are
+ * not drawn, and the ones that are there with no picture.
+ *
+ * **An icon with no picture is invisible to every other check.** Nuxt Icon draws
+ * one as an empty `<span class="iconify i-lucide:search">` and writes its CSS —
+ * the `mask-image` that is the picture — once it has the icon's data. One it
+ * could not get is the same span with no rule, a computed `mask-image` of `none`,
+ * and a blank square: no console error, no failed text assertion, only a gap
+ * where the glyph was.
+ *
+ * It lives here for the reason `screenText` does: the body runs in the browser.
+ */
+export function iconProblems(page: Page, names: readonly string[]): Promise<{ missing: string[], bare: string[] }> {
+  return page.evaluate((wanted) => {
+    const icons = Array.from(document.querySelectorAll('.iconify')).map(icon => ({
+      name: Array.from(icon.classList).find(className => className.startsWith('i-')) ?? icon.className,
+      drawn: getComputedStyle(icon).maskImage !== 'none',
+    }))
+
+    return {
+      missing: wanted.filter(name => !icons.some(icon => icon.drawn && icon.name === name)),
+      bare: icons.filter(icon => !icon.drawn).map(icon => icon.name),
+    }
+  }, names)
+}
+
 /** O texto de cada cópia de segurança deste navegador. */
 export function backups(page: Page): Promise<string[]> {
   return page.evaluate(() => Object.keys(window.localStorage)
