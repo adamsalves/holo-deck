@@ -2192,36 +2192,47 @@ até o PR 7a nada na suíte o pesava. Esta seção guarda o que foi medido em 06
 o build escreveu em `.output/public`, para cada página de `app/pages` nos dois idiomas,
 e soma o que ele declara em bytes **crus**
 ([`test/support/first-load.ts`](test/support/first-load.ts)): `script type=module` e
-`modulepreload` para o JS, `stylesheet` para o CSS. Crus e não comprimidos, porque quem
-escolhe a codificação é o host, e um teto que andasse com ela mediria a CDN. O gêmeo
-`/en` pesa o mesmo que a página em português, então cada tela tem **um par de tetos,
-pelo nome**, com JS e CSS separados: um teto sobre a soma é sustentado por quem ainda
-cabe, e o CSS dobraria com o JS ainda folgado.
+`modulepreload` para o JS; `stylesheet` e o que vem dentro do próprio HTML, em `<style>`,
+para o CSS. Crus e não comprimidos, porque quem escolhe a codificação é o host, e um
+teto que andasse com ela mediria a CDN. O gêmeo `/en` pesa o mesmo que a página em
+português, então cada tela tem **um par de tetos, pelo nome**, com JS e CSS separados:
+um teto sobre a soma é sustentado por quem ainda cabe, e o CSS dobraria com o JS ainda
+folgado.
+
+**O CSS dentro do HTML conta.** O Nuxt escreve em `<style>` o CSS `scoped` dos
+componentes que o servidor renderizou, ao lado das variáveis de cor do Nuxt UI: de 21 a
+28 KB por página, e é ali que mora a maior parte do CSS do próprio jogo — as folhas são,
+quase inteiras, o tema da biblioteca e a folha global. O medidor nasceu lendo só
+`<link rel="stylesheet">`, e o review mostrou o buraco: 42 KB plantados no
+`<style scoped>` de `/settings` deixavam o teto verde. As mesmas regras chegam de novo
+em arquivo quando os chunks da página carregam, sem o HTML declarar; aqui contam uma
+vez.
 
 | tela               | JS antes → agora  | teto de JS | CSS antes → agora | teto de CSS |
 | ------------------ | ----------------- | ---------- | ----------------- | ----------- |
-| `/`                | 628.759 → 630.324 | 661.000    | 240.530 → 125.623 | 132.000     |
-| `/battle/1`        | 628.927 → 630.480 | 661.000    | 240.145 → 125.238 | 132.000     |
-| `/collection`      | 633.544 → 635.109 | 666.000    | 243.474 → 128.567 | 135.000     |
-| `/deck`            | 632.872 → 634.437 | 665.000    | 242.865 → 127.958 | 135.000     |
-| `/league`          | 625.019 → 626.584 | 657.000    | 240.145 → 125.238 | 132.000     |
-| `/login`           | 619.191 → 620.756 | 651.000    | 239.921 → 125.014 | 132.000     |
-| `/packs`           | 632.428 → 633.993 | 665.000    | 242.865 → 127.958 | 135.000     |
-| `/pokedex`         | 754.715 → 756.280 | 793.000    | 241.100 → 126.193 | 133.000     |
-| `/pokedex/1`       | 766.217 → 767.782 | 805.000    | 243.659 → 128.752 | 136.000     |
-| `/pokemon/pikachu` | 792.720 → 794.285 | 833.000    | 240.715 → 125.808 | 133.000     |
-| `/rules`           | 628.191 → 629.756 | 660.000    | 239.921 → 125.014 | 132.000     |
-| `/settings`        | 634.124 → 635.689 | 666.000    | 239.921 → 125.014 | 132.000     |
+| `/`                | 628.759 → 630.324 | 661.000    | 265.464 → 150.557 | 159.000     |
+| `/battle/1`        | 628.927 → 630.480 | 661.000    | 264.813 → 149.906 | 158.000     |
+| `/collection`      | 633.544 → 635.109 | 666.000    | 267.467 → 152.560 | 161.000     |
+| `/deck`            | 632.872 → 634.437 | 665.000    | 266.921 → 152.014 | 160.000     |
+| `/league`          | 625.019 → 626.584 | 657.000    | 265.884 → 150.977 | 159.000     |
+| `/login`           | 619.191 → 620.756 | 651.000    | 261.054 → 146.147 | 154.000     |
+| `/packs`           | 632.428 → 633.993 | 665.000    | 271.223 → 156.316 | 165.000     |
+| `/pokedex`         | 754.715 → 756.280 | 793.000    | 261.783 → 146.876 | 155.000     |
+| `/pokedex/1`       | 766.217 → 767.782 | 805.000    | 270.085 → 155.178 | 163.000     |
+| `/pokemon/pikachu` | 792.720 → 794.285 | 833.000    | 268.866 → 153.959 | 162.000     |
+| `/rules`           | 628.191 → 629.756 | 660.000    | 264.107 → 149.200 | 157.000     |
+| `/settings`        | 634.124 → 635.689 | 666.000    | 267.057 → 152.150 | 160.000     |
 
 O teto de JS é o medido na `0fa2e03` mais 5%; o de CSS, o medido depois da detecção de
 componentes (abaixo), também mais 5%, ambos arredondados para cima no KB. O JS de hoje
 é o de antes mais ~1,5 KB dos ícones e 12 bytes do `prefetch`: o PR não o emagrece.
 
 O que o portão cobra além do teto: página de `app/pages` sem teto reprova, e teto de
-página que não existe também, os dois por nome e como conjuntos; cada página tem JS e
-CSS contados (> 0), senão o teto passaria qualquer coisa; e um endereço declarado que
-não é arquivo do build, um script de terceiros por exemplo, é acusado em vez de
-descartado. **Subir um teto é decisão, escrita no PR que engordou a página**; descer é
+página que não existe também, os dois por nome e como conjuntos; cada página tem JS,
+folha de estilo e CSS inline contados (> 0), cada origem pelo nome, senão o teto
+passaria qualquer coisa — um piso sobre a soma do CSS seria sustentado pela origem que
+ainda fosse lida; e um endereço declarado que não é arquivo do build, um script de
+terceiros por exemplo, é acusado em vez de descartado. **Subir um teto é decisão, escrita no PR que engordou a página**; descer é
 no PR que a emagreceu. O portão só tem teto, de propósito, e um teto longe da página
 não mede nada. O medidor tem o seu teste, sobre um documento escrito para a pergunta:
 com os `modulepreload` ignorados o orçamento seguia verde, e só ele reprovava.
@@ -2232,8 +2243,8 @@ O Nuxt UI escrevia no CSS de cada página o tema de todos os componentes da bibl
 ~240 KB iguais em toda tela, e o jogo desenha 4 deles: `UApp`, `UModal`, `UTabs` e
 `UCommandPalette`, 17 contando o que eles usam por dentro.
 `ui.experimental.componentDetection` entrega ao Tailwind só o tema dos componentes que
-as fontes nomeiam, e toda página perdeu os mesmos 114.907 bytes de CSS (de -47% a -48%)
-sem mexer no JS. Reintroduzir o defeito, tirando a opção, reprova os 24 tetos de CSS,
+as fontes nomeiam, e toda página perdeu os mesmos 114.907 bytes de CSS (de -42% a -44%
+do CSS da tela, contado o inline; de -47% a -48% das folhas) sem mexer no JS. Reintroduzir o defeito, tirando a opção, reprova os 24 tetos de CSS,
 cada um com a página e os bytes na mensagem, e nenhum de JS.
 
 **A detecção lê nomes.** Um componente que só se alcança por um nome que ela não lê,
@@ -2251,9 +2262,13 @@ no lugar do campo e do botão de fechar. Hoje são seis SVG em `app/assets/icons
 embarcados no cliente como coleção própria (`icon.customCollections`, `provider: 'none'`
 e `serverBundle: false`, em `nuxt.config.ts`), ao custo de 1.553 bytes de JS por tela.
 Com `provider: 'none'` um ícone que ninguém embarcou não é achado em lugar nenhum — o
-módulo só pede ao próprio host um `undefined/lucide.json`, que dá 404, e o ícone fica
-em branco — e passa a reprovar o e2e, em vez de funcionar na máquina de quem desenvolve
-e falhar no celular sem sinal. O crédito do Lucide (ISC) está em *Créditos*.
+módulo só pede ao próprio host um `undefined/lucide.json`, que dá 404 — e fica em
+branco com ou sem rede: aparece na máquina de quem desenvolve, e não só no celular sem
+sinal. **Quem reprova por ele é só o fluxo da paleta.** Medido no review com um ícone
+plantado em `/login`: o build termina, todo portão fica verde, e a tela mostra um
+quadrado em branco. As fontes não nomeiam ícone fora da paleta hoje; o primeiro que
+nomear precisa da sua tela em `palette-icons.spec.ts`. O crédito do Lucide (ISC) está em
+*Créditos*.
 
 **O que embarca o ícone é o arquivo, e não o nome na lista.** A lista de
 `clientBundle.icons` parece quem carrega, e medido não é: tirar um nome dela não muda
@@ -2267,7 +2282,8 @@ checagem do build de que o arquivo existe.
   —, cobra por nome os ícones de cada passo, exige zero requisições de ícone e zero
   `.iconify` sem `mask-image`, que é o quadrado em branco que nenhuma outra asserção
   vê. O índice é segurado, para o ícone de carregando ficar na tela, e os dois
-  instrumentos têm o seu teste do outro lado.
+  instrumentos têm o seu teste do outro lado: o espião tem de ver, uma a uma, as três
+  formas de pedido que procura, cada uma escrita para casar só com a sua alternativa.
 - [`test/e2e/offline.spec.ts`](test/e2e/offline.spec.ts) abre a paleta pela primeira
   vez sem rede, sob o worker. No build de antes do conserto o fluxo via três requisições
   a `lucide.json` e o offline via `search` e `x` sem imagem.
@@ -2291,17 +2307,29 @@ clique. Dois casos, medidos em 06/10/2026 contra o `yarn build`:
   próprio. Os outros links da barra são `custom`, que o `NuxtLink` não observa, e não
   pré-buscavam.
 
-[`test/e2e/prefetch.spec.ts`](test/e2e/prefetch.spec.ts) compara, por nome, o conjunto de
-`_payload.json` pedidos em `/rules` — uma tela sem cartas e sem link no corpo — com a
-lista permitida, vazia hoje, nos dois idiomas: um link novo da barra que passe a
-pré-buscar reprova pelo endereço, e a lista só cresce por decisão. O outro lado vem do
-mesmo instrumento: o espião tem de ter visto o payload da própria página, e a grade de
-`/pokedex/1` tem de continuar pré-buscando as espécies. Provado no build de antes do
-conserto: `/packs/_payload.json` e `/en/packs/_payload.json` acusados, e a grade passa.
+[`test/e2e/prefetch.spec.ts`](test/e2e/prefetch.spec.ts) pergunta a `/settings`, uma tela
+sem cartas cujo corpo tem um link pré-buscado de propósito: o do seletor de idioma, para
+a mesma página em cada outro idioma. Tirando o payload da própria página e o desse link,
+o que sobra veio da barra, e é comparado por nome com a lista permitida, vazia hoje, nos
+dois idiomas: um link novo da barra que passe a pré-buscar reprova pelo endereço, e a
+lista só cresce por decisão. A grade de `/pokedex/1` tem de continuar pré-buscando as
+espécies. Provado no build de antes do conserto: `/packs/_payload.json` e
+`/en/packs/_payload.json` acusados, e a grade passa.
+
+**A lista é lida depois de uma testemunha, e não de uma espera.** O payload de um link
+sai no fim de uma cadeia — dois idle callbacks, a resposta do observer, o manifesto do
+app pela rede —, e o portão nasceu lendo a lista quando a rede ficava quieta. O
+`waitForLoadState('networkidle')` responde na hora quando isso já aconteceu durante a
+hidratação: com o `:prefetch="false"` removido e a CPU da página dez vezes mais lenta, o
+teste passava em 8 de 20 rodadas, e a vinte vezes em 20 de 20. Agora ele espera o payload
+do seletor, que só sai dessa mesma cadeia, e mais duas rodadas de idle e frame. Com o
+defeito plantado reprova em 10 de 10 a 10× e a 20×, e em 40 de 40 sob carga real (48 e 96
+processos de CPU em 12 núcleos); o build bom passa em todas, nas mesmas condições.
 
 **O que segue pré-buscado, e não foi mexido:** os links do corpo das telas — o Hub
-pré-busca `/packs` e `/deck`, a coleção pré-busca `/packs` — e o grid, pela decisão
-acima. A paleta carregada sob demanda é a #85, fora deste PR.
+pré-busca `/packs` e `/deck`, a coleção pré-busca `/packs`, as preferências pré-buscam a
+si mesmas no outro idioma — e o grid, pela decisão acima. A paleta carregada sob demanda
+é a #85, fora deste PR.
 
 ## O save
 
