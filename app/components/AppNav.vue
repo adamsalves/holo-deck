@@ -99,6 +99,51 @@ onMounted(() => {
 
 onBeforeUnmount(() => document.documentElement.style.removeProperty('--nav-height'))
 
+/**
+ * The two faces the bar is written in — Chakra Petch 600 for its links, 700 for
+ * the name —, asked for before the first paint.
+ *
+ * A face is only fetched once the layout finds text that needs it, which is
+ * after the stylesheet is in; the page was painted in the fallback and painted
+ * again when the face came. The fallback is wider, and on a phone between 412
+ * and 440 px the bar's links take one line more in it: the bar went from 217 px
+ * to 160 on the second paint, and everything under it with it. That is DejaVu
+ * Sans, the fallback of the machine that measured; in one with Arial's metrics
+ * the widths are 412 to 414 px, and 428 in English.
+ *
+ * With the two faces preloaded they race the stylesheet instead of waiting for
+ * it. They are 20 KB; the stylesheet is 125 as `yarn preview` serves it and 16
+ * as a host compresses it, so the head start they had was 2.8 s in the first and
+ * about 140 ms in the second, and in both the bar was painted once.
+ *
+ * **`crossorigin` is part of the address.** A font is fetched without
+ * credentials even from its own origin, and a preload that does not say so is
+ * another request: the file comes twice, and the one that came early is not the
+ * one the text is drawn with.
+ *
+ * **Two, and not the page's four.** The body's 400 and the numbers' JetBrains
+ * Mono still swap, and what that moves is a line or two of text by a few pixels:
+ * 0.003 of the 0.42 a first load of `/rules` shifted on a phone's network. All
+ * four preloaded (61 KB) cost a Pokémon's page 216 ms of its largest paint,
+ * which is the art; these two cost it about 100.
+ *
+ * **Here, and not in `app.head`**, because the battle has no bar and asks for no
+ * 600: there the preload would be a download for nothing.
+ *
+ * **The address carries a hash, and is written out.** `@nuxt/fonts` names each
+ * file after where it came from, and gives the page no way to ask for "the 600";
+ * its own `preload` option emits one link, to an italic nobody uses. When the
+ * hash changes — a new version of the family at the provider — the link points
+ * at nothing and the page is back to swapping, and it is
+ * `test/e2e/layout-stability.spec.ts` that says so, by family and weight.
+ */
+useHead({
+  link: [
+    { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: '/_fonts/_UD-Vsgk_PIM6h-K9movJq1VPwOqzdDTbLoFnG0hdjg-1aJ4yTecMvX4aSh8J2b6z_wDXdwgAg9ku2z1UTivOGk.woff2' },
+    { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: '/_fonts/jZcCW7QNHMX8IgH7jpo26yyDVfkqF2EsLKizjCKQkAk-XNWpNVwOBXAmAm9kG99iEVQv4Ef2MXC0MZj913anVoo.woff2' },
+  ],
+})
+
 /** A seção atual, por prefixo de caminho — exato só onde `exact` pede. */
 function isCurrent(link: NavLink): boolean {
   const to = localePath(link.to)
@@ -202,6 +247,34 @@ function isCurrent(link: NavLink): boolean {
           {{ gameNumber(progress.coins) }}
           <span class="nav__coins-label">{{ t('nav.coins') }}</span>
         </NuxtLink>
+
+        <!-- The link's box, before there is a link. The balance is the player's, so
+             the server writes none, and the link only exists once the page hydrates:
+             until then the bar was 4 px shorter — the link is its tallest item, 35 px
+             against 31 — and everything after it sat about 100 px to the left, which
+             moved the whole page on every first load of a phone. This is the same
+             box with nothing to see in it: the same classes, the mark's 13 px, the
+             digit of an empty balance and the label in the page's language, which a
+             width written in the CSS would get wrong by 7 px in the other one.
+             One digit is the balance of a new player: each character more is
+             8.4 px, and whoever comes back with ten coins or more still sees the
+             links after this one move (#97).
+             `test/e2e/layout-stability.spec.ts` measures the bar both ways. -->
+        <template #fallback>
+          <span
+            class="numeric nav__coins"
+            style="visibility: hidden"
+            aria-hidden="true"
+          >
+            <svg
+              class="nav__coin-mark"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            />
+            0
+            <span class="nav__coins-label">{{ t('nav.coins') }}</span>
+          </span>
+        </template>
       </ClientOnly>
 
       <NuxtLink
