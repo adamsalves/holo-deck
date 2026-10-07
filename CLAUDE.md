@@ -72,9 +72,11 @@ Um portão errado é pior que nenhum: ele dá a impressão de que a regra está 
   idioma**, que é onde o literal aparece.
 - Helper de portão mora em `test/support/`.
 
-*Piso por fonte* e *asserção que lê a mesma fonte* têm a mesma raiz: somar um termo ao piso trata a
-instância, e comparar a saída contra o arquivo de onde ela vem fica verde com o defeito
-reintroduzido. **Conserto de portão que não muda a forma da asserção reaparece no PR seguinte.**
+*Piso por fonte* e *asserção que lê a mesma fonte* têm a mesma raiz: o conserto que trata a
+instância e não a forma. Somar um termo ao piso quando entra uma fonte nova dura até a fonte
+seguinte; e teste que compara a saída com o arquivo de onde ela vem fica verde com o defeito
+reintroduzido, então não prova o conserto. **Conserto de portão que não muda a forma da asserção
+reaparece no PR seguinte.**
 
 ## Commits e release
 
@@ -109,8 +111,8 @@ medição e motivo (*"Medido: a arte oficial pesa 118 KB"*), então traduzir mal
 
 A regra diz *tudo que se lê dentro do arquivo* porque uma lista fechada de exemplos vira, na leitura
 de quem aplica, uma lista fechada do que a regra alcança: comentário, descrição de teste e mensagem
-de asserção cresceram em português por não estarem em lista nenhuma. Os exemplos acima são
-exemplos.
+de asserção cresceram em português enquanto não estavam em lista nenhuma. A lista do parágrafo
+acima exemplifica; não delimita.
 
 **Identificador em português é defeito, não estilo.** Conferir com a medição, não a olho: a
 varredura por lista de palavras já subestimou o problema em uma ordem de grandeza, porque perde
@@ -118,6 +120,7 @@ parâmetro de arrow além do primeiro e perde palavra que existe nas duas língu
 
 ## Onde ler cada assunto
 
-Hoje tudo está em `README.md`, uma seção `## ` por assunto: os títulos do arquivo são o índice, e
-lê-se só a seção do assunto. O PR 8 da Fase 8 parte isso em `docs/` — quando existir, ler o arquivo
-do assunto e atualizar esta seção.
+Hoje quase tudo está em `README.md` (o release, em `RELEASE.md`). Os títulos são o índice —
+`grep -nE '^#{2,3} ' README.md` — e nem todo assunto tem `## ` próprio: se o título não aparecer,
+procurar a palavra e ler a seção em volta. Lê-se só a seção do assunto. O PR 8 da Fase 8 parte isso
+em `docs/` — quando existir, ler o arquivo do assunto e atualizar esta seção.
