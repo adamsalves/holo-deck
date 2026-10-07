@@ -2331,6 +2331,92 @@ pré-busca `/packs` e `/deck`, a coleção pré-busca `/packs`, as preferências
 si mesmas no outro idioma — e o grid, pela decisão acima. A paleta carregada sob demanda
 é a #85, fora deste PR.
 
+### A barra, parada na primeira carga
+
+A barra está em toda tela menos a batalha, e no celular ela quebra em três ou quatro
+linhas: o que muda a altura dela empurra a página inteira. Duas coisas mudavam, medidas
+em 07/10/2026 no Chrome completo com emulação de celular, CPU 4× e rede de 1,6 Mbps com
+150 ms (a `d9f0e51` antes, o PR 7c depois; cinco cargas por célula, três nas duas
+últimas linhas, todas com o mesmo valor):
+
+| tela | deslocamento antes | depois |
+|---|---|---|
+| `/rules` a 430 px | 0,418 | 0,003 |
+| `/en/rules` a 430 px | 0,403 | 0,003 |
+| `/pokemon/charizard` a 412 px | 0,462 | 0,003 |
+| `/pokedex/1` a 412 px | 0,607 | 0,034 |
+| `/collection` a 412 px | 1,045 | 0,434 |
+
+- **O link das moedas só existe depois da hidratação**, porque o saldo é do jogador e o
+  servidor não o escreve. Até lá a barra tinha 4 px a menos e os dois links seguintes
+  ficavam 104 px à esquerda em pt-BR e 97 em inglês: 0,09 a 0,10 em toda largura de
+  celular. O `ClientOnly` ganhou um `#fallback` com a mesma caixa, invisível e fora da
+  árvore de acessibilidade, com o rótulo no idioma da página — uma largura escrita no
+  CSS erraria 7 px no outro idioma.
+- **As faces da barra chegavam depois da primeira pintura.** Uma face só é buscada
+  quando o layout acha texto que precisa dela; a página era pintada na reserva e de novo
+  na Chakra Petch, e entre 412 e 440 px os links ocupam uma linha a mais na reserva: a
+  barra ia de 217 para 160 px (0,31 a 0,35). O `AppNav` declara o `preload` das duas
+  faces em que a barra é escrita, a 600 e a 700 (20 KB). Na barra e não no `app.head`,
+  porque a batalha não tem barra e não pede a 600.
+
+**Duas faces, e não as quatro da tela.** A 400 do corpo e a JetBrains Mono seguem
+trocando, e o que isso move é o 0,003 da tabela. As quatro (61 KB) custaram 216 ms ao
+LCP do Detalhe, que é a arte; as duas custam cerca de 100 (4.520 → 4.624 ms na mediana
+de cinco cargas; só com a caixa das moedas a mediana já era 4.556). Na segunda visita,
+com o service worker respondendo as fontes, a troca acontecia do mesmo jeito (0,416 em
+`/rules`) e cai para 0,012.
+
+**O endereço do `preload` leva um hash, e vai escrito no `AppNav`.** O `@nuxt/fonts` dá a
+cada arquivo um nome derivado de onde ele veio e não oferece jeito de pedir "a 600"; a
+opção `preload` do módulo emite um link só, para uma itálica que nenhuma tela usa.
+Quando a família mudar de versão no provedor o hash muda, o link aponta para nada e a
+página volta a trocar — quem avisa é o portão, pelo nome da face, e o conserto é copiar
+os dois endereços novos, que o `@font-face` do CSS construído diz quais são.
+
+[`test/e2e/layout-stability.spec.ts`](test/e2e/layout-stability.spec.ts) guarda as duas
+coisas, em `/rules` e nos dois idiomas:
+
+- **A barra que o servidor escreveu é a barra hidratada**, a 360 e a 430 px: a altura,
+  o lugar de cada link e a caixa reservada contra a do link, lidos com o JavaScript
+  desligado e depois com a página hidratada. Com o `#fallback` retirado reprova nos
+  quatro casos, com os 4 px e os 104 px na mensagem. Entre 412 e 416 px o *headless
+  shell* do e2e quebra a barra diferente do Chrome completo, e por isso a largura não é
+  uma dessas.
+- **Numa carga a frio, nada que se move é a barra nem o bloco logo abaixo dela.** O
+  teste lê as fontes de cada `layout-shift`, sem o filtro de `hadRecentInput`, depois de
+  empurrar ele mesmo a barra 120 px: o deslocamento plantado é a testemunha de que a
+  sonda enxerga. Ele não cobra deslocamento zero porque as faces do corpo ainda trocam,
+  dentro do bloco, e o quanto isso soma depende da fonte de reserva da máquina.
+- **Toda página declara o `preload` das faces da barra quando tem a barra, e de nenhuma
+  quando não tem**, dito por família e peso lidos do `@font-face` do CSS construído. E
+  **cada arquivo declarado é um que a página pede sozinha**, com o `preload` retirado do
+  HTML e o JavaScript desligado — o nome não distingue o subconjunto latino do
+  vietnamita, e o pedido distingue.
+
+Provado com defeito plantado e build de verdade: sem o `preload`, as 22 páginas com
+barra nomeadas e o bloco indo de 217 para 160; com um hash inexistente e a 700 do
+subconjunto vietnamita, 22 páginas reprovadas pelo nome nas duas perguntas; com a 600 no
+`app.head`, `/battle/1` e `/en/battle/1` acusadas.
+
+**O teste segura a folha de estilo por 300 ms, e isso é um limite do `preload`, não só
+do teste.** A face pré-buscada só serve se chegar antes de a página poder pintar. Numa
+rede de verdade ela corre ao lado da folha de estilo e chega a tempo — zero trocas nas
+cargas da tabela. Em `localhost` nada demora, e quem chegava primeiro era acaso: sem
+segurar, o build bom reprovou 2 vezes em 40 com os seis workers da suíte e 18 em 40 com
+a máquina saturada. Segurando, nenhuma carga do build bom moveu a barra (cerca de 400,
+com a máquina livre e saturada) e as 80 do build sem o `preload` moveram. Quem abre o
+jogo em rede muito rápida com a CPU ocupada ainda pode ver a barra trocar de altura.
+
+**O que saiu por medição, e o que sobra:**
+
+- O sprite da primeira tela sem `lazy` e o herói com `fetchpriority="high"` não mexeram
+  no LCP (6.120 → 6.112 ms em `/pokedex/1`, 4.512 → 4.500 no Detalhe) e não entraram.
+- A fonte de reserva com a métrica ajustada é a #94: o módulo não a gera, e escrita à
+  mão ela só vale onde `local("Roboto")` ou `local("Arial")` resolve.
+- O 0,034 de `/pokedex/1` é a grade, que o servidor escreve em uma coluna (#93); o 0,434
+  de `/collection` é o corpo das telas de jogo, que pede prancha (#87).
+
 ## O save
 
 Um documento só, versionado, em `holodeck:save`.
