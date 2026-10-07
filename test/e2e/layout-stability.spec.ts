@@ -24,6 +24,14 @@ import { hydrated } from './support'
  * happen while the probe is looking; the two boxes are there whenever they are
  * read.
  *
+ * **Whose bar: a new player's, with no account.** The reserved box is written
+ * with one digit, and the server writes nothing where the account goes. A
+ * balance of more digits is a wider link, 8.4 px each, and the links after it
+ * still move (#97); an account is a line of its own, and the bar still grows
+ * 46 px when the session comes (#96). Neither is what these tests hold, and the
+ * test answers the session itself so that which player it measures is not left
+ * to a server with no database.
+ *
  * The widths are a phone's, where the jump was, and two at which the bar breaks
  * its lines the same way in the headless shell this suite runs on and in the
  * Chrome a player has: between 412 and 416 px they disagree, and a width in
@@ -33,12 +41,13 @@ import { hydrated } from './support'
  * paint.** Painted in the fallback, the bar's links take one line more at 430 px,
  * and the bar loses 57 px when the face comes. The two faces are preloaded by
  * the bar itself (see `AppNav.vue`), by an address that carries a hash, and
- * three things are asked of that: that a cold load moves neither the bar nor the
- * page under it; that every page preloads the faces of the bar when it has the
- * bar and none when it does not, said by family and weight as the built CSS
- * declares them; and that each preloaded file is one the page would have asked
- * for anyway. The second and third read `.output/public`, so they need
- * `yarn build`.
+ * four things are asked of that: that a cold load moves neither the bar nor the
+ * page under it; that it fetches each preloaded face once, which is the preload
+ * being what the page draws with; that every page preloads the faces of the bar
+ * when it has the bar and none when it does not, said by family and weight as
+ * the built CSS declares them; and that each preloaded file is one the page
+ * would have asked for anyway. All but the first read `.output/public`, so they
+ * need `yarn build`.
  */
 
 const ADDRESS = '/rules'
@@ -55,7 +64,9 @@ interface Bar {
   readonly height: number
   /** The coins: the reserved box before hydration, the link after it. */
   readonly coins: Box | null
-  /** Where each link of the bar sits, by its address. */
+  /** The pieces of the coins' box that are drawn, and so read out too: none of a box that is only reserved. */
+  readonly coinsSeen: readonly string[]
+  /** Where each link of the bar sits, by its address, and by its turn where two share one. */
   readonly links: Readonly<Record<string, Box>>
 }
 
@@ -73,10 +84,20 @@ function readBar(page: Page): Promise<Bar> {
     const coins = bar.querySelector('.nav__coins')
     const links: Record<string, Box> = {}
     for (const link of Array.from(bar.querySelectorAll('a[href]:not(.nav__coins)'))) {
-      links[link.getAttribute('href') ?? ''] = boxOf(link)
+      // The name and the first section go to the same address: by the address alone, one was read over the other.
+      const address = link.getAttribute('href') ?? ''
+      let key = address
+      for (let turn = 2; Object.hasOwn(links, key); turn += 1) key = `${address} (${turn})`
+      links[key] = boxOf(link)
     }
 
-    return { height: bar.getBoundingClientRect().height, coins: coins === null ? null : boxOf(coins), links }
+    // `visibility` is what takes a box out of the paint and out of the accessibility
+    // tree at once, and a child can turn it back on: every piece is asked.
+    const coinsSeen = (coins === null ? [] : [coins, ...Array.from(coins.querySelectorAll('*'))])
+      .filter(piece => getComputedStyle(piece).visibility !== 'hidden')
+      .map(piece => `${piece.localName}.${piece.classList.item(0) ?? ''}`)
+
+    return { height: bar.getBoundingClientRect().height, coins: coins === null ? null : boxOf(coins), coinsSeen, links }
   })
 }
 
@@ -90,6 +111,7 @@ async function barOf(browser: Browser, baseURL: string, path: string, width: num
 
   try {
     const page = await context.newPage()
+    await signedOut(page)
     await page.goto(path)
 
     if (javaScriptEnabled) await barBooted(page)
@@ -105,7 +127,7 @@ for (const code of localeCodes()) {
   for (const width of WIDTHS) {
     const path = localeUrl(ADDRESS, code)
 
-    test(`${path} at ${width} px: the bar the server wrote is the bar hydrated`, async ({ browser, baseURL }) => {
+    test(`${path} at ${width} px, with no account: the bar the server wrote is the bar hydrated`, async ({ browser, baseURL }) => {
       if (baseURL === undefined) throw new Error('no baseURL')
 
       const served = await barOf(browser, baseURL, path, width, false)
@@ -127,9 +149,22 @@ for (const code of localeCodes()) {
 
       expect(served.coins, 'the bar the server wrote reserves no box for the coins').not.toBeNull()
       expect(served.coins?.width, 'the box reserved for the coins is empty').toBeGreaterThan(0)
-      expect(served.coins, 'the box reserved for the coins is not the box of the link').toEqual(booted.coins)
+      expect.soft(served.coins, 'the box reserved for the coins is not the box of the link').toEqual(booted.coins)
+
+      // The other side: the link is seen, so a reading that calls everything unseen fails here.
+      expect(booted.coinsSeen, 'the coins link of the hydrated bar reads as not drawn: the reading proves nothing').not.toEqual([])
+      expect(served.coinsSeen, 'pieces of the reserved box that are drawn, and read out, before there is a balance').toEqual([])
     })
   }
+}
+
+/**
+ * A player with no account, said by the test. The server the suite runs has no
+ * database and answers the session with a 500, which the bar takes the same way;
+ * that was the server's accident, and the bar of a player with one is another bar.
+ */
+async function signedOut(page: Page): Promise<void> {
+  await page.route('**/api/auth/get-session', route => route.fulfill({ json: null }))
 }
 
 /** The bar is there once the client has it whole: hydrated, the coins in, the account known. */
@@ -162,6 +197,9 @@ interface Shift {
  * machine free and with it saturated — where a page that cannot hydrate in time
  * fails on the test's timeout, which is another matter —, and every load of the
  * build with no preload did, 80 in 80.
+ *
+ * The test counts the stylesheets it held: with none, it is back to that race
+ * and says nothing about why.
  */
 const HEAD_START = 300
 
@@ -194,8 +232,17 @@ for (const code of localeCodes()) {
    * in it: they come in the order they happened, so whatever came before is the
    * page's, and a probe that sees nothing fails on the witness instead of
    * passing.
+   *
+   * **And each preloaded face is fetched once.** The move is what a face that
+   * came late does on this machine: it takes a fallback in which the links wrap
+   * differently, and that is the font the machine has. In DejaVu Sans the bar is
+   * a line taller at 430 px; in a fallback with Arial's metrics it is not, and a
+   * preload the page could not use moved nothing there. What does not depend on
+   * the fallback is the request: a preload the page draws with is the only fetch
+   * of its file, and one it cannot use — without `crossorigin`, a font's preload
+   * is not the font's request — is fetched again when the text needs it.
    */
-  test(`${path} at 430 px: a cold load does not move the bar, nor the page under it`, async ({ browser, baseURL }) => {
+  test(`${path} at 430 px, with no account: a cold load does not move the bar, nor the page under it`, async ({ browser, baseURL }) => {
     if (baseURL === undefined) throw new Error('no baseURL')
 
     const context = await browser.newContext({ baseURL, viewport: { width: 430, height: 932 }, serviceWorkers: 'block' })
@@ -244,14 +291,25 @@ for (const code of localeCodes()) {
         }).observe({ type: 'layout-shift', buffered: true })
       })
 
+      const asked = new Map<string, number>()
+      page.on('request', (request) => {
+        const { pathname } = new URL(request.url())
+        if (pathname.startsWith('/_fonts/')) asked.set(pathname, (asked.get(pathname) ?? 0) + 1)
+      })
+
+      let held = 0
       await page.route('**/_nuxt/*.css', async (route) => {
+        held += 1
         await new Promise(resolve => setTimeout(resolve, HEAD_START))
         await route.continue()
       })
+      await signedOut(page)
 
       await page.goto(path)
       await barBooted(page)
       await page.evaluate(() => document.fonts.ready.then(() => undefined))
+
+      expect(held, 'no stylesheet came through the test: the faces had no head start, and what follows is a race').toBeGreaterThan(0)
 
       const planted = await page.evaluate(() => {
         const block = document.createElement('div')
@@ -265,9 +323,21 @@ for (const code of localeCodes()) {
         { message: 'the probe did not see the bar pushed down in front of it: an empty list proves nothing' },
       ).toBeGreaterThan(0)
 
-      expect(
+      expect.soft(
         shifts.filter(shift => shift.at < planted).flatMap(shift => shift.outside),
         'what moved while the page loaded that is not a piece of its content',
+      ).toEqual([])
+
+      const early = await page.locator('link[rel="preload"][as="font"]').evaluateAll(
+        links => links.map(link => new URL(link.getAttribute('href') ?? '', document.baseURI).pathname),
+      )
+      // The other side: with no preload in the page, the list below is empty whatever the page did.
+      expect(early, 'the page preloads no face, so none was asked whether it is used').not.toEqual([])
+
+      const faces = builtFaces()
+      expect(
+        early.filter(address => asked.get(address) !== 1).map(address => `${faceName(faces, address)}, fetched ${asked.get(address) ?? 0} times`),
+        'faces the page preloads and does not draw with: a preload that is used is the only fetch of its file',
       ).toEqual([])
     }
     finally {
@@ -329,7 +399,7 @@ function faceName(faces: ReadonlyMap<string, readonly string[]>, address: string
 }
 
 /** The page as the build wrote it, in each language. */
-function builtPages(): { route: string, html: string }[] {
+function builtDocuments(): { route: string, html: string }[] {
   return pageAddresses().flatMap(address => localeCodes().map((code) => {
     const route = localeUrl(address, code)
 
@@ -346,7 +416,7 @@ test('a page preloads the faces of the bar when it has the bar, and no face when
   // the comparison fails for the wrong reason — and a name nothing is called passes nowhere.
   expect(BAR_FACES.filter(face => !named.includes(face)), 'faces of the bar that the built CSS does not declare').toEqual([])
 
-  const pages = builtPages()
+  const pages = builtDocuments()
   const withBar = pages.filter(({ html }) => /<header\b[^>]*\bclass="nav"/.test(html))
   // Both kinds have to be there, or one half of the rule is asked of no page.
   expect(withBar.length, 'no built page has the bar').toBeGreaterThan(0)
@@ -364,7 +434,7 @@ test('a page preloads the faces of the bar when it has the bar, and no face when
   expect(problems).toEqual([])
 })
 
-for (const { route, html } of existsSync(PUBLIC) ? builtPages() : []) {
+for (const { route, html } of existsSync(PUBLIC) ? builtDocuments() : []) {
   /**
    * The page with its font preloads taken out and JavaScript off asks for the
    * faces its first paint needs, and for nothing else: what it preloads has to be
@@ -401,9 +471,12 @@ for (const { route, html } of existsSync(PUBLIC) ? builtPages() : []) {
       expect(asked.size, 'the page asked for no font at all').toBeGreaterThan(0)
 
       const faces = builtFaces()
+      // What the page asked for is what it should preload from: when a hash changes, the
+      // new address is in this list, and the name alone is shared by three subsets.
+      const own = [...asked].sort().map(address => `${faceName(faces, address)} at ${address}`)
       expect(
         earlyFonts(html).filter(address => !asked.has(address)).map(address => faceName(faces, address)),
-        'faces the page preloads and does not use',
+        `faces the page preloads and does not use — by itself it asks for: ${own.join('; ')}`,
       ).toEqual([])
     }
     finally {
