@@ -202,6 +202,31 @@ function isCurrent(link: NavLink): boolean {
           {{ gameNumber(progress.coins) }}
           <span class="nav__coins-label">{{ t('nav.coins') }}</span>
         </NuxtLink>
+
+        <!-- The link's box, before there is a link. The balance is the player's, so
+             the server writes none, and the link only exists once the page hydrates:
+             until then the bar was 4 px shorter — the link is its tallest item, 35 px
+             against 31 — and everything after it sat about 100 px to the left, which
+             moved the whole page on every first load of a phone. This is the same
+             box with nothing to see in it: the same classes, the mark's 13 px, the
+             digit of an empty balance and the label in the page's language, which a
+             width written in the CSS would get wrong by 7 px in the other one.
+             `test/e2e/layout-stability.spec.ts` measures the bar both ways. -->
+        <template #fallback>
+          <span
+            class="numeric nav__coins"
+            style="visibility: hidden"
+            aria-hidden="true"
+          >
+            <svg
+              class="nav__coin-mark"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            />
+            0
+            <span class="nav__coins-label">{{ t('nav.coins') }}</span>
+          </span>
+        </template>
       </ClientOnly>
 
       <NuxtLink
