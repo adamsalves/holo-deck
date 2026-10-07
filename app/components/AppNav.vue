@@ -107,9 +107,19 @@ onBeforeUnmount(() => document.documentElement.style.removeProperty('--nav-heigh
  * after the stylesheet is in; the page was painted in the fallback and painted
  * again when the face came. The fallback is wider, and on a phone between 412
  * and 440 px the bar's links take one line more in it: the bar went from 217 px
- * to 160 on the second paint, and everything under it with it. With the two
- * faces preloaded they race the stylesheet instead of waiting for it, and they
- * are 20 KB against its 125.
+ * to 160 on the second paint, and everything under it with it. That is DejaVu
+ * Sans, the fallback of the machine that measured; in one with Arial's metrics
+ * the widths are 412 to 414 px, and 428 in English.
+ *
+ * With the two faces preloaded they race the stylesheet instead of waiting for
+ * it. They are 20 KB; the stylesheet is 125 as `yarn preview` serves it and 16
+ * as a host compresses it, so the head start they had was 2.8 s in the first and
+ * about 140 ms in the second, and in both the bar was painted once.
+ *
+ * **`crossorigin` is part of the address.** A font is fetched without
+ * credentials even from its own origin, and a preload that does not say so is
+ * another request: the file comes twice, and the one that came early is not the
+ * one the text is drawn with.
  *
  * **Two, and not the page's four.** The body's 400 and the numbers' JetBrains
  * Mono still swap, and what that moves is a line or two of text by a few pixels:
@@ -246,6 +256,9 @@ function isCurrent(link: NavLink): boolean {
              box with nothing to see in it: the same classes, the mark's 13 px, the
              digit of an empty balance and the label in the page's language, which a
              width written in the CSS would get wrong by 7 px in the other one.
+             One digit is the balance of a new player: each character more is
+             8.4 px, and whoever comes back with ten coins or more still sees the
+             links after this one move (#97).
              `test/e2e/layout-stability.spec.ts` measures the bar both ways. -->
         <template #fallback>
           <span

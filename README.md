@@ -2334,10 +2334,12 @@ si mesmas no outro idioma — e o grid, pela decisão acima. A paleta carregada 
 ### A barra, parada na primeira carga
 
 A barra está em toda tela menos a batalha, e no celular ela quebra em três ou quatro
-linhas: o que muda a altura dela empurra a página inteira. Duas coisas mudavam, medidas
-em 07/10/2026 no Chrome completo com emulação de celular, CPU 4× e rede de 1,6 Mbps com
-150 ms (a `d9f0e51` antes, o PR 7c depois; cinco cargas por célula, três nas duas
-últimas linhas, todas com o mesmo valor):
+linhas: o que muda a altura dela empurra a página inteira. Para o jogador novo, sem
+conta, duas coisas mudavam, medidas em 07/10/2026 no Chrome completo com emulação de
+celular, CPU 4× e rede de 1,6 Mbps com 150 ms (a `d9f0e51` antes, o PR 7c depois; cinco
+cargas por célula, três nas duas últimas linhas, todas com o mesmo valor). O servidor
+da medição é o `yarn preview`, que não comprime, e a fonte de reserva é a DejaVu Sans
+desta máquina; as duas coisas pesam nos números, e estão ditas onde pesam:
 
 | tela | deslocamento antes | depois |
 |---|---|---|
@@ -2350,13 +2352,17 @@ em 07/10/2026 no Chrome completo com emulação de celular, CPU 4× e rede de 1,
 - **O link das moedas só existe depois da hidratação**, porque o saldo é do jogador e o
   servidor não o escreve. Até lá a barra tinha 4 px a menos e os dois links seguintes
   ficavam 104 px à esquerda em pt-BR e 97 em inglês: 0,09 a 0,10 em toda largura de
-  celular. O `ClientOnly` ganhou um `#fallback` com a mesma caixa, invisível e fora da
+  celular. O `ClientOnly` ganhou um `#fallback` com a caixa do link, invisível e fora da
   árvore de acessibilidade, com o rótulo no idioma da página — uma largura escrita no
-  CSS erraria 7 px no outro idioma.
+  CSS erraria 7 px no outro idioma. A caixa é a de um saldo de um dígito, que é o do
+  jogador novo: cada caractere a mais alarga o link 8,4 px, e quem volta com 10 moedas
+  ou mais ainda vê os dois links seguintes andarem (#97).
 - **As faces da barra chegavam depois da primeira pintura.** Uma face só é buscada
   quando o layout acha texto que precisa dela; a página era pintada na reserva e de novo
   na Chakra Petch, e entre 412 e 440 px os links ocupam uma linha a mais na reserva: a
-  barra ia de 217 para 160 px (0,31 a 0,35). O `AppNav` declara o `preload` das duas
+  barra ia de 217 para 160 px (0,31 a 0,35). A faixa é a da DejaVu Sans; numa reserva
+  com a métrica da Arial ela é de 412 a 414 px em pt-BR e 428 px em inglês, e fora dela
+  a troca de fonte não muda a altura da barra. O `AppNav` declara o `preload` das duas
   faces em que a barra é escrita, a 600 e a 700 (20 KB). Na barra e não no `app.head`,
   porque a batalha não tem barra e não pede a 600.
 
@@ -2367,27 +2373,46 @@ de cinco cargas; só com a caixa das moedas a mediana já era 4.556). Na segunda
 com o service worker respondendo as fontes, a troca acontecia do mesmo jeito (0,416 em
 `/rules`) e cai para 0,012.
 
+**Os tempos são de servidor sem compressão, e a folga do `preload` também.** O
+`entry.css` sai do `yarn preview` com 125 KB e chega em 3,5 s nessa rede, contra 0,7 s
+das duas faces: 2,8 s de folga. Comprimido ele tem 16 KB em brotli, menos que as faces.
+Com o mesmo build atrás de um proxy que comprime, a folha chega em 0,74 s e as faces em
+0,60: a folga cai para uns 140 ms, e a barra não se moveu em 52 cargas, de três telas
+em quatro perfis de rede e CPU. O `preload` segue valendo num host que comprime; os LCP
+desta seção são os do servidor sem compressão, maiores que os de um host (o FCP de
+`/rules` é 3,6 s direto e 0,86 s comprimido).
+
 **O endereço do `preload` leva um hash, e vai escrito no `AppNav`.** O `@nuxt/fonts` dá a
 cada arquivo um nome derivado de onde ele veio e não oferece jeito de pedir "a 600"; a
 opção `preload` do módulo emite um link só, para uma itálica que nenhuma tela usa.
 Quando a família mudar de versão no provedor o hash muda, o link aponta para nada e a
 página volta a trocar — quem avisa é o portão, pelo nome da face, e o conserto é copiar
-os dois endereços novos, que o `@font-face` do CSS construído diz quais são.
+os dois endereços novos. Três arquivos se chamam *Chakra Petch 600*, um por subconjunto,
+e o que serve é o que a página pede sozinha: a mensagem do portão traz essa lista, com
+o endereço de cada face.
 
 [`test/e2e/layout-stability.spec.ts`](test/e2e/layout-stability.spec.ts) guarda as duas
-coisas, em `/rules` e nos dois idiomas:
+coisas, em `/rules` e nos dois idiomas, para o jogador sem conta — o teste responde a
+sessão ele mesmo, em vez de depender do 500 que o servidor sem banco devolve:
 
 - **A barra que o servidor escreveu é a barra hidratada**, a 360 e a 430 px: a altura,
   o lugar de cada link e a caixa reservada contra a do link, lidos com o JavaScript
   desligado e depois com a página hidratada. Com o `#fallback` retirado reprova nos
   quatro casos, com os 4 px e os 104 px na mensagem. Entre 412 e 416 px o *headless
   shell* do e2e quebra a barra diferente do Chrome completo, e por isso a largura não é
-  uma dessas.
+  uma dessas. **E a caixa reservada não se vê**: nenhuma peça dela tem `visibility`
+  diferente de `hidden`, que é o que a tira da pintura e da árvore de acessibilidade de
+  uma vez; o link hidratado, lido do mesmo jeito, tem de se ver.
 - **Numa carga a frio, nada que se move é a barra nem o bloco logo abaixo dela.** O
   teste lê as fontes de cada `layout-shift`, sem o filtro de `hadRecentInput`, depois de
   empurrar ele mesmo a barra 120 px: o deslocamento plantado é a testemunha de que a
   sonda enxerga. Ele não cobra deslocamento zero porque as faces do corpo ainda trocam,
   dentro do bloco, e o quanto isso soma depende da fonte de reserva da máquina.
+- **Na mesma carga, cada face pré-buscada é pedida uma vez só.** A barra mexer é a
+  consequência, e ela depende da fonte de reserva: com a métrica da Arial um `preload`
+  que a página não consegue usar não move nada a 430 px. O pedido não depende. Um
+  `preload` usado é o único pedido do arquivo; sem `crossorigin` ele não serve à fonte,
+  e o arquivo é pedido de novo quando o texto precisa dele.
 - **Toda página declara o `preload` das faces da barra quando tem a barra, e de nenhuma
   quando não tem**, dito por família e peso lidos do `@font-face` do CSS construído. E
   **cada arquivo declarado é um que a página pede sozinha**, com o `preload` retirado do
@@ -2397,7 +2422,11 @@ coisas, em `/rules` e nos dois idiomas:
 Provado com defeito plantado e build de verdade: sem o `preload`, as 22 páginas com
 barra nomeadas e o bloco indo de 217 para 160; com um hash inexistente e a 700 do
 subconjunto vietnamita, 22 páginas reprovadas pelo nome nas duas perguntas; com a 600 no
-`app.head`, `/battle/1` e `/en/battle/1` acusadas.
+`app.head`, `/battle/1` e `/en/battle/1` acusadas. Sem o `crossorigin`, que as duas
+perguntas de disco deixam passar, a carga a frio acusa `Chakra Petch 600, fetched 2
+times` e a 700 igual. Com o `style` do `#fallback` trocado por uma classe sem regra, os
+quatro casos da barra nomeiam as três peças que se veem; com só o rótulo de volta a
+`visibility: visible`, nomeiam o rótulo.
 
 **O teste segura a folha de estilo por 300 ms, e isso é um limite do `preload`, não só
 do teste.** A face pré-buscada só serve se chegar antes de a página poder pintar. Numa
@@ -2406,7 +2435,9 @@ cargas da tabela. Em `localhost` nada demora, e quem chegava primeiro era acaso:
 segurar, o build bom reprovou 2 vezes em 40 com os seis workers da suíte e 18 em 40 com
 a máquina saturada. Segurando, nenhuma carga do build bom moveu a barra (cerca de 400,
 com a máquina livre e saturada) e as 80 do build sem o `preload` moveram. Quem abre o
-jogo em rede muito rápida com a CPU ocupada ainda pode ver a barra trocar de altura.
+jogo em rede muito rápida com a CPU ocupada ainda pode ver a barra trocar de altura. O
+teste conta as folhas que segurou: se o caminho do CSS mudar e nenhuma passar por ele,
+reprova dizendo isso, em vez de voltar à corrida calado.
 
 **O que saiu por medição, e o que sobra:**
 
@@ -2416,6 +2447,11 @@ jogo em rede muito rápida com a CPU ocupada ainda pode ver a barra trocar de al
   mão ela só vale onde `local("Roboto")` ou `local("Arial")` resolve.
 - O 0,034 de `/pokedex/1` é a grade, que o servidor escreve em uma coluna (#93); o 0,434
   de `/collection` é o corpo das telas de jogo, que pede prancha (#87).
+- **Quem tem conta ainda vê a barra crescer 46 px** em toda primeira carga de celular
+  (217 → 263 a 360 px, 160 → 206 a 430): o servidor escreve o canto da conta vazio, e a
+  linha do avatar e do SAIR entra quando a sessão chega. Reservá-la muda o que a barra
+  desenha, e é a #96.
+- O saldo de mais de um dígito, que a caixa reservada não cobre, é a #97.
 
 ## O save
 
