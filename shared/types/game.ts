@@ -185,8 +185,8 @@ export function generationNumeral(generation: number): string {
  * prominent word of the panel, and that is why it is translated at all: the
  * PokeAPI sends `rough-terrain`, and a highlighted `ROUGH TERRAIN` is exactly
  * the `FLYING` the canvas replaced with `VOADOR` on the type chips. The board
- * writes the identifier and the code writes the word — a divergence, and the
- * README records it.
+ * writes the identifier and the code writes the word — a divergence, and
+ * `docs/canvas-divergences.md` records it.
  *
  * `rare` is the one that needed a decision rather than a dictionary: in the
  * PokeAPI it is the habitat of what lives nowhere common, so *raro* would

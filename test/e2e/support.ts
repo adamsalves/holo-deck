@@ -245,8 +245,8 @@ export async function fakeSync(
      * `isSyncBody` é o mesmo guarda da rota — recusa chave desconhecida, batalha
      * não nula e `schemaVersion` acima do teto —, e sem ele o caminho 400 nunca
      * atravessava o navegador. O teto de escritas é o outro: ele produz o estado
-     * 03 do indicador (*N mudanças na fila*) **sem** falta de rede, que é
-     * exatamente a divergência da prancha que o README registra neste PR.
+     * 03 do indicador (*N mudanças na fila*) **sem** falta de rede.
+     * That is the divergence from the board recorded in `docs/canvas-divergences.md`.
      */
     if (!isSyncBody(body.data)) {
       await route.fulfill({ status: 400, json: { statusMessage: 'Corpo inválido' } })

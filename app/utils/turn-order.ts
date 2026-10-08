@@ -15,7 +15,7 @@
  * `spendPp` runs at `engine.ts:222`, *before* the accuracy roll at `:226`, while
  * the page lists `pp` fifth, after `hit` and `damage`. The order shipped that way
  * before this PR and the difference is invisible to the player (PP is spent on a
- * miss either way), so it is registered in the README's divergences rather than
+ * miss either way), so it is registered in `docs/canvas-divergences.md` rather than
  * reordered here: the board draws this list, and reordering it is the board's
  * call, not a docblock's.
  *

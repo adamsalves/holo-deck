@@ -209,11 +209,11 @@ test('o indicador acompanha a jogada: enviando, e sincronizado de novo', async (
 })
 
 /**
- * O estado 03 cobre **toda fila que não subiu**, e não só a falta de rede — é a
- * divergência da prancha que o README registra neste PR. O teto de 60 escritas
- * por hora é o outro caminho até ele, e o que o separa do offline é que a
- * tentativa **acontece**: o `PUT` sai, o servidor recusa, e a fila espera a
- * próxima jogada em vez do evento `online`.
+ * O estado 03 cobre **toda fila que não subiu**, e não só a falta de rede.
+ * That is a divergence from the board, recorded in `docs/canvas-divergences.md`.
+ * O teto de 60 escritas por hora é o outro caminho até ele, e o que o separa do
+ * offline é que a tentativa **acontece**: o `PUT` sai, o servidor recusa, e a
+ * fila espera a próxima jogada em vez do evento `online`.
  */
 test('o servidor recusando também conta a fila, sem falta de rede', async ({ page }) => {
   const sync = await syncedDevice(page)

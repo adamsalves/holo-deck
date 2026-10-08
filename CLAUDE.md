@@ -129,6 +129,7 @@ Arquivo novo em `docs/` entra nesta tabela e no índice do `README.md` no mesmo 
 | --- | --- |
 | Verificação, portões e hooks de git | `docs/verification.md` |
 | Sistema de design: tema, tokens, foil | `docs/design-system.md` |
+| As pranchas do canvas e a tela de cada uma | `docs/canvas.md` |
 | Divergências do canvas | `docs/canvas-divergences.md` |
 | Idiomas: portões, seletor, `hreflang` | `docs/i18n.md` |
 | Dados do jogo: o dex gerado em build-time | `docs/game-data.md` |

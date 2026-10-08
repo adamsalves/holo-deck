@@ -49,13 +49,14 @@ database checks and the git hooks.
 ## Documentation
 
 Everything past the quick start lives in `docs/`, one file per subject. The files are in
-Portuguese, the language they were written in; the translation is tracked in
-[issue #46](https://github.com/adamsalves/holo-deck/issues/46).
+Portuguese, the language they were written in, except `docs/canvas.md`; the translation is tracked
+in [issue #46](https://github.com/adamsalves/holo-deck/issues/46).
 
 - [`docs/verification.md`](docs/verification.md): the checks, the Vercel preset, the manual database
   checks and the git hooks.
 - [`docs/design-system.md`](docs/design-system.md): the Holo TCG theme, why it is dark-only, its CSS
   tokens and the holographic foil.
+- [`docs/canvas.md`](docs/canvas.md): the canvas boards and the screen each one specifies.
 - [`docs/canvas-divergences.md`](docs/canvas-divergences.md): where the code departs from the
   approved canvas, and why.
 - [`docs/i18n.md`](docs/i18n.md): the two languages: the three language gates, the switcher and how
