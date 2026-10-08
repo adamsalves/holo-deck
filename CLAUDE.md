@@ -105,7 +105,7 @@ pt-BR e EN; a *chave* segue a regra. Plano, commits e PRs em português.
 
 **A prosa dentro do código também é inglês**: comentário, docblock, descrição de `describe`/`it` e
 **mensagem de asserção** — tudo que se lê dentro de um arquivo de código, e não só o que a pessoa
-comenta. Vale para toda linha que se escreve ou reescreve. A prosa em português que já está nos
+comenta. Vale para toda frase que se escreve ou reescreve. A prosa em português que já está nos
 arquivos fica para uma varredura única depois do `1.0.0` — são ~7.600 linhas em 197 arquivos, e
 elas guardam medição e motivo (*"Medido: a arte oficial pesa 118 KB"*), então traduzir mal custa
 mais que deixar.
@@ -114,6 +114,11 @@ A regra diz *tudo que se lê dentro do arquivo* porque uma lista fechada de exem
 de quem aplica, uma lista fechada do que a regra alcança: comentário, descrição de teste e mensagem
 de asserção cresceram em português enquanto não estavam em lista nenhuma. A lista do parágrafo
 acima exemplifica; não delimita.
+
+**A unidade é a frase, não a linha do diff.** Reescrever uma frase dentro de um comentário em
+português corta a vizinha no meio da linha, e a sobra aparece como linha `+` sem que ninguém tenha
+escrito português novo: é prosa antiga, e vai na varredura. A frase reescrita sai inteira em inglês;
+a vizinha não se traduz pela metade. Decidido no review do #98, que achou dez linhas assim.
 
 **Identificador em português é defeito, não estilo.** Conferir com a medição, não a olho: a
 varredura por lista de palavras já subestimou o problema em uma ordem de grandeza, porque perde
