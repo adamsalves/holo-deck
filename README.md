@@ -37,7 +37,7 @@ yarn db:generate:auth   # rewrites server/db/auth-schema.ts through the better-a
 
 ```bash
 yarn lint        # ESLint 10 flat config, with the typing-honesty rules
-yarn typecheck   # vue-tsc over app/, shared/, scripts/, test/ and the configs
+yarn typecheck   # vue-tsc over app/, server/, shared/, scripts/, test/ and the configs
 yarn test        # Vitest, unit tests, headless
 yarn build       # Nitro output in .output/
 yarn test:e2e    # Playwright; needs `yarn build` first

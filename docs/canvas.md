@@ -1,14 +1,19 @@
 # The canvas
 
-The canvas is the visual specification of the game. Each screen was drawn as a board and approved
-before it was built. A screen, panel or state with no board does not start: it gets a board first,
-and the project owner approves it. Where the code departs from a board,
-[`canvas-divergences.md`](canvas-divergences.md) records it and says why.
+The canvas is the visual specification of the game. A screen is drawn as a board and approved
+before it is built, and a screen, panel or state with no board does not start: it gets a board
+first, and the project owner approves it. What went the other way is on record. The Pokédex index
+shipped in Phase 3 with no board, and *Pokédex — as 9 regiões* was drawn from the component
+afterwards; the states written with no board are listed in
+[`canvas-divergences.md`](canvas-divergences.md), under *Estados sem prancha, escritos neste PR*.
+Where the code departs from a board, the same file records it and says why.
 
 ## Boards and screens
 
-Boards are named the way the documentation and the code comments name them: in italics, in the
-language they were drawn in. A board that is not a page of its own has no route.
+Boards are named in italics, in the language they were drawn in, and the documentation and the
+code comments use the names below. Three boards go by a second name in the code comments:
+*Estados de sync* is *Sync*, *Convite de conta* is *Convite*, and *Abertura* is *Abertura de pack*.
+A board that is not a page of its own has no route.
 
 | Board | What it draws | Route | Files |
 | --- | --- | --- | --- |
@@ -24,7 +29,7 @@ language they were drawn in. A board that is not a page of its own has no route.
 | *Detalhe* | One species | `/pokemon/[name]` | [`app/pages/pokemon/[name].vue`](../app/pages/pokemon/[name].vue) |
 | *Regras* | The rules, read from `shared/game/` | `/rules` | [`app/pages/rules.vue`](../app/pages/rules.vue) |
 | *Ajustes* | Account, save and preferences | `/settings` | [`app/pages/settings.vue`](../app/pages/settings.vue) |
-| *Offline* | The download-for-offline row of *Preferências*, and the card without its thumbnail | `/settings` | [`app/pages/settings.vue`](../app/pages/settings.vue), [`app/plugins/missing-sprite.client.ts`](../app/plugins/missing-sprite.client.ts) |
+| *Offline* | The download-for-offline row of *Preferências*, the card without its thumbnail, and what the species hero falls back to when the artwork does not load | `/settings`, `/pokemon/[name]` | [`app/pages/settings.vue`](../app/pages/settings.vue), [`app/plugins/missing-sprite.client.ts`](../app/plugins/missing-sprite.client.ts), [`app/pages/pokemon/[name].vue`](../app/pages/pokemon/[name].vue) |
 | *Entrar* | Signing in | `/login` | [`app/pages/login.vue`](../app/pages/login.vue) |
 | *Convite* | The invitation to create an account | none, drawn over any screen | [`app/components/AccountInvite.vue`](../app/components/AccountInvite.vue) |
 | *Duas coleções* | The choice between the collection on this device and the account's | none, drawn over any screen | [`app/components/SaveChoice.vue`](../app/components/SaveChoice.vue) |

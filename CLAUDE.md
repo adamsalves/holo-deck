@@ -18,7 +18,7 @@ commitados; o jogo roda do `localStorage` e sincroniza para o Postgres quem tem 
 - **Não puxar o canvas publicado para o contexto.** Ele tem ~3,4 MB. Extrair só a prancha necessária
   para um arquivo local pequeno.
 - **Preferir o `code-review-graph` (MCP) a `grep`/`read` amplo** para achar onde as coisas moram.
-- **Ler o arquivo do assunto**, não varrer o README inteiro.
+- **Ler o arquivo do assunto**, não varrer o `docs/` inteiro.
 - **Conferir a própria medição antes de planejar sobre ela.** Um `grep` com backreference já devolveu
   zero num lugar que tinha seis mapas de rótulo, e isso quase sub-dimensionou uma fase.
 
