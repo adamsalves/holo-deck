@@ -132,8 +132,8 @@ const SOURCE = hasExtension(['.vue', '.ts'])
  * resource in play, in both languages. *"{name} recovered {healed} HP"* and
  * *"do HP máximo"* are about the quantity, not about the axis of the chart, and
  * pt-BR keeps `PV` on the bar while the prose keeps `HP`. That split was an
- * explicit decision rather than an oversight, and the *Canvas divergences*
- * section of the README carries it.
+ * explicit decision rather than an oversight, and `docs/canvas-divergences.md`
+ * carries it.
  *
  * - `styleguide.vue` is a numeric-font specimen (`110 HP · 1.600 pó`), not a
  *   screen of the game, and nothing about it is translated.
@@ -439,8 +439,8 @@ describe('who spells an abbreviation by hand', () => {
  * excuses: `HP` is the English badge **and** the word this game uses for the
  * resource in play, in both languages. The 7 `battle.log.*` messages and the 3
  * under `rules.*` are about the quantity — *"perdeu 20 HP"* — and pt-BR keeps
- * `PV` on the bar while the prose keeps `HP`. That divergence is declared in the
- * *Canvas divergences* section of the README, not tolerated here by accident.
+ * `PV` on the bar while the prose keeps `HP`. That divergence is declared in
+ * `docs/canvas-divergences.md`, not tolerated here by accident.
  *
  * The figure is the one measured beside `EXCUSED_IN_LOCALES`, and it is written
  * once per place rather than remembered: this line said 8 while that one said 7,

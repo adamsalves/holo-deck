@@ -59,10 +59,20 @@ A segunda linha é o **título do PR**, e é ela que o release-please lê. Se o
 título começa com tipo convencional, ele vira mais uma entrada do changelog, ao
 lado das que os commits da branch já geraram.
 
-Isto é o efeito observado, não a fonte lida: se o release-please pega o título do
-corpo do merge commit ou o busca pela associação do PR na API não foi conferido —
-e não muda o que fazer, porque as duas rotas chegam ao mesmo texto. O que decide
-é o título do PR.
+O título sai da **mensagem do merge commit**, e não da associação do PR na API.
+Conferido em 08/10/2026 rodando o parser do release-please 17.6.0 — a versão que
+o `release-please-action@v5` fixa — sobre a mensagem que o GitHub monta: a primeira
+linha, `Merge pull request …`, não é commit convencional e é descartada, e o
+parser corta a mensagem em cada parágrafo que começa por um tipo convencional, de
+modo que o título vira um commit à parte. Duas consequências do mesmo corte:
+
+- um parágrafo de **corpo de commit** que comece por `feat: `, `fix: `, `docs: ` ou
+  qualquer outro tipo vira entrada própria — e, sendo `feat:` ou `fix:`, entra no
+  changelog e pesa na versão;
+- um rodapé digitado à mão na mensagem do merge commit é lido como o de qualquer
+  commit.
+
+O que decide a linha extra, então, é o título do PR.
 
 Aconteceu na `v0.2.0`: o changelog saiu com cinco Features, e a quinta —
 `pipeline de dados — o dex da PokeAPI gerado em build-time` — é o merge commit do
@@ -145,6 +155,39 @@ qualquer tag existir.
    acha o próprio PR pelo label `autorelease: pending`.
 6. Varra as branches órfãs e apague — a release não fecha antes disso. Veja a
    seção abaixo.
+
+## Forçar um número: o rodapé `Release-As`
+
+Com `bump-minor-pre-major`, nenhum tipo de commit leva de `0.x` a `1.0.0`: até
+`feat!:` dá minor. O número que os commits não calculam é pedido por um rodapé no
+corpo de um commit da branch:
+
+```
+docs: os comentários apontam para docs/ e o canvas ganha o mapa de pranchas
+
+Release-As: 1.0.0
+```
+
+O primeiro uso é o da `1.0.0`, no PR #98. O que foi conferido antes dele, com o
+mesmo parser da seção acima sobre os commits reais da branch:
+
+- **o tipo do commit não importa** — o rodapé num `docs:` é lido, mesmo com o
+  `docs:` fora do changelog;
+- **commits novos por cima não o escondem** — a busca cobre todo commit desde a
+  última tag, e não só o último da branch. Num `rebase` ou `amend`, o rodapé tem de
+  sobreviver na mensagem;
+- **o merge tem de ser por merge commit** — é a regra de sempre, e aqui ela é o
+  que leva o commit com o rodapé até `main` como ele é;
+- **um `BEGIN_COMMIT_OVERRIDE` no corpo do PR substitui a mensagem inteira**, com
+  o rodapé junto.
+
+O que **não** foi visto ainda é o workflow reescrever o release PR com o número
+pedido: isso só acontece depois do merge. Por isso a conferência é do passo 3 do
+passo a passo — o release PR tem de dizer `chore(main): release 1.0.0` **antes**
+de alguém mergeá-lo. Se seguir no número antigo, a saída é declarar
+`"release-as": "1.0.0"` no pacote, em
+[`release-please-config.json`](release-please-config.json), por PR, e tirar a
+linha depois da tag — enquanto estiver lá, toda release sai com esse número.
 
 ## Uma fase partida em vários PRs: o release PR fica segurado
 

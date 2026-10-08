@@ -18,7 +18,7 @@ commitados; o jogo roda do `localStorage` e sincroniza para o Postgres quem tem 
 - **Não puxar o canvas publicado para o contexto.** Ele tem ~3,4 MB. Extrair só a prancha necessária
   para um arquivo local pequeno.
 - **Preferir o `code-review-graph` (MCP) a `grep`/`read` amplo** para achar onde as coisas moram.
-- **Ler o arquivo do assunto**, não varrer o README inteiro.
+- **Ler o arquivo do assunto**, não varrer o `docs/` inteiro.
 - **Conferir a própria medição antes de planejar sobre ela.** Um `grep` com backreference já devolveu
   zero num lugar que tinha seis mapas de rótulo, e isso quase sub-dimensionou uma fase.
 
@@ -121,7 +121,24 @@ parâmetro de arrow além do primeiro e perde palavra que existe nas duas língu
 
 ## Onde ler cada assunto
 
-Hoje quase tudo está em `README.md` (o release, em `RELEASE.md`). Os títulos são o índice —
-`grep -nE '^#{2,3} ' README.md` — e nem todo assunto tem `## ` próprio: se o título não aparecer,
-procurar a palavra e ler a seção em volta. Lê-se só a seção do assunto. O PR 8 da Fase 8 parte isso
-em `docs/` — quando existir, ler o arquivo do assunto e atualizar esta seção.
+Um arquivo por assunto em `docs/`; o release fica em `RELEASE.md`. Lê-se só o arquivo do assunto.
+Arquivo novo em `docs/` entra nesta tabela e no índice do `README.md` no mesmo commit — o
+`docs-gate` reprova quando as três listas discordam.
+
+| Assunto | Arquivo |
+| --- | --- |
+| Verificação, portões e hooks de git | `docs/verification.md` |
+| Sistema de design: tema, tokens, foil | `docs/design-system.md` |
+| As pranchas do canvas e a tela de cada uma | `docs/canvas.md` |
+| Divergências do canvas | `docs/canvas-divergences.md` |
+| Idiomas: portões, seletor, `hreflang` | `docs/i18n.md` |
+| Dados do jogo: o dex gerado em build-time | `docs/game-data.md` |
+| Pokédex | `docs/pokedex.md` |
+| Pack, coleção, forja e deck | `docs/collection-and-deck.md` |
+| A Liga, a batalha e o motor | `docs/league-and-battle.md` |
+| A loja, `/rules`, `/settings` e a barra global | `docs/shop-rules-settings.md` |
+| Acessibilidade: estrutura, anel de foco, foco depois de uma ação | `docs/accessibility.md` |
+| Offline | `docs/offline.md` |
+| Primeira carga | `docs/performance.md` |
+| O save | `docs/save.md` |
+| Release | `RELEASE.md` |

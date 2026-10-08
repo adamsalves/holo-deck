@@ -17,7 +17,9 @@
  * deixa de existir, então não há segunda paleta a manter.
  *
  * (O plano escreve `background-blend-mode`; o canvas usa `mix-blend-mode`, e é o
- * segundo que renderiza. Divergência consciente, registrada aqui e no README.)
+ * segundo que renderiza.)
+ *
+ * A conscious divergence, recorded here and in `docs/canvas-divergences.md`.
  */
 
 @theme static {

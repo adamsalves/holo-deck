@@ -303,7 +303,7 @@ const next = computed(() => view.next.value)
  * the panel 285.5px. At a fixed height the bevel cut the bottom 15px off
  * CHALLENGE — out of sight, out of reach of a click, and out of reach of its
  * focus ring (#74). Growing is the lesser divergence: the panel ends 35.5px
- * below the gyms of its row (37.5 with an empty deck), which the README records.
+ * below the gyms of its row (37.5 with an empty deck), which `docs/canvas-divergences.md` records.
  */
 .league__next {
   box-sizing: border-box;

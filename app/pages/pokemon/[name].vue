@@ -429,8 +429,9 @@ useSeoMeta({
                      planta — hue sem papel no sistema, e um componente não cita
                      primitivo. `--accent` é o semântico que existe para "este
                      valor se destaca", e é o mesmo azul que a trilha e o foco já
-                     usam nesta página. A troca está na seção de divergências do
-                     README, com o valor exato.
+                     usam nesta página.
+                     The swap, with the exact value, is recorded in
+                     `docs/canvas-divergences.md`.
 
                      E por `t(habitatKey(...))`, não pelo `rough-terrain` da
                      PokeAPI com o hífen trocado por espaço: `--accent` faz dele
@@ -587,8 +588,8 @@ useSeoMeta({
  * o maior é o menos fundo.)
  *
  * O branco a 3% vem de `--text`, e não de um `rgba` cru: é o papel que o sistema
- * tem para "quase branco", e o portão de token não admite hex aqui. A prancha
- * usa 2,8% — a diferença está na tabela de divergências do README.
+ * tem para "quase branco", e o portão de token não admite hex aqui.
+ * The board draws 2.8%; the difference is recorded in `docs/canvas-divergences.md`.
  */
 .hero__watermark {
   position: absolute;

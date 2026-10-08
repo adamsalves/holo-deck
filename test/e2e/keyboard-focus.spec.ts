@@ -102,7 +102,7 @@ const PRESSING_WOULD: Readonly<Record<string, string>> = {
  * Kinds **no scene draws**, so the census cannot press them — the gap, written as
  * one. The boot's notices and the restore of a saved version need a state only a
  * server or a damaged save makes, and their buttons leave the page like every
- * other; they are not mended in this PR (README, *Foco depois de uma ação*). Each
+ * other; they are not mended in this PR (`docs/accessibility.md`, *Foco depois de uma ação*). Each
  * has to be on a button of `app/` and on no screen: once a scene draws one, the
  * census presses it and its entry goes.
  */

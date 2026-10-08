@@ -269,8 +269,8 @@ const renderedLabel = computed(() => {
              está desenhado, não o que foi capturado. A prancha a pinta com o
              verde de progresso de coleção, que não tem token no sistema — usá-lo
              aqui gastaria o significado da Fase 5 num medidor que não fala de
-             coleção. `--accent` é o semântico que sobra, e o valor da prancha
-             está na seção de divergências do README.
+             coleção. `--accent` é o semântico que sobra.
+             The board's own value is recorded in `docs/canvas-divergences.md`.
 
              `aria-hidden` porque o número ao lado já diz a mesma coisa em texto,
              e um `progressbar` anunciando "12%" sem rótulo é ruído. -->
