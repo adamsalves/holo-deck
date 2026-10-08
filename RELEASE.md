@@ -89,7 +89,8 @@ no changelog, e a decisão é de gosto:
 
 Nada a corrigir na `v0.2.0` — a linha extra descreve a fase corretamente. Vale
 saber para escolher o título da próxima com a decisão na mão, em vez de descobrir
-o efeito depois de mergear.
+o efeito depois de mergear. Quando são muitas, dá para tirá-las do release PR:
+ver *Tirar entradas do changelog antes do merge*.
 
 ## O que cada tipo faz com a versão
 
@@ -283,6 +284,42 @@ Aprovar é conferência, não obrigação: o PR de release só mexe em `CHANGELO
 `package.json` e no manifest, e o código já passou pelos portões quando entrou em
 `main`. O que a aprovação garante é que a árvore que vira tag foi testada como
 está.
+
+## Tirar entradas do changelog antes do merge
+
+O release PR é texto gerado, mas até o merge ele é um PR como outro: dá para
+editá-lo. Foi feito na `v1.0.0`, que juntava os vinte PRs da Fase 8 — das 79
+entradas, 20 eram de merge commit repetindo o título do PR ao lado das entradas
+dos commits da branch, e saíram 59.
+
+1. **Achar as entradas pelo SHA, não pelo texto.** É de merge commit a entrada
+   cujo commit tem dois pais:
+
+   ```bash
+   git rev-list --parents -n1 <sha>   # três hashes: o commit e os dois pais
+   ```
+
+2. **Conferir que nenhum PR some junto.** Para cada merge commit `M`, pelo menos
+   um commit de `M^1..M^2` tem de ter entrada própria no changelog. Um PR cujos
+   commits são todos de tipo oculto só aparece pelo título, e tirar a linha dele
+   apaga o PR das notas. Na `v1.0.0` os vinte tinham de uma a sete.
+
+3. **Editar nos dois lugares**, com o mesmo corte:
+   - o `CHANGELOG.md` na branch do release PR, num commit `chore:` por cima do
+     commit do bot;
+   - o **corpo do PR**. É dele, e não do arquivo, que o release-please tira as
+     notas da release no GitHub (`buildRelease` lê o corpo do PR mergeado). Só as
+     linhas `* ` saem: o cabeçalho, o título `## [x.y.z]` e o rodapé são o que o
+     parser procura.
+
+4. **Mergear em seguida, sem nada entrar em `main` no meio.** A cada push em
+   `main` o release-please gera o changelog de novo, e a edição à mão não está
+   em lugar nenhum que ele leia. Por isso o corte é o último passo antes do
+   merge, depois de todo PR pendente. (Na `v1.0.0` nada entrou no meio; o que
+   ele faz com um corte já feito não foi medido.)
+
+O commit do passo 3 é empurrado por uma pessoa, e não pelo `GITHUB_TOKEN`: o CI
+roda nele sozinho, sem o *Approve and run* da seção acima.
 
 ## Consertar as notas depois do merge
 
