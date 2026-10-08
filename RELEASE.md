@@ -171,8 +171,8 @@ Release-As: 1.0.0
 O primeiro uso é o da `1.0.0`, no PR #98. O que foi conferido antes dele, com o
 mesmo parser da seção acima sobre os commits reais da branch:
 
-- **o tipo do commit não importa** — o rodapé num `docs:` é lido, mesmo com o
-  `docs:` fora do changelog;
+- **o tipo do commit não importa** — o rodapé num `docs:` é lido como o de um
+  `feat:`;
 - **commits novos por cima não o escondem** — a busca cobre todo commit desde a
   última tag, e não só o último da branch. Num `rebase` ou `amend`, o rodapé tem de
   sobreviver na mensagem;
@@ -181,11 +181,22 @@ mesmo parser da seção acima sobre os commits reais da branch:
 - **um `BEGIN_COMMIT_OVERRIDE` no corpo do PR substitui a mensagem inteira**, com
   o rodapé junto.
 
-O que **não** foi visto ainda é o workflow reescrever o release PR com o número
-pedido: isso só acontece depois do merge. Por isso a conferência é do passo 3 do
-passo a passo — o release PR tem de dizer `chore(main): release 1.0.0` **antes**
-de alguém mergeá-lo. Se seguir no número antigo, a saída é declarar
-`"release-as": "1.0.0"` no pacote, em
+E o que só se viu depois do merge, em 08/10/2026:
+
+- **o workflow reescreve o release PR com o número pedido.** O #42 propunha
+  `0.9.0` e passou a `chore(main): release 1.0.0` dois minutos depois do merge do
+  #98, com o `package.json` e o manifest em `1.0.0`;
+- **o commit que carrega o rodapé entra no changelog, mesmo de tipo oculto.** É
+  a única exceção à tabela de tipos acima: o preset do changelog não descarta
+  commit com `Release-As`, e o `docs:` do exemplo saiu na `1.0.0` numa seção
+  *Documentation* que nenhuma outra release tem. A conferência anterior ao merge
+  não tinha como ver isso — ela rodou o parser, que decide o número, e não o
+  escritor do changelog, que decide as linhas. O assunto do commit que leva o
+  rodapé é, portanto, uma linha das notas da release: vale escolhê-lo para isso.
+
+A conferência continua sendo a do passo 3 do passo a passo — o release PR tem de
+dizer o número pedido **antes** de alguém mergeá-lo. Se seguir no número antigo,
+a saída é declarar `"release-as": "1.0.0"` no pacote, em
 [`release-please-config.json`](release-please-config.json), por PR, e tirar a
 linha depois da tag — enquanto estiver lá, toda release sai com esse número.
 
