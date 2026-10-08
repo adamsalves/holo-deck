@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isExternalTarget, markdownLinks, tableCitations } from '../support/markdown'
+import { isExternalTarget, markdownLinks, sectionLinks, tableCitations } from '../support/markdown'
 import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
 
 /**
@@ -25,9 +25,11 @@ import { hasExtension, REPO_ROOT, walkFiles } from '../support/source-tree'
  * the browser quietly lands on the top. Pointing at the file and naming the section in
  * the sentence survives both.
  *
- * **Three lists, one set.** The `docs/` files on disk, the ones the README links and
- * the ones the table in `CLAUDE.md` cites. They are compared as sets: a count would
- * stay green with one file added and another deleted.
+ * **Three lists, one set.** The `docs/` files on disk, the ones the index of the README
+ * lists and the ones the table in `CLAUDE.md` cites. They are compared as sets: a count
+ * would stay green with one file added and another deleted. The index and the table are
+ * each a named section: a `docs/` file linked from the prose of another section of the
+ * README is not in the index, and used to pass for an entry of it.
  */
 
 /** Written by release-please from the commit subjects; every link in it is a URL. */
@@ -35,6 +37,9 @@ const GENERATED = new Set(['CHANGELOG.md'])
 
 /** The section of `CLAUDE.md` whose table says where each subject is documented. */
 const TABLE_HEADING = 'Onde ler cada assunto'
+
+/** The section of the README that is the index of `docs/`. */
+const INDEX_HEADING = 'Documentation'
 
 /** Markdown files at the root, from the disk, minus the generated ones. */
 function rootDocuments(): string[] {
@@ -55,6 +60,10 @@ const read = (file: string): string => readFileSync(join(REPO_ROOT, file), 'utf8
 /** The links of a file that stay inside the repository. */
 const relativeLinks = (file: string) =>
   markdownLinks(read(file)).filter(link => !isExternalTarget(link.target))
+
+/** Every relative link the gate checks, with the file it was read from. */
+const scannedLinks = () =>
+  documents().flatMap(file => relativeLinks(file).map(link => ({ file, ...link })))
 
 /** A link target as a path from the root, without the fragment. */
 function pathFromRoot(file: string, target: string): string {
@@ -77,12 +86,24 @@ describe('docs gate', () => {
     expect(scanned).toEqual(expect.arrayContaining(['README.md', 'RELEASE.md', 'CLAUDE.md']))
     expect(scanned.some(file => file.startsWith('docs/')), 'nothing under docs/ was scanned').toBe(true)
     expect(scanned).not.toContain('CHANGELOG.md')
+
+    // Finding the files is not reading them: most of the links live under docs/, and a
+    // reader that came back empty for that folder would leave the two link checks green.
+    // By source and not by file, because a file with no link at all is a good file.
+    const links = scannedLinks()
+
+    expect(links.some(link => !link.file.startsWith('docs/')), 'no relative link was read from the root documents').toBe(true)
+    expect(links.some(link => link.file.startsWith('docs/')), 'no relative link was read from docs/').toBe(true)
   })
 
   /**
    * The instrument is measured on a sample that holds both kinds of line: the ones the
    * gate must see and the ones it must not. Without the second kind, a reader that
    * returned every `](` it could find would pass.
+   *
+   * The two fences are the ones the code spans cannot hide: a blank line ends a span,
+   * and `~~~` opens none. A fence of backticks with no blank line inside is swallowed
+   * as a span, and a sample with only that one stays green with the fences unmasked.
    */
   it('reads the links of a Markdown file, and only the real ones', () => {
     const sample = [
@@ -93,22 +114,28 @@ describe('docs gate', () => {
       '', // 5
       '```md', // 6
       '[fenced](not/a-link-either.md)', // 7
-      '```', // 8
-      '', // 9
-      '[web](https://example.com/x) [mail](mailto:a@b.c) [top](#top) [angle](<docs/with space.md>)', // 10
+      '', // 8
+      '[fenced, past a blank line](not/this-one.md)', // 9
+      '```', // 10
       '', // 11
-      '[ref]: docs/d.md', // 12
+      '~~~', // 12
+      '[tilde](not/in-a-tilde-fence.md)', // 13
+      '~~~', // 14
+      '', // 15
+      '[web](https://example.com/x) [mail](mailto:a@b.c) [top](#top) [angle](<docs/with space.md>)', // 16
+      '', // 17
+      '[ref]: docs/d.md', // 18
     ].join('\n')
 
     expect(markdownLinks(sample)).toEqual([
       { line: 1, target: 'docs/a.md' },
       { line: 1, target: 'img/b.png' },
       { line: 4, target: 'docs/c.md#section' },
-      { line: 10, target: 'https://example.com/x' },
-      { line: 10, target: 'mailto:a@b.c' },
-      { line: 10, target: '#top' },
-      { line: 10, target: 'docs/with space.md' },
-      { line: 12, target: 'docs/d.md' },
+      { line: 16, target: 'https://example.com/x' },
+      { line: 16, target: 'mailto:a@b.c' },
+      { line: 16, target: '#top' },
+      { line: 16, target: 'docs/with space.md' },
+      { line: 18, target: 'docs/d.md' },
     ])
 
     expect(['https://a.b/c', 'http://a.b', 'mailto:x@y.z', '//cdn.example/x'].map(isExternalTarget))
@@ -144,16 +171,41 @@ describe('docs gate', () => {
     expect(() => tableCitations(sample, 'Renamed')).toThrow('no "## Renamed" section')
   })
 
-  it('every relative link points at a file that exists', () => {
-    const broken = documents().flatMap(file => relativeLinks(file).flatMap((link) => {
-      const path = link.target.split('#')[0] ?? ''
-      // An anchor with no path is the next test's finding, and is not reported twice.
-      if (path === '' && link.target.includes('#')) return []
+  it('reads the links of one section, and only that section', () => {
+    const sample = [
+      '## Verifying', // 1
+      '', // 2
+      '[`docs/verification.md`](docs/verification.md) has the rest.', // 3
+      '', // 4
+      '## Documentation', // 5
+      '', // 6
+      'Tracked in [an issue](https://example.com/46).', // 7
+      '', // 8
+      '- [`docs/save.md`](docs/save.md): the save.', // 9
+      '', // 10
+      '## Release', // 11
+      '', // 12
+      '[`RELEASE.md`](RELEASE.md) has the step by step.', // 13
+    ].join('\n')
 
-      return existsSync(resolve(REPO_ROOT, dirname(file), path))
-        ? []
-        : [`${file}:${link.line} -> ${link.target || '(empty)'}`]
-    }))
+    expect(sectionLinks(sample, 'Documentation')).toEqual([
+      { line: 7, target: 'https://example.com/46' },
+      { line: 9, target: 'docs/save.md' },
+    ])
+    expect(sectionLinks(sample, 'Release')).toEqual([{ line: 13, target: 'RELEASE.md' }])
+    expect(() => sectionLinks(sample, 'Renamed')).toThrow('no "## Renamed" section')
+  })
+
+  it('every relative link points at a file that exists', () => {
+    const broken = scannedLinks().flatMap(({ file, line, target }) => {
+      const path = target.split('#')[0] ?? ''
+      // An anchor with no path is the next test's finding, and is not reported twice.
+      if (path === '' && target.includes('#')) return []
+      // An empty path resolves to the folder the file is in, and that one always exists.
+      if (path === '') return [`${file}:${line} -> (empty)`]
+
+      return existsSync(resolve(REPO_ROOT, dirname(file), path)) ? [] : [`${file}:${line} -> ${target}`]
+    })
 
     expect(
       broken,
@@ -162,9 +214,9 @@ describe('docs gate', () => {
   })
 
   it('no relative link carries an anchor', () => {
-    const anchored = documents().flatMap(file => relativeLinks(file)
+    const anchored = scannedLinks()
       .filter(link => link.target.includes('#'))
-      .map(link => `${file}:${link.line} -> ${link.target}`))
+      .map(link => `${link.file}:${link.line} -> ${link.target}`)
 
     expect(
       anchored,
@@ -175,14 +227,15 @@ describe('docs gate', () => {
 
   it('the docs/ files on disk, the README index and the CLAUDE.md table are the same set', () => {
     const onDisk = docsFiles()
-    const indexed = [...new Set(relativeLinks('README.md')
+    const indexed = [...new Set(sectionLinks(read('README.md'), INDEX_HEADING)
+      .filter(link => !isExternalTarget(link.target))
       .map(link => pathFromRoot('README.md', link.target))
       .filter(path => /^docs\/.+\.md$/.test(path)))]
     const tabled = [...new Set(tableCitations(read('CLAUDE.md'), TABLE_HEADING))]
 
     // Each source alive on its own: equal sets would hold again if all three went empty.
     expect(onDisk.length, 'no file under docs/').toBeGreaterThan(0)
-    expect(indexed.length, 'the README links no docs/ file').toBeGreaterThan(0)
+    expect(indexed.length, `the section "## ${INDEX_HEADING}" of the README links no docs/ file`).toBeGreaterThan(0)
     expect(tabled.length, `the table under "## ${TABLE_HEADING}" in CLAUDE.md cites no docs/ file`).toBeGreaterThan(0)
 
     expect.soft(without(onDisk, indexed), 'in docs/ but not linked from the README: add a line to its index').toEqual([])

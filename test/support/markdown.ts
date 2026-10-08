@@ -73,21 +73,41 @@ export function isExternalTarget(target: string): boolean {
 }
 
 /**
- * The `docs/*.md` paths cited in the table rows of the section called `heading`.
+ * The 1-based first and last line of the section called `heading`, its title left out.
  *
- * Only rows count: a path in the sentence above the table, or in another section, is
- * not a row. A missing section throws instead of returning `[]` — a heading that was
- * renamed would otherwise read as a table that cites nothing, and say so quietly.
+ * A missing section throws instead of reading as an empty one — a heading that was
+ * renamed would otherwise look like a section that holds nothing, and say so quietly.
  */
-export function tableCitations(source: string, heading: string): string[] {
-  const lines = source.split('\n')
+function sectionRange(lines: readonly string[], heading: string): [first: number, last: number] {
   const start = lines.findIndex(line => line.trim() === `## ${heading}`)
   if (start === -1) throw new Error(`no "## ${heading}" section`)
 
   const end = lines.findIndex((line, index) => index > start && line.startsWith('## '))
-  const section = lines.slice(start + 1, end === -1 ? undefined : end)
 
-  return section
+  return [start + 2, end === -1 ? lines.length : end]
+}
+
+/**
+ * The links of the section called `heading`, and of no other: a link to the same file
+ * in the prose of another section is not an entry of this one.
+ */
+export function sectionLinks(source: string, heading: string): MarkdownLink[] {
+  const [first, last] = sectionRange(source.split('\n'), heading)
+
+  return markdownLinks(source).filter(link => link.line >= first && link.line <= last)
+}
+
+/**
+ * The `docs/*.md` paths cited in the table rows of the section called `heading`.
+ *
+ * Only rows count: a path in the sentence above the table, or in another section, is
+ * not a row.
+ */
+export function tableCitations(source: string, heading: string): string[] {
+  const lines = source.split('\n')
+  const [first, last] = sectionRange(lines, heading)
+
+  return lines.slice(first - 1, last)
     .filter(line => line.trimStart().startsWith('|'))
     .flatMap(row => row.match(/\bdocs\/[\w./-]+\.md\b/g) ?? [])
 }
