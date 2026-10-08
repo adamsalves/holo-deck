@@ -1,21 +1,15 @@
 # Holo Deck
 
-Deck battler holográfico sobre o dex da PokeAPI: abrir packs, montar um deck de 6
-e enfrentar os 9 ginásios. Nuxt 4 + Vue 3, tema escuro-único, dados de jogo
-gerados em build-time.
+A holographic deck battler on top of the PokeAPI dex: open packs, build a deck of 6 and take on the
+9 gyms. Built with Nuxt 4 and Vue 3, with a dark-only theme and game data generated at build time.
 
-> **Em construção.** Este é o estado da **Fase 7, primeira metade** — tudo da Fase
-> 6 (a Pokédex, o ciclo de pack e coleção, o deck builder, a Liga com os nove
-> ginásios e a tela de batalha, a loja, `/rules` e `/settings`), mais conta no
-> GitHub e save no servidor. O jogo continua jogável **sem conta**, inteiro, a
-> partir do `localStorage`. A sincronização contínua — fila offline, debounce, 409
-> com reaplicação, indicador na barra — é a segunda metade da fase; até ela, a
-> conta recebe a coleção no primeiro login e nada além disso. O README completo é
-> reescrito na Fase 8.
+The game is local-first: it runs from `localStorage` and needs no account, and an optional GitHub
+account syncs the save to a server. It speaks Brazilian Portuguese and English, installs as an app
+and plays offline after the first visit.
 
-## Rodando
+## Running
 
-Requer Node na versão do [`.nvmrc`](.nvmrc) e yarn.
+Requires Node at the version in [`.nvmrc`](.nvmrc), and yarn.
 
 ```bash
 nvm use
@@ -23,64 +17,83 @@ yarn install
 yarn dev
 ```
 
-Jogar não precisa de nada além disso. **Conta e save no servidor** precisam de um
-`.env` — ver [`.env.example`](.env.example) —, e sem ele o jogo abre e funciona:
-só `/api/auth/*` e `/api/save` respondem 500, que é o comportamento decidido para
-um jogo local-first (ver o docblock de `server/utils/env.ts`).
+Playing needs nothing else. **An account and the server-side save** need a `.env` — see
+[`.env.example`](.env.example) — and without one the game still opens and works: only
+`/api/auth/*` and `/api/save` answer 500, which is the behavior decided for a local-first game
+(see the docblock of `server/utils/env.ts`).
 
-Duas variáveis apontam para o **mesmo** banco e as duas são necessárias:
-`DATABASE_URL` é a do pooler, que o runtime usa porque função serverless abre e
-fecha conexão a cada requisição; `DATABASE_URL_UNPOOLED` é a direta, que só a
-migração usa, porque o PgBouncer em modo transaction não sustenta os recursos de
-sessão que DDL pede.
+Two variables point at the **same** database and both are required: `DATABASE_URL` is the
+pooler's, which the runtime uses because a serverless function opens and closes a connection on
+every request; `DATABASE_URL_UNPOOLED` is the direct one, which only the migration uses, because
+PgBouncer in transaction mode does not support the session features that DDL needs.
 
 ```bash
-yarn db:generate        # gera a migration a partir de server/db/schema.ts
-yarn db:migrate         # aplica as migrations no banco do .env
-yarn db:generate:auth   # reescreve server/db/auth-schema.ts pelo CLI do better-auth
+yarn db:generate        # generates the migration from server/db/schema.ts
+yarn db:migrate         # applies the migrations to the database in .env
+yarn db:generate:auth   # rewrites server/db/auth-schema.ts through the better-auth CLI
 ```
 
-## Documentação
+## Verifying
 
-O resto da documentação mora em `docs/`, um arquivo por assunto:
+```bash
+yarn lint        # ESLint 10 flat config, with the typing-honesty rules
+yarn typecheck   # vue-tsc over app/, shared/, scripts/, test/ and the configs
+yarn test        # Vitest, unit tests, headless
+yarn build       # Nitro output in .output/
+yarn test:e2e    # Playwright; needs `yarn build` first
+```
 
-- [`docs/verification.md`](docs/verification.md) — Verificação
-- [`docs/design-system.md`](docs/design-system.md) — Sistema de design
-- [`docs/canvas-divergences.md`](docs/canvas-divergences.md) — Divergências do canvas
-- [`docs/i18n.md`](docs/i18n.md) — Idiomas
-- [`docs/game-data.md`](docs/game-data.md) — Dados do jogo
-- [`docs/pokedex.md`](docs/pokedex.md) — Pokédex
-- [`docs/collection-and-deck.md`](docs/collection-and-deck.md) — Pack, coleção, forja e deck
-- [`docs/league-and-battle.md`](docs/league-and-battle.md) — A Liga, a batalha e o motor
-- [`docs/shop-rules-settings.md`](docs/shop-rules-settings.md) — A loja, as regras e os ajustes
-- [`docs/accessibility.md`](docs/accessibility.md) — Acessibilidade
-- [`docs/offline.md`](docs/offline.md) — Offline
-- [`docs/performance.md`](docs/performance.md) — Primeira carga
-- [`docs/save.md`](docs/save.md) — O save
+[`docs/verification.md`](docs/verification.md) has the rest: the Vercel preset, the two manual
+database checks and the git hooks.
+
+## Documentation
+
+Everything past the quick start lives in `docs/`, one file per subject. The files are in
+Portuguese, the language they were written in; the translation is tracked in
+[issue #46](https://github.com/adamsalves/holo-deck/issues/46).
+
+- [`docs/verification.md`](docs/verification.md): the checks, the Vercel preset, the manual database
+  checks and the git hooks.
+- [`docs/design-system.md`](docs/design-system.md): the Holo TCG theme, why it is dark-only, its CSS
+  tokens and the holographic foil.
+- [`docs/canvas-divergences.md`](docs/canvas-divergences.md): where the code departs from the
+  approved canvas, and why.
+- [`docs/i18n.md`](docs/i18n.md): the two languages: the three language gates, the switcher and how
+  the root follows its choice, `hreflang`, and what is still untranslated.
+- [`docs/game-data.md`](docs/game-data.md): how the dex is generated at build time and committed,
+  instead of fetched from PokeAPI at runtime.
+- [`docs/pokedex.md`](docs/pokedex.md): the Pokédex screens: all 1025 species, the region index and
+  the species page.
+- [`docs/collection-and-deck.md`](docs/collection-and-deck.md): packs, the collection, the forge and
+  the deck.
+- [`docs/league-and-battle.md`](docs/league-and-battle.md): the League and its economy, the battle
+  screen and the battle engine.
+- [`docs/shop-rules-settings.md`](docs/shop-rules-settings.md): the shop, `/rules`, `/settings`, the
+  animation switch and the global bar.
+- [`docs/accessibility.md`](docs/accessibility.md): page structure, the focus ring and where focus
+  goes after an action.
+- [`docs/offline.md`](docs/offline.md): the service worker, the two cache layers, installing the app
+  and downloading everything for offline.
+- [`docs/performance.md`](docs/performance.md): the first-load budget of each screen, prefetching
+  and the stable top bar.
+- [`docs/save.md`](docs/save.md): the save document, its migrations, backups and recovery.
 
 ## Release
 
-Versionamento e changelog são automáticos, a partir das mensagens de commit. O
-passo a passo — e a regra de merge commit que o processo exige — está no
-[`RELEASE.md`](RELEASE.md).
+Versioning and the changelog are automatic, from the commit messages. [`RELEASE.md`](RELEASE.md)
+has the step by step, the merge commit rule the process requires, and the rule for holding the
+release PR until the last PR of a phase split into several lands.
 
-O plano fecha **uma minor por fase**, e uma fase partida em vários PRs cortaria
-uma minor por PR. A regra que resolve isso — **segurar o release PR até o último
-PR da fase entrar** — também está lá, com o comentário 🔒 que a Fase 6 usou para
-não esquecer.
+## Credits
 
-## Créditos
+Data and sprites come from [PokeAPI](https://pokeapi.co), used here **non-commercially**, as its
+fair use policy asks. Pokémon is a registered trademark of Nintendo / Creatures Inc. / GAME FREAK
+inc. This project is a portfolio piece, with no connection to the trademark holders.
 
-Dados e sprites vêm da [PokeAPI](https://pokeapi.co), usada aqui de forma
-**não-comercial**, como pede sua política de fair use. Pokémon é marca registrada
-da Nintendo / Creatures Inc. / GAME FREAK inc. Este projeto é portfólio, sem
-qualquer vínculo com os detentores da marca.
-
-Os seis ícones da paleta de busca, em `app/assets/icons/lucide/`, são do
-[Lucide](https://lucide.dev), licença ISC (© Lucide Icons and Contributors), na
-versão 1.52.0 do `lucide-static`, com o aviso de licença que cada arquivo traz no
-topo. Cinco deles — `arrow-left`, `check`, `chevron-right`, `search` e `x` —
-derivam do Feather (MIT, © Cole Bemis), como o próprio Lucide registra em
-[lucide.dev/license](https://lucide.dev/license). Moram no repositório, e não
-vêm de um pacote, para a paleta não pedir ícone à rede: o motivo está em
-`nuxt.config.ts`.
+The six icons of the search palette, in `app/assets/icons/lucide/`, are from
+[Lucide](https://lucide.dev), ISC license (© Lucide Icons and Contributors), at version 1.52.0 of
+`lucide-static`, with the license notice that each file carries at the top. Five of them —
+`arrow-left`, `check`, `chevron-right`, `search` and `x` — derive from Feather (MIT, © Cole
+Bemis), as Lucide itself records at [lucide.dev/license](https://lucide.dev/license). They live in
+the repository rather than coming from a package, so that the palette does not ask the network for
+an icon: the reason is in `nuxt.config.ts`.

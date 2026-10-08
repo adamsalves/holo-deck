@@ -203,30 +203,6 @@ e um caminho para a loja — que é o que a prancha *Loja* faz na mesma situaç�
 Não é divergência — é dado que ainda não existe. Inventar um zero desenha um
 progresso que ninguém pode mover.
 
-- ~~**Fase 5:** a contagem `98 / 151 capturados`, o anel de não possuída, o
-  marcador de shiny, os filtros *Possuídos* e *Faltando*, e o verde de
-  progresso.~~ **Entregue na Fase 5.**
-- ~~**Fase 6:** a faixa de retomar batalha no Hub, o saldo de moedas e o painel
-  do próximo ginásio.~~ **Entregues no PR da Liga.**
-- ~~**A barra de navegação global e o cartão do pack diário.**~~ **Entregues no PR
-  da loja**, que é o que criou os destinos da primeira (`/rules`, `/settings`,
-  `/packs` como loja) e a economia do segundo. Com eles saíram a barra própria do
-  Hub e a fileira provisória de portas.
-- ~~**Fase 7, e o que `/settings` deixa de fora por causa dela:** o painel de
-  conta, o estado de sincronização e *restaurar a gravação anterior do
-  servidor*.~~ **Entregues no PR 2 da fase.** O painel de conta traz o e-mail, o
-  estado do sync e *SAIR*; *Restaurar versão anterior* aparece quando o servidor
-  tem uma, com o instante e a contagem de cartas dela, e espera a fila subir antes
-  de trocar; a zona de perigo ganhou *Excluir conta e save do servidor*. O painel
-  *Ainda não* ficou com três coisas, e as três são da Fase 8.
-- ~~**Sem prancha para os estados:** *baixar tudo para offline*.~~ **Entregue no 5b
-  da Fase 8**, nos quatro estados que a prancha *Offline* desenhou no ciclo de canvas
-  antes dele. ~~O seletor de **idioma**~~ **entregue no 4d-2**, na primeira linha de
-  *Preferências*, onde a prancha *Ajustes* o desenha; ~~o interruptor de
-  **som**~~ **aposentado** em 12/09 — a prancha deixou de desenhá-lo na versão 16.
-- ~~**A Liga:** contra qual ginásio o `/deck` lê a cobertura.~~ **Entregue.** A
-  constante de `useDeck` virou `progress.nextGym`, que foi exatamente a troca de
-  uma linha que o comentário dela prometia.
 - **Sem dado no dex:** a lista de jogos da geração (`Red · Blue · Yellow`) que a
   prancha *Pokédex* põe no cabeçalho. `GenerationMeta` traz geração, região,
   nome e contagem — o campo teria de nascer no pipeline.
