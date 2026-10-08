@@ -1,5 +1,82 @@
 # Changelog
 
+## [1.0.0](https://github.com/adamsalves/holo-deck/compare/v0.8.0...v1.0.0) (2026-10-08)
+
+
+### Features
+
+* /rules nos dois idiomas, com a ordem do turno remontada ([93d38e3](https://github.com/adamsalves/holo-deck/commit/93d38e3d19314a26e9bf7db3f50399f03daa124f))
+* /settings nos dois idiomas, com o chip de sync e o aviso de boot junto ([09018e3](https://github.com/adamsalves/holo-deck/commit/09018e31a28e7dee86188dc866f1729dbeb7456f))
+* a Liga e a batalha nos dois idiomas, e o log de turno remontado ([53e68c0](https://github.com/adamsalves/holo-deck/commit/53e68c0d113afcf1a77ade43f6a2cc520ab5575c))
+* a miniatura que falta mostra o glifo da prancha, uma vez por imagem ([ab68424](https://github.com/adamsalves/holo-deck/commit/ab68424aed7a9df58de0fdc83ac351f034f179bf))
+* a raridade e o tipo do jogo falam os dois idiomas ([d5b3733](https://github.com/adamsalves/holo-deck/commit/d5b3733e6b413ecc28d6e9dc5f5ab0a6e3f1a347))
+* as duas telas da Pokédex nos dois idiomas, e os links que abrem o /en ([24bb9d5](https://github.com/adamsalves/holo-deck/commit/24bb9d516906025f5bd241555a43e60be708ddc1))
+* as seis siglas de stat vindas do locale, e as duas colisões fechadas ([79fddff](https://github.com/adamsalves/holo-deck/commit/79fddff5bfaf5640910c435a1ed703fc5039ec09))
+* baixar tudo para offline, nos quatro estados da prancha ([b630cc2](https://github.com/adamsalves/holo-deck/commit/b630cc2cac08c30001484d6a47db5acb494b0731))
+* o /login e os três painéis de boot nos dois idiomas, e os dois últimos links da [#37](https://github.com/adamsalves/holo-deck/issues/37) ([b084b71](https://github.com/adamsalves/holo-deck/commit/b084b71e634884961a1322c54e42b9d3be9f3f99))
+* o Detalhe nos dois idiomas, e o último texto de tela sai de shared/ ([6d131fd](https://github.com/adamsalves/holo-deck/commit/6d131fd20058999d8d64564a99a60ac06b64537f))
+* o herói do Detalhe cai na miniatura e no glifo, com o chip só sem rede ([be06843](https://github.com/adamsalves/holo-deck/commit/be06843c5241adda7a599325e1ca6c751048dab5))
+* o Hub, a loja, o binder e o deck nos dois idiomas ([9847b69](https://github.com/adamsalves/holo-deck/commit/9847b694e6a580a8c5cd55d911ea43b5211410dc))
+* o ícone do app vira a marca da barra e o ícone do site ([9ec6e86](https://github.com/adamsalves/holo-deck/commit/9ec6e86359e7cc1f4b538fe1b7bddbab383be4c4))
+* o jogo é instalável, com o manifesto e os ícones da prancha ([72e5486](https://github.com/adamsalves/holo-deck/commit/72e54864f9d87fb1a575dde71b82ca92a0834704))
+* o jogo fala pt-BR e inglês, com os rótulos da barra vindos do locale ([97d25c5](https://github.com/adamsalves/holo-deck/commit/97d25c593a65d45830cd95c102c8fa7e1fbc7e4d))
+* o jogo roda offline, por um service worker próprio e o shell /200.html ([39100b9](https://github.com/adamsalves/holo-deck/commit/39100b9bdf3b842a667a3c463d8baa82ed682952))
+* o registro de turnos da batalha é uma região viva, lida quando o turno entra ([82d7b7b](https://github.com/adamsalves/holo-deck/commit/82d7b7ba9d4f5a3bec4a5f392d7003797939ce1b))
+* seletor de idioma em Ajustes, a raiz no idioma escolhido e o hreflang com baseUrl ([d2a5404](https://github.com/adamsalves/holo-deck/commit/d2a5404a0eda8609a806fd4c9e18c534b5344431))
+* toda tela tem um &lt;main&gt; com o seu &lt;h1&gt; — o Hub, a batalha, o deck e a Liga ([fcf5dca](https://github.com/adamsalves/holo-deck/commit/fcf5dca7a1d152efdd22a8243b627c79d8e565f2))
+
+
+### Bug Fixes
+
+* a barra leva o jogador junto quando ele está em inglês ([242c5d5](https://github.com/adamsalves/holo-deck/commit/242c5d55a27c4619f10cfc5930dbad8291860012))
+* a barra reserva a caixa das moedas antes da hidratação ([4d48299](https://github.com/adamsalves/holo-deck/commit/4d482991faf69e272e5e45d363650ca12c840b26))
+* a batalha só recua a partir do GIF, e o laço não depende do listener ([5a772bd](https://github.com/adamsalves/holo-deck/commit/5a772bdfcb4ca00463c08b7044a9805af99f195d))
+* a contagem de carta volta formatada, e um quarto motivo para de compilar ([d4bee4d](https://github.com/adamsalves/holo-deck/commit/d4bee4d485246c254967bf74b8211c15deedb4d7))
+* a função da Vercel roda no Node do repositório ([4b9ffed](https://github.com/adamsalves/holo-deck/commit/4b9ffed36e5d44155e71d9ccfd0eb9c64b56bc72))
+* a instalação aceita o shell como o host o serve, e o preview da Vercel volta a instalar ([a5c8747](https://github.com/adamsalves/holo-deck/commit/a5c87477f75b716e74bbda679e4fb6e4460fbf6b))
+* a sugestão da forja sobe no foco e mostra o anel inteiro ([53d2867](https://github.com/adamsalves/holo-deck/commit/53d2867227723613dd9d430e158ce0f6e4a4a51e))
+* a tabela de forja do binder fala os dois idiomas ([836e48c](https://github.com/adamsalves/holo-deck/commit/836e48c4c29d2495371d319548176451d6b7edc5))
+* a troca de rota é anunciada e a barra do topo deixa de cobrir o foco no celular ([83abd16](https://github.com/adamsalves/holo-deck/commit/83abd16c99cf0beb819e99384bd041f55274fe6f))
+* a troca forçada repetia a chave do registro, e a região viva relia linhas velhas ([6c5e208](https://github.com/adamsalves/holo-deck/commit/6c5e20872b5e30cf74684b3feab8cb882ddb8332))
+* moer e escalar sob filtro levam o foco ao próximo, e o soltar de uma carta é anunciado ([a9e7323](https://github.com/adamsalves/holo-deck/commit/a9e73237ad7276e82db482556fa1e6568397a69a))
+* no celular, a faixa de chips e o painel de retomar luta deixam de cortar o anel ([891db3a](https://github.com/adamsalves/holo-deck/commit/891db3a089f1711b1b3e5c83bb4899abe07cd604))
+* o × do slot a 24 px e três nomes acessíveis que não diziam o que a tela mostra ([08b2be8](https://github.com/adamsalves/holo-deck/commit/08b2be84d30cc58eb76acf8682e1cb93f8a1968c))
+* o anel de foco aparece em todo controle, com o corte e a folga da prancha ([9286541](https://github.com/adamsalves/holo-deck/commit/9286541f198a587be20e8e1cc59496f045fef09d))
+* o anel do chanfro deixa de fora a folha que recebe foco por script ([f61f159](https://github.com/adamsalves/holo-deck/commit/f61f159d146b9921b101f3eb5e63c7ad4e5b9091))
+* o anel pintado guarda a cor do sistema em cores forçadas ([9baaf2a](https://github.com/adamsalves/holo-deck/commit/9baaf2a0400b05fbb24da7f6b8ec06f987e2af8e))
+* o build velho, offline, não grava por cima do save que o build novo migrou ([259a1d2](https://github.com/adamsalves/holo-deck/commit/259a1d23e4b7c30421fc87af10f31388efb8e9df))
+* o chip do herói segue a rede, e a arte volta quando ela volta ([0dac8f2](https://github.com/adamsalves/holo-deck/commit/0dac8f2425fdb757bec24a2524e2a1a4b98e383a))
+* o cliente do Postgres e o better-auth passam a nascer na primeira chamada ([cce4250](https://github.com/adamsalves/holo-deck/commit/cce4250ee6d887329f0a20c4749c85f74b1e639e))
+* o deck diz em voz alta quem entrou e quem saiu de cada slot ([941e005](https://github.com/adamsalves/holo-deck/commit/941e0056dd56aa487199befeffd217c61c501985))
+* o download para por falta de espaço só quando o erro é de cota ([30a1b62](https://github.com/adamsalves/holo-deck/commit/30a1b620257d800aa7a61ff5d763036425c79c5b))
+* o download pede por cima do worker, e não guarda a arte de outro build ([8b64cec](https://github.com/adamsalves/holo-deck/commit/8b64cec739ec5b26576f35db50445a2bf53da26d))
+* o Fechar da paleta de busca ganha o anel do sistema ([8efc394](https://github.com/adamsalves/holo-deck/commit/8efc394e2378cff7067f6a31920da399e32c48a8))
+* o foco acompanha quem escala, tira e luta no deck e na batalha ([879de62](https://github.com/adamsalves/holo-deck/commit/879de629f249da5f553cac994afc2debf7234727))
+* o foco não cai no body ao abrir pack, forjar, moer, desistir ou fechar o convite ([399e6dc](https://github.com/adamsalves/holo-deck/commit/399e6dc27a0829e77b48a7b2dd63267bf8222a19))
+* o foco só segue o teclado, e a tecla segurada não aperta o controle seguinte ([35c3666](https://github.com/adamsalves/holo-deck/commit/35c366665ee06ba11c9decca533858faed065696))
+* o HOLO/DECK da barra volta a ser uma palavra, como as pranchas desenham ([06e488b](https://github.com/adamsalves/holo-deck/commit/06e488bf08f33f8318648428c67ffea89f156e2d))
+* o ícone da aba é uma tag só depois do boot, e não duas ([2994854](https://github.com/adamsalves/holo-deck/commit/2994854ba3ea3b3f6fcf3ec0ec172db1a149c77c))
+* o painel do próximo líder cresce com o conteúdo e devolve o DESAFIAR inteiro ([8feef50](https://github.com/adamsalves/holo-deck/commit/8feef504196f64e21c0bff177772e9b2f19964e5))
+* o portão da narração enumerando quem sai, e a Pokédex sem frase bilíngue ([e31593e](https://github.com/adamsalves/holo-deck/commit/e31593e9648edab18bd63da857fd06c98f93e18b))
+* o pular-para-o-conteúdo aponta para #content, e o portão de nomes lê o id do template ([917f60b](https://github.com/adamsalves/holo-deck/commit/917f60be58e46197b295c3d61ed34735a822c262))
+* o recuo do herói fica na caixa da arte também no telefone ([ed0bdb5](https://github.com/adamsalves/holo-deck/commit/ed0bdb5b185b590c6aceb49c24b77e97f9cfe09f))
+* o seletor só grava a escolha no clique que navega no lugar ([93aaddc](https://github.com/adamsalves/holo-deck/commit/93aaddc25d634bb2e9b3863b45bdff7459ddc907))
+* o tamanho do save sai no formato do idioma da página ([59131f1](https://github.com/adamsalves/holo-deck/commit/59131f156832545d612495db343d0d6f2752eb56))
+* o worker só serve à página o dex dela, confere o que baixa e não espera rede muda ([685a9fd](https://github.com/adamsalves/holo-deck/commit/685a9fdb9696ba023ae6009453ee6a87baa05af3))
+* os ícones da paleta vão embarcados e não dependem da rede ([7c2bb45](https://github.com/adamsalves/holo-deck/commit/7c2bb45516e90003c624ea34bb4498566d0935e9))
+
+
+### Performance Improvements
+
+* as faces da barra chegam antes da primeira pintura ([7c3c720](https://github.com/adamsalves/holo-deck/commit/7c3c7205ae62275709644e89cb3673bbec8c5b7a))
+* o CSS só traz o tema dos componentes do Nuxt UI que o jogo usa ([2dc98ad](https://github.com/adamsalves/holo-deck/commit/2dc98ad91ffb7d52890c8864d8bb05e53a92945e))
+* o link das moedas não pré-busca o payload de /packs ([5652683](https://github.com/adamsalves/holo-deck/commit/565268366ebb33048d1b213f7da9ac483cd99959))
+
+
+### Documentation
+
+* os comentários apontam para docs/ e o canvas ganha o mapa de pranchas ([56db126](https://github.com/adamsalves/holo-deck/commit/56db126330a2623424353b50fbe198644f121bb6))
+
 ## [0.8.0](https://github.com/adamsalves/holo-deck/compare/v0.7.0...v0.8.0) (2026-09-12)
 
 
