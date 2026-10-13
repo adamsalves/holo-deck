@@ -144,7 +144,9 @@ jogo mora em `i18n/locales/`: `rarityKey()` e `typeKey()`, em
 
 **O vocabulário que `shared/` ainda carrega.** A
 [issue #38](https://github.com/adamsalves/holo-deck/issues/38) lista seis mapas.
-A medição achou **dez** produtores de texto de tela, e é a lista de dez que vale:
+A medição achou **dez** produtores de texto de tela, e é a lista de dez que vale;
+a tabela tem onze desde 13/10/2026, porque `gameDecimal` nasceu no conserto dos
+dois últimos:
 
 | produtor | o que escreve | quando sai |
 | --- | --- | --- |
@@ -173,7 +175,8 @@ então deixaria o elenco do jogo aqui sem nada vigiando. As duas listas são
 montada a partir dos próprios valores: uma décima região é exceção no dia em que
 for escrita.
 
-Os dois últimos são os que a issue não via, e são de outra classe: eles não
+Os dois últimos da medição, `gameNumber` e `gamePercent`, são os que a issue não
+via, e são de outra classe: eles não
 escrevem palavra nenhuma — escreviam **número com o separador de `pt-BR` fixo**,
 por `toLocaleString('pt-BR')`. Em `/en` a tabela de forja saía `1.600` e o
 shiny `0,4%`, que um leitor de inglês lê como 1,6 e 0,4. O erro não era de idioma,
