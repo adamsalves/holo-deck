@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { PROGRESS_THRESHOLDS, gameNumber, progressLabel, progressRatio, progressStep } from '~~/shared/game/progress'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import type { GameUnit } from '~~/shared/game/progress'
+import {
+  PROGRESS_THRESHOLDS,
+  gameDecimal,
+  gameNumber,
+  gamePercent,
+  progressLabel,
+  progressRatio,
+  progressStep,
+} from '~~/shared/game/progress'
 
 /**
  * Os quatro degraus da barra de progresso.
@@ -71,20 +80,85 @@ describe('o rótulo', () => {
   })
 })
 
-describe('o número do jogo', () => {
+describe('the game number', () => {
   /**
-   * O documento é `lang="pt-BR"`, e a prancha escreve `custa 1.600 pó`. Com o
-   * locale do navegador no lugar do fixo, um jogador com o aparelho em inglês
-   * leria `1,600` no meio de uma frase em português.
+   * The same figure in both languages, with the separators written by hand: they
+   * are the answer here and not the question, so nothing below builds them with
+   * `Intl`. The board draws `custa 1.600 pó`; in English that value is `1,600`,
+   * and the pt-BR spelling would read as 1.6 there (issue #49).
    */
-  it('usa o separador de milhar do pt-BR, e não o do aparelho', () => {
-    expect(gameNumber(1600)).toBe('1.600')
-    expect(gameNumber(1260)).toBe('1.260')
+  it('writes the thousands separator of the language it is given', () => {
+    expect(gameNumber(1600, 'pt-BR')).toBe('1.600')
+    expect(gameNumber(1600, 'en-US')).toBe('1,600')
+    expect(gameNumber(1260, 'pt-BR')).toBe('1.260')
+    expect(gameNumber(1260, 'en-US')).toBe('1,260')
   })
 
-  it('não inventa separador onde não cabe', () => {
-    expect(gameNumber(0)).toBe('0')
-    expect(gameNumber(5)).toBe('5')
-    expect(gameNumber(600)).toBe('600')
+  it('does not invent a separator where none fits', () => {
+    for (const language of ['pt-BR', 'en-US']) {
+      expect(gameNumber(0, language)).toBe('0')
+      expect(gameNumber(5, language)).toBe('5')
+      expect(gameNumber(600, language)).toBe('600')
+    }
+  })
+})
+
+describe('the game percent', () => {
+  it('writes the decimal separator of the language it is given', () => {
+    expect(gamePercent(0.045, 'pt-BR')).toBe('4,5%')
+    expect(gamePercent(0.045, 'en-US')).toBe('4.5%')
+    expect(gamePercent(0.005, 'pt-BR')).toBe('0,5%')
+    expect(gamePercent(0.005, 'en-US')).toBe('0.5%')
+  })
+
+  it('shows the decimal only when there is one', () => {
+    for (const language of ['pt-BR', 'en-US']) {
+      expect(gamePercent(0.25, language)).toBe('25%')
+      expect(gamePercent(0.8, language)).toBe('80%')
+    }
+  })
+})
+
+describe('the game decimal', () => {
+  it('writes the decimal separator of the language it is given', () => {
+    expect(gameDecimal(1.5, 'pt-BR')).toBe('1,5')
+    expect(gameDecimal(1.5, 'en-US')).toBe('1.5')
+    expect(gameDecimal(0.7, 'pt-BR')).toBe('0,7')
+    expect(gameDecimal(0.7, 'en-US')).toBe('0.7')
+  })
+
+  it('keeps the count of decimals it is asked for, trailing zero included', () => {
+    expect(gameDecimal(6, 'pt-BR')).toBe('6,0')
+    expect(gameDecimal(6, 'en-US')).toBe('6.0')
+    expect(gameDecimal(1.5, 'en-US', 2)).toBe('1.50')
+  })
+
+  it('carries its unit when it has one', () => {
+    expect(gameDecimal(6, 'pt-BR', 1, 'megabyte')).toBe('6,0 MB')
+    expect(gameDecimal(6, 'en-US', 1, 'megabyte')).toBe('6.0 MB')
+  })
+})
+
+describe('the language parameter', () => {
+  /**
+   * The three helpers take the language, and it is **required**.
+   *
+   * A default is the defect of issue #49 written as a signature: whoever forgot
+   * the argument would get the default's language on every page. And a literal
+   * gate does not see every spelling of it — `language = 'en'` reads like an
+   * identifier to `shared-text-gate`, and `language?: string` has no literal at
+   * all and hands the choice to the device.
+   *
+   * The tuple is compared whole, so an optional `language` is a different type
+   * and not a wider one. **This is asserted by `yarn typecheck`, not by the
+   * runner**: the matcher does nothing at run time, and a default planted in a
+   * helper leaves `yarn test` green and stops `vue-tsc` on this line.
+   */
+  it('is required by each helper, with no default', () => {
+    expectTypeOf(gameNumber).parameters.toEqualTypeOf<[value: number, language: string]>()
+    expectTypeOf(gamePercent).parameters.toEqualTypeOf<[fraction: number, language: string]>()
+    expectTypeOf(gameDecimal).parameters.toEqualTypeOf<
+      [value: number, language: string, places?: number, unit?: GameUnit]
+    >()
   })
 })

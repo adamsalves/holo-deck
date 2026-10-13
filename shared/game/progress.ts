@@ -57,41 +57,74 @@ export function progressLabel(owned: number, total: number): string {
 }
 
 /**
- * Um número do jogo, em pt-BR — `1.600`, não `1600`.
- *
- * O documento é `lang="pt-BR"` e a prancha *Coleção* escreve `custa 1.600 pó` e
- * `FALTAM 1.260 PÓ` com o ponto. Ela também escreve `1600` na tabela ao lado, o
- * que é inconsistência do mockup e não decisão: aqui vale o separador em todo
- * lugar, porque duas grafias do mesmo valor na mesma tela é pior que discordar
- * de um canto da prancha.
- *
- * `Intl` com locale fixo, e não o do navegador: os números do jogo são parte do
- * texto em português que está ao lado deles, e um jogador com o aparelho em
- * inglês leria `custa 1,600 pó` no meio de uma frase em pt-BR.
+ * The unit a decimal figure may carry. One for now: the weight of the thumbnails,
+ * in *Settings*.
  */
-export function gameNumber(value: number): string {
-  return value.toLocaleString('pt-BR')
+export type GameUnit = 'megabyte'
+
+/**
+ * A figure of the game as `language` writes it — `1.600` in pt-BR, `1,600` in
+ * English.
+ *
+ * The board *Coleção* draws `custa 1.600 pó` and `FALTAM 1.260 PÓ` with the dot,
+ * and `1600` in the table beside them. That is the mockup disagreeing with itself
+ * and not a decision, so the grouping applies everywhere: two spellings of one
+ * value on one screen is worse than departing from one corner of the board. The
+ * pt-BR spelling is the board's; the English one is the same figure in the
+ * format of its own language, recorded in `docs/canvas-divergences.md`.
+ *
+ * **The language is a parameter, and it has no default.** This helper used to
+ * fix `pt-BR`, on the argument that the figure sits in the middle of a sentence
+ * in Portuguese and a device set to English would read `1,600` inside it. The
+ * argument held while every page was Portuguese. Inside `/en` it wrote `1.600`,
+ * which an English reader takes for 1.6 — a wrong value, not an odd-looking one
+ * (issue #49). A default would bring the defect back for whoever forgets the
+ * argument, so leaving it out does not compile. Screens do not pass it by hand:
+ * `useGameNumbers()` supplies the language of the URL.
+ */
+export function gameNumber(value: number, language: string): string {
+  return value.toLocaleString(language)
 }
 
 /**
- * Uma taxa do jogo em porcentagem, a partir da **fração** — `0,25` vira `25%`,
- * `0,045` vira `4,5%`.
+ * A rate of the game as a percentage, from the **fraction** — `0.25` becomes
+ * `25%`, and `0.045` becomes `4,5%` in pt-BR and `4.5%` in English.
  *
- * `Intl` com `style: 'percent'`, e não uma multiplicação por 100 seguida de
- * `toFixed`, por três razões que se somam:
+ * `Intl` with `style: 'percent'`, and not a multiplication by 100 followed by
+ * `toFixed`, for two reasons that add up:
  *
- * - **A casa decimal aparece só quando existe.** `25%` e `4,5%`, sem o `25,0%`
- *   que um `toFixed(1)` fixo produziria nem o `4%` que um `toFixed(0)` cortaria.
- * - **A vírgula é a do pt-BR**, pelo mesmo argumento de `gameNumber`: locale
- *   fixo, porque o número está no meio de uma frase em português.
- * - **Ninguém escreve `100`.** A página `/rules` tem por contrato não conter
- *   número calibrado, e `GYM_REWARD_STEP` vale exatamente 100 — a base da
- *   porcentagem escrita à mão colidia com ele, e o portão não tem como
- *   distinguir as duas. Com o formatador, a colisão deixa de existir.
+ * - **The decimal shows only when it exists.** `25%` and `4.5%`, without the
+ *   `25.0%` a fixed `toFixed(1)` would write and without the `4%` a
+ *   `toFixed(0)` would cut.
+ * - **Nobody writes `100`.** The page `/rules` is contracted to hold no
+ *   calibrated number, and `GYM_REWARD_STEP` is exactly 100 — the base of a
+ *   percentage written by hand collided with it, and the gate cannot tell the
+ *   two apart. With the formatter the collision does not exist.
+ *
+ * The language is a parameter for the reason `gameNumber` gives.
  */
-export function gamePercent(fraction: number): string {
-  return fraction.toLocaleString('pt-BR', {
+export function gamePercent(fraction: number, language: string): string {
+  return fraction.toLocaleString(language, {
     style: 'percent',
     maximumFractionDigits: 1,
+  })
+}
+
+/**
+ * A figure with a fixed count of decimals — `1,5` in pt-BR and `1.5` in English.
+ *
+ * It replaces `toFixed(places)` followed by a `.replace('.', ',')` written by
+ * hand, which put the pt-BR comma on the English pages: `0,8% of the dex`,
+ * `0,7 m`, `×1,5`. The same rule as the other two, for the same reason: the
+ * language is a parameter, with no default.
+ *
+ * `unit` is for the one figure that carries its own: the thumbnails' weight in
+ * *Settings*, which the board writes as `6,0 MB` and `6.0 MB`.
+ */
+export function gameDecimal(value: number, language: string, places = 1, unit?: GameUnit): string {
+  return value.toLocaleString(language, {
+    ...(unit === undefined ? {} : { style: 'unit', unit }),
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
   })
 }

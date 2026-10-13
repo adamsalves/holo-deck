@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import type { GymView } from '~/composables/useLeague'
 import { generationNumeral, REGION_LABELS, typeKey } from '~~/shared/types/game'
-import { gameNumber } from '~~/shared/game/progress'
 import { aceOf } from '~~/shared/game/gyms'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -140,13 +141,13 @@ const generation = computed(() => t('generation.label', {
         <template v-if="view.status === 'won'">
           <span class="gym__badge">{{ t('league.gym.won') }}</span>
           <span class="gym__rematch">
-            {{ t('league.gym.rematch', { coins: gameNumber(view.reward.total) }) }}
+            {{ t('league.gym.rematch', { coins: formatNumber(view.reward.total) }) }}
           </span>
         </template>
         <span
           v-else
           class="gym__challenge"
-        >{{ t('league.gym.challenge', { coins: gameNumber(view.reward.total) }) }}</span>
+        >{{ t('league.gym.challenge', { coins: formatNumber(view.reward.total) }) }}</span>
       </footer>
     </template>
 

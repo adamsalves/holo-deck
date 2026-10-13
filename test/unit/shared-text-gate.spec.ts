@@ -211,8 +211,9 @@ const PATH = /^(?:[a-z]+:)?\/\/|^\.{0,2}\//
  *
  * The rest is code that happens to be spelled with a capital: `GymBand` is the
  * three-letter union of `gyms.ts`, and the three brand tags exist only in a type
- * position. `pt-BR` is the exception that is a real defect — issue #49 owns it,
- * and naming it here is what keeps it from being read as settled.
+ * position. `pt-BR` was on this list while issue #49 was open, the one entry
+ * that named a real defect and not a harmless word; the number helpers take the
+ * language as a parameter now, and no language tag is written under `shared/`.
  */
 const EXEMPT: readonly string[] = [
   ...Object.values(REGION_LABELS),
@@ -224,7 +225,6 @@ const EXEMPT: readonly string[] = [
   'SpeciesId',
   'MoveId',
   'GymId',
-  'pt-BR',
 ]
 
 /** Whether a literal is a word the player could read. */
@@ -378,9 +378,10 @@ describe('shared/ writes no screen text', () => {
    * And an exception that no longer applies is gone.
    *
    * The half that makes the list shrink instead of age: the two derived groups
-   * follow their source on their own, and the seven written by hand have to be
-   * deleted the day their literal is. Without this, `pt-BR` would outlive issue
-   * #49 and go on describing a defect that was already fixed.
+   * follow their source on their own, and the six written by hand have to be
+   * deleted the day their literal is. `pt-BR` is the entry it forced out: the
+   * literal left `shared/` with issue #49, and the entry could not stay behind
+   * describing a defect that was already fixed.
    */
   it('and no exception outlives the literal it forgives', () => {
     const written = new Set(sources().flatMap(({ file, code }) =>

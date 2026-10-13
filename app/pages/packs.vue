@@ -18,7 +18,6 @@ import {
   buildPool,
   openPack,
 } from '~~/shared/game/packs'
-import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { PackCard } from '~~/shared/types/game'
 import { rarityKey, rarityRank } from '~~/shared/types/game'
@@ -26,11 +25,13 @@ import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useDex } from '~/composables/useDex'
 import { useGameClock } from '~/composables/useGameClock'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useReduceMotion } from '~/composables/useMotion'
 import { useInvite } from '~/composables/useInvite'
 import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
+const { formatNumber, formatPercent } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -266,7 +267,7 @@ const again = computed(() => {
 
   if (from === 'welcome') return { from, label: t('packs.again.welcome') }
   if (from === 'store') {
-    return { from, label: t('packs.again.store', { coins: gameNumber(PACK_PRICE) }) }
+    return { from, label: t('packs.again.store', { coins: formatNumber(PACK_PRICE) }) }
   }
 
   return null
@@ -286,10 +287,10 @@ const rarePlusOdds = computed(() =>
     share: RARE_PLUS_WEIGHTS[tier],
   })))
 
-// A largura da barra é CSS e o rótulo é texto, e por isso são duas contas: o
-// `gamePercent` escreve `4,5%` com a vírgula do pt-BR, que uma declaração de
-// `width` não aceita. O que a tela lê e o que o navegador desenha divergem na
-// pontuação, não no valor.
+// The bar's width is CSS and the label is text, so they are two computations.
+// `formatPercent` writes `4,5%` or `4.5%` by the language of the URL, and a
+// `width` declaration takes only the dot. What the screen reads and what the
+// browser draws differ in the punctuation, not in the value.
 
 /** A chance de um pack trazer ao menos um shiny — `1 − (1 − p)^10`, em fração. */
 const shinyPerPack = computed(() => 1 - (1 - SHINY_ODDS) ** PACK_SIZE)
@@ -425,11 +426,11 @@ useSeoMeta({
                 <button
                   type="button"
                   class="numeric packs__buy packs__buy--coin bevel-control"
-                  :aria-label="t('packs.store.buyLabel', { coins: gameNumber(PACK_PRICE) })"
+                  :aria-label="t('packs.store.buyLabel', { coins: formatNumber(PACK_PRICE) })"
                   :disabled="!canOpen('store')"
                   @click="open('store')"
                 >
-                  {{ t('packs.store.price', { coins: gameNumber(PACK_PRICE) }) }}
+                  {{ t('packs.store.price', { coins: formatNumber(PACK_PRICE) }) }}
                 </button>
 
                 <i18n-t
@@ -440,7 +441,7 @@ useSeoMeta({
                   tag="p"
                 >
                   <template #coins>
-                    <b>{{ gameNumber(progress.coins - PACK_PRICE) }}</b>
+                    <b>{{ formatNumber(progress.coins - PACK_PRICE) }}</b>
                   </template>
                   <template #packs>
                     {{ progress.affordablePacks }}
@@ -450,7 +451,7 @@ useSeoMeta({
                   v-else
                   class="numeric packs__offer-meta packs__offer-meta--deficit"
                 >
-                  {{ t('packs.store.missing', { coins: gameNumber(progress.missingCoins) }) }}
+                  {{ t('packs.store.missing', { coins: formatNumber(progress.missingCoins) }) }}
                 </p>
               </div>
             </div>
@@ -528,7 +529,7 @@ useSeoMeta({
                   />
                 </div>
                 <dd class="numeric">
-                  {{ gamePercent(odd.share) }}
+                  {{ formatPercent(odd.share) }}
                 </dd>
               </div>
             </dl>
@@ -539,7 +540,7 @@ useSeoMeta({
               </span>
               <span class="numeric packs__shiny-note">
                 {{ t('packs.rates.shinyNote', {
-                  chance: gamePercent(shinyPerPack),
+                  chance: formatPercent(shinyPerPack),
                   packs: packsPerShiny,
                 }) }}
               </span>

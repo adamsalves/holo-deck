@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { TURN_STEPS, turnStepKey } from '../../app/utils/turn-order.ts'
 import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
-import { gamePercent } from '../../shared/game/progress.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
 import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels } from '../support/locales.ts'
 import { screenText } from './support.ts'
@@ -121,9 +120,14 @@ test('the calibrated numbers reach the screen, in both languages', async ({ page
       `pity in ${code}`,
     ).toContainText(String(PITY_THRESHOLD))
 
+    // The number from the module and the sign written here, and not the formatter
+    // the page uses: a test that asked it would agree with whatever it did. Whole
+    // percents are the same in both languages, so one spelling serves the loop.
+    // Rounded, because the product of a fraction and 100 is not always the whole
+    // number it stands for: `0.07 * 100` is `7.000000000000001`.
     await expect(
       page.locator('[data-panel="conditions"] dd').first(),
       `paralysis in ${code}`,
-    ).toContainText(gamePercent(PARALYSIS_SKIP_CHANCE))
+    ).toContainText(`${Math.round(PARALYSIS_SKIP_CHANCE * 100)}%`)
   }
 })

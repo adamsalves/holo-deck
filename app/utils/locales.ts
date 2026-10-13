@@ -25,10 +25,10 @@
  * It lives in `app/utils/` and not in `shared/`, which is where a list read by
  * the build and the app would usually go: `shared-text-gate` reads every literal
  * under `shared/` as screen text until something built from a source excuses
- * it, and `en-US` would be the first language tag it met. The one it already
- * excuses, `pt-BR`, is excused **as a marker for issue #49** — a second
- * `pt-BR` written there would keep that exception alive after #49 closes, and
- * the gate would stop saying the defect is still open.
+ * it, and `pt-BR` and `en-US` would be the first language tags it met. It used
+ * to excuse `pt-BR` as a marker for issue #49, the fixed locale of the number
+ * helpers; they take the language as a parameter now, and the exception left
+ * with the literal.
  */
 export const LOCALES = [
   { code: 'pt-BR', language: 'pt-BR' },

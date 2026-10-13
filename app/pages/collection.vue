@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
 import { dustFor, dustMissing, forgeCost } from '~~/shared/game/dust'
-import { gameNumber, progressLabel } from '~~/shared/game/progress'
+import { progressLabel } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
 import { rarityKey, RARITY_NAMES } from '~~/shared/types/game'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useCollection } from '~/composables/useCollection'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { keepFocus } from '~~/app/utils/focus'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -277,7 +279,7 @@ useSeoMeta({
         </p>
         <p class="mt-3 flex items-baseline gap-2">
           <span class="numeric text-[38px] font-extrabold leading-none text-highlighted">
-            {{ gameNumber(store.dust) }}
+            {{ formatNumber(store.dust) }}
           </span>
           <span class="numeric text-xs text-muted">{{ t('collection.dustTotal') }}</span>
         </p>
@@ -357,7 +359,7 @@ useSeoMeta({
                 tag="p"
               >
                 <template #dust>
-                  <strong class="collection__cost">{{ gameNumber(targetCost) }}</strong>
+                  <strong class="collection__cost">{{ formatNumber(targetCost) }}</strong>
                 </template>
               </i18n-t>
             </div>
@@ -372,7 +374,7 @@ useSeoMeta({
             @click="forgeTarget()"
           >
             {{ missing > 0
-              ? t('collection.forge.missing', { dust: gameNumber(missing) })
+              ? t('collection.forge.missing', { dust: formatNumber(missing) })
               : t('collection.forge.action') }}
           </button>
         </section>
@@ -430,10 +432,10 @@ useSeoMeta({
               {{ tier === 'legendary' ? t('rarity.legendaryMythicShort') : t(rarityKey(tier)) }}
             </th>
             <td class="numeric">
-              {{ gameNumber(dustFor(tier)) }}
+              {{ formatNumber(dustFor(tier)) }}
             </td>
             <td class="numeric">
-              {{ gameNumber(forgeCost(tier)) }}
+              {{ formatNumber(forgeCost(tier)) }}
             </td>
           </tr>
         </tbody>

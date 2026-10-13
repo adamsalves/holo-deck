@@ -6,7 +6,6 @@ import { switchOptions } from '~~/shared/game/engine'
 import { gymLeader } from '~~/shared/game/gyms'
 import { effectiveSpeed } from '~~/shared/game/status'
 import { effectivenessAgainst, multiplierLabel } from '~~/shared/game/typechart'
-import { gameNumber } from '~~/shared/game/progress'
 import { battleSpriteUrl } from '~~/shared/dex/artwork'
 import type { GymId, SpeciesId } from '~~/shared/types/brand'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
@@ -25,12 +24,14 @@ import { useBattleStore } from '~~/app/stores/battle'
 import { useDeckStore } from '~~/app/stores/deck'
 import { useProgressStore } from '~~/app/stores/progress'
 import { loadBattleContext } from '~/composables/useBattleContext'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useInvite } from '~/composables/useInvite'
 import { keepFocus } from '~~/app/utils/focus'
 import type { NarratedTurn } from '~~/app/utils/battle-narration'
 import { narrate } from '~~/app/utils/battle-narration'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -650,15 +651,15 @@ function fallbackSprite(event: Event, id: number): void {
             >
               <div>
                 <dt>{{ rematched ? t('battle.prize.rematch') : t('battle.prize.reward') }}</dt>
-                <dd>+{{ gameNumber(battle.reward.earned) }}</dd>
+                <dd>+{{ formatNumber(battle.reward.earned) }}</dd>
               </div>
               <div v-if="battle.reward.flawless > 0">
                 <dt>{{ t('battle.prize.flawless') }}</dt>
-                <dd>+{{ gameNumber(battle.reward.flawless) }}</dd>
+                <dd>+{{ formatNumber(battle.reward.flawless) }}</dd>
               </div>
               <div class="battle__prize-total">
                 <dt>{{ t('battle.prize.balance') }}</dt>
-                <dd>{{ gameNumber(progress.coins) }}</dd>
+                <dd>{{ formatNumber(progress.coins) }}</dd>
               </div>
             </dl>
             <p
