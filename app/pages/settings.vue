@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useNuxtApp, useRuntimeConfig } from 'nuxt/app'
 import { dayKey } from '~~/shared/game/economy'
-import { gameNumber } from '~~/shared/game/progress'
 import type { SaveData } from '~~/shared/save/schema'
 import { SCHEMA_VERSION, emptySave, migrate } from '~~/shared/save/schema'
 import type { PreviousSummary } from '~~/shared/save/sync'
@@ -20,6 +19,7 @@ import { reasonKey } from '~~/app/utils/recovery-reason'
 import { syncLabel } from '~~/app/utils/sync-label'
 import { useAccount } from '~/composables/useAccount'
 import { useGameClock } from '~/composables/useGameClock'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useMotionSwitch } from '~/composables/useMotion'
 import { useSpriteDownload } from '~/composables/useSpriteDownload'
 import { useSync } from '~/composables/useSync'
@@ -60,6 +60,7 @@ const { $saveDriver, $pinia, $sync, $httpDriver } = useNuxtApp()
 const { appVersion, gitSha, spriteBytes } = useRuntimeConfig().public
 
 const { t, localeProperties } = useI18n()
+const { formatNumber, formatDecimal } = useGameNumbers()
 const switchLocalePath = useSwitchLocalePath()
 
 /**
@@ -100,18 +101,17 @@ function rememberLocale(code: LocaleCode, event: MouseEvent): void {
  * the evolution chain and the turn order each had to be rebuilt to do.
  *
  * **The count travels twice, and the two halves are not the same value.**
- * `gameNumber` fills the sentence, the raw number picks the form — which is
+ * `formatNumber` fills the sentence, the raw number picks the form — which is
  * exactly what the third argument is for. Handing vue-i18n the bare number for
- * both dropped the pt-BR grouping: `1600 cartas`, three lines under a stat tile
+ * both dropped the grouping: `1600 cartas`, three lines under a stat tile
  * still reading `1.600`, because named interpolation stringifies and never
- * formats. Issue #49 owns the locale of these numbers, and until it closes they
- * are pt-BR — which is what `gameNumber` keeps them.
+ * formats.
  *
  * Not `cardCount`: the collection store already exports one, and that one counts
  * copies where this counts species.
  */
 function cardsLabel(count: number): string {
-  return t('settings.cardCount', { count: gameNumber(count) }, count)
+  return t('settings.cardCount', { count: formatNumber(count) }, count)
 }
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -153,24 +153,11 @@ const saveText = computed(() => JSON.stringify(composeSave($pinia), null, 2))
  * put a second figure on this screen, the thumbnails' `6.0 MB`, which the board
  * writes per language.
  */
-const sizeKb = computed(() => oneDecimal(new TextEncoder().encode(saveText.value).length / 1024))
-
-/**
- * A figure with one decimal, as the language of the page writes it. The
- * language is `localeProperties.language`, the tag `<html lang>` carries — see
- * `backupLabel`.
- */
-function oneDecimal(value: number, unit?: 'megabyte'): string {
-  return value.toLocaleString(localeProperties.value.language, {
-    ...(unit === undefined ? {} : { style: 'unit', unit }),
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })
-}
+const sizeKb = computed(() => formatDecimal(new TextEncoder().encode(saveText.value).length / 1024))
 
 const stats = computed(() => [
-  { key: 'cards', value: gameNumber(collection.ownedCount), label: t('settings.stats.cards') },
-  { key: 'badges', value: gameNumber(progress.badges), label: t('settings.stats.badges') },
+  { key: 'cards', value: formatNumber(collection.ownedCount), label: t('settings.stats.cards') },
+  { key: 'badges', value: formatNumber(progress.badges), label: t('settings.stats.badges') },
   { key: 'schema', value: `v${SCHEMA_VERSION}`, label: t('settings.stats.schema') },
   { key: 'size', value: sizeKb.value, label: t('settings.stats.size') },
 ])
@@ -377,9 +364,6 @@ function refreshBackups(): void {
  * config declares — `en-US`, not the `en` that names the route — and it is the
  * same one `app.vue` writes into `<html lang>`. `Intl` reads the two alike
  * today, so this is one source rather than two agreeing by luck.
- *
- * The card counts on this screen are origins the issue does name, and they
- * stay pt-BR until it is closed; the save's size follows the page (`sizeKb`).
  */
 function backupLabel(at: number): string {
   return new Date(at).toLocaleString(localeProperties.value.language, {
@@ -455,7 +439,7 @@ const offline = computed(() => {
 })
 
 /** The thumbnails' weight, measured on the build's disk: `6,0 MB`, and `6.0 MB` in English. */
-const spritesSize = computed(() => oneDecimal(spriteBytes / 1024 / 1024, 'megabyte'))
+const spritesSize = computed(() => formatDecimal(spriteBytes / 1024 / 1024, 1, 'megabyte'))
 
 onMounted(() => {
   void download.count()

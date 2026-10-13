@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useLeague } from '~/composables/useLeague'
 import { useProgressStore } from '~~/app/stores/progress'
 import { DECK_SIZE } from '~~/shared/game/deck'
-import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT } from '~~/shared/types/brand'
 import { typeKey } from '~~/shared/types/game'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -132,7 +133,7 @@ const next = computed(() => view.next.value)
               <div>
                 <dt>{{ t('league.next.prize') }}</dt>
                 <dd class="league__prize">
-                  +{{ gameNumber(next.reward.total) }}
+                  +{{ formatNumber(next.reward.total) }}
                 </dd>
               </div>
               <div>

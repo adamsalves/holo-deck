@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from 'vue'
 import { dustFor } from '~~/shared/game/dust'
-import { gameNumber } from '~~/shared/game/progress'
 import { rarityFrom } from '~~/shared/game/rarity'
 import type { SearchEntry } from '~~/shared/types/dex'
 import { rarityKey } from '~~/shared/types/game'
 import { keepFocus } from '~~/app/utils/focus'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 
 /**
  * Uma carta do binder — a mesma carta do sistema, com o rodapé que a coleção
@@ -123,7 +124,7 @@ const label = computed(() => [
           class="numeric binder-card__foot binder-card__scrap"
           :aria-label="t(
             'collection.card.scrapLabel',
-            { count: duplicates, name: entry.displayName, dust: gameNumber(dustValue) },
+            { count: duplicates, name: entry.displayName, dust: formatNumber(dustValue) },
             duplicates,
           )"
           @click="scrap"
@@ -137,7 +138,7 @@ const label = computed(() => [
               {{ duplicates }}
             </template>
             <template #dust>
-              <strong>{{ t('collection.card.dustAmount', { dust: gameNumber(dustValue) }) }}</strong>
+              <strong>{{ t('collection.card.dustAmount', { dust: formatNumber(dustValue) }) }}</strong>
             </template>
           </i18n-t>
         </button>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, useTemplateRef, watch } from 'vue'
 import { useGameClock } from '~/composables/useGameClock'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useLeague } from '~/composables/useLeague'
 import { useCollection } from '~/composables/useCollection'
 import { useInvite } from '~/composables/useInvite'
@@ -13,12 +14,12 @@ import { activeOf, isFainted } from '~~/shared/game/battle'
 import { gymLeader } from '~~/shared/game/gyms'
 import { PACK_SIZE, RARE_PLUS_SLOTS } from '~~/shared/game/packs'
 import { countdownLabel } from '~~/shared/game/economy'
-import { gameNumber } from '~~/shared/game/progress'
 import { GYM_COUNT, isGymId } from '~~/shared/types/brand'
 import { rarityKey, typeKey } from '~~/shared/types/game'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -384,7 +385,7 @@ onMounted(() => {
                 tag="p"
               >
                 <template #coins>
-                  <b>+{{ gameNumber(league.next.value.reward.total) }}</b>
+                  <b>+{{ formatNumber(league.next.value.reward.total) }}</b>
                 </template>
               </i18n-t>
             </div>
@@ -399,8 +400,8 @@ onMounted(() => {
                   {{ t('hub.collection.eyebrow') }}
                 </p>
                 <p class="numeric hub__count">
-                  <b>{{ gameNumber(owned.ownedCount) }}</b>
-                  <span>/ {{ gameNumber(collection.total.value) }}</span>
+                  <b>{{ formatNumber(owned.ownedCount) }}</b>
+                  <span>/ {{ formatNumber(collection.total.value) }}</span>
                   <em>{{ t('hub.collection.ofDex', { percent }) }}</em>
                 </p>
               </div>

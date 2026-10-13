@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core'
 import { onBeforeUnmount, onMounted, useTemplateRef, watchEffect } from 'vue'
-import { gameNumber } from '~~/shared/game/progress'
 import { useProgressStore } from '~~/app/stores/progress'
 import { useRoute } from 'nuxt/app'
 import type { NavLink } from '~~/app/utils/nav-links'
 import { NAV_LINKS, NAV_RULES, NAV_SETTINGS } from '~~/app/utils/nav-links'
 import appIcon from '~~/app/assets/images/app-icon.svg?no-inline'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 
 // Os rótulos da barra são chave de i18n desde a Fase 8, não texto — ver o
 // docblock de `NavLink`. Quem resolve é este `t`.
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 
 /**
  * O caminho de cada destino no idioma da vez.
@@ -244,7 +245,7 @@ function isCurrent(link: NavLink): boolean {
               stroke-linecap="round"
             />
           </svg>
-          {{ gameNumber(progress.coins) }}
+          {{ formatNumber(progress.coins) }}
           <span class="nav__coins-label">{{ t('nav.coins') }}</span>
         </NuxtLink>
 

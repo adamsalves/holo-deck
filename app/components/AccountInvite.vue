@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useAccount } from '~/composables/useAccount'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { useInvite } from '~/composables/useInvite'
 import { useCollectionStore } from '~~/app/stores/collection'
 import { useProgressStore } from '~~/app/stores/progress'
 import { moveFocus } from '~~/app/utils/focus'
 import { inviteSeen, markInviteSeen } from '~~/app/utils/invite'
 import { NAV_ACCOUNT } from '~~/app/utils/nav-links'
-import { gameNumber } from '~~/shared/game/progress'
 
 /**
  * O convite de conta — a prancha *Convite de conta*.
@@ -29,6 +29,7 @@ const { account, known } = useAccount()
 const collection = useCollectionStore()
 const progress = useProgressStore()
 const { t } = useI18n()
+const { formatNumber } = useGameNumbers()
 const localePath = useLocalePath()
 
 watch([requested, known, account, () => collection.ownedCount], () => {
@@ -58,9 +59,9 @@ const stakes = computed(() => {
   const shiny = Object.values(collection.entries).filter(entry => entry.s > 0).length
 
   return [
-    { key: 'cards', value: gameNumber(collection.ownedCount), label: t('invite.stakes.cards', {}, collection.ownedCount) },
-    { key: 'shiny', value: gameNumber(shiny), label: t('invite.stakes.shiny') },
-    { key: 'badges', value: gameNumber(progress.badges), label: t('invite.stakes.badges', {}, progress.badges) },
+    { key: 'cards', value: formatNumber(collection.ownedCount), label: t('invite.stakes.cards', {}, collection.ownedCount) },
+    { key: 'shiny', value: formatNumber(shiny), label: t('invite.stakes.shiny') },
+    { key: 'badges', value: formatNumber(progress.badges), label: t('invite.stakes.badges', {}, progress.badges) },
   ]
 })
 

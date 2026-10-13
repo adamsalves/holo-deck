@@ -31,7 +31,6 @@ import {
   SHINY_ODDS,
   UNCOMMON_SLOTS,
 } from '~~/shared/game/packs'
-import { gameNumber, gamePercent } from '~~/shared/game/progress'
 import { RARITY_THRESHOLDS } from '~~/shared/game/rarity'
 import { BATTLE_IV, BATTLE_LEVEL } from '~~/shared/game/stats'
 import {
@@ -49,8 +48,10 @@ import { AILMENT_NAMES, TYPE_COUNT } from '~~/shared/types/dex'
 import type { Rarity } from '~~/shared/types/game'
 import { ailmentKey, rarityKey, RARITY_NAMES, statKey, statNameKey } from '~~/shared/types/game'
 import { TURN_STEPS, turnStepKey } from '~~/app/utils/turn-order'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 
 const { t } = useI18n()
+const { formatNumber, formatPercent } = useGameNumbers()
 
 /**
  * `/rules` — a referência, e a única tela do jogo cujo contrato é **não conter
@@ -144,7 +145,7 @@ const forgeRows = computed(() => {
 })
 
 const rarePlusOdds = computed(() =>
-  RARE_PLUS_TIERS.map(tier => gamePercent(RARE_PLUS_WEIGHTS[tier])).join(' / '))
+  RARE_PLUS_TIERS.map(tier => formatPercent(RARE_PLUS_WEIGHTS[tier])).join(' / '))
 
 /**
  * The formula, with the level in plain sight.
@@ -186,7 +187,7 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
     paralysis: t('rules.conditions.paralysis', {
       stat: t(statKey('speed')),
       factor: decimal(PARALYSIS_SPEED_FACTOR),
-      chance: gamePercent(PARALYSIS_SKIP_CHANCE),
+      chance: formatPercent(PARALYSIS_SKIP_CHANCE),
     }),
     burn: t('rules.conditions.burn', {
       factor: decimal(BURN_ATTACK_FACTOR),
@@ -199,8 +200,8 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
 
 /** O ruído do primeiro ginásio e o do último — a curva de dificuldade, medida. */
 const noiseRange = computed(() => ({
-  first: gamePercent(noiseChance(1)),
-  last: gamePercent(noiseChance(GYM_COUNT)),
+  first: formatPercent(noiseChance(1)),
+  last: formatPercent(noiseChance(GYM_COUNT)),
 }))
 
 /** Em que faixa cada comportamento do líder entra. */
@@ -237,7 +238,7 @@ const campaign = computed(() => {
  * página poder escrevê-la sem digitar nenhuma delas.
  */
 const rewardCurve = computed(() =>
-  `${gameNumber(GYM_REWARD_BASE)} + ${gameNumber(GYM_REWARD_STEP)}×n`)
+  `${formatNumber(GYM_REWARD_BASE)} + ${formatNumber(GYM_REWARD_STEP)}×n`)
 
 useSeoMeta({
   title: () => t('rules.seo.title'),
@@ -440,7 +441,7 @@ useSeoMeta({
               {{ row.label.toLowerCase() }}
             </dt>
             <dd class="numeric rules__value">
-              {{ gameNumber(row.dust) }} · {{ gameNumber(row.cost) }}
+              {{ formatNumber(row.dust) }} · {{ formatNumber(row.cost) }}
             </dd>
           </div>
         </dl>
@@ -545,7 +546,7 @@ useSeoMeta({
                 {{ t(statNameKey('speed')) }}
               </template>
               <template #chance>
-                {{ gamePercent(PARALYSIS_SKIP_CHANCE) }}
+                {{ formatPercent(PARALYSIS_SKIP_CHANCE) }}
               </template>
               <template #seed>
                 <b>{{ t('rules.battle.steps.seed') }}</b>
@@ -578,7 +579,7 @@ useSeoMeta({
               </em>
             </template>
             <template #heal>
-              {{ gamePercent(POTION_HEAL_FRACTION) }}
+              {{ formatPercent(POTION_HEAL_FRACTION) }}
             </template>
           </i18n-t>
           {{ t('rules.battle.rematch') }}
@@ -711,7 +712,7 @@ useSeoMeta({
               {{ t('rules.economy.gymRematch') }}
             </dt>
             <dd class="numeric rules__value rules__value--coin">
-              {{ gamePercent(REMATCH_RATE) }}
+              {{ formatPercent(REMATCH_RATE) }}
             </dd>
           </div>
           <div class="rules__line">
@@ -719,7 +720,7 @@ useSeoMeta({
               {{ t('rules.economy.flawless') }}
             </dt>
             <dd class="numeric rules__value rules__value--progress">
-              +{{ gamePercent(FLAWLESS_RATE) }}
+              +{{ formatPercent(FLAWLESS_RATE) }}
             </dd>
           </div>
           <div class="rules__line">
@@ -735,7 +736,7 @@ useSeoMeta({
               {{ t('rules.economy.shop') }}
             </dt>
             <dd class="numeric rules__value">
-              {{ gameNumber(PACK_PRICE) }}
+              {{ formatNumber(PACK_PRICE) }}
             </dd>
           </div>
         </dl>
@@ -745,7 +746,7 @@ useSeoMeta({
                the pity line uses: written as `{packs} packs` the sentence would
                read *about 1 packs* the day the campaign paid for one. -->
           {{ t('rules.economy.foot', {
-            coins: gameNumber(campaign.total),
+            coins: formatNumber(campaign.total),
             packs: t('rules.packCount', { count: campaign.packs }, campaign.packs),
           }) }}
         </p>
