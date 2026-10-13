@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { GameUnit } from '~~/shared/game/progress'
 import {
@@ -9,6 +11,8 @@ import {
   progressRatio,
   progressStep,
 } from '~~/shared/game/progress'
+import { isGenerationData } from '~~/shared/types/dex'
+import { REPO_ROOT } from '../support/source-tree'
 
 /**
  * Os quatro degraus da barra de progresso.
@@ -160,5 +164,71 @@ describe('the language parameter', () => {
     expectTypeOf(gameDecimal).parameters.toEqualTypeOf<
       [value: number, language: string, places?: number, unit?: GameUnit]
     >()
+  })
+})
+
+describe('the pt-BR spelling', () => {
+  /**
+   * `Intl` writes pt-BR as the hand-written separator did, for the decimals that
+   * come out of the dex: each height and weight in it, and each share of it the
+   * Hub can show.
+   *
+   * The three do not weigh the same. Only a **share** can tie — a count divided by
+   * the size of the dex — and every difference a change of rounding makes falls
+   * there. A height or a weight is a whole number of tenths, which no rounding
+   * touches; what those two would name is a thousands separator, the day a species
+   * passes 999,9 kg. The multipliers of `/rules` and the sizes in *Settings* go
+   * through the same helper and are not here: they are constants and a
+   * measurement of the device, and the e2e reads them off the page.
+   *
+   * That is the decision "pt-BR stays identical to the board", and it was measured
+   * once, by hand, when the helpers changed (issue #49). The two do **not** agree
+   * in general: `toFixed` rounds the binary value and `Intl` the decimal one, so
+   * a tie parts them, and the last test says so with a value that is one. A
+   * regenerated dex that brought such a value would change a figure on a pt-BR
+   * page without a line of code changing, and this is what would name it.
+   *
+   * The reference is the old algorithm written out, and not a second call to
+   * `Intl`, which would agree with whatever the helper did.
+   */
+  const byHand = (value: number): string => value.toFixed(1).replace('.', ',')
+
+  const DATA = join(REPO_ROOT, 'public/data')
+
+  const species = readdirSync(DATA)
+    .filter(name => /^gen-\d+\.json$/.test(name))
+    .flatMap((name) => {
+      const data: unknown = JSON.parse(readFileSync(join(DATA, name), 'utf8'))
+      if (!isGenerationData(data)) throw new Error(`${name} did not pass its read guard`)
+
+      return data.species
+    })
+
+  const figures: readonly { source: string, value: number }[] = [
+    ...species.map(one => ({ source: 'height', value: one.height / 10 })),
+    ...species.map(one => ({ source: 'weight', value: one.weight / 10 })),
+    ...Array.from({ length: species.length + 1 }, (_, owned) => ({
+      source: 'share',
+      value: progressRatio(owned, species.length) * 100,
+    })),
+  ]
+
+  it('is the hand-written one, for every height, weight and share of the dex', () => {
+    expect(
+      [...new Set(figures.map(one => one.source))].sort(),
+      'a source of figures that was not read',
+    ).toEqual(['height', 'share', 'weight'])
+
+    expect(
+      figures
+        .filter(one => gameDecimal(one.value, 'pt-BR') !== byHand(one.value))
+        .map(one => `${one.source} ${one.value}: ${byHand(one.value)} by hand, ${gameDecimal(one.value, 'pt-BR')} now`),
+      'a figure that pt-BR now writes differently from the board',
+    ).toEqual([])
+  })
+
+  it('is not the hand-written one on a tie, which is why the figures are compared', () => {
+    expect(byHand(0.35)).toBe('0,3')
+    expect(gameDecimal(0.35, 'pt-BR')).toBe('0,4')
   })
 })

@@ -40,6 +40,40 @@ export function localeCodes(): string[] {
 }
 
 /**
+ * An expectation written once per language, asked for every locale on disk.
+ *
+ * It is for what a test must write **by hand** in each language — the separator
+ * of a number, say — because building it from `Intl` or from the code under test
+ * would agree with whatever that code did. The table names the locales; this
+ * checks that the names are the ones on disk, so a third language fails the test
+ * until somebody writes its row, and a row for a language that is not there fails
+ * too — the loop would otherwise run over fewer languages than the game speaks and
+ * look healthy for it.
+ *
+ * Throws instead of asserting: `test/support/` is imported by the unit suite and
+ * by the e2e, which share no `expect`.
+ */
+export function perLocale<T>(table: Readonly<Record<string, T>>): [string, T][] {
+  const codes = localeCodes()
+  const rows = Object.entries(table)
+  const named = rows.map(([code]) => code)
+
+  const forgotten = codes.filter(code => !named.includes(code))
+  const invented = named.filter(code => !codes.includes(code))
+
+  const wrong = [
+    forgotten.length > 0 ? `no row for: [${forgotten.join(', ')}]` : '',
+    invented.length > 0 ? `a row for a language that is not there: [${invented.join(', ')}]` : '',
+  ].filter(part => part !== '')
+
+  if (wrong.length > 0) {
+    throw new Error(`the expectations and \`i18n/locales/\` name different languages — ${wrong.join(', ')}`)
+  }
+
+  return rows
+}
+
+/**
  * O locale como dado cru.
  *
  * `JSON.parse` devolve `any`, que é por onde o `any` entrou na Fase 0 — ele sai

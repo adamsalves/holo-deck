@@ -126,8 +126,8 @@ um terceiro parâmetro para o plural: a contagem **escolhe** a frase e não só 
 preenche, e passar só o valor renderiza o pipe e as duas metades na tela.
 
 Ele também é o que deixa a contagem viajar **duas vezes**, com metades
-diferentes: `gameNumber` preenche a frase e o número cru escolhe a forma. Entregar
-o número para os dois papéis derrubava o separador do pt-BR — `1600 cartas` sob um
+diferentes: `formatNumber` preenche a frase e o número cru escolhe a forma. Entregar
+o número para os dois papéis derrubava o separador — `1600 cartas` sob um
 bloco de estatísticas ainda escrevendo `1.600` —, porque interpolação nomeada do
 vue-i18n converte para texto e nunca formata.
 

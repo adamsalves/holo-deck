@@ -40,6 +40,27 @@ export function hasExtension(extensions: readonly string[]) {
   return (fileName: string) => extensions.some(extension => fileName.endsWith(extension))
 }
 
+/**
+ * The directories `.gitignore` names, by name: the ones that exist on one machine
+ * and not on the next — `test-results/` after a local e2e run, `playwright-report/`,
+ * `node_modules/` everywhere.
+ *
+ * Read from the file and not listed in the test, for the reason the gate-writing
+ * rule gives: a list written beside a rule ages with it. It also keeps a question
+ * about *which top-level directories exist* deterministic — a hand-written list
+ * would classify them on one machine and fail on the other.
+ */
+export function ignoredDirectories(): Set<string> {
+  return new Set(
+    readFileSync(join(REPO_ROOT, '.gitignore'), 'utf8')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.endsWith('/') && !line.startsWith('#') && !line.startsWith('!'))
+      .map(line => line.replace(/\/$/, ''))
+      .filter(name => !name.startsWith('.') && !name.includes('/')),
+  )
+}
+
 /** A sample value for each route parameter, so a dynamic page has an address to open. */
 const SAMPLES: Readonly<Record<string, string>> = { gymId: '1', gen: '1', name: 'pikachu' }
 

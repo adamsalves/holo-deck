@@ -144,7 +144,9 @@ jogo mora em `i18n/locales/`: `rarityKey()` e `typeKey()`, em
 
 **O vocabulário que `shared/` ainda carrega.** A
 [issue #38](https://github.com/adamsalves/holo-deck/issues/38) lista seis mapas.
-A medição achou **dez** produtores de texto de tela, e é a lista de dez que vale:
+A medição achou **dez** produtores de texto de tela, e é a lista de dez que vale;
+a tabela tem onze desde 13/10/2026, porque `gameDecimal` nasceu no conserto dos
+dois últimos:
 
 | produtor | o que escreve | quando sai |
 | --- | --- | --- |
@@ -155,7 +157,7 @@ A medição achou **dez** produtores de texto de tela, e é a lista de dez que v
 | `CONDITION_LABELS` → `conditionKey` | `PAR`, `QUE`, `ENV`, `SON` | **entregue** |
 | `generationLabel` → `generationNumeral` | `Geração IV` | **entregue** |
 | `shared/game/evolution.ts` | 43 condições (`Subir de nível`, `de dia`) | **entregue** |
-| `gameNumber` / `gamePercent` (`shared/game/progress.ts`) | `1.600`, `0,4%` | [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
+| `gameNumber` / `gamePercent` / `gameDecimal` (`shared/game/progress.ts`) | `1.600` e `1,600`, `0,4%` e `0.4%` | **entregue**, [issue #49](https://github.com/adamsalves/holo-deck/issues/49) |
 
 As três primeiras `entregue` saíram no PR das telas de batalha, e as duas do
 meio pela mesma troca: a função devolve o **endereço** e quem resolve o `t()` é a
@@ -173,14 +175,16 @@ então deixaria o elenco do jogo aqui sem nada vigiando. As duas listas são
 montada a partir dos próprios valores: uma décima região é exceção no dia em que
 for escrita.
 
-Os dois últimos são os que a issue não via, e são de outra classe: eles não
-escrevem palavra nenhuma — escrevem **número com o separador de `pt-BR` fixo**,
-por `toLocaleString('pt-BR')`. Em `/en` a tabela de forja já sai `1.600` e o
-shiny `0,4%`, que um leitor de inglês lê como 1,6 e 0,4. O erro não é de idioma,
-é de **valor lido errado**, e é justamente por isso que uma varredura por palavra
-não o encontra. O docblock de `gameNumber` justifica o locale fixo dizendo que o
+Os dois últimos da medição, `gameNumber` e `gamePercent`, são os que a issue não
+via, e são de outra classe: eles não
+escrevem palavra nenhuma — escreviam **número com o separador de `pt-BR` fixo**,
+por `toLocaleString('pt-BR')`. Em `/en` a tabela de forja saía `1.600` e o
+shiny `0,4%`, que um leitor de inglês lê como 1,6 e 0,4. O erro não era de idioma,
+era de **valor lido errado**, e é justamente por isso que uma varredura por palavra
+não o encontrava. O docblock de `gameNumber` justificava o locale fixo dizendo que o
 número está no meio de uma frase em português — a premissa deixou de valer no dia
-em que existiu uma frase em inglês.
+em que existiu uma frase em inglês. Entregues em 13/10/2026, com a língua como
+parâmetro obrigatório: ver [`i18n.md`](i18n.md).
 
 Consequência para o plano: o portão de "`shared/` sem texto de tela" **não pode
 fechar verde antes do PR do Detalhe**, que é quem leva os últimos. Escrito antes,

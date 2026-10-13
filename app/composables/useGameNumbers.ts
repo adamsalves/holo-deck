@@ -7,9 +7,9 @@ import { gameDecimal, gameNumber, gamePercent } from '~~/shared/game/progress'
  * The three helpers in `shared/game/progress.ts` take the language as a required
  * parameter, because `shared/` has no way to know it. This is what knows, and it
  * is the only file in `app/` that imports them: a screen asks for the three
- * functions below and never passes a language. That is a convention this file
- * states and does not enforce — a screen that imported a helper and wrote the
- * tag by hand would still compile.
+ * functions below and never passes a language. `number-format-gate` holds that:
+ * a screen that named a helper and wrote the tag by hand would still compile, so
+ * a helper named in any other file of `app/` fails there.
  *
  * - `formatNumber` — a whole figure, grouped: `1.600` in pt-BR, `1,600` in English.
  * - `formatPercent` — a rate, from the **fraction**: `4,5%` and `4.5%`.

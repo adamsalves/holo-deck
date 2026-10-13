@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 import { TURN_STEPS, turnStepKey } from '../../app/utils/turn-order.ts'
 import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
-import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels } from '../support/locales.ts'
-import { screenText } from './support.ts'
+import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels, perLocale } from '../support/locales.ts'
+import { hydrated, screenText } from './support.ts'
 
 /**
  * `/rules` in a browser, which is the half no gate on disk can reach.
@@ -129,5 +129,40 @@ test('the calibrated numbers reach the screen, in both languages', async ({ page
       page.locator('[data-panel="conditions"] dd').first(),
       `paralysis in ${code}`,
     ).toContainText(`${Math.round(PARALYSIS_SKIP_CHANCE * 100)}%`)
+  }
+})
+
+/**
+ * The multipliers on `/rules`, in the decimal separator of the URL — `×1,5` and `×1.5`.
+ *
+ * The two came from a helper of this very page that did `toFixed(1)` and swapped
+ * the dot by hand, so `/en/rules` wrote `STAB ×1,5` (issue #49). The chip and the
+ * first condition are two of the helper's four call sites, and both are asked.
+ *
+ * Written by hand, in each language, and read off the rendered page: the page
+ * formats with `Intl`, and an expectation built from `Intl` would agree with
+ * whatever the page did. The words around the figure (`STAB`) are the same in both
+ * languages, which is why the chip can be asserted whole; the condition carries a
+ * translated stat name, so only the figure is. Both are read after the client
+ * took the page over, or the answer is the static file's.
+ */
+const MULTIPLIERS: Readonly<Record<string, { stab: string, paralysis: string }>> = {
+  'pt-BR': { stab: 'STAB ×1,5', paralysis: '×0,5' },
+  'en': { stab: 'STAB ×1.5', paralysis: '×0.5' },
+}
+
+test('the multipliers are written with the decimal separator of the URL', async ({ page }) => {
+  for (const [code, expected] of perLocale(MULTIPLIERS)) {
+    await page.goto(localeUrl('/rules', code))
+    await hydrated(page)
+
+    await expect(
+      page.locator('[data-panel="battle"] .rules__chip').first(),
+      `the STAB chip in ${code}`,
+    ).toHaveText(expected.stab)
+    await expect(
+      page.locator('[data-panel="conditions"] dd').first(),
+      `the paralysis line in ${code}`,
+    ).toContainText(expected.paralysis)
   }
 })
