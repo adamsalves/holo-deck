@@ -5,9 +5,11 @@ import { gameDecimal, gameNumber, gamePercent } from '~~/shared/game/progress'
  * The game's figures, written the way the language of the URL writes them.
  *
  * The three helpers in `shared/game/progress.ts` take the language as a required
- * parameter, because `shared/` has no way to know it. This is what knows: every
- * screen that prints a figure asks for these three and never passes a language,
- * so there is no call site where one could be forgotten or fixed by hand.
+ * parameter, because `shared/` has no way to know it. This is what knows, and it
+ * is the only file in `app/` that imports them: a screen asks for the three
+ * functions below and never passes a language. That is a convention this file
+ * states and does not enforce — a screen that imported a helper and wrote the
+ * tag by hand would still compile.
  *
  * - `formatNumber` — a whole figure, grouped: `1.600` in pt-BR, `1,600` in English.
  * - `formatPercent` — a rate, from the **fraction**: `4,5%` and `4.5%`.

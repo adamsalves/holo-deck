@@ -123,9 +123,11 @@ test('the calibrated numbers reach the screen, in both languages', async ({ page
     // The number from the module and the sign written here, and not the formatter
     // the page uses: a test that asked it would agree with whatever it did. Whole
     // percents are the same in both languages, so one spelling serves the loop.
+    // Rounded, because the product of a fraction and 100 is not always the whole
+    // number it stands for: `0.07 * 100` is `7.000000000000001`.
     await expect(
       page.locator('[data-panel="conditions"] dd').first(),
       `paralysis in ${code}`,
-    ).toContainText(`${PARALYSIS_SKIP_CHANCE * 100}%`)
+    ).toContainText(`${Math.round(PARALYSIS_SKIP_CHANCE * 100)}%`)
   }
 })

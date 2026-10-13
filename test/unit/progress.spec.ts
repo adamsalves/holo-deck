@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import type { GameUnit } from '~~/shared/game/progress'
 import {
   PROGRESS_THRESHOLDS,
   gameDecimal,
@@ -135,5 +136,29 @@ describe('the game decimal', () => {
   it('carries its unit when it has one', () => {
     expect(gameDecimal(6, 'pt-BR', 1, 'megabyte')).toBe('6,0 MB')
     expect(gameDecimal(6, 'en-US', 1, 'megabyte')).toBe('6.0 MB')
+  })
+})
+
+describe('the language parameter', () => {
+  /**
+   * The three helpers take the language, and it is **required**.
+   *
+   * A default is the defect of issue #49 written as a signature: whoever forgot
+   * the argument would get the default's language on every page. And a literal
+   * gate does not see every spelling of it — `language = 'en'` reads like an
+   * identifier to `shared-text-gate`, and `language?: string` has no literal at
+   * all and hands the choice to the device.
+   *
+   * The tuple is compared whole, so an optional `language` is a different type
+   * and not a wider one. **This is asserted by `yarn typecheck`, not by the
+   * runner**: the matcher does nothing at run time, and a default planted in a
+   * helper leaves `yarn test` green and stops `vue-tsc` on this line.
+   */
+  it('is required by each helper, with no default', () => {
+    expectTypeOf(gameNumber).parameters.toEqualTypeOf<[value: number, language: string]>()
+    expectTypeOf(gamePercent).parameters.toEqualTypeOf<[fraction: number, language: string]>()
+    expectTypeOf(gameDecimal).parameters.toEqualTypeOf<
+      [value: number, language: string, places?: number, unit?: GameUnit]
+    >()
   })
 })
