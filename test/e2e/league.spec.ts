@@ -16,7 +16,7 @@ import {
   readLocale,
   spells,
 } from '../support/locales'
-import { DEX_VERSION, openWelcomePack, playTurn, saveWith, seedLocalSave, skipInvite } from './support'
+import { DEX_VERSION, hydrated, openWelcomePack, playTurn, saveWith, seedLocalSave, skipInvite } from './support'
 
 /**
  * A Liga e a batalha num navegador de verdade.
@@ -262,6 +262,7 @@ test('the Hub writes the dex and its share in the number format of the URL', asy
 
   for (const [code, expected] of perLocale(HUB_COUNT)) {
     await page.goto(localeUrl('/', code))
+    await hydrated(page)
 
     const count = page.locator('.hub__count')
 

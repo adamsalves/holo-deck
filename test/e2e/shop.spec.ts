@@ -4,7 +4,7 @@ import type { SaveData } from '../../shared/save/schema.ts'
 import { isSaveData } from '../../shared/save/schema.ts'
 import { RARITY_NAMES, rarityKey } from '../../shared/types/game.ts'
 import { defaultLocale, label, localeCodes, localeUrl, message, messagePattern, perLocale } from '../support/locales.ts'
-import { openingProgress, skipInvite } from './support'
+import { hydrated, openingProgress, skipInvite } from './support'
 
 /**
  * A loja, as regras e os ajustes num navegador de verdade.
@@ -228,10 +228,6 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
   await expect(rules).toContainText('529 – 580')
   await expect(rules).toContainText('10 packs')
   await expect(rules).toContainText('1 / 256')
-  await expect(rules).toContainText('80% / 15% / 4,5% / 0,5%')
-  await expect(rules).toContainText('400 · 1.600')
-  await expect(rules).toContainText('200 + 100×n')
-  await expect(rules).toContainText('6.300')
 
   // O passo 5 da ordem do turno **corrige a prancha**, que escreve "no zero o
   // golpe fica inselecionável". O motor cai em Struggle por slot.
@@ -239,7 +235,8 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
 })
 
 /**
- * The same four lines of `/rules`, once per language — the pair of the test above.
+ * Four lines of `/rules`, once per language. The test above asserted them in
+ * Portuguese alone until this one took them over, with the row of each language.
  *
  * The Portuguese ones are the board's: `4,5%`, `1.600`, `6.300`. The English ones
  * are the same figures in the format of their own language, which is the decision
@@ -249,7 +246,9 @@ test('as regras exibem os números do jogo, vindos dos módulos', async ({ page 
  *
  * Written by hand, in each language, and read off the rendered page. The page
  * formats with `Intl`, and a test that built its expectation from `Intl` — or from
- * the helpers — would agree with whatever the page did.
+ * the helpers — would agree with whatever the page did. Read after the client took
+ * the page over, here and in the test of the shop below: before that, the answer
+ * is the static file's.
  */
 const RULES_NUMBERS: Readonly<Record<string, readonly string[]>> = {
   'pt-BR': ['80% / 15% / 4,5% / 0,5%', '400 · 1.600', '200 + 100×n', '6.300'],
@@ -259,6 +258,7 @@ const RULES_NUMBERS: Readonly<Record<string, readonly string[]>> = {
 test('/rules writes the calibrated numbers with the separators of the URL', async ({ page }) => {
   for (const [code, lines] of perLocale(RULES_NUMBERS)) {
     await page.goto(localeUrl('/rules', code))
+    await hydrated(page)
 
     for (const line of lines) {
       await expect(page.locator('.rules'), `${line} in ${code}`).toContainText(line)
@@ -282,6 +282,7 @@ const RARE_SLOT_ODDS: Readonly<Record<string, readonly string[]>> = {
 test('the shop writes the odds of the rare slot with the separators of the URL', async ({ page }) => {
   for (const [code, odds] of perLocale(RARE_SLOT_ODDS)) {
     await page.goto(localeUrl('/packs', code))
+    await hydrated(page)
 
     await expect(page.locator('.packs__odd dd'), `the odds of the rare slot in ${code}`).toHaveText(odds)
   }

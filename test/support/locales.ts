@@ -61,11 +61,13 @@ export function perLocale<T>(table: Readonly<Record<string, T>>): [string, T][] 
   const forgotten = codes.filter(code => !named.includes(code))
   const invented = named.filter(code => !codes.includes(code))
 
-  if (forgotten.length > 0 || invented.length > 0) {
-    throw new Error(
-      `the expectations and \`i18n/locales/\` name different languages — no row for: [${forgotten.join(', ')}], `
-      + `a row for a language that is not there: [${invented.join(', ')}]`,
-    )
+  const wrong = [
+    forgotten.length > 0 ? `no row for: [${forgotten.join(', ')}]` : '',
+    invented.length > 0 ? `a row for a language that is not there: [${invented.join(', ')}]` : '',
+  ].filter(part => part !== '')
+
+  if (wrong.length > 0) {
+    throw new Error(`the expectations and \`i18n/locales/\` name different languages — ${wrong.join(', ')}`)
   }
 
   return rows

@@ -169,9 +169,17 @@ describe('the language parameter', () => {
 
 describe('the pt-BR spelling', () => {
   /**
-   * `Intl` writes pt-BR as the hand-written separator did, for every decimal the
-   * game can print today: each height and weight of the dex, and each share of it
-   * the Hub can show.
+   * `Intl` writes pt-BR as the hand-written separator did, for the decimals that
+   * come out of the dex: each height and weight in it, and each share of it the
+   * Hub can show.
+   *
+   * The three do not weigh the same. Only a **share** can tie — a count divided by
+   * the size of the dex — and every difference a change of rounding makes falls
+   * there. A height or a weight is a whole number of tenths, which no rounding
+   * touches; what those two would name is a thousands separator, the day a species
+   * passes 999,9 kg. The multipliers of `/rules` and the sizes in *Settings* go
+   * through the same helper and are not here: they are constants and a
+   * measurement of the device, and the e2e reads them off the page.
    *
    * That is the decision "pt-BR stays identical to the board", and it was measured
    * once, by hand, when the helpers changed (issue #49). The two do **not** agree

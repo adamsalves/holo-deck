@@ -3,7 +3,7 @@ import { TURN_STEPS, turnStepKey } from '../../app/utils/turn-order.ts'
 import { PITY_THRESHOLD } from '../../shared/game/packs.ts'
 import { PARALYSIS_SKIP_CHANCE } from '../../shared/game/status.ts'
 import { foreignPhrases, label, localeCodes, localeUrl, namespaceLabels, perLocale } from '../support/locales.ts'
-import { screenText } from './support.ts'
+import { hydrated, screenText } from './support.ts'
 
 /**
  * `/rules` in a browser, which is the half no gate on disk can reach.
@@ -143,7 +143,8 @@ test('the calibrated numbers reach the screen, in both languages', async ({ page
  * formats with `Intl`, and an expectation built from `Intl` would agree with
  * whatever the page did. The words around the figure (`STAB`) are the same in both
  * languages, which is why the chip can be asserted whole; the condition carries a
- * translated stat name, so only the figure is.
+ * translated stat name, so only the figure is. Both are read after the client
+ * took the page over, or the answer is the static file's.
  */
 const MULTIPLIERS: Readonly<Record<string, { stab: string, paralysis: string }>> = {
   'pt-BR': { stab: 'STAB ×1,5', paralysis: '×0,5' },
@@ -153,6 +154,7 @@ const MULTIPLIERS: Readonly<Record<string, { stab: string, paralysis: string }>>
 test('the multipliers are written with the decimal separator of the URL', async ({ page }) => {
   for (const [code, expected] of perLocale(MULTIPLIERS)) {
     await page.goto(localeUrl('/rules', code))
+    await hydrated(page)
 
     await expect(
       page.locator('[data-panel="battle"] .rules__chip').first(),

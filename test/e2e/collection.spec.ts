@@ -11,7 +11,7 @@ import {
   perLocale,
   spells,
 } from '../support/locales'
-import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
+import { hydrated, navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
 
 /**
  * O ciclo da Fase 5, num navegador de verdade.
@@ -647,6 +647,12 @@ test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', asy
  * measured is how the page wrote it. In `/en` it wrote `1.600` — which English
  * reads as 1.6 — until the formatter took the language of the URL (issue #49).
  *
+ * It is read **after the client took the page over**. The address is a static
+ * file, and a figure read before that is the one the build wrote: a formatter
+ * that asked the browser for its language on the client, and the URL on the
+ * server, passed this test two runs in three while the screen settled on the
+ * wrong number (review of #109).
+ *
  * Measured as shape, by the separator each language writes, and not against
  * `Intl`: the page formats with it, and a test asking `Intl` the same question
  * would agree with whatever the page did. The separators are written here
@@ -660,6 +666,7 @@ const LEGENDARY_ROW: Readonly<Record<string, readonly string[]>> = {
 test('the forge table writes its figures in the number format of the URL', async ({ page }) => {
   for (const [code, cells] of perLocale(LEGENDARY_ROW)) {
     await page.goto(localeUrl('/collection', code))
+    await hydrated(page)
 
     await expect(
       page.locator('.collection__table tr[data-rarity="legendary"] td'),

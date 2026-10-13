@@ -15,7 +15,7 @@ import {
   spells,
 } from '../support/locales.ts'
 import { REPO_ROOT } from '../support/source-tree.ts'
-import { screenText } from './support.ts'
+import { hydrated, screenText } from './support.ts'
 
 /** The six stat badges of one locale, as that locale spells them. */
 function badgesOf(code: string): string[] {
@@ -662,7 +662,8 @@ function progressWord(code: string): string {
  * comma swapped in by hand, so `/en` wrote the Portuguese ones (issue #49).
  *
  * The figures are written here, in each language: the page formats with `Intl`,
- * and an expectation built from it would agree with whatever the page did.
+ * and an expectation built from it would agree with whatever the page did. They
+ * are read after the client took the page over, or the answer is the static file's.
  */
 const BULBASAUR_FACTS: Readonly<Record<string, { height: string, weight: string }>> = {
   'pt-BR': { height: '0,7 m', weight: '6,9 kg' },
@@ -672,6 +673,7 @@ const BULBASAUR_FACTS: Readonly<Record<string, { height: string, weight: string 
 test('the Detail screen writes height and weight with the decimal separator of the URL', async ({ page }) => {
   for (const [code, expected] of perLocale(BULBASAUR_FACTS)) {
     await page.goto(localeUrl('/pokemon/bulbasaur', code))
+    await hydrated(page)
 
     const fact = (key: string) => page
       .locator('.hero__facts > div')
