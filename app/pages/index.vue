@@ -19,7 +19,7 @@ import { rarityKey, typeKey } from '~~/shared/types/game'
 import { multiplierLabel } from '~~/shared/game/typechart'
 
 const { t } = useI18n()
-const { formatNumber } = useGameNumbers()
+const { formatNumber, formatDecimal } = useGameNumbers()
 const localePath = useLocalePath()
 
 /**
@@ -129,7 +129,7 @@ const advantage = computed(() => {
  * `collection.total` é o tamanho do dex, não o que se tem, e o Hub abriu
  * dizendo `1.025 / 1.025` ao lado de `0,8% do dex`.
  */
-const percent = computed(() => (collection.ratio.value * 100).toFixed(1).replace('.', ','))
+const percent = computed(() => formatDecimal(collection.ratio.value * 100))
 
 /** Os quatro números do cabeçalho da prancha: três tiers e o brilho, que não é
  * tier nenhum — shiny rola sobre qualquer raridade e conta à parte. */

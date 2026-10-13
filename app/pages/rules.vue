@@ -51,7 +51,7 @@ import { TURN_STEPS, turnStepKey } from '~~/app/utils/turn-order'
 import { useGameNumbers } from '~/composables/useGameNumbers'
 
 const { t } = useI18n()
-const { formatNumber, formatPercent } = useGameNumbers()
+const { formatNumber, formatPercent, formatDecimal } = useGameNumbers()
 
 /**
  * `/rules` — a referência, e a única tela do jogo cujo contrato é **não conter
@@ -71,11 +71,6 @@ const { formatNumber, formatPercent } = useGameNumbers()
  * O que a página **pode** escrever é prosa: o porquê de cada regra, que não mora
  * em constante nenhuma. A linha divisória é essa — número, não; frase, sim.
  */
-
-/** `1,5` e `0,5` no lugar de `1.5` — o documento é `lang="pt-BR"`. */
-function decimal(value: number, places = 1): string {
-  return value.toFixed(places).replace('.', ',')
-}
 
 /** `1/24`, `1/16`, `1/8` — a fração como o jogador a lê, e não como float. */
 function ratio(fraction: number): string {
@@ -186,11 +181,11 @@ const conditions = computed(() => AILMENT_NAMES.map(name => ({
   effect: {
     paralysis: t('rules.conditions.paralysis', {
       stat: t(statKey('speed')),
-      factor: decimal(PARALYSIS_SPEED_FACTOR),
+      factor: formatDecimal(PARALYSIS_SPEED_FACTOR),
       chance: formatPercent(PARALYSIS_SKIP_CHANCE),
     }),
     burn: t('rules.conditions.burn', {
-      factor: decimal(BURN_ATTACK_FACTOR),
+      factor: formatDecimal(BURN_ATTACK_FACTOR),
       fraction: ratio(BURN_DAMAGE_FRACTION),
     }),
     poison: t('rules.conditions.poison', { fraction: ratio(POISON_DAMAGE_FRACTION) }),
@@ -471,14 +466,14 @@ useSeoMeta({
 
         <ul class="rules__chips">
           <li class="numeric rules__chip">
-            {{ t('rules.battle.stab', { multiplier: decimal(STAB_MULTIPLIER) }) }}
+            {{ t('rules.battle.stab', { multiplier: formatDecimal(STAB_MULTIPLIER) }) }}
           </li>
           <li class="numeric rules__chip">
             {{ t('rules.battle.effectiveness') }}
           </li>
           <li class="numeric rules__chip">
             {{ t('rules.battle.crit', {
-              multiplier: decimal(CRIT_MULTIPLIER),
+              multiplier: formatDecimal(CRIT_MULTIPLIER),
               chance: ratio(CRIT_CHANCE),
             }) }}
           </li>

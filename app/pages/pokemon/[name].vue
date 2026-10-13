@@ -8,8 +8,10 @@ import { habitatKey, rarityKey } from '~~/shared/types/game'
 import { artworkUrl } from '~~/shared/dex/artwork'
 import { dexNumber, toRegions } from '~~/shared/dex/regions'
 import { useDex } from '~/composables/useDex'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 
 const { t } = useI18n()
+const { formatDecimal } = useGameNumbers()
 
 /**
  * A página de uma espécie — a prancha *Detalhe*.
@@ -120,8 +122,8 @@ const effectiveness = computed(() => data.value?.effectiveness ?? [])
 const chainKnown = computed(() => new Map((data.value?.chainSpecies ?? []).map(entry => [entry.id, entry])))
 
 /** Altura e peso vêm em decímetros e hectogramas — a unidade da PokeAPI. */
-const height = computed(() => (species.value === null ? '' : `${(species.value.height / 10).toFixed(1).replace('.', ',')} m`))
-const weight = computed(() => (species.value === null ? '' : `${(species.value.weight / 10).toFixed(1).replace('.', ',')} kg`))
+const height = computed(() => (species.value === null ? '' : `${formatDecimal(species.value.height / 10)} m`))
+const weight = computed(() => (species.value === null ? '' : `${formatDecimal(species.value.weight / 10)} kg`))
 
 /**
  * Sem `value` de propósito: com chaves explícitas o `UTabs` nasce sem nenhuma

@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useDex } from '~/composables/useDex'
 import { useFirstSync } from '~/composables/useFirstSync'
 import type { ChoiceSide } from '~/composables/useFirstSync'
+import { useGameNumbers } from '~/composables/useGameNumbers'
 import { composeSave } from '~/utils/save-document'
 import { summarize } from '~/utils/save-summary'
 import type { SearchEntry } from '~~/shared/types/dex'
@@ -28,6 +29,7 @@ import type { SearchEntry } from '~~/shared/types/dex'
 const { pending, choose } = useFirstSync()
 const { loadIndex } = useDex()
 const { t, localeProperties } = useI18n()
+const { formatNumber } = useGameNumbers()
 
 const index = ref<readonly SearchEntry[]>([])
 const applying = ref<ChoiceSide | null>(null)
@@ -302,7 +304,7 @@ async function pick(side: ChoiceSide): Promise<void> {
                 {{ t('save.choice.cards', {}, side.sum?.cards ?? 0) }}
               </dt>
               <dd class="numeric choice__number">
-                {{ side.sum?.cards ?? '—' }}
+                {{ side.sum === null ? '—' : formatNumber(side.sum.cards) }}
               </dd>
             </div>
             <div>
@@ -310,7 +312,7 @@ async function pick(side: ChoiceSide): Promise<void> {
                 {{ t('save.choice.badges', {}, side.sum?.badges ?? 0) }}
               </dt>
               <dd class="numeric choice__number">
-                {{ side.sum?.badges ?? '—' }}
+                {{ side.sum === null ? '—' : formatNumber(side.sum.badges) }}
               </dd>
             </div>
             <div>
@@ -318,7 +320,7 @@ async function pick(side: ChoiceSide): Promise<void> {
                 {{ t('save.choice.shiny') }}
               </dt>
               <dd class="numeric choice__number choice__number--shiny">
-                {{ side.sum?.shiny ?? '—' }}
+                {{ side.sum === null ? '—' : formatNumber(side.sum.shiny) }}
               </dd>
             </div>
           </dl>
@@ -359,7 +361,7 @@ async function pick(side: ChoiceSide): Promise<void> {
             <div>
               <dt>{{ t('save.choice.dust') }}</dt>
               <dd class="numeric">
-                {{ side.dust }}
+                {{ formatNumber(side.dust) }}
               </dd>
             </div>
           </dl>
