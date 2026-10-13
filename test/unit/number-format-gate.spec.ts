@@ -14,7 +14,8 @@ import { hasExtension, ignoredDirectories, REPO_ROOT, stripComments, walkFiles }
  * **value read wrong**, and it passed every other gate for as long as the pages
  * were Portuguese.
  *
- * It charges three forms, in `app/` and in `shared/`:
+ * It charges four forms — the first three in `app/` and in `shared/`, the last
+ * in `app/`:
  *
  * 1. **A locale-sensitive formatter given a locale written in the code, or none.**
  *    `toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`,
@@ -26,13 +27,21 @@ import { hasExtension, ignoredDirectories, REPO_ROOT, stripComments, walkFiles }
  *    `replaceAll`. It is the same defect as the first, written without `Intl`.
  * 3. **`toFixed`**, outside the named exceptions. It writes a dot in every
  *    language, and the way out of it is the way out of the second form.
+ * 4. **A helper of `shared/game/progress.ts` named outside `useGameNumbers`.**
+ *    The helpers take the language as an argument, so a screen that called one
+ *    could write the tag in place: `gameNumber(coins, 'pt-BR')` is none of the
+ *    forms above, and it is the first one with a function in between.
  *
  * The argument of a formatter is judged by its **shape**: a quoted string, an
  * array of one, `undefined` or nothing is wrong, and anything else is taken to be
  * the language. So a locale written once into a constant and passed by its name
- * would walk past. `shared-text-gate` closes that door under `shared/` — every
- * literal there is screen text, and a language tag is not exempt any more — and
- * nothing in `app/` hands a formatter a constant of that kind today.
+ * would walk past. `shared-text-gate` closes that door under `shared/` for a tag
+ * with a capital in it — `'pt-BR'` is screen text there, and not exempt any more.
+ * A lowercase one, `'en'`, reads as an identifier to that gate and walks past
+ * both. What holds the three helpers against it is `progress.spec.ts`: the
+ * figures are asserted in two languages, and the language parameter is asserted
+ * to have no default. Nothing in `app/` hands a formatter a constant of that kind
+ * today.
  *
  * **It is built the way this repository's gates are, and each choice answers a
  * failure that has happened:**
@@ -117,6 +126,24 @@ const LANGUAGE_AWARE: readonly string[] = [
   'app/pages/settings.vue',
   'app/components/SaveChoice.vue',
 ]
+
+/**
+ * The one file of `app/` that may name a helper of `shared/game/progress.ts`: it
+ * is where the language of the URL is read and handed over.
+ */
+const HELPER_CALLER = 'app/composables/useGameNumbers.ts'
+
+/**
+ * A helper by its name, anywhere in the code — an import, a call, a member of a
+ * namespace import. The name and not the import line, because `shared/game/` is
+ * not auto-imported and so a name in code is a use, however it was brought in.
+ */
+const HELPER_NAME = /\b(?:gameNumber|gamePercent|gameDecimal)\b/
+
+/** Whether a file names a helper outside its comments. */
+function namesHelper(source: string): boolean {
+  return HELPER_NAME.test(stripComments(source))
+}
 
 /** One place in a file, as a failure message names it. */
 interface Sighting {
@@ -305,6 +332,15 @@ describe('what the reader sees', () => {
     expect(read('planted.ts', source).toFixed.map(one => one.line)).toEqual([1, 2])
   })
 
+  it('sees a helper named in code, however it was brought in, and not in a comment', () => {
+    expect(namesHelper('import { gameNumber } from \'~~/shared/game/progress\'')).toBe(true)
+    expect(namesHelper('<span>{{ gamePercent(rate, \'pt-BR\') }}</span>')).toBe(true)
+    expect(namesHelper('const text = progress.gameDecimal(value, \'pt-BR\')')).toBe(true)
+
+    expect(namesHelper('// gameNumber(value, \'pt-BR\') is what this replaced')).toBe(false)
+    expect(namesHelper('const { formatNumber } = useGameNumbers()')).toBe(false)
+  })
+
   /**
    * A comment may quote what it forbids — this file's docblock does, and so do the
    * helpers' in `shared/game/progress.ts`.
@@ -387,6 +423,23 @@ describe('the tree', () => {
       named(READINGS.filter(one => !TO_FIXED_EXCEPTIONS.has(one.file)).flatMap(one => one.toFixed)),
       'toFixed writes a dot in every language — use formatDecimal, or name the file in TO_FIXED_EXCEPTIONS with the reason',
     ).toEqual([])
+  })
+
+  /**
+   * Compared as the set of files, so both sides are one answer: the composable
+   * has to be **seen** naming the helpers, or an empty list would pass with the
+   * reader blind, and nobody else may.
+   */
+  it('names the helpers of shared/game/progress.ts in the composable, and nowhere else in app/', () => {
+    const callers = (SWEPT.get('app') ?? [])
+      .filter(file => namesHelper(readFileSync(join(REPO_ROOT, file), 'utf8')))
+      .sort()
+
+    expect(
+      callers,
+      'a file of app/ that names gameNumber, gamePercent or gameDecimal — a screen takes formatNumber, formatPercent '
+      + 'and formatDecimal from useGameNumbers(), which is where the language of the URL is read',
+    ).toEqual([HELPER_CALLER])
   })
 
   /**
