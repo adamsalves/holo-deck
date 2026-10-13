@@ -11,6 +11,7 @@ import {
   localeUrl,
   message,
   messagePattern,
+  perLocale,
   spells,
 } from '../support/locales.ts'
 import { REPO_ROOT } from '../support/source-tree.ts'
@@ -650,3 +651,34 @@ test('the Pokédex screens read in the language of the URL, links included', asy
 function progressWord(code: string): string {
   return label('collection.progress.valueText', code).replaceAll(/\{\w+\}/g, '').trim()
 }
+
+/**
+ * Height and weight on the Detail screen, in the decimal separator of the URL.
+ *
+ * Bulbasaur is 7 decimetres and 69 hectograms in the dex, and the page writes them
+ * as metres and kilograms: `0,7 m` and `6,9 kg`, and `0.7 m` and `6.9 kg` in
+ * English. **Only the separator changes** — no conversion to feet and pounds, which
+ * is a decision about units and not about format. Both were `toFixed(1)` with the
+ * comma swapped in by hand, so `/en` wrote the Portuguese ones (issue #49).
+ *
+ * The figures are written here, in each language: the page formats with `Intl`,
+ * and an expectation built from it would agree with whatever the page did.
+ */
+const BULBASAUR_FACTS: Readonly<Record<string, { height: string, weight: string }>> = {
+  'pt-BR': { height: '0,7 m', weight: '6,9 kg' },
+  'en': { height: '0.7 m', weight: '6.9 kg' },
+}
+
+test('the Detail screen writes height and weight with the decimal separator of the URL', async ({ page }) => {
+  for (const [code, expected] of perLocale(BULBASAUR_FACTS)) {
+    await page.goto(localeUrl('/pokemon/bulbasaur', code))
+
+    const fact = (key: string) => page
+      .locator('.hero__facts > div')
+      .filter({ hasText: label(key, code) })
+      .locator('dd')
+
+    await expect(fact('species.height'), `the height in ${code}`).toHaveText(expected.height)
+    await expect(fact('species.weight'), `the weight in ${code}`).toHaveText(expected.weight)
+  }
+})

@@ -7,6 +7,7 @@ import {
   localeCodes,
   message,
   messagePattern,
+  perLocale,
   pluralForm,
   readLocale,
 } from '../support/locales'
@@ -193,5 +194,24 @@ describe('locale message helper', () => {
 
     expect(pattern.test(rendered)).toBe(true)
     expect(pattern.test(rendered.replace('/', 'de'))).toBe(false)
+  })
+
+  /**
+   * An expectation table is one row per locale on disk — no fewer, no more.
+   *
+   * The e2e that writes a number by hand in each language loops over the table,
+   * and a loop over fewer languages than the game speaks passes without
+   * measuring the one that is missing. So the table is held to the directory:
+   * the failure names the language it forgot and the one it invented.
+   */
+  it('refuses an expectation table that is not one row per locale on disk', () => {
+    const codes = localeCodes()
+    const table = Object.fromEntries(codes.map(code => [code, code]))
+    const [first = ''] = codes
+
+    expect(perLocale(table).map(([code]) => code).sort()).toEqual(codes)
+    expect(() => perLocale({ ...table, xx: 'invented' })).toThrow(/language that is not there: \[xx\]/)
+    expect(() => perLocale(Object.fromEntries(Object.entries(table).filter(([code]) => code !== first))))
+      .toThrow(new RegExp(`no row for: \\[${first}\\]`))
   })
 })

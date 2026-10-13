@@ -8,6 +8,7 @@ import {
   localeUrl,
   message,
   messagePattern,
+  perLocale,
   spells,
 } from '../support/locales'
 import { navLabel, openingProgress, saveWith, seedLocalSave, skipInvite } from './support'
@@ -635,4 +636,34 @@ test('a carta navega pelo link-camada, e o rodapé de moer fica acima dele', asy
   // clique, a URL seria a da espécie.
   await expect(page).toHaveURL(/\/collection$/)
   await expect(scrap).toHaveCount(0)
+})
+
+/**
+ * The forge table in the number format of the URL — `1.600` and `1,600`.
+ *
+ * It is the board's own example: *Coleção* draws `custa 1.600 pó`, and the cost
+ * of a legendary is that figure. The table renders on the server, with no save
+ * behind it, so the figure is on the page before anything hydrates; what is
+ * measured is how the page wrote it. In `/en` it wrote `1.600` — which English
+ * reads as 1.6 — until the formatter took the language of the URL (issue #49).
+ *
+ * Measured as shape, by the separator each language writes, and not against
+ * `Intl`: the page formats with it, and a test asking `Intl` the same question
+ * would agree with whatever the page did. The separators are written here
+ * because they are the answer, not the question.
+ */
+const LEGENDARY_ROW: Readonly<Record<string, readonly string[]>> = {
+  'pt-BR': ['400', '1.600'],
+  'en': ['400', '1,600'],
+}
+
+test('the forge table writes its figures in the number format of the URL', async ({ page }) => {
+  for (const [code, cells] of perLocale(LEGENDARY_ROW)) {
+    await page.goto(localeUrl('/collection', code))
+
+    await expect(
+      page.locator('.collection__table tr[data-rarity="legendary"] td'),
+      `the legendary row of the forge table in ${code}`,
+    ).toHaveText(cells)
+  }
 })

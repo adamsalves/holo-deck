@@ -12,6 +12,7 @@ import {
   localeUrl,
   message,
   messagePattern,
+  perLocale,
   readLocale,
   spells,
 } from '../support/locales'
@@ -231,6 +232,44 @@ test('o Hub conta a coleção, o saldo e o próximo ginásio', async ({ page }) 
 
   // Sem batalha aberta a faixa de retomar não existe — ela não é uma casca vazia.
   await expect(page.locator('.hub__resume')).toHaveCount(0)
+})
+
+/**
+ * The Hub's count of the dex and its share of it, in the number format of the URL.
+ *
+ * Eight species of 1025 is 0.78%, which the Hub rounds to one decimal: `0,8` in
+ * Portuguese and `0.8` in English — the figure the issue quotes as *0,8% of the
+ * dex* (issue #49). The dex's own size sits on the same line and has a thousands
+ * separator, so the one count asks both separators: `/ 1.025` and `/ 1,025`.
+ *
+ * The figures are written here, in each language: the page formats with `Intl`,
+ * and an expectation built from it would agree with whatever the page did. The
+ * sentence around the share is read from the locale, and the number in it is not.
+ *
+ * The save is planted, and the invite is shut: none of the eight is asked for by
+ * a pack, and a dialog over the Hub would hide the line this measures.
+ */
+const HUB_COUNT: Readonly<Record<string, { total: string, share: string }>> = {
+  'pt-BR': { total: '/ 1.025', share: '0,8' },
+  'en': { total: '/ 1,025', share: '0.8' },
+}
+
+test('the Hub writes the dex and its share in the number format of the URL', async ({ page }) => {
+  await skipInvite(page)
+  await seedLocalSave(page, saveWith({
+    collection: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map(id => [id, { c: 1, s: 0 }])),
+  }))
+
+  for (const [code, expected] of perLocale(HUB_COUNT)) {
+    await page.goto(localeUrl('/', code))
+
+    const count = page.locator('.hub__count')
+
+    await expect(count.locator('span'), `the size of the dex in ${code}`).toHaveText(expected.total)
+    await expect(count.locator('em'), `the share of the dex in ${code}`).toHaveText(
+      message('hub.collection.ofDex', code, { percent: expected.share }),
+    )
+  }
 })
 
 /**
