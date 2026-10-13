@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/adamsalves/holo-deck/compare/v1.0.0...v1.0.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* as origens que formatavam à mão passam pelo idioma da URL ([df92ab8](https://github.com/adamsalves/holo-deck/commit/df92ab8ad3800a04d63b3912be232ad86bd7f247))
+* os números do jogo seguem o idioma da URL, e não o pt-BR fixo ([daad77d](https://github.com/adamsalves/holo-deck/commit/daad77d8dcdc06b0060916e8ebb355ea8e6ccda6))
+* os números do jogo seguem o idioma da URL, e não o pt-BR fixo ([afb2412](https://github.com/adamsalves/holo-deck/commit/afb241233c05d9cc97b79580470dd956ecaa912c))
+
 ## [1.0.0](https://github.com/adamsalves/holo-deck/compare/v0.8.0...v1.0.0) (2026-10-08)
 
 
